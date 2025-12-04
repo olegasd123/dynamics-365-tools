@@ -4,6 +4,8 @@ export interface EnvironmentConfig {
 }
 
 export interface SolutionConfig {
+  /** Unique solution name (CRM solution unique name) */
+  solutionName: string;
   /** Publisher prefix used for web resource paths, e.g. new_ */
   prefix: string;
   displayName?: string;
@@ -13,7 +15,7 @@ export interface SolutionConfig {
 export interface XrmConfiguration {
   environments: EnvironmentConfig[];
   solutions: SolutionConfig[];
-  /** Default publisher prefix */
+  /** Default solution name (unique name) */
   defaultSolution?: string;
 }
 

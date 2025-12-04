@@ -15,14 +15,16 @@
   ],
   "solutions": [
     {
+      "solutionName": "CoreWebResources",
       "prefix": "new_",
       "displayName": "Default Solution",
       "default": true
     },
     {
+      "solutionName": "ComponentWebResources",
       "prefix": "cmp_",
       "displayName": "Component Solution"
     }
   ],
-  "defaultSolution": "new_"
+  "defaultSolution": "CoreWebResources"
 }
