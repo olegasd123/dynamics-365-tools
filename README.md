@@ -38,12 +38,13 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`) and
   "defaultSolution": "CoreWebResources"
 }
 ```
-Publisher prefixes are used when generating remote paths. `defaultSolution` refers to the solution unique name (not the prefix) so it stays unique even when multiple solutions share a publisher.
+Publisher prefixes are used when generating remote paths. `defaultSolution` refers to the solution unique name (not the prefix) so it stays unique even when multiple solutions share a publisher. Optionally add `resource` per environment to override the token audience (defaults to `url` + `/.default`).
+To force client-credential auth for an environment, set `"authType": "clientSecret"` in that environment entry.
 
-### Store credentials securely
-- Run `XRM: Set Environment Credentials` to save `clientId`, `clientSecret`, and optional `tenantId` for a specific environment into VS Code Secret Storage.  
-- Credentials are **not** written to `.vscode/xrm.config.json`; only non-sensitive settings live there.
-During publish, the extension will pull credentials from Secret Storage if present.
+### Authenticate (interactive by default)
+- Run `XRM: Sign In (Interactive)` (or publish to an environment) to sign in using VS Code's Microsoft authentication provider. Tokens are scoped to the environment URL/resource (`https://{org}.crm.dynamics.com/.default` by default).
+- If you must use client credentials, run `XRM: Set Environment Credentials` to store `clientId`, `clientSecret`, and optional `tenantId` in Secret Storage (never in `xrm.config.json`).
+During publish, the extension prefers interactive tokens; it falls back to stored client credentials when no token is available or when `authType` is set to `clientSecret` for an environment.
 
 ### Bind and publish resources
 - In the Explorer, right-click any file or folder → **XRM** → **XRM: Resource Actions**.  

@@ -1,6 +1,10 @@
 export interface EnvironmentConfig {
   name: string;
   url: string;
+  /** Optional resource/audience to request tokens for; defaults to url */
+  resource?: string;
+  /** Preferred auth type; defaults to interactive */
+  authType?: "interactive" | "clientSecret";
 }
 
 export interface SolutionConfig {

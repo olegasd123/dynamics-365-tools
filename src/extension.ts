@@ -5,6 +5,7 @@ import { UiService } from "./services/uiService";
 import { PublisherService } from "./services/publisherService";
 import { BindingEntry } from "./types";
 import { SecretService } from "./services/secretService";
+import { AuthService } from "./services/authService";
 
 export async function activate(context: vscode.ExtensionContext) {
   const configuration = new ConfigurationService();
@@ -12,12 +13,21 @@ export async function activate(context: vscode.ExtensionContext) {
   const ui = new UiService();
   const publisher = new PublisherService();
   const secrets = new SecretService(context.secrets);
+  const auth = new AuthService();
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "xrm.openResourceMenu",
       async (uri?: vscode.Uri) =>
-        openResourceMenu(uri, configuration, bindings, ui, publisher, secrets),
+        openResourceMenu(
+          uri,
+          configuration,
+          bindings,
+          ui,
+          publisher,
+          secrets,
+          auth,
+        ),
     ),
     vscode.commands.registerCommand(
       "xrm.configureEnvironments",
@@ -35,6 +45,10 @@ export async function activate(context: vscode.ExtensionContext) {
       "xrm.setEnvironmentCredentials",
       async () => setEnvironmentCredentials(configuration, ui, secrets),
     ),
+    vscode.commands.registerCommand(
+      "xrm.signInInteractive",
+      async () => signInInteractive(configuration, ui, auth),
+    ),
   );
 }
 
@@ -45,6 +59,7 @@ async function openResourceMenu(
   ui: UiService,
   publisher: PublisherService,
   secrets: SecretService,
+  auth: AuthService,
 ) {
   const targetUri = await resolveTargetUri(uri);
   if (!targetUri) {
@@ -57,7 +72,7 @@ async function openResourceMenu(
     return;
   }
 
-  await publishFlow(binding, configuration, ui, publisher, secrets);
+  await publishFlow(binding, configuration, ui, publisher, secrets, auth);
 }
 
 async function addBinding(
@@ -122,6 +137,7 @@ async function publishFlow(
   ui: UiService,
   publisher: PublisherService,
   secrets: SecretService,
+  auth: AuthService,
 ) {
   const config = await configuration.loadConfiguration();
   const env = await ui.pickEnvironment(config.environments);
@@ -129,8 +145,18 @@ async function publishFlow(
     return;
   }
 
-  const creds = await secrets.getCredentials(env.name);
-  await publisher.publish(binding, env, creds);
+  const accessToken =
+    env.authType !== "clientSecret"
+      ? await auth.getAccessToken(env)
+      : undefined;
+  const creds =
+    env.authType === "clientSecret" || !accessToken
+      ? await secrets.getCredentials(env.name)
+      : undefined;
+  await publisher.publish(binding, env, {
+    accessToken,
+    credentials: creds,
+  });
 }
 
 async function editConfiguration(
@@ -225,6 +251,23 @@ async function setEnvironmentCredentials(
   vscode.window.showInformationMessage(
     `Credentials saved securely for environment ${env.name}.`,
   );
+}
+
+async function signInInteractive(
+  configuration: ConfigurationService,
+  ui: UiService,
+  auth: AuthService,
+): Promise<void> {
+  const config = await configuration.loadConfiguration();
+  const env = await ui.pickEnvironment(config.environments);
+  if (!env) {
+    return;
+  }
+
+  const token = await auth.getAccessToken(env);
+  if (token) {
+    vscode.window.showInformationMessage(`Signed in interactively for ${env.name}.`);
+  }
 }
 
 async function resolveTargetUri(

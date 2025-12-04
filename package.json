@@ -15,6 +15,7 @@
     "onCommand:xrm.configureEnvironments",
     "onCommand:xrm.setDefaultSolution",
     "onCommand:xrm.bindResource",
+    "onCommand:xrm.signInInteractive",
     "onCommand:xrm.setEnvironmentCredentials",
     "onStartupFinished"
   ],
@@ -44,6 +45,11 @@
       {
         "command": "xrm.setEnvironmentCredentials",
         "title": "XRM: Set Environment Credentials",
+        "category": "XRM"
+      },
+      {
+        "command": "xrm.signInInteractive",
+        "title": "XRM: Sign In (Interactive)",
         "category": "XRM"
       }
     ],
@@ -87,6 +93,9 @@
         },
         {
           "command": "xrm.setEnvironmentCredentials"
+        },
+        {
+          "command": "xrm.signInInteractive"
         }
       ]
     }
