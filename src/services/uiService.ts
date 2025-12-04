@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { EnvironmentConfig } from "../types";
+import { EnvironmentConfig, SolutionConfig } from "../types";
 
 export class UiService {
   async pickEnvironment(
@@ -33,25 +33,32 @@ export class UiService {
   }
 
   async promptSolution(
-    solutions: string[],
-    defaultSolution?: string,
-  ): Promise<string | undefined> {
+    solutions: SolutionConfig[],
+    defaultSolutionName?: string,
+  ): Promise<SolutionConfig | undefined> {
     if (!solutions.length) {
-      return vscode.window.showInputBox({
-        prompt: "Enter solution prefix",
-        value: defaultSolution,
+      const entered = await vscode.window.showInputBox({
+        prompt: "Enter solution unique name",
+        value: defaultSolutionName,
         ignoreFocusOut: true,
       });
+      if (!entered) {
+        return undefined;
+      }
+      return { solutionName: entered, prefix: "", displayName: entered };
     }
 
     const pick = await vscode.window.showQuickPick(
-      solutions.map((name) => ({
-        label: name,
-        picked: name === defaultSolution,
+      solutions.map((solution) => ({
+        label: solution.prefix || solution.solutionName,
+        description: solution.solutionName,
+        detail: solution.displayName,
+        picked: solution.solutionName === defaultSolutionName,
+        solution,
       })),
-      { placeHolder: "Select solution for this resource" },
+      { placeHolder: "Select solution for this resource (prefix shown)" },
     );
 
-    return pick?.label;
+    return pick?.solution;
   }
 }

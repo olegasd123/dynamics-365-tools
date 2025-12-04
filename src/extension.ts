@@ -105,13 +105,13 @@ async function addBinding(
     return;
   }
 
-  const solution =
+  const solutionConfig =
     (await ui.promptSolution(
-      config.solutions.map((s) => s.prefix),
-      defaultPrefix,
-    )) || defaultPrefix;
+      config.solutions,
+      defaultSolutionConfig?.solutionName,
+    )) || defaultSolutionConfig;
 
-  if (!solution) {
+  if (!solutionConfig) {
     vscode.window.showWarningMessage(
       "No solution selected. Binding was not created.",
     );
@@ -121,13 +121,13 @@ async function addBinding(
   const binding: BindingEntry = {
     localPath: targetUri.fsPath,
     remotePath,
-    solution,
+    solutionName: solutionConfig.solutionName,
     kind,
   };
 
   await bindings.addOrUpdateBinding(binding);
   vscode.window.showInformationMessage(
-    `Bound ${relative || targetUri.fsPath} to ${remotePath} (${solution}).`,
+    `Bound ${relative || targetUri.fsPath} to ${remotePath} (${solutionConfig.solutionName}).`,
   );
 }
 

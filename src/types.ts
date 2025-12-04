@@ -28,8 +28,8 @@ export interface BindingEntry {
   localPath: string;
   /** CRM web resource path, e.g. new_/account/form.js */
   remotePath: string;
-  /** Solution prefix or friendly name */
-  solution: string;
+  /** Solution unique name */
+  solutionName: string;
   /** folder or file binding */
   kind: "file" | "folder";
 }
