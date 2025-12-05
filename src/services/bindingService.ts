@@ -13,9 +13,9 @@ export class BindingService {
       this.pathMatches(binding, targetPath),
     );
 
-    // Prefer the most specific path (longest localPath)
+    // Prefer the most specific path (longest relativeLocalPath)
     return matches.sort(
-      (a, b) => b.localPath.length - a.localPath.length,
+      (a, b) => b.relativeLocalPath.length - a.relativeLocalPath.length,
     )[0];
   }
 
