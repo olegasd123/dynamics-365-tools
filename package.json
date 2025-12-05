@@ -24,32 +24,32 @@
     "commands": [
       {
         "command": "xrm.openResourceMenu",
-        "title": "XRM: Resource Actions",
+        "title": "Resource Actions",
         "category": "XRM"
       },
       {
         "command": "xrm.configureEnvironments",
-        "title": "XRM: Edit Environments & Solutions",
+        "title": "Edit Environments & Solutions",
         "category": "XRM"
       },
       {
         "command": "xrm.setDefaultSolution",
-        "title": "XRM: Set Default Solution",
+        "title": "Set Default Solution",
         "category": "XRM"
       },
       {
         "command": "xrm.bindResource",
-        "title": "XRM: Bind Resource",
+        "title": "Bind Resource",
         "category": "XRM"
       },
       {
         "command": "xrm.setEnvironmentCredentials",
-        "title": "XRM: Set Environment Credentials",
+        "title": "Set Environment Credentials",
         "category": "XRM"
       },
       {
         "command": "xrm.signInInteractive",
-        "title": "XRM: Sign In (Interactive)",
+        "title": "Sign In (Interactive)",
         "category": "XRM"
       }
     ],
