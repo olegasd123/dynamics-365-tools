@@ -91,7 +91,7 @@ async function addBinding(
   const kind = stat.type === vscode.FileType.Directory ? "folder" : "file";
   const relative = configuration.getRelativeToWorkspace(targetUri.fsPath);
   const defaultSolutionConfig =
-    config.solutions.find((s) => s.solutionName === config.defaultSolution) ||
+    config.solutions.find((s) => s.name === config.defaultSolution) ||
     config.solutions.find((s) => s.default) ||
     config.solutions[0];
   const defaultPrefix = defaultSolutionConfig?.prefix;
@@ -106,10 +106,8 @@ async function addBinding(
   }
 
   const solutionConfig =
-    (await ui.promptSolution(
-      config.solutions,
-      defaultSolutionConfig?.solutionName,
-    )) || defaultSolutionConfig;
+    (await ui.promptSolution(config.solutions, defaultSolutionConfig?.name)) ||
+    defaultSolutionConfig;
 
   if (!solutionConfig) {
     vscode.window.showWarningMessage(
@@ -121,13 +119,13 @@ async function addBinding(
   const binding: BindingEntry = {
     localPath: targetUri.fsPath,
     remotePath,
-    solutionName: solutionConfig.solutionName,
+    solutionName: solutionConfig.name,
     kind,
   };
 
   await bindings.addOrUpdateBinding(binding);
   vscode.window.showInformationMessage(
-    `Bound ${relative || targetUri.fsPath} to ${remotePath} (${solutionConfig.solutionName}).`,
+    `Bound ${relative || targetUri.fsPath} to ${remotePath} (${solutionConfig.name}).`,
   );
 }
 
@@ -181,7 +179,7 @@ async function setDefaultSolution(
       prompt:
         "Enter default solution unique name or pick an existing one to set it globally",
       value: config.defaultSolution,
-      placeHolder: config.solutions.map((s) => s.solutionName).join(", "),
+      placeHolder: config.solutions.map((s) => s.name).join(", "),
     })) ?? config.defaultSolution;
 
   if (!candidate) {
@@ -197,7 +195,7 @@ async function setDefaultSolution(
 function markDefault(
   solutions: {
     prefix: string;
-    solutionName: string;
+    name: string;
     displayName?: string;
     default?: boolean;
   }[],
@@ -205,7 +203,7 @@ function markDefault(
 ) {
   return solutions.map((solution) => ({
     ...solution,
-    default: solution.solutionName === defaultName,
+    default: solution.name === defaultName,
   }));
 }
 

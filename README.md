@@ -24,13 +24,13 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`) and
   ],
   "solutions": [
     {
-      "solutionName": "CoreWebResources",
+      "name": "CoreWebResources",
       "prefix": "new_",
       "displayName": "Default Solution",
       "default": true
     },
     {
-      "solutionName": "ComponentWebResources",
+      "name": "ComponentWebResources",
       "prefix": "cmp_",
       "displayName": "Component Solution"
     }

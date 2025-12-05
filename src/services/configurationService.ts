@@ -34,7 +34,20 @@ export class ConfigurationService {
     }
 
     const content = await vscode.workspace.fs.readFile(uri);
-    return JSON.parse(content.toString()) as XrmConfiguration;
+    const parsed = JSON.parse(content.toString()) as XrmConfiguration & {
+      solutions?: Array<{ name?: string; solutionName?: string }>;
+    };
+
+    if (parsed.solutions) {
+      parsed.solutions = parsed.solutions.map((solution) => {
+        if (!solution.name && (solution as any).solutionName) {
+          return { ...solution, name: (solution as any).solutionName };
+        }
+        return solution as any;
+      });
+    }
+
+    return parsed;
   }
 
   async saveConfiguration(config: XrmConfiguration): Promise<void> {

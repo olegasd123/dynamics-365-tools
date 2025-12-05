@@ -45,15 +45,15 @@ export class UiService {
       if (!entered) {
         return undefined;
       }
-      return { solutionName: entered, prefix: "", displayName: entered };
+      return { name: entered, prefix: "", displayName: entered };
     }
 
     const pick = await vscode.window.showQuickPick(
       solutions.map((solution) => ({
-        label: solution.prefix || solution.solutionName,
-        description: solution.solutionName,
+        label: solution.prefix || solution.name,
+        description: solution.name,
         detail: solution.displayName,
-        picked: solution.solutionName === defaultSolutionName,
+        picked: solution.name === defaultSolutionName,
         solution,
       })),
       { placeHolder: "Select solution for this resource (prefix shown)" },

@@ -9,7 +9,7 @@ export interface EnvironmentConfig {
 
 export interface SolutionConfig {
   /** Unique solution name (CRM solution unique name) */
-  solutionName: string;
+  name: string;
   /** Publisher prefix used for web resource paths, e.g. new_ */
   prefix: string;
   displayName?: string;
