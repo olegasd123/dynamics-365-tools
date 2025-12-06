@@ -288,8 +288,21 @@ async function publishFolder(
     return;
   }
 
-  for (const file of files) {
-    await publisher.publish(binding, publishAuth.env, publishAuth.auth, file);
+  files.sort((a, b) => a.fsPath.localeCompare(b.fsPath));
+  const total = files.length;
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    const isFirst = i === 0;
+    await publisher.publish(
+      binding,
+      publishAuth.env,
+      publishAuth.auth,
+      file,
+      {
+        logHeader: isFirst,
+        logAuth: isFirst,
+      },
+    );
   }
 }
 

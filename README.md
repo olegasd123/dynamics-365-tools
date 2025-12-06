@@ -38,7 +38,6 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`) and
   "defaultSolution": "CoreWebResources",
   "webResourceSupportedExtensions": [
     ".js",
-    ".ts",
     ".css",
     ".htm",
     ".html",

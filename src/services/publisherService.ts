@@ -8,6 +8,13 @@ export interface PublishAuth {
   credentials?: EnvironmentCredentials;
 }
 
+export interface PublishOptions {
+  /** Log the header line with timestamp/resource/env. Defaults to true. */
+  logHeader?: boolean;
+  /** Log which auth source was used. Defaults to true. */
+  logAuth?: boolean;
+}
+
 export class PublisherService {
   private readonly output: vscode.OutputChannel;
 
@@ -20,15 +27,20 @@ export class PublisherService {
     env: EnvironmentConfig,
     auth: PublishAuth = {},
     targetUri?: vscode.Uri,
+    options: PublishOptions = {},
   ): Promise<void> {
+    const shouldLogHeader = options.logHeader ?? true;
+    const shouldLogAuth = options.logAuth ?? true;
     const started = new Date().toISOString();
-    this.output.appendLine(
-      `[${started}] Publishing ${binding.remotePath} to ${env.name} (${env.url})...`,
-    );
+    if (shouldLogHeader) {
+      this.output.appendLine(
+        `[${started}] Publishing ${binding.remotePath} to ${env.name} (${env.url})...`,
+      );
+    }
 
     try {
       const { localPath, remotePath } = await this.resolvePaths(binding, targetUri);
-      const token = await this.resolveToken(env, auth);
+      const token = await this.resolveToken(env, auth, shouldLogAuth);
       if (!token) {
         throw new Error(
           "No credentials available. Sign in interactively or set client credentials first.",
@@ -59,7 +71,6 @@ export class PublisherService {
 
       await this.addToSolution(apiRoot, token, resourceId, binding.solutionName);
       await this.publishWebResource(apiRoot, token, resourceId);
-      this.output.appendLine("Publish completed.");
       this.output.show(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -127,20 +138,25 @@ export class PublisherService {
   private async resolveToken(
     env: EnvironmentConfig,
     auth: PublishAuth,
+    logAuth: boolean,
   ): Promise<string | undefined> {
     if (auth.accessToken) {
-      this.output.appendLine(
-        "Using interactive access token from VS Code authentication provider.",
-      );
+      if (logAuth) {
+        this.output.appendLine(
+          "Using interactive access token from VS Code authentication provider.",
+        );
+      }
       return auth.accessToken;
     }
 
     if (auth.credentials) {
-      this.output.appendLine(
-        `Using clientId ${auth.credentials.clientId} ${
-          auth.credentials.tenantId ? `(tenant ${auth.credentials.tenantId})` : ""
-        } from secret storage.`,
-      );
+      if (logAuth) {
+        this.output.appendLine(
+          `Using clientId ${auth.credentials.clientId} ${
+            auth.credentials.tenantId ? `(tenant ${auth.credentials.tenantId})` : ""
+          } from secret storage.`,
+        );
+      }
       return this.acquireTokenWithClientCredentials(env, auth.credentials);
     }
 
@@ -316,9 +332,6 @@ export class PublisherService {
     );
 
     if (alreadyInSolution) {
-      this.output.appendLine(
-        `Web resource already present in solution ${solutionName}.`,
-      );
       return;
     }
 

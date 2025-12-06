@@ -70,7 +70,7 @@
         {
           "submenu": "xrm.resourceMenu",
           "group": "navigation@xrm",
-          "when": "resourceScheme == 'file'"
+          "when": "resourceScheme == 'file' && (explorerResourceIsFolder || resourceExtname =~ /\\.(js|css|html|htm|xml|json|resx|png|jpg|jpeg|gif|xap|xsl|xslt|ico|svg)$/)"
         }
       ],
       "xrm.resourceMenu": [
