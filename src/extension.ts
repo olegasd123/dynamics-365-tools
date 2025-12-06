@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { ConfigurationService } from "./services/configurationService";
 import { BindingService } from "./services/bindingService";
 import { UiService } from "./services/uiService";
@@ -28,6 +29,11 @@ export async function activate(context: vscode.ExtensionContext) {
           secrets,
           auth,
         ),
+    ),
+    vscode.commands.registerCommand(
+      "xrm.publishResource",
+      async (uri?: vscode.Uri) =>
+        publishResource(uri, configuration, bindings, ui, publisher, secrets, auth),
     ),
     vscode.commands.registerCommand(
       "xrm.configureEnvironments",
@@ -66,9 +72,47 @@ async function openResourceMenu(
     return;
   }
 
+  if (!(await ensureSupportedResource(targetUri))) {
+    return;
+  }
+
   const binding = await bindings.getBinding(targetUri);
   if (!binding) {
     await addBinding(targetUri, configuration, bindings, ui);
+    return;
+  }
+
+  await publishFlow(binding, targetUri, configuration, ui, publisher, secrets, auth);
+}
+
+async function publishResource(
+  uri: vscode.Uri | undefined,
+  configuration: ConfigurationService,
+  bindings: BindingService,
+  ui: UiService,
+  publisher: PublisherService,
+  secrets: SecretService,
+  auth: AuthService,
+): Promise<void> {
+  const targetUri = await resolveTargetUri(uri);
+  if (!targetUri) {
+    return;
+  }
+
+  if (!(await ensureSupportedResource(targetUri))) {
+    return;
+  }
+
+  const binding = await bindings.getBinding(targetUri);
+  if (!binding) {
+    const choice = await vscode.window.showInformationMessage(
+      "This resource is not bound yet. Add a binding to publish it.",
+      "Add Binding",
+      "Cancel",
+    );
+    if (choice === "Add Binding") {
+      await addBinding(targetUri, configuration, bindings, ui);
+    }
     return;
   }
 
@@ -302,6 +346,43 @@ async function resolveTargetUri(
 
   vscode.window.showInformationMessage("Select a file or folder to proceed.");
   return undefined;
+}
+
+async function ensureSupportedResource(uri: vscode.Uri): Promise<boolean> {
+  const stat = await vscode.workspace.fs.stat(uri);
+  if (stat.type === vscode.FileType.Directory) {
+    return true;
+  }
+
+  const ext = path.extname(uri.fsPath).toLowerCase();
+  const supported = new Set([
+    ".js",
+    ".ts",
+    ".css",
+    ".htm",
+    ".html",
+    ".xml",
+    ".json",
+    ".resx",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".xap",
+    ".xsl",
+    ".xslt",
+    ".ico",
+    ".svg",
+  ]);
+
+  if (!supported.has(ext)) {
+    vscode.window.showInformationMessage(
+      "XRM actions are available only for supported web resource types.",
+    );
+    return false;
+  }
+
+  return true;
 }
 
 export function deactivate() {}

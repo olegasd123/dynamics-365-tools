@@ -15,6 +15,7 @@
     "onCommand:xrm.configureEnvironments",
     "onCommand:xrm.setDefaultSolution",
     "onCommand:xrm.bindResource",
+    "onCommand:xrm.publishResource",
     "onCommand:xrm.signInInteractive",
     "onCommand:xrm.setEnvironmentCredentials",
     "onStartupFinished"
@@ -43,6 +44,11 @@
         "category": "XRM"
       },
       {
+        "command": "xrm.publishResource",
+        "title": "Publish Resource",
+        "category": "XRM"
+      },
+      {
         "command": "xrm.setEnvironmentCredentials",
         "title": "Set Environment Credentials",
         "category": "XRM"
@@ -64,18 +70,22 @@
         {
           "submenu": "xrm.resourceMenu",
           "group": "navigation@xrm",
-          "when": "resourceScheme == 'file'"
+          "when": "resourceScheme == 'file' && (explorerResourceIsFolder || resourceExtname =~ /\\.(js|css|html|htm|xml|json|resx|png|jpg|jpeg|gif|xap|xsl|xslt|ico|svg)$/)"
         }
       ],
       "xrm.resourceMenu": [
         {
-          "command": "xrm.openResourceMenu",
+          "command": "xrm.publishResource",
           "group": "inline@1",
           "when": "true"
         },
         {
-          "command": "xrm.configureEnvironments",
+          "command": "xrm.bindResource",
           "group": "inline@2"
+        },
+        {
+          "command": "xrm.configureEnvironments",
+          "group": "inline@3"
         }
       ],
       "commandPalette": [
@@ -90,6 +100,9 @@
         },
         {
           "command": "xrm.bindResource"
+        },
+        {
+          "command": "xrm.publishResource"
         },
         {
           "command": "xrm.setEnvironmentCredentials"

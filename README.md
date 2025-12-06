@@ -5,7 +5,7 @@ Publish Dynamics 365 (XRM) web resources directly from VS Code. Bind folders or 
 ### Features
 - Multi-environment configuration (dev/test/prod) stored in `.vscode/xrm.config.json`.
 - Bind files or folders to CRM web resources; bindings saved in `.vscode/xrm.bindings.json` for team sharing.
-- Explorer context menu item **XRM** that adds new resources or publishes existing bindings to a selected environment.
+- Explorer context menu item **XRM** with separate **Publish Resource** and **Bind Resource** actions.
 - Global default-solution selection; defaults applied when building remote paths.
 - Extensible service-based architecture ready for future CRM publish operations (e.g., assemblies).
 
@@ -47,9 +47,7 @@ To force client-credential auth for an environment, set `"authType": "clientSecr
 During publish, the extension prefers interactive tokens; it falls back to stored client credentials when no token is available or when `authType` is set to `clientSecret` for an environment.
 
 ### Bind and publish resources
-- In the Explorer, right-click any file or folder → **XRM** → **XRM: Resource Actions**.  
-  - If unbound, you'll be prompted for the CRM path and solution.  
-  - If already bound, you'll pick an environment and the extension will publish it to CRM.
+- In the Explorer, right-click any file or folder → **XRM** → pick **Publish Resource** (prompts for environment; asks to bind first if needed) or **Bind Resource**.
 - Run `XRM: Bind Resource` from the Command Palette to bind the active file/folder.
 - Run `XRM: Set Default Solution` to update the global default solution.
 
