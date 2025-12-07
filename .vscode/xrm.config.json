@@ -1,0 +1,49 @@
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-dev.crm.dynamics.com",
+      "createMissingWebResources": false
+    },
+    {
+      "name": "test",
+      "url": "https://your-test.crm.dynamics.com",
+      "createMissingWebResources": false
+    },
+    {
+      "name": "prod",
+      "url": "https://your-prod.crm.dynamics.com",
+      "createMissingWebResources": false
+    }
+  ],
+  "solutions": [
+    {
+      "name": "CoreWebResources",
+      "prefix": "new_",
+      "default": true
+    },
+    {
+      "name": "ComponentWebResources",
+      "prefix": "cmp_"
+    }
+  ],
+  "defaultSolution": "CoreWebResources",
+  "webResourceSupportedExtensions": [
+    ".js",
+    ".css",
+    ".htm",
+    ".html",
+    ".xml",
+    ".json",
+    ".resx",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".xap",
+    ".xsl",
+    ".xslt",
+    ".ico",
+    ".svg"
+  ]
+}

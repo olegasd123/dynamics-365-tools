@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# VS Code settings (keep project configs)
+.vscode/*
+!.vscode/xrm.config.json
+!.vscode/xrm.bindings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Logs and caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
