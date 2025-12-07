@@ -67,15 +67,20 @@ During publish, the extension prefers interactive tokens; it falls back to store
 - Run `XRM: Bind Resource` from the Command Palette to bind the active file/folder.
 - Run `XRM: Set Default Solution` to update the global default solution.
 
+**Binding priority:** When publishing a folder, file-specific bindings take precedence over folder bindings. This lets you override the remote path for individual files while keeping the folder binding for everything else.
+
 Bindings are stored in `.vscode/xrm.bindings.json`:
 ```jsonc
 {
   "bindings": [
-    { "relativeLocalPath": "/abs/path/new_/account/form.js", "remotePath": "new_/account/form.js", "solutionName": "CoreWebResources", "kind": "file" },
-    { "relativeLocalPath": "/abs/path/new_/account", "remotePath": "new_/account", "solutionName": "CoreWebResources", "kind": "folder" }
+    { "relativeLocalPath": "src/webresources/hjk_", "remotePath": "hjk_", "solutionName": "HjkCore", "kind": "folder" },
+    { "relativeLocalPath": "src/webresources/hjk_/contact/form.js", "remotePath": "hjk_/contact/form.js", "solutionName": "HjkCore", "kind": "file" }
   ]
 }
 ```
+In this example, publishing the `hjk_` folder will:
+- Publish `hjk_/contact/form.js` as `hjk_/contact/form.js` (file binding wins)
+- Publish all other files using their relative paths under `hjk_/` (folder binding)
 
 ### Notes and next steps
 - Publish uses the Dataverse Web API to create/update the web resource, add it to the selected solution, and call `PublishXml` for that resource.

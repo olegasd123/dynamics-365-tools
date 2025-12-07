@@ -92,6 +92,7 @@ async function openResourceMenu(
       targetUri,
       supportedExtensions,
       configuration,
+      bindings,
       ui,
       publisher,
       secrets,
@@ -154,6 +155,7 @@ async function publishResource(
       targetUri,
       supportedExtensions,
       configuration,
+      bindings,
       ui,
       publisher,
       secrets,
@@ -268,10 +270,11 @@ async function publishFlow(
 }
 
 async function publishFolder(
-  binding: BindingEntry,
+  folderBinding: BindingEntry,
   folderUri: vscode.Uri,
   supportedExtensions: Set<string>,
   configuration: ConfigurationService,
+  bindings: BindingService,
   ui: UiService,
   publisher: PublisherService,
   secrets: SecretService,
@@ -294,8 +297,10 @@ async function publishFolder(
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const isFirst = i === 0;
+    // Use most specific binding for this file (file binding > folder binding)
+    const fileBinding = await bindings.getBinding(file) ?? folderBinding;
     const result = await publisher.publish(
-      binding,
+      fileBinding,
       publishAuth.env,
       publishAuth.auth,
       file,
