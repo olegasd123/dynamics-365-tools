@@ -30,16 +30,19 @@ export class ConfigurationService {
             name: "dev",
             url: "https://your-dev.crm.dynamics.com",
             authType: "interactive",
+            createMissingWebResources: false
           },
           {
             name: "test",
             url: "https://your-test.crm.dynamics.com",
             authType: "interactive",
+            createMissingWebResources: false
           },
           {
             name: "prod",
             url: "https://your-prod.crm.dynamics.com",
             authType: "interactive",
+            createMissingWebResources: false
           },
         ],
         solutions: [
@@ -91,7 +94,41 @@ export class ConfigurationService {
       });
     }
 
-    return parsed;
+    const normalized: XrmConfiguration = {
+      webResourceSupportedExtensions:
+        parsed.webResourceSupportedExtensions ?? [
+          ".js",
+          ".ts",
+          ".css",
+          ".htm",
+          ".html",
+          ".xml",
+          ".json",
+          ".resx",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".gif",
+          ".xap",
+          ".xsl",
+          ".xslt",
+          ".ico",
+          ".svg",
+        ],
+      ...parsed,
+    };
+
+    if (normalized.environments) {
+      normalized.environments = normalized.environments.map((env) => ({
+        createMissingWebResources:
+          env.createMissingWebResources === undefined
+            ? false
+            : env.createMissingWebResources,
+        ...env,
+      }));
+    }
+
+    return normalized;
   }
 
   async saveConfiguration(config: XrmConfiguration): Promise<void> {

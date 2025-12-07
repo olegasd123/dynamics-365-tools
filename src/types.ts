@@ -5,6 +5,8 @@ export interface EnvironmentConfig {
   resource?: string;
   /** Preferred auth type; defaults to interactive */
   authType?: "interactive" | "clientSecret";
+  /** If false, publishing will fail instead of creating missing web resources */
+  createMissingWebResources?: boolean;
 }
 
 export interface SolutionConfig {

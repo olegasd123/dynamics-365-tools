@@ -19,8 +19,8 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`) and
 ```jsonc
 {
   "environments": [
-    { "name": "dev", "url": "https://your-dev.crm.dynamics.com", "authType": "interactive" },
-    { "name": "prod", "url": "https://your-prod.crm.dynamics.com", "authType": "clientSecret" }
+    { "name": "dev", "url": "https://your-dev.crm.dynamics.com", "authType": "interactive", "createMissingWebResources": false },
+    { "name": "prod", "url": "https://your-prod.crm.dynamics.com", "authType": "clientSecret", "createMissingWebResources": false }
   ],
   "solutions": [
     {
@@ -55,7 +55,7 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`) and
 }
 ```
 Publisher prefixes are used when generating remote paths. `defaultSolution` refers to the solution unique name (not the prefix) so it stays unique even when multiple solutions share a publisher. Optionally add `resource` per environment to override the token audience (defaults to `url` + `/.default`).
-`webResourceSupportedExtensions` controls which file types appear in the XRM menu and are included when publishing a bound folder. To force client-credential auth for an environment, set `"authType": "clientSecret"` in that environment entry.
+`webResourceSupportedExtensions` controls which file types appear in the XRM menu and are included when publishing a bound folder. `createMissingWebResources` (defaults to `false`) controls whether publishing is allowed to create web resources that don't already exist in the environment/solution. To force client-credential auth for an environment, set `"authType": "clientSecret"` in that environment entry.
 
 ### Authenticate (interactive by default)
 - Run `XRM: Sign In (Interactive)` (or publish to an environment) to sign in using VS Code's Microsoft authentication provider. Tokens are scoped to the environment URL/resource (`https://{org}.crm.dynamics.com/.default` by default).

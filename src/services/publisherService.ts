@@ -56,6 +56,7 @@ export class PublisherService {
 
       this.output.appendLine(`Uploading ${remotePath} from ${localPath}...`);
       const existingId = await this.findWebResource(apiRoot, token, remotePath);
+      const allowCreate = env.createMissingWebResources !== false;
       const resourceId = existingId
         ? await this.updateWebResource(apiRoot, token, existingId, {
             content: encoded,
@@ -63,12 +64,18 @@ export class PublisherService {
             name: remotePath,
             type: webResourceType,
           })
-        : await this.createWebResource(apiRoot, token, {
-            content: encoded,
-            displayName,
-            name: remotePath,
-            type: webResourceType,
-          });
+        : allowCreate
+          ? await this.createWebResource(apiRoot, token, {
+              content: encoded,
+              displayName,
+              name: remotePath,
+              type: webResourceType,
+            })
+          : await Promise.reject(
+              new Error(
+                `Web resource ${remotePath} does not exist and creation is disabled for ${env.name}.`,
+              ),
+            );
 
       await this.addToSolution(apiRoot, token, resourceId, binding.solutionName);
       await this.publishWebResource(apiRoot, token, resourceId);
