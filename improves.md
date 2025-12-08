@@ -1,9 +1,7 @@
 ## XRM VS Code Extension — Improvement Ideas
 
 - **Publishing ergonomics**
-  - Remember the last picked environment per workspace and preselect it in the Quick Pick.
   - Offer a “Publish & Open in Browser” action that deep-links to the web resource record.
-  - Show a concise toast when a publish succeeds (with counters) instead of only writing to the output channel.
   - Support a “watch” mode to auto-publish on save for bound files, gated by a toggle.
 
 - **Speed & efficiency**

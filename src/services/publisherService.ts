@@ -114,7 +114,7 @@ export class PublisherService {
     return result;
   }
 
-  logSummary(result: PublishResult): void {
+  logSummary(result: PublishResult, envName?: string): void {
     const parts: string[] = [];
     if (result.created) parts.push(`${result.created} created`);
     if (result.updated) parts.push(`${result.updated} updated`);
@@ -123,6 +123,18 @@ export class PublisherService {
     if (parts.length) {
       this.output.appendLine(`  ─────`);
       this.output.appendLine(`  Total: ${parts.join(", ")}`);
+      if (envName) {
+        const summary = parts.join(", ");
+        if (result.failed) {
+          vscode.window.showWarningMessage(
+            `XRM publish to ${envName}: ${summary} (check output for errors)`,
+          );
+        } else {
+          vscode.window.showInformationMessage(
+            `XRM publish to ${envName}: ${summary}`,
+          );
+        }
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { ConfigurationService } from "./services/configurationService";
+import { ConfigurationService, WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "./services/configurationService";
 import { BindingService } from "./services/bindingService";
 import { UiService } from "./services/uiService";
 import { PublisherService } from "./services/publisherService";
@@ -383,7 +383,7 @@ async function publishFlow(
   }
 
   const result = await publisher.publish(binding, publishAuth.env, publishAuth.auth, targetUri);
-  publisher.logSummary(result);
+  publisher.logSummary(result, publishAuth.env.name);
   statusBar.setLastPublish({
     binding,
     environment: publishAuth.env,
@@ -448,7 +448,7 @@ async function publishFolder(
     totals.skipped += result.skipped;
     totals.failed += result.failed;
   }
-  publisher.logSummary(totals);
+  publisher.logSummary(totals, publishAuth.env.name);
   statusBar.setLastPublish({
     binding: folderBinding,
     environment: publishAuth.env,
@@ -705,24 +705,7 @@ function buildSupportedSet(config: XrmConfiguration): Set<string> {
   const extensions =
     config.webResourceSupportedExtensions && config.webResourceSupportedExtensions.length
       ? config.webResourceSupportedExtensions
-      : [
-          ".js",
-          ".css",
-          ".htm",
-          ".html",
-          ".xml",
-          ".json",
-          ".resx",
-          ".png",
-          ".jpg",
-          ".jpeg",
-          ".gif",
-          ".xap",
-          ".xsl",
-          ".xslt",
-          ".ico",
-          ".svg",
-        ];
+      : WEB_RESOURCE_SUPPORTED_EXTENSIONS;
   return new Set(extensions.map((ext) => ext.toLowerCase()));
 }
 

@@ -6,6 +6,25 @@ import {
   BindingEntry,
 } from "../types";
 
+export const WEB_RESOURCE_SUPPORTED_EXTENSIONS = [
+  ".js",
+  ".css",
+  ".htm",
+  ".html",
+  ".xml",
+  ".json",
+  ".resx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".xap",
+  ".xsl",
+  ".xslt",
+  ".ico",
+  ".svg",
+]
+
 const CONFIG_FILENAME = "xrm.config.json";
 const BINDINGS_FILENAME = "xrm.bindings.json";
 
@@ -57,24 +76,7 @@ export class ConfigurationService {
           },
         ],
         defaultSolution: "CoreWebResources",
-        webResourceSupportedExtensions: [
-          ".js",
-          ".css",
-          ".htm",
-          ".html",
-          ".xml",
-          ".json",
-          ".resx",
-          ".png",
-          ".jpg",
-          ".jpeg",
-          ".gif",
-          ".xap",
-          ".xsl",
-          ".xslt",
-          ".ico",
-          ".svg",
-        ],
+        webResourceSupportedExtensions: WEB_RESOURCE_SUPPORTED_EXTENSIONS,
       };
       await this.saveConfiguration(defaults);
       return defaults;
@@ -96,25 +98,7 @@ export class ConfigurationService {
 
     const normalized: XrmConfiguration = {
       webResourceSupportedExtensions:
-        parsed.webResourceSupportedExtensions ?? [
-          ".js",
-          ".ts",
-          ".css",
-          ".htm",
-          ".html",
-          ".xml",
-          ".json",
-          ".resx",
-          ".png",
-          ".jpg",
-          ".jpeg",
-          ".gif",
-          ".xap",
-          ".xsl",
-          ".xslt",
-          ".ico",
-          ".svg",
-        ],
+        parsed.webResourceSupportedExtensions ?? WEB_RESOURCE_SUPPORTED_EXTENSIONS,
       ...parsed,
     };
 
