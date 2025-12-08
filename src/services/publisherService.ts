@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { BindingEntry, EnvironmentConfig } from "../types";
 import { EnvironmentCredentials } from "./secretService";
+import { PublishCacheService } from "./publishCacheService";
+import * as crypto from "crypto";
 
 // Formatting helpers for OutputChannel (plain text)
 const fmt = {
@@ -23,6 +25,8 @@ export interface PublishOptions {
   logHeader?: boolean;
   /** Log which auth source was used. Defaults to true. */
   logAuth?: boolean;
+  /** Optional cache used to skip unchanged files during folder publish. */
+  cache?: PublishCacheService;
 }
 
 export interface PublishResult {
@@ -60,6 +64,20 @@ export class PublisherService {
 
     try {
       const { localPath, remotePath } = await this.resolvePaths(binding, targetUri);
+      const fileStat = await vscode.workspace.fs.stat(vscode.Uri.file(localPath));
+      let content: Buffer | undefined;
+      let hash: string | undefined;
+
+      if (options.cache) {
+        content = await this.readFile(localPath);
+        hash = this.hashContent(content);
+        if (await options.cache.isUnchanged(remotePath, fileStat, hash)) {
+          this.output.appendLine(`  ↷ ${fmt.resource(remotePath)} unchanged (skipped)`);
+          result.skipped = 1;
+          return result;
+        }
+      }
+
       const token = await this.resolveToken(env, auth, shouldLogAuth);
       if (!token) {
         throw new Error(
@@ -68,8 +86,9 @@ export class PublisherService {
       }
 
       const apiRoot = this.apiRoot(env.url);
-      const content = await this.readFile(localPath);
+      content = content ?? (await this.readFile(localPath));
       const encoded = content.toString("base64");
+      hash = hash ?? this.hashContent(content);
       const webResourceType = this.detectType(localPath);
       const displayName = path.posix.basename(remotePath);
 
@@ -104,6 +123,9 @@ export class PublisherService {
       }
 
       await this.publishWebResource(apiRoot, token, resourceId);
+      if (options.cache && hash) {
+        await options.cache.update(remotePath, fileStat, hash);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.output.appendLine(`  ✗ Publish failed: ${message}`);
@@ -224,6 +246,10 @@ export class PublisherService {
   private async readFile(localPath: string): Promise<Buffer> {
     const uri = vscode.Uri.file(localPath);
     return Buffer.from(await vscode.workspace.fs.readFile(uri));
+  }
+
+  private hashContent(content: Buffer): string {
+    return crypto.createHash("sha256").update(content).digest("hex");
   }
 
   private detectType(localPath: string): number {

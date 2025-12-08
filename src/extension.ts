@@ -9,6 +9,7 @@ import { SecretService } from "./services/secretService";
 import { AuthService } from "./services/authService";
 import { StatusBarService } from "./services/statusBarService";
 import { LastSelectionService } from "./services/lastSelectionService";
+import { PublishCacheService } from "./services/publishCacheService";
 
 export async function activate(context: vscode.ExtensionContext) {
   const configuration = new ConfigurationService();
@@ -19,6 +20,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const auth = new AuthService();
   const statusBar = new StatusBarService("xrm.publishLastResource");
   const lastSelection = new LastSelectionService(context.workspaceState);
+  const publishCache = new PublishCacheService(configuration);
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -34,6 +36,7 @@ export async function activate(context: vscode.ExtensionContext) {
           auth,
           statusBar,
           lastSelection,
+          publishCache,
         ),
     ),
     vscode.commands.registerCommand(
@@ -49,6 +52,7 @@ export async function activate(context: vscode.ExtensionContext) {
           auth,
           statusBar,
           lastSelection,
+          publishCache,
         ),
     ),
     vscode.commands.registerCommand(
@@ -63,6 +67,7 @@ export async function activate(context: vscode.ExtensionContext) {
           auth,
           statusBar,
           lastSelection,
+          publishCache,
         ),
     ),
     vscode.commands.registerCommand(
@@ -98,6 +103,7 @@ async function publishLastResource(
   auth: AuthService,
   statusBar: StatusBarService,
   lastSelection: LastSelectionService,
+  publishCache: PublishCacheService,
 ): Promise<void> {
   const last = statusBar.getLastPublish();
   if (!last) {
@@ -131,6 +137,7 @@ async function publishLastResource(
       auth,
       statusBar,
       lastSelection,
+      publishCache,
       config,
       preferredEnvName,
     );
@@ -162,6 +169,7 @@ async function openResourceMenu(
   auth: AuthService,
   statusBar: StatusBarService,
   lastSelection: LastSelectionService,
+  publishCache: PublishCacheService,
 ) {
   const targetUri = await resolveTargetUri(uri);
   if (!targetUri) {
@@ -195,6 +203,7 @@ async function openResourceMenu(
       auth,
       statusBar,
       lastSelection,
+      publishCache,
       config,
     );
     return;
@@ -224,6 +233,7 @@ async function publishResource(
   auth: AuthService,
   statusBar: StatusBarService,
   lastSelection: LastSelectionService,
+  publishCache: PublishCacheService,
 ): Promise<void> {
   const targetUri = await resolveTargetUri(uri);
   if (!targetUri) {
@@ -264,6 +274,7 @@ async function publishResource(
       auth,
       statusBar,
       lastSelection,
+      publishCache,
       config,
     );
     return;
@@ -404,6 +415,7 @@ async function publishFolder(
   auth: AuthService,
   statusBar: StatusBarService,
   lastSelection: LastSelectionService,
+  publishCache: PublishCacheService,
   config?: XrmConfiguration,
   preferredEnvName?: string,
 ): Promise<void> {
@@ -441,6 +453,7 @@ async function publishFolder(
       {
         logHeader: isFirst,
         logAuth: isFirst,
+        cache: publishCache,
       },
     );
     totals.created += result.created;
