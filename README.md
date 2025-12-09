@@ -55,6 +55,7 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`) and
 }
 ```
 Publisher prefixes are used when generating remote paths. `defaultSolution` refers to the solution unique name (not the prefix) so it stays unique even when multiple solutions share a publisher. Optionally add `resource` per environment to override the token audience (defaults to `url` + `/.default`).
+To opt into tagging requests with a user agent, set `"userAgentEnabled": true` on an environment. You can also provide `"userAgent": "XRM-VSCode/{version}"` (custom string) if you want to override the default `XRM-VSCode/{extensionVersion}` header for server-side logging.
 `webResourceSupportedExtensions` controls which file types appear in the XRM menu and are included when publishing a bound folder. `createMissingWebResources` (defaults to `false`) controls whether publishing is allowed to create web resources that don't already exist in the environment/solution. To force client-credential auth for an environment, set `"authType": "clientSecret"` in that environment entry.
 
 ### Authenticate (interactive by default)

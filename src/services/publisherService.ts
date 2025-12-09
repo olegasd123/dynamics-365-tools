@@ -54,6 +54,7 @@ export class PublisherService {
   ): Promise<PublishResult> {
     const result: PublishResult = { created: 0, updated: 0, skipped: 0, failed: 0 };
     const cancellationToken = options.cancellationToken;
+    const userAgent = this.buildUserAgent(env);
     const shouldLogHeader = options.isFirst ?? true;
     const started = new Date().toISOString();
     if (shouldLogHeader) {
@@ -82,7 +83,7 @@ export class PublisherService {
       }
 
       this.throwIfCancelled(cancellationToken);
-      const token = await this.resolveToken(env, auth, shouldLogHeader);
+      const token = await this.resolveToken(env, auth, shouldLogHeader, userAgent);
       if (!token) {
         throw new Error(
           "No credentials available. Sign in interactively or set client credentials first.",
@@ -96,6 +97,7 @@ export class PublisherService {
         token,
         binding.solutionName,
         remotePath,
+        userAgent,
       );
       content = content ?? (await this.readFile(localPath));
       const encoded = content.toString("base64");
@@ -119,7 +121,7 @@ export class PublisherService {
           displayName,
           name: remotePath,
           type: webResourceType,
-        });
+        }, userAgent);
         this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been updated, publishing...`);
         result.updated = 1;
       } else {
@@ -128,13 +130,13 @@ export class PublisherService {
           displayName,
           name: remotePath,
           type: webResourceType,
-        });
+        }, userAgent);
         this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been created`);
-        await this.addToSolution(apiRoot, token, resourceId, binding.solutionName, solutionId);
+        await this.addToSolution(apiRoot, token, resourceId, binding.solutionName, solutionId, userAgent);
         result.created = 1;
       }
 
-      await this.publishSerial(apiRoot, token, resourceId, remotePath, cancellationToken);
+      await this.publishSerial(apiRoot, token, resourceId, remotePath, cancellationToken, userAgent);
       if (options.cache && hash) {
         await options.cache.update(remotePath, fileStat, hash, env.name);
       }
@@ -240,7 +242,9 @@ export class PublisherService {
     env: EnvironmentConfig,
     auth: PublishAuth,
     logAuth: boolean,
+    userAgent?: string,
   ): Promise<string | undefined> {
+    const resolvedUserAgent = userAgent ?? this.buildUserAgent(env);
     if (auth.credentials) {
       if (logAuth) {
         this.output.appendLine("  ↳ auth: client credentials");
@@ -248,7 +252,7 @@ export class PublisherService {
       if (auth.accessToken) {
         return auth.accessToken;
       }
-      return this.acquireTokenWithClientCredentials(env, auth.credentials);
+      return this.acquireTokenWithClientCredentials(env, auth.credentials, resolvedUserAgent);
     }
 
     if (auth.accessToken) {
@@ -316,10 +320,11 @@ export class PublisherService {
     token: string,
     solutionName: string,
     remotePath: string,
+    userAgent?: string,
   ): Promise<{ solutionId: string; existingId?: string }> {
     const [solutionId, resources] = await Promise.all([
-      this.getSolutionId(apiRoot, token, solutionName),
-      this.listWebResources(apiRoot, token, remotePath),
+      this.getSolutionId(apiRoot, token, solutionName, userAgent),
+      this.listWebResources(apiRoot, token, remotePath, userAgent),
     ]);
 
     if (!solutionId) {
@@ -339,14 +344,20 @@ export class PublisherService {
     apiRoot: string,
     token: string,
     remotePath: string,
+    userAgent?: string,
   ): Promise<Array<{ webresourceid: string }>> {
     const escapedName = remotePath.replace(/'/g, "''");
     const filter = encodeURIComponent(`name eq '${escapedName}'`);
     const url = `${apiRoot}/webresourceset?$select=webresourceid,name&$filter=${filter}&$top=2`;
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
     });
 
@@ -365,14 +376,20 @@ export class PublisherService {
     token: string,
     id: string,
     payload: { content: string; displayName: string; name: string; type: number },
+    userAgent?: string,
   ): Promise<string> {
     const url = `${apiRoot}/webresourceset(${id})`;
     const response = await fetch(url, {
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
       body: JSON.stringify({
         content: payload.content,
@@ -393,14 +410,20 @@ export class PublisherService {
     apiRoot: string,
     token: string,
     payload: { content: string; displayName: string; name: string; type: number },
+    userAgent?: string,
   ): Promise<string> {
     const url = `${apiRoot}/webresourceset`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
       body: JSON.stringify({
         content: payload.content,
@@ -443,9 +466,10 @@ export class PublisherService {
     componentId: string,
     solutionName: string,
     solutionId?: string,
+    userAgent?: string,
   ): Promise<void> {
     const targetSolutionId =
-      solutionId ?? (await this.getSolutionId(apiRoot, token, solutionName));
+      solutionId ?? (await this.getSolutionId(apiRoot, token, solutionName, userAgent));
     if (!targetSolutionId) {
       throw new Error(`Solution ${solutionName} not found.`);
     }
@@ -455,6 +479,7 @@ export class PublisherService {
       token,
       componentId,
       targetSolutionId,
+      userAgent,
     );
 
     if (alreadyInSolution) {
@@ -465,9 +490,14 @@ export class PublisherService {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
       body: JSON.stringify({
         ComponentId: componentId,
@@ -491,13 +521,19 @@ export class PublisherService {
     apiRoot: string,
     token: string,
     solutionName: string,
+    userAgent?: string,
   ): Promise<string | undefined> {
     const filter = encodeURIComponent(`uniquename eq '${solutionName.replace(/'/g, "''")}'`);
     const url = `${apiRoot}/solutions?$select=solutionid,uniquename&$filter=${filter}`;
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
     });
 
@@ -516,6 +552,7 @@ export class PublisherService {
     token: string,
     componentId: string,
     solutionId: string,
+    userAgent?: string,
   ): Promise<boolean> {
     const normalizedComponentId = this.trimGuid(componentId);
     const normalizedSolutionId = this.trimGuid(solutionId);
@@ -525,8 +562,13 @@ export class PublisherService {
     const url = `${apiRoot}/solutioncomponents?$select=solutioncomponentid&$filter=${filter}&$top=1`;
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
     });
 
@@ -549,6 +591,7 @@ export class PublisherService {
     token: string,
     webResourceId: string,
     cancellationToken?: vscode.CancellationToken,
+    userAgent?: string,
   ): Promise<void> {
     this.throwIfCancelled(cancellationToken);
     const url = `${apiRoot}/PublishXml`;
@@ -556,9 +599,14 @@ export class PublisherService {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+        ...this.withUserAgent(
+          {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          userAgent,
+        ),
       },
       body: JSON.stringify({ ParameterXml: parameterXml }),
     });
@@ -574,10 +622,11 @@ export class PublisherService {
     webResourceId: string,
     remotePath: string,
     cancellationToken?: vscode.CancellationToken,
+    userAgent?: string,
   ): Promise<void> {
     const run = async () => {
       this.throwIfCancelled(cancellationToken);
-      await this.publishWebResource(apiRoot, token, webResourceId, cancellationToken);
+      await this.publishWebResource(apiRoot, token, webResourceId, cancellationToken, userAgent);
       this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been published`);
     };
 
@@ -597,6 +646,7 @@ export class PublisherService {
   private async acquireTokenWithClientCredentials(
     env: EnvironmentConfig,
     credentials: EnvironmentCredentials,
+    userAgent?: string,
   ): Promise<string> {
     const tenantId = credentials.tenantId || "organizations";
     const resource = (env.resource || env.url).replace(/\/$/, "");
@@ -604,7 +654,12 @@ export class PublisherService {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        ...this.withUserAgent(
+          {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          userAgent,
+        ),
       },
       body: new URLSearchParams({
         client_id: credentials.clientId,
@@ -753,5 +808,28 @@ export class PublisherService {
     } catch {
       return undefined;
     }
+  }
+
+  private withUserAgent<T extends Record<string, string>>(
+    headers: T,
+    userAgent?: string,
+  ): T & { "User-Agent"?: string } {
+    if (!userAgent) {
+      return headers;
+    }
+    return { ...headers, "User-Agent": userAgent };
+  }
+
+  private buildUserAgent(env: EnvironmentConfig): string | undefined {
+    if (!env.userAgentEnabled) {
+      return undefined;
+    }
+    if (env.userAgent?.trim()) {
+      return env.userAgent.trim();
+    }
+    const extension = vscode.extensions.getExtension("your-name.xrm-vscode");
+    const version =
+      (extension?.packageJSON as { version?: string })?.version || "dev";
+    return `XRM-VSCode/${version}`;
   }
 }

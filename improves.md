@@ -21,7 +21,6 @@
 
 - **Security & compliance**
   - Allow configuring `resource` separately from `url` per environment to support sovereign clouds and custom apps.
-  - Add an opt-in user agent (e.g., `XRM-VSCode/{version}`) so server logs can identify extension traffic.
 
 - **Testing & tooling**
   - Add unit tests for path resolution, binding precedence, and publish branching (create vs update vs skip).

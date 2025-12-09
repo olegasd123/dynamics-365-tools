@@ -122,6 +122,57 @@ test("resolveToken reuses provided client credential token without re-acquiring"
   assert.ok(logs.some((line: string) => line.includes("auth: client credentials")));
 });
 
+test("buildUserAgent returns default format when enabled", () => {
+  const publisher = new PublisherService();
+  (vscode.extensions as any).getExtension = () => ({
+    packageJSON: { version: "1.2.3" },
+  });
+
+  const userAgent = (publisher as any).buildUserAgent({
+    name: "dev",
+    url: "https://example",
+    userAgentEnabled: true,
+  });
+
+  assert.strictEqual(userAgent, "XRM-VSCode/1.2.3");
+});
+
+test("buildUserAgent returns custom value when provided", () => {
+  const publisher = new PublisherService();
+  const userAgent = (publisher as any).buildUserAgent({
+    name: "dev",
+    url: "https://example",
+    userAgentEnabled: true,
+    userAgent: "Custom-UA",
+  });
+
+  assert.strictEqual(userAgent, "Custom-UA");
+});
+
+test("acquireTokenWithClientCredentials sends user agent when provided", async () => {
+  const publisher = new PublisherService();
+  let capturedUserAgent: string | undefined;
+  const originalFetch = global.fetch;
+  global.fetch = (async (_url: any, init: any) => {
+    capturedUserAgent = init.headers["User-Agent"];
+    return new Response(JSON.stringify({ access_token: "token" }), {
+      status: 200,
+    });
+  }) as any;
+
+  try {
+    const token = await (publisher as any).acquireTokenWithClientCredentials(
+      { name: "dev", url: "https://example" },
+      { clientId: "id", clientSecret: "secret" },
+      "Agent/1.0",
+    );
+    assert.strictEqual(token, "token");
+    assert.strictEqual(capturedUserAgent, "Agent/1.0");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("publish fails fast when solution is missing", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
   (vscode.workspace as any).workspaceFolders = [

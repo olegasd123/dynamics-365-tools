@@ -3,17 +3,20 @@
     {
       "name": "dev",
       "url": "https://your-dev.crm.dynamics.com",
-      "createMissingWebResources": false
+      "createMissingWebResources": false,
+      "userAgentEnabled": true
     },
     {
       "name": "test",
       "url": "https://your-test.crm.dynamics.com",
-      "createMissingWebResources": false
+      "createMissingWebResources": false,
+      "userAgentEnabled": true
     },
     {
       "name": "prod",
       "url": "https://your-prod.crm.dynamics.com",
-      "createMissingWebResources": false
+      "createMissingWebResources": false,
+      "userAgentEnabled": true
     }
   ],
   "solutions": [

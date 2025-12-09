@@ -3,6 +3,10 @@ export interface EnvironmentConfig {
   url: string;
   /** Optional resource/audience to request tokens for; defaults to url */
   resource?: string;
+  /** Optional user agent to send with HTTP requests */
+  userAgent?: string;
+  /** Opt-in flag to include user agent in HTTP requests */
+  userAgentEnabled?: boolean;
   /** Preferred auth type; defaults to interactive */
   authType?: "interactive" | "clientSecret";
   /** If false, publishing will fail instead of creating missing web resources */

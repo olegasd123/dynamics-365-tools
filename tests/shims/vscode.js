@@ -92,6 +92,10 @@ const window = {
   __messages: messages,
 };
 
+const extensions = {
+  getExtension: () => undefined,
+};
+
 class InMemorySecretStorage {
   constructor() {
     this.map = new Map();
@@ -128,6 +132,7 @@ module.exports = {
   Uri,
   workspace,
   window,
+  extensions,
   commands,
   FileType,
   authentication,
