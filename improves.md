@@ -10,7 +10,6 @@
   - Add a retry policy with exponential backoff for transient 429/5xx responses to reduce manual reruns.
 
 - **Reliability & UX safeguards**
-  - Add preflight validation: verify solution exists and remotePath uniqueness before uploading the content payload.
   - Provide clearer error surfaces: bubble up Dataverse error codes and correlation IDs, and show a “copy error details” button.
   - Let users choose whether missing web resources should be created per publish invocation (override the env default).
   - Add cancellation tokens to abort long-running folder publishes and surface partial results cleanly.

@@ -125,3 +125,104 @@ test("resolveToken reuses provided client credential token without re-acquiring"
     logs.some((line: string) => line.includes("auth: clientId=id")),
   );
 });
+
+test("publish fails fast when solution is missing", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
+  (vscode.workspace as any).workspaceFolders = [
+    { uri: vscode.Uri.file(workspaceRoot) },
+  ];
+  const file = path.join(workspaceRoot, "script.js");
+  await fs.writeFile(file, "console.log('hi');");
+
+  const calls: string[] = [];
+  const originalFetch = global.fetch;
+  global.fetch = (async (url: any) => {
+    calls.push(String(url));
+    if (String(url).includes("/solutions?")) {
+      return new Response(JSON.stringify({ value: [] }), { status: 200 });
+    }
+    if (String(url).includes("/webresourceset")) {
+      return new Response(JSON.stringify({ value: [] }), { status: 200 });
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  }) as any;
+
+  try {
+    const publisher = new PublisherService();
+    const result = await publisher.publish(
+      {
+        relativeLocalPath: file,
+        remotePath: "new_/web/script.js",
+        solutionName: "MissingSolution",
+        kind: "file",
+      },
+      { name: "dev", url: "https://example" },
+      { accessToken: "token" },
+      vscode.Uri.file(file),
+    );
+
+    assert.strictEqual(result.failed, 1);
+    assert.strictEqual(calls.length, 2);
+    const logs = (publisher as any).output.logs.join("\n");
+    assert.match(logs, /Solution MissingSolution not found/);
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("publish aborts when remotePath matches multiple resources", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
+  (vscode.workspace as any).workspaceFolders = [
+    { uri: vscode.Uri.file(workspaceRoot) },
+  ];
+  const file = path.join(workspaceRoot, "script.js");
+  await fs.writeFile(file, "console.log('hi');");
+
+  const calls: string[] = [];
+  const originalFetch = global.fetch;
+  global.fetch = (async (url: any) => {
+    calls.push(String(url));
+    if (String(url).includes("/solutions?")) {
+      return new Response(
+        JSON.stringify({ value: [{ solutionid: "abc" }] }),
+        { status: 200 },
+      );
+    }
+    if (String(url).includes("/webresourceset")) {
+      return new Response(
+        JSON.stringify({
+          value: [
+            { webresourceid: "one" },
+            { webresourceid: "two" },
+          ],
+        }),
+        { status: 200 },
+      );
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  }) as any;
+
+  try {
+    const publisher = new PublisherService();
+    const result = await publisher.publish(
+      {
+        relativeLocalPath: file,
+        remotePath: "new_/web/script.js",
+        solutionName: "CoreWebResources",
+        kind: "file",
+      },
+      { name: "dev", url: "https://example" },
+      { accessToken: "token" },
+      vscode.Uri.file(file),
+    );
+
+    assert.strictEqual(result.failed, 1);
+    assert.strictEqual(calls.length, 2);
+    const logs = (publisher as any).output.logs.join("\n");
+    assert.match(logs, /Multiple web resources found/);
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});

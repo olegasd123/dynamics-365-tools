@@ -84,6 +84,12 @@ export class PublisherService {
       }
 
       const apiRoot = this.apiRoot(env.url);
+      const { existingId, solutionId } = await this.preflight(
+        apiRoot,
+        token,
+        binding.solutionName,
+        remotePath,
+      );
       content = content ?? (await this.readFile(localPath));
       const encoded = content.toString("base64");
       hash = hash ?? this.hashContent(content);
@@ -91,7 +97,6 @@ export class PublisherService {
       const displayName = path.posix.basename(remotePath);
 
       this.output.appendLine(`  ${fmt.resource(remotePath)} ← ${localPath}`);
-      const existingId = await this.findWebResource(apiRoot, token, remotePath);
       const allowCreate = env.createMissingWebResources !== false;
 
       if (!existingId && !allowCreate) {
@@ -117,8 +122,8 @@ export class PublisherService {
           name: remotePath,
           type: webResourceType,
         });
-        this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been created, publishing...`);
-        await this.addToSolution(apiRoot, token, resourceId, binding.solutionName);
+        this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been created`);
+        await this.addToSolution(apiRoot, token, resourceId, binding.solutionName, solutionId);
         result.created = 1;
       }
 
@@ -291,14 +296,38 @@ export class PublisherService {
     }
   }
 
-  private async findWebResource(
+  private async preflight(
+    apiRoot: string,
+    token: string,
+    solutionName: string,
+    remotePath: string,
+  ): Promise<{ solutionId: string; existingId?: string }> {
+    const [solutionId, resources] = await Promise.all([
+      this.getSolutionId(apiRoot, token, solutionName),
+      this.listWebResources(apiRoot, token, remotePath),
+    ]);
+
+    if (!solutionId) {
+      throw new Error(`Solution ${solutionName} not found.`);
+    }
+
+    if (resources.length > 1) {
+      throw new Error(
+        `Multiple web resources found for ${fmt.resource(remotePath)}; resolve duplicates before publishing.`,
+      );
+    }
+
+    return { solutionId, existingId: resources[0]?.webresourceid };
+  }
+
+  private async listWebResources(
     apiRoot: string,
     token: string,
     remotePath: string,
-  ): Promise<string | undefined> {
+  ): Promise<Array<{ webresourceid: string }>> {
     const escapedName = remotePath.replace(/'/g, "''");
     const filter = encodeURIComponent(`name eq '${escapedName}'`);
-    const url = `${apiRoot}/webresourceset?$select=webresourceid,name&$filter=${filter}`;
+    const url = `${apiRoot}/webresourceset?$select=webresourceid,name&$filter=${filter}&$top=2`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -313,7 +342,7 @@ export class PublisherService {
     const body = (await response.json()) as {
       value?: Array<{ webresourceid: string }>;
     };
-    return body.value?.[0]?.webresourceid;
+    return body.value ?? [];
   }
 
   private async updateWebResource(
@@ -398,9 +427,11 @@ export class PublisherService {
     token: string,
     componentId: string,
     solutionName: string,
+    solutionId?: string,
   ): Promise<void> {
-    const solutionId = await this.getSolutionId(apiRoot, token, solutionName);
-    if (!solutionId) {
+    const targetSolutionId =
+      solutionId ?? (await this.getSolutionId(apiRoot, token, solutionName));
+    if (!targetSolutionId) {
       throw new Error(`Solution ${solutionName} not found.`);
     }
 
@@ -408,7 +439,7 @@ export class PublisherService {
       apiRoot,
       token,
       componentId,
-      solutionId,
+      targetSolutionId,
     );
 
     if (alreadyInSolution) {
