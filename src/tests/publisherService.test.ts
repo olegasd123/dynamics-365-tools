@@ -96,9 +96,7 @@ test("resolveToken falls back to client credentials when interactive token missi
 
   assert.strictEqual(token, "client-token");
   const logs = (publisher as any).output.logs;
-  assert.ok(
-    logs.some((line: string) => line.includes("auth: clientId=id")),
-  );
+  assert.ok(logs.some((line: string) => line.includes("auth: client credentials")));
 });
 
 test("resolveToken reuses provided client credential token without re-acquiring", async () => {
@@ -121,9 +119,7 @@ test("resolveToken reuses provided client credential token without re-acquiring"
 
   assert.strictEqual(token, "cached-token");
   const logs = (publisher as any).output.logs;
-  assert.ok(
-    logs.some((line: string) => line.includes("auth: clientId=id")),
-  );
+  assert.ok(logs.some((line: string) => line.includes("auth: client credentials")));
 });
 
 test("publish fails fast when solution is missing", async () => {

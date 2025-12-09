@@ -18,10 +18,8 @@
   - Centralize OutputChannel formatting helpers and reuse logging code to avoid duplication and keep logs uniform.
   - Normalize remote paths in one utility (including case rules, trailing slashes) to reduce subtle mismatches.
   - Split `PublisherService.publish` into smaller units (resolve paths, acquire token, sync resource, publish) for easier testing.
-  - Replace repeated `JSON.parse(JSON.stringify())` style parsing with Zod/io-ts schemas to validate `xrm.config.json` and `xrm.bindings.json`.
 
 - **Security & compliance**
-  - Avoid logging any part of tokens/credentials and mark secrets as `MaskedString` in telemetry when added later.
   - Allow configuring `resource` separately from `url` per environment to support sovereign clouds and custom apps.
   - Add an opt-in user agent (e.g., `XRM-VSCode/{version}`) so server logs can identify extension traffic.
 

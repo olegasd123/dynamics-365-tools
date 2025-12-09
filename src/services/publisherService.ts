@@ -243,8 +243,7 @@ export class PublisherService {
   ): Promise<string | undefined> {
     if (auth.credentials) {
       if (logAuth) {
-        const tenant = auth.credentials.tenantId ? ` tenant=${auth.credentials.tenantId}` : "";
-        this.output.appendLine(`  ↳ auth: clientId=${auth.credentials.clientId}${tenant}`);
+        this.output.appendLine("  ↳ auth: client credentials");
       }
       if (auth.accessToken) {
         return auth.accessToken;
