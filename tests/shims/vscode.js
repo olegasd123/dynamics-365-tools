@@ -89,6 +89,14 @@ const window = {
       logs: lines,
     };
   },
+  createStatusBarItem: () => ({
+    text: "",
+    tooltip: "",
+    command: undefined,
+    show: () => {},
+    hide: () => {},
+    dispose: () => {},
+  }),
   __messages: messages,
 };
 
@@ -128,6 +136,11 @@ const ProgressLocation = {
   Notification: 15,
 };
 
+const StatusBarAlignment = {
+  Left: 1,
+  Right: 2,
+};
+
 module.exports = {
   Uri,
   workspace,
@@ -138,4 +151,5 @@ module.exports = {
   authentication,
   InMemorySecretStorage,
   ProgressLocation,
+  StatusBarAlignment,
 };
