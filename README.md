@@ -45,7 +45,7 @@ Edit `.vscode/xrm.config.json` (or run `XRM: Edit Environments & Solutions`). Ex
     }
   ],
   "solutions": [
-    { "name": "CoreWebResources", "prefix": "new_", "default": true },
+    { "name": "CoreWebResources", "prefix": "cwr_", "default": true },
     { "name": "ComponentWebResources", "prefix": "cmp_" }
   ],
   "defaultSolution": "CoreWebResources",
@@ -89,14 +89,14 @@ Notes:
 {
   "bindings": [
     {
-      "relativeLocalPath": "src/webresources/new_",
-      "remotePath": "new_",
+      "relativeLocalPath": "src/webresources/cwr_",
+      "remotePath": "cwr_",
       "solutionName": "CoreWebResources",
       "kind": "folder"
     },
     {
-      "relativeLocalPath": "src/webresources/new_/contact/form.js",
-      "remotePath": "new_/contact/form.js",
+      "relativeLocalPath": "src/webresources/cwr_/contact/form.js",
+      "remotePath": "cwr_/contact/form.js",
       "solutionName": "CoreWebResources",
       "kind": "file"
     }
