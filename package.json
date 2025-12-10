@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/olegasd123/xrm-vscode"
+    "url": "https://github.com/olegasd123/dynamics-365-tools"
   },
   "bugs": {
-    "url": "https://github.com/olegasd123/xrm-vscode/issues"
+    "url": "https://github.com/olegasd123/dynamics-365-tools/issues"
   },
-  "homepage": "https://github.com/olegasd123/xrm-vscode#readme",
+  "homepage": "https://github.com/olegasd123/dynamics-365-tools#readme",
   "engines": {
     "vscode": "^1.84.0"
   },
