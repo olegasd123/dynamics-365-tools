@@ -126,8 +126,7 @@ export class PublishCacheService {
     try {
       return JSON.parse(content.toString());
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       throw new Error(`${filename} contains invalid JSON: ${message}`);
     }
   }

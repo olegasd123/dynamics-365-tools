@@ -9,22 +9,17 @@ export class BindingService {
   async getBinding(uri: vscode.Uri): Promise<BindingEntry | undefined> {
     const snapshot = await this.config.loadBindings();
     const targetPath = path.normalize(uri.fsPath);
-    const matches = snapshot.bindings.filter((binding) =>
-      this.pathMatches(binding, targetPath),
-    );
+    const matches = snapshot.bindings.filter((binding) => this.pathMatches(binding, targetPath));
 
     // Prefer the most specific path (longest relativeLocalPath)
-    return matches.sort(
-      (a, b) => b.relativeLocalPath.length - a.relativeLocalPath.length,
-    )[0];
+    return matches.sort((a, b) => b.relativeLocalPath.length - a.relativeLocalPath.length)[0];
   }
 
   async addOrUpdateBinding(entry: BindingEntry): Promise<void> {
     const snapshot = await this.config.loadBindings();
     const normalized = this.config.createBinding(entry);
     const existingIndex = snapshot.bindings.findIndex(
-      (binding) =>
-        path.normalize(binding.relativeLocalPath) === normalized.relativeLocalPath,
+      (binding) => path.normalize(binding.relativeLocalPath) === normalized.relativeLocalPath,
     );
 
     if (existingIndex >= 0) {
@@ -46,8 +41,6 @@ export class BindingService {
       return bindingPath === targetPath;
     }
 
-    return (
-      targetPath === bindingPath || targetPath.startsWith(bindingPath + path.sep)
-    );
+    return targetPath === bindingPath || targetPath.startsWith(bindingPath + path.sep);
   }
 }

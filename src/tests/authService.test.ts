@@ -6,10 +6,7 @@ import { AuthService } from "../services/authService";
 test("getAccessToken requests scope built from resource when provided", async () => {
   const auth = new AuthService();
   let capturedScopes: string[] = [];
-  (vscode.authentication as any).getSession = async (
-    _providerId: string,
-    scopes: string[],
-  ) => {
+  (vscode.authentication as any).getSession = async (_providerId: string, scopes: string[]) => {
     capturedScopes = scopes;
     return { accessToken: "token-from-session" };
   };

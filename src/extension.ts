@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { ConfigurationService, WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "./services/configurationService";
+import {
+  ConfigurationService,
+  WEB_RESOURCE_SUPPORTED_EXTENSIONS,
+} from "./services/configurationService";
 import { BindingService } from "./services/bindingService";
 import { UiService } from "./services/uiService";
 import { PublisherService } from "./services/publisherService";
@@ -25,72 +28,61 @@ export async function activate(context: vscode.ExtensionContext) {
   const publishCache = new PublishCacheService(configuration);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "xrm.openResourceMenu",
-      async (uri?: vscode.Uri) =>
-        openResourceMenu(
-          uri,
-          configuration,
-          bindings,
-          ui,
-          publisher,
-          secrets,
-          auth,
-          statusBar,
-          lastSelection,
-          publishCache,
-        ),
+    vscode.commands.registerCommand("xrm.openResourceMenu", async (uri?: vscode.Uri) =>
+      openResourceMenu(
+        uri,
+        configuration,
+        bindings,
+        ui,
+        publisher,
+        secrets,
+        auth,
+        statusBar,
+        lastSelection,
+        publishCache,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "xrm.publishResource",
-      async (uri?: vscode.Uri) =>
-        publishResource(
-          uri,
-          configuration,
-          bindings,
-          ui,
-          publisher,
-          secrets,
-          auth,
-          statusBar,
-          lastSelection,
-          publishCache,
-        ),
+    vscode.commands.registerCommand("xrm.publishResource", async (uri?: vscode.Uri) =>
+      publishResource(
+        uri,
+        configuration,
+        bindings,
+        ui,
+        publisher,
+        secrets,
+        auth,
+        statusBar,
+        lastSelection,
+        publishCache,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "xrm.publishLastResource",
-      async () =>
-        publishLastResource(
-          configuration,
-          bindings,
-          ui,
-          publisher,
-          secrets,
-          auth,
-          statusBar,
-          lastSelection,
-          publishCache,
-        ),
+    vscode.commands.registerCommand("xrm.publishLastResource", async () =>
+      publishLastResource(
+        configuration,
+        bindings,
+        ui,
+        publisher,
+        secrets,
+        auth,
+        statusBar,
+        lastSelection,
+        publishCache,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "xrm.configureEnvironments",
-      async () => editConfiguration(configuration),
+    vscode.commands.registerCommand("xrm.configureEnvironments", async () =>
+      editConfiguration(configuration),
     ),
-    vscode.commands.registerCommand(
-      "xrm.setDefaultSolution",
-      async () => setDefaultSolution(configuration),
+    vscode.commands.registerCommand("xrm.setDefaultSolution", async () =>
+      setDefaultSolution(configuration),
     ),
-    vscode.commands.registerCommand(
-      "xrm.bindResource",
-      async (uri?: vscode.Uri) => addBinding(uri, configuration, bindings, ui),
+    vscode.commands.registerCommand("xrm.bindResource", async (uri?: vscode.Uri) =>
+      addBinding(uri, configuration, bindings, ui),
     ),
-    vscode.commands.registerCommand(
-      "xrm.setEnvironmentCredentials",
-      async () => setEnvironmentCredentials(configuration, ui, secrets),
+    vscode.commands.registerCommand("xrm.setEnvironmentCredentials", async () =>
+      setEnvironmentCredentials(configuration, ui, secrets),
     ),
-    vscode.commands.registerCommand(
-      "xrm.signInInteractive",
-      async () => signInInteractive(configuration, ui, auth, lastSelection),
+    vscode.commands.registerCommand("xrm.signInInteractive", async () =>
+      signInInteractive(configuration, ui, auth, lastSelection),
     ),
     statusBar,
   );
@@ -331,9 +323,7 @@ async function addBinding(
     defaultSolutionConfig;
 
   if (!solutionConfig) {
-    vscode.window.showWarningMessage(
-      "No solution selected. Binding was not created.",
-    );
+    vscode.window.showWarningMessage("No solution selected. Binding was not created.");
     return;
   }
 
@@ -350,10 +340,7 @@ async function addBinding(
   );
 }
 
-function buildDefaultRemotePath(
-  relativePath: string,
-  defaultPrefix?: string,
-): string {
+function buildDefaultRemotePath(relativePath: string, defaultPrefix?: string): string {
   const normalized = relativePath.replace(/\\/g, "/");
   if (!defaultPrefix) {
     return normalized;
@@ -362,8 +349,7 @@ function buildDefaultRemotePath(
   const prefix = defaultPrefix.replace(/[\\/]+$/, "");
   const segments = normalized.split("/").filter(Boolean);
   const prefixIndex = segments.findIndex((segment) => segment === prefix);
-  const trimmed =
-    prefixIndex >= 0 ? segments.slice(prefixIndex).join("/") : normalized;
+  const trimmed = prefixIndex >= 0 ? segments.slice(prefixIndex).join("/") : normalized;
 
   if (trimmed === prefix || trimmed.startsWith(`${prefix}/`)) {
     return trimmed;
@@ -449,11 +435,7 @@ async function publishFolder(
   let sharedAuth = { ...publishAuth.auth };
   if (!sharedAuth.accessToken && sharedAuth.credentials) {
     try {
-      const token = await publisher.resolveToken(
-        publishAuth.env,
-        sharedAuth,
-        false,
-      );
+      const token = await publisher.resolveToken(publishAuth.env, sharedAuth, false);
       if (token) {
         sharedAuth = { ...sharedAuth, accessToken: token };
       }
@@ -491,17 +473,11 @@ async function publishFolder(
             const isFirst = currentIndex === 0;
             // Use most specific binding for this file (file binding > folder binding)
             const fileBinding = (await bindings.getBinding(file)) ?? folderBinding;
-            const result = await publisher.publish(
-              fileBinding,
-              publishAuth.env,
-              sharedAuth,
-              file,
-              {
-                isFirst: isFirst,
-                cache: publishCache,
-                cancellationToken,
-              },
-            );
+            const result = await publisher.publish(fileBinding, publishAuth.env, sharedAuth, file, {
+              isFirst: isFirst,
+              cache: publishCache,
+              cancellationToken,
+            });
             totals.created += result.created;
             totals.updated += result.updated;
             totals.skipped += result.skipped;
@@ -523,8 +499,7 @@ async function publishFolder(
           isFolder: true,
         });
       } else {
-        const processed =
-          totals.created + totals.updated + totals.skipped + totals.failed;
+        const processed = totals.created + totals.updated + totals.skipped + totals.failed;
         const summary = processed
           ? `${processed} file(s) processed before cancellation`
           : "No files were processed";
@@ -536,9 +511,7 @@ async function publishFolder(
   );
 }
 
-async function editConfiguration(
-  configuration: ConfigurationService,
-): Promise<void> {
+async function editConfiguration(configuration: ConfigurationService): Promise<void> {
   const config = await configuration.loadConfiguration();
   await configuration.saveConfiguration(config);
   const uri = vscode.Uri.joinPath(
@@ -549,14 +522,11 @@ async function editConfiguration(
   await vscode.window.showTextDocument(uri);
 }
 
-async function setDefaultSolution(
-  configuration: ConfigurationService,
-): Promise<void> {
+async function setDefaultSolution(configuration: ConfigurationService): Promise<void> {
   const config = await configuration.loadConfiguration();
   const candidate =
     (await vscode.window.showInputBox({
-      prompt:
-        "Enter default solution unique name or pick an existing one to set it globally",
+      prompt: "Enter default solution unique name or pick an existing one to set it globally",
       value: config.defaultSolution,
       placeHolder: config.solutions.map((s) => s.name).join(", "),
     })) ?? config.defaultSolution;
@@ -624,9 +594,7 @@ async function setEnvironmentCredentials(
     clientSecret,
     tenantId,
   });
-  vscode.window.showInformationMessage(
-    `Credentials saved securely for environment ${env.name}.`,
-  );
+  vscode.window.showInformationMessage(`Credentials saved securely for environment ${env.name}.`);
 }
 
 async function signInInteractive(
@@ -636,10 +604,7 @@ async function signInInteractive(
   lastSelection: LastSelectionService,
 ): Promise<void> {
   const config = await configuration.loadConfiguration();
-  const env = await ui.pickEnvironment(
-    config.environments,
-    lastSelection.getLastEnvironment(),
-  );
+  const env = await ui.pickEnvironment(config.environments, lastSelection.getLastEnvironment());
   if (!env) {
     return;
   }
@@ -652,9 +617,7 @@ async function signInInteractive(
   }
 }
 
-async function resolveTargetUri(
-  uri?: vscode.Uri,
-): Promise<vscode.Uri | undefined> {
+async function resolveTargetUri(uri?: vscode.Uri): Promise<vscode.Uri | undefined> {
   if (uri) {
     return uri;
   }
@@ -678,24 +641,20 @@ async function pickEnvironmentAndAuth(
   preferredEnvName?: string,
 ): Promise<
   | {
-    env: XrmConfiguration["environments"][number];
-    auth: {
-      accessToken?: string;
-      credentials?: Awaited<ReturnType<SecretService["getCredentials"]>>;
-    };
-  }
+      env: XrmConfiguration["environments"][number];
+      auth: {
+        accessToken?: string;
+        credentials?: Awaited<ReturnType<SecretService["getCredentials"]>>;
+      };
+    }
   | undefined
 > {
   const resolvedConfig = config ?? (await configuration.loadConfiguration());
   let env: XrmConfiguration["environments"][number] | undefined;
   if (preferredEnvName) {
-    env = resolvedConfig.environments.find(
-      (candidate) => candidate.name === preferredEnvName,
-    );
+    env = resolvedConfig.environments.find((candidate) => candidate.name === preferredEnvName);
     if (!env) {
-      vscode.window.showErrorMessage(
-        `Environment ${preferredEnvName} is not configured.`,
-      );
+      vscode.window.showErrorMessage(`Environment ${preferredEnvName} is not configured.`);
       return undefined;
     }
   } else {
@@ -708,8 +667,7 @@ async function pickEnvironmentAndAuth(
 
   await lastSelection.setLastEnvironment(env.name);
 
-  const accessToken =
-    env.authType !== "clientSecret" ? await auth.getAccessToken(env) : undefined;
+  const accessToken = env.authType !== "clientSecret" ? await auth.getAccessToken(env) : undefined;
   const credentials =
     env.authType === "clientSecret" || !accessToken
       ? await secrets.getCredentials(env.name)
@@ -751,10 +709,7 @@ async function ensureSupportedResource(
   return true;
 }
 
-function isSupportedExtension(
-  ext: string,
-  supportedExtensions: Set<string>,
-): boolean {
+function isSupportedExtension(ext: string, supportedExtensions: Set<string>): boolean {
   return supportedExtensions.has(ext);
 }
 
@@ -788,4 +743,4 @@ function buildSupportedSet(config: XrmConfiguration): Set<string> {
   return new Set(extensions.map((ext) => ext.toLowerCase()));
 }
 
-export function deactivate() { }
+export function deactivate() {}

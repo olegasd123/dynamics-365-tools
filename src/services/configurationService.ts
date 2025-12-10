@@ -20,7 +20,7 @@ export const WEB_RESOURCE_SUPPORTED_EXTENSIONS = [
   ".xslt",
   ".ico",
   ".svg",
-]
+];
 
 const CONFIG_FILENAME = "xrm.config.json";
 const BINDINGS_FILENAME = "xrm.bindings.json";
@@ -46,19 +46,19 @@ export class ConfigurationService {
             name: "dev",
             url: "https://your-dev.crm.dynamics.com",
             authType: "interactive",
-            createMissingWebResources: false
+            createMissingWebResources: false,
           },
           {
             name: "test",
             url: "https://your-test.crm.dynamics.com",
             authType: "interactive",
-            createMissingWebResources: false
+            createMissingWebResources: false,
           },
           {
             name: "prod",
             url: "https://your-prod.crm.dynamics.com",
             authType: "interactive",
-            createMissingWebResources: false
+            createMissingWebResources: false,
           },
         ],
         solutions: [
@@ -92,10 +92,7 @@ export class ConfigurationService {
   async saveConfiguration(config: XrmConfiguration): Promise<void> {
     const uri = this.getConfigUri();
     await this.ensureVscodeFolder();
-    await vscode.workspace.fs.writeFile(
-      uri,
-      Buffer.from(JSON.stringify(config, null, 2), "utf8"),
-    );
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(config, null, 2), "utf8"));
   }
 
   async loadBindings(): Promise<BindingSnapshot> {
@@ -182,11 +179,7 @@ export class ConfigurationService {
       throw new Error("This extension requires an opened workspace folder.");
     }
 
-    return vscode.Uri.joinPath(
-      this.workspaceFolder.uri,
-      ".vscode",
-      filename,
-    );
+    return vscode.Uri.joinPath(this.workspaceFolder.uri, ".vscode", filename);
   }
 
   private async ensureVscodeFolder(): Promise<void> {
@@ -214,8 +207,7 @@ export class ConfigurationService {
     try {
       return JSON.parse(content.toString());
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       throw new Error(`${filename} contains invalid JSON: ${message}`);
     }
   }

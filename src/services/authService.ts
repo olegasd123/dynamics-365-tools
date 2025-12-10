@@ -5,11 +5,9 @@ export class AuthService {
   async getAccessToken(env: EnvironmentConfig): Promise<string | undefined> {
     const scope = this.buildScope(env);
     try {
-      const session = await vscode.authentication.getSession(
-        "microsoft",
-        [scope],
-        { createIfNone: true },
-      );
+      const session = await vscode.authentication.getSession("microsoft", [scope], {
+        createIfNone: true,
+      });
       return session.accessToken;
     } catch (error) {
       vscode.window.showErrorMessage(

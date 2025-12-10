@@ -8,9 +8,7 @@ import { PublisherService } from "../services/publisherService";
 
 test("resolvePaths maps folder bindings to nested files", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const folder = path.join(workspaceRoot, "web");
   const file = path.join(folder, "script.js");
   await fs.mkdir(folder, { recursive: true });
@@ -34,9 +32,7 @@ test("resolvePaths maps folder bindings to nested files", async () => {
 
 test("resolvePaths rejects publishing a directory target", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const folder = path.join(workspaceRoot, "web");
   await fs.mkdir(folder, { recursive: true });
 
@@ -175,9 +171,7 @@ test("acquireTokenWithClientCredentials sends user agent when provided", async (
 
 test("publish fails fast when solution is missing", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 
@@ -220,9 +214,7 @@ test("publish fails fast when solution is missing", async () => {
 
 test("publish aborts when remotePath matches multiple resources", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 
@@ -231,18 +223,12 @@ test("publish aborts when remotePath matches multiple resources", async () => {
   global.fetch = (async (url: any) => {
     calls.push(String(url));
     if (String(url).includes("/solutions?")) {
-      return new Response(
-        JSON.stringify({ value: [{ solutionid: "abc" }] }),
-        { status: 200 },
-      );
+      return new Response(JSON.stringify({ value: [{ solutionid: "abc" }] }), { status: 200 });
     }
     if (String(url).includes("/webresourceset")) {
       return new Response(
         JSON.stringify({
-          value: [
-            { webresourceid: "one" },
-            { webresourceid: "two" },
-          ],
+          value: [{ webresourceid: "one" }, { webresourceid: "two" }],
         }),
         { status: 200 },
       );
@@ -290,10 +276,7 @@ test("buildError surfaces code and correlation id", async () => {
     { status: 400, headers },
   );
 
-  const error = await (publisher as any).buildError(
-    "Failed to test",
-    response,
-  );
+  const error = await (publisher as any).buildError("Failed to test", response);
 
   assert.strictEqual((error as any).code, "0x80040217");
   assert.strictEqual((error as any).correlationId, "corr-123");
@@ -302,9 +285,7 @@ test("buildError surfaces code and correlation id", async () => {
 
 test("publish returns cancellation result when token is cancelled", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 
@@ -346,9 +327,7 @@ test("publish returns cancellation result when token is cancelled", async () => 
 
 test("publish creates a new web resource and adds it to the solution", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 
@@ -404,14 +383,8 @@ test("publish creates a new web resource and adds it to the solution", async () 
       skipped: 0,
       failed: 0,
     });
-    assert.strictEqual(
-      calls.filter((c) => c.url.includes("/AddSolutionComponent")).length,
-      1,
-    );
-    assert.strictEqual(
-      calls.filter((c) => c.url.includes("/PublishXml")).length,
-      1,
-    );
+    assert.strictEqual(calls.filter((c) => c.url.includes("/AddSolutionComponent")).length, 1);
+    assert.strictEqual(calls.filter((c) => c.url.includes("/PublishXml")).length, 1);
   } finally {
     global.fetch = originalFetch;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
@@ -420,9 +393,7 @@ test("publish creates a new web resource and adds it to the solution", async () 
 
 test("publish updates an existing web resource for folder binding", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const folder = path.join(workspaceRoot, "web");
   const file = path.join(folder, "script.js");
   await fs.mkdir(folder, { recursive: true });
@@ -488,9 +459,7 @@ test("publish updates an existing web resource for folder binding", async () => 
 
 test("publish skips when cache reports unchanged", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 
@@ -533,9 +502,7 @@ test("publish skips when cache reports unchanged", async () => {
 
 test("publish respects createMissingWebResources=false and skips missing resource", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "xrm-publish-"));
-  (vscode.workspace as any).workspaceFolders = [
-    { uri: vscode.Uri.file(workspaceRoot) },
-  ];
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 

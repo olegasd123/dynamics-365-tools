@@ -58,7 +58,9 @@ export class PublisherService {
     const shouldLogHeader = options.isFirst ?? true;
     const started = new Date().toISOString();
     if (shouldLogHeader) {
-      this.output.appendLine('────────────────────────────────────────────────────────────────────');
+      this.output.appendLine(
+        "────────────────────────────────────────────────────────────────────",
+      );
       this.output.appendLine(
         `[${started}] Publishing ${fmt.remote(binding.remotePath)} → ${fmt.env(env.name)} ${fmt.url(env.url)}`,
       );
@@ -109,34 +111,61 @@ export class PublisherService {
       const allowCreate = env.createMissingWebResources !== false;
 
       if (!existingId && !allowCreate) {
-        this.output.appendLine(`  ✗ Resource does not exist and creation is disabled for ${fmt.env(env.name)}`);
+        this.output.appendLine(
+          `  ✗ Resource does not exist and creation is disabled for ${fmt.env(env.name)}`,
+        );
         result.skipped = 1;
         return result;
       }
 
       let resourceId: string;
       if (existingId) {
-        resourceId = await this.updateWebResource(apiRoot, token, existingId, {
-          content: encoded,
-          displayName,
-          name: remotePath,
-          type: webResourceType,
-        }, userAgent);
+        resourceId = await this.updateWebResource(
+          apiRoot,
+          token,
+          existingId,
+          {
+            content: encoded,
+            displayName,
+            name: remotePath,
+            type: webResourceType,
+          },
+          userAgent,
+        );
         this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been updated, publishing...`);
         result.updated = 1;
       } else {
-        resourceId = await this.createWebResource(apiRoot, token, {
-          content: encoded,
-          displayName,
-          name: remotePath,
-          type: webResourceType,
-        }, userAgent);
+        resourceId = await this.createWebResource(
+          apiRoot,
+          token,
+          {
+            content: encoded,
+            displayName,
+            name: remotePath,
+            type: webResourceType,
+          },
+          userAgent,
+        );
         this.output.appendLine(`  ✓ ${fmt.resource(remotePath)} has been created`);
-        await this.addToSolution(apiRoot, token, resourceId, binding.solutionName, solutionId, userAgent);
+        await this.addToSolution(
+          apiRoot,
+          token,
+          resourceId,
+          binding.solutionName,
+          solutionId,
+          userAgent,
+        );
         result.created = 1;
       }
 
-      await this.publishSerial(apiRoot, token, resourceId, remotePath, cancellationToken, userAgent);
+      await this.publishSerial(
+        apiRoot,
+        token,
+        resourceId,
+        remotePath,
+        cancellationToken,
+        userAgent,
+      );
       if (options.cache && hash) {
         await options.cache.update(remotePath, fileStat, hash, env.name);
       }
@@ -175,9 +204,7 @@ export class PublisherService {
             `XRM publish to ${envName}: ${cancelled ? "cancelled, " : ""}${summary} (check output for errors)`,
           );
         } else {
-          vscode.window.showInformationMessage(
-            `XRM publish to ${envName}: ${summary}`,
-          );
+          vscode.window.showInformationMessage(`XRM publish to ${envName}: ${summary}`);
         }
       }
     }
@@ -233,9 +260,7 @@ export class PublisherService {
   private joinRemote(base: string, relative: string): string {
     const normalizedBase = base.replace(/\\/g, "/").replace(/\/+$/, "");
     const normalizedRelative = relative.replace(/\\/g, "/");
-    return normalizedRelative
-      ? `${normalizedBase}/${normalizedRelative}`
-      : normalizedBase;
+    return normalizedRelative ? `${normalizedBase}/${normalizedRelative}` : normalizedBase;
   }
 
   async resolveToken(
@@ -508,10 +533,7 @@ export class PublisherService {
     });
 
     if (!response.ok) {
-      throw await this.buildError(
-        `Failed to add to solution ${solutionName}`,
-        response,
-      );
+      throw await this.buildError(`Failed to add to solution ${solutionName}`, response);
     }
 
     this.output.appendLine(`  ✓ added to solution ${fmt.solution(solutionName)}`);
@@ -769,8 +791,7 @@ export class PublisherService {
     }
 
     const correlationId = this.extractCorrelationId(response);
-    const message =
-      code && detail !== code ? `${code}: ${detail}` : detail;
+    const message = code && detail !== code ? `${code}: ${detail}` : detail;
 
     const error = new Error(`${context}: ${message} (${response.status})`) as Error & {
       code?: string;
@@ -796,8 +817,7 @@ export class PublisherService {
       return direct;
     }
 
-    const diagnostics =
-      headers.get("x-ms-diagnostics") || headers.get("x-ms-ags-diagnostic");
+    const diagnostics = headers.get("x-ms-diagnostics") || headers.get("x-ms-ags-diagnostic");
     if (!diagnostics) {
       return undefined;
     }
@@ -828,8 +848,7 @@ export class PublisherService {
       return env.userAgent.trim();
     }
     const extension = vscode.extensions.getExtension("your-name.xrm-vscode");
-    const version =
-      (extension?.packageJSON as { version?: string })?.version || "dev";
+    const version = (extension?.packageJSON as { version?: string })?.version || "dev";
     return `XRM-VSCode/${version}`;
   }
 }

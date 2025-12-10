@@ -13,10 +13,7 @@ export class StatusBarService {
   private last?: LastPublishContext;
 
   constructor(commandId: string) {
-    this.item = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left,
-      100,
-    );
+    this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this.item.command = commandId;
     this.item.tooltip = "Publish the last web resource again";
     this.item.hide();
