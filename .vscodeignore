@@ -1,0 +1,16 @@
+.github/**
+.vscode/**
+.vscode-test/**
+src/**
+tests/**
+out/tests/**
+**/*.ts
+**/*.map
+tsconfig.json
+tsconfig.*.json
+package-lock.json
+.eslintrc.*
+.eslintignore
+.prettier*
+.gitignore
+vsc-extension-quickstart.md
