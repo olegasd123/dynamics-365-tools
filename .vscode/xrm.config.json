@@ -22,31 +22,11 @@
   "solutions": [
     {
       "name": "CoreWebResources",
-      "prefix": "new_",
-      "default": true
+      "prefix": "new_"
     },
     {
       "name": "ComponentWebResources",
       "prefix": "cmp_"
     }
-  ],
-  "defaultSolution": "CoreWebResources",
-  "webResourceSupportedExtensions": [
-    ".js",
-    ".css",
-    ".htm",
-    ".html",
-    ".xml",
-    ".json",
-    ".resx",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".xap",
-    ".xsl",
-    ".xslt",
-    ".ico",
-    ".svg"
   ]
 }
