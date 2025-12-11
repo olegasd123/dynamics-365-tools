@@ -5,6 +5,7 @@ export class UiService {
   async pickEnvironment(
     environments: EnvironmentConfig[],
     defaultEnvName?: string,
+    options?: { placeHolder?: string },
   ): Promise<EnvironmentConfig | undefined> {
     if (!environments.length) {
       vscode.window.showErrorMessage(
@@ -24,7 +25,7 @@ export class UiService {
         picked: defaultEnv ? env.name === defaultEnv.name : false,
         env,
       })),
-      { placeHolder: "Select environment for publish" },
+      { placeHolder: options?.placeHolder ?? "Select environment for publish" },
     );
 
     return pick?.env;

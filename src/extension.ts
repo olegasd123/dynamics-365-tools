@@ -42,6 +42,9 @@ export async function activate(context: vscode.ExtensionContext) {
         publishCache,
       ),
     ),
+    vscode.commands.registerCommand("dynamics365Tools.openInCrm", async (uri?: vscode.Uri) =>
+      openInCrm(uri, configuration, bindings, ui, publisher, secrets, auth, lastSelection),
+    ),
     vscode.commands.registerCommand("dynamics365Tools.publishResource", async (uri?: vscode.Uri) =>
       publishResource(
         uri,
@@ -152,6 +155,85 @@ async function publishLastResource(
     config,
     preferredEnvName,
   );
+}
+
+async function openInCrm(
+  uri: vscode.Uri | undefined,
+  configuration: ConfigurationService,
+  bindings: BindingService,
+  ui: UiService,
+  publisher: PublisherService,
+  secrets: SecretService,
+  auth: AuthService,
+  lastSelection: LastSelectionService,
+): Promise<void> {
+  const targetUri = await resolveTargetUri(uri);
+  if (!targetUri) {
+    return;
+  }
+
+  const config = await configuration.loadConfiguration();
+  const supportedExtensions = buildSupportedSet();
+
+  if (!(await ensureSupportedResource(targetUri, supportedExtensions))) {
+    return;
+  }
+
+  const binding = await bindings.getBinding(targetUri);
+  if (!binding) {
+    const choice = await vscode.window.showInformationMessage(
+      "This resource is not bound yet. Add a binding to open it in CRM.",
+      "Add Binding",
+      "Cancel",
+    );
+    if (choice === "Add Binding") {
+      await addBinding(targetUri, configuration, bindings, ui);
+    }
+    return;
+  }
+
+  const stat = await vscode.workspace.fs.stat(targetUri);
+  if (stat.type !== vscode.FileType.File) {
+    vscode.window.showInformationMessage("Select a file to open its web resource in CRM.");
+    return;
+  }
+
+  const remotePath = resolveRemotePath(binding, targetUri, configuration);
+  if (!remotePath) {
+    return;
+  }
+
+  const openContext = await pickEnvironmentAndAuth(
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment to open in Power Apps" },
+  );
+  if (!openContext) {
+    return;
+  }
+
+  const env = openContext.env;
+  await lastSelection.setLastEnvironment(env.name);
+
+  const token = await resolveTokenForOpen(env, openContext.auth, publisher);
+  if (!token) {
+    return;
+  }
+
+  const classicUrl = await buildClassicWebResourceUrl(env, token, binding.solutionName, remotePath);
+  if (!classicUrl) {
+    return;
+  }
+
+  const opened = await vscode.env.openExternal(vscode.Uri.parse(classicUrl));
+  if (!opened) {
+    vscode.window.showErrorMessage(`Could not open web resource in ${env.name}.`);
+  }
 }
 
 async function openResourceMenu(
@@ -651,6 +733,7 @@ async function pickEnvironmentAndAuth(
   lastSelection: LastSelectionService,
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
+  pickOptions?: { placeHolder?: string },
 ): Promise<
   | {
       env: Dynamics365Configuration["environments"][number];
@@ -671,7 +754,7 @@ async function pickEnvironmentAndAuth(
     }
   } else {
     const rememberedEnv = lastSelection.getLastEnvironment();
-    env = await ui.pickEnvironment(resolvedConfig.environments, rememberedEnv);
+    env = await ui.pickEnvironment(resolvedConfig.environments, rememberedEnv, pickOptions);
     if (!env) {
       return undefined;
     }
@@ -725,6 +808,32 @@ function isSupportedExtension(ext: string, supportedExtensions: Set<string>): bo
   return supportedExtensions.has(ext);
 }
 
+function resolveRemotePath(
+  binding: BindingEntry,
+  targetUri: vscode.Uri,
+  configuration: ConfigurationService,
+): string | undefined {
+  const bindingRoot = configuration.resolveLocalPath(binding.relativeLocalPath);
+  const targetPath = path.normalize(targetUri.fsPath);
+
+  if (binding.kind === "folder") {
+    const relative = path.relative(bindingRoot, targetPath);
+    if (!relative || relative.startsWith("..")) {
+      vscode.window.showErrorMessage("Selected file is outside the bound folder mapping.");
+      return undefined;
+    }
+    return joinRemote(binding.remotePath, relative);
+  }
+
+  return binding.remotePath.replace(/\\/g, "/");
+}
+
+function joinRemote(base: string, relative: string): string {
+  const normalizedBase = base.replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalizedRelative = relative.replace(/\\/g, "/");
+  return normalizedRelative ? `${normalizedBase}/${normalizedRelative}` : normalizedBase;
+}
+
 async function collectSupportedFiles(
   folder: vscode.Uri,
   supportedExtensions: Set<string>,
@@ -749,6 +858,138 @@ async function collectSupportedFiles(
 
 function buildSupportedSet(): Set<string> {
   return new Set(WEB_RESOURCE_SUPPORTED_EXTENSIONS.map((ext) => ext.toLowerCase()));
+}
+
+async function resolveTokenForOpen(
+  env: Dynamics365Configuration["environments"][number],
+  auth: {
+    accessToken?: string;
+    credentials?: Awaited<ReturnType<SecretService["getCredentials"]>>;
+  },
+  publisher: PublisherService,
+): Promise<string | undefined> {
+  if (auth.accessToken) {
+    return auth.accessToken;
+  }
+
+  if (!auth.credentials) {
+    vscode.window.showErrorMessage(
+      "No credentials available. Sign in interactively or set client credentials first.",
+    );
+    return undefined;
+  }
+
+  try {
+    return await publisher.resolveToken(env, { credentials: auth.credentials }, false);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    vscode.window.showErrorMessage(`Could not acquire token for ${env.name}: ${message}`);
+    return undefined;
+  }
+}
+
+async function resolveSolutionId(
+  env: Dynamics365Configuration["environments"][number],
+  token: string,
+  solutionName: string,
+): Promise<string | undefined> {
+  const apiRoot = env.url.replace(/\/+$/, "") + "/api/data/v9.2";
+  const filter = encodeURIComponent(`uniquename eq '${solutionName.replace(/'/g, "''")}'`);
+  const url = `${apiRoot}/solutions?$select=solutionid,uniquename&$filter=${filter}&$top=2`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
+  const body = (await response.json()) as {
+    value?: Array<{ solutionid?: string }>;
+  };
+  return body.value?.[0]?.solutionid?.replace(/[{}]/g, "");
+}
+
+async function resolveWebResourceId(
+  env: Dynamics365Configuration["environments"][number],
+  token: string,
+  remotePath: string,
+): Promise<string | undefined> {
+  const apiRoot = env.url.replace(/\/+$/, "") + "/api/data/v9.2";
+  const escapedName = remotePath.replace(/'/g, "''");
+  const filter = encodeURIComponent(`name eq '${escapedName}'`);
+  const url = `${apiRoot}/webresourceset?$select=webresourceid,name&$filter=${filter}&$top=2`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
+  const body = (await response.json()) as {
+    value?: Array<{ webresourceid?: string }>;
+  };
+  if (!body.value?.length) {
+    return undefined;
+  }
+  if (body.value.length > 1) {
+    throw new Error(`Multiple web resources found for ${remotePath}; please resolve duplicates.`);
+  }
+
+  return body.value[0].webresourceid?.replace(/[{}]/g, "");
+}
+
+async function buildClassicWebResourceUrl(
+  env: Dynamics365Configuration["environments"][number],
+  token: string,
+  solutionName: string,
+  remotePath: string,
+): Promise<string | undefined> {
+  let solutionId: string | undefined;
+  let webResourceId: string | undefined;
+
+  try {
+    [solutionId, webResourceId] = await Promise.all([
+      resolveSolutionId(env, token, solutionName),
+      resolveWebResourceId(env, token, remotePath),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    vscode.window.showErrorMessage(`Could not resolve CRM ids: ${message}`);
+    return undefined;
+  }
+
+  if (!webResourceId) {
+    vscode.window.showErrorMessage(
+      `Web resource ${remotePath} not found in ${env.name}; publish it first.`,
+    );
+    return undefined;
+  }
+
+  const base = env.url.replace(/\/+$/, "");
+  const params = new URLSearchParams({
+    etc: "9333",
+    pagetype: "webresourceedit",
+    id: `{${webResourceId}}`,
+  });
+
+  if (solutionId) {
+    params.append("appSolutionId", `{${solutionId}}`);
+    params.append("_CreateFromType", "7100");
+    params.append("_CreateFromId", `{${solutionId}}`);
+  }
+
+  const hash = solutionId ? "#webresource" : "";
+  return `${base}/main.aspx?${params.toString()}${hash}`;
 }
 
 export function deactivate() {}

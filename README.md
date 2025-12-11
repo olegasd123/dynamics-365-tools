@@ -15,6 +15,7 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 - **Multi-environment config** stored in `.vscode/dynamics365tools.config.json` (dev/test/prod, etc.), with optional custom resource/audience and opt-in user agent header.
 - **Solution-aware bindings** for files or folders saved in `.vscode/dynamics365tools.bindings.json`; file bindings override folder bindings when both exist.
 - **Explorer context menu** `Dynamics 365 Tools` → `Publish Resource` / `Bind Resource`; bound folders publish all supported files inside.
+- **Open in Power Apps** directly from the Explorer `Dynamics 365 Tools` menu to jump to the Web Resources list for the bound solution.
 - **Publish last resource** from the status bar (cloud icon) or via `Dynamics 365 Tools: Publish Last Resource`; remembers the last environment used.
 - **Folder publish extras**: up to 4 files publish in parallel, unchanged files are skipped using `.vscode/dynamics365tools.publishCache.json`, and you can cancel from the progress notification.
 - **Auth options**: interactive sign-in (default) or client credentials stored securely; per-environment `authType` control.
@@ -100,6 +101,7 @@ File bindings win over folder bindings when both cover the same file.
 - For bound folders, supported files inside are published (file bindings are used when present). Up to 4 files publish at once. The progress dialog can be cancelled.
 - Unchanged files in a folder publish are skipped using `.vscode/dynamics365tools.publishCache.json` (based on content hash, size, and mtime).
 - Quick publish: click the status bar item (cloud upload) or run `Dynamics 365 Tools: Publish Last Resource` to republish the most recent file or folder with the same environment and binding.
+- Open a published web resource in classic CRM: right-click the bound file → `Dynamics 365 Tools` → `Open in Power Apps`, choose the environment, and the extension opens the classic web resource editor URL for that solution and resource.
 
 ### Supported file types
 

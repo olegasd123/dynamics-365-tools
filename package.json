@@ -31,6 +31,7 @@
     "onCommand:dynamics365Tools.openResourceMenu",
     "onCommand:dynamics365Tools.configureEnvironments",
     "onCommand:dynamics365Tools.bindResource",
+    "onCommand:dynamics365Tools.openInCrm",
     "onCommand:dynamics365Tools.publishResource",
     "onCommand:dynamics365Tools.signInInteractive",
     "onCommand:dynamics365Tools.signOut",
@@ -44,6 +45,11 @@
       {
         "command": "dynamics365Tools.openResourceMenu",
         "title": "Resource Actions",
+        "category": "Dynamics 365 Tools"
+      },
+      {
+        "command": "dynamics365Tools.openInCrm",
+        "title": "Open in Power Apps",
         "category": "Dynamics 365 Tools"
       },
       {
@@ -99,21 +105,28 @@
       "dynamics365Tools.resourceMenu": [
         {
           "command": "dynamics365Tools.publishResource",
-          "group": "inline@1",
-          "when": "true"
+          "group": "inline@1"
         },
         {
           "command": "dynamics365Tools.bindResource",
           "group": "inline@2"
         },
         {
+          "command": "dynamics365Tools.openInCrm",
+          "group": "inline@3",
+          "when": "true"
+        },
+        {
           "command": "dynamics365Tools.configureEnvironments",
-          "group": "inline@3"
+          "group": "inline@4"
         }
       ],
       "commandPalette": [
         {
           "command": "dynamics365Tools.openResourceMenu"
+        },
+        {
+          "command": "dynamics365Tools.openInCrm"
         },
         {
           "command": "dynamics365Tools.configureEnvironments"
