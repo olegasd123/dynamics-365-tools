@@ -126,6 +126,7 @@ const authentication = {
   getSession: async () => {
     throw new Error("authentication.getSession not stubbed");
   },
+  removeSession: undefined,
 };
 
 const commands = {

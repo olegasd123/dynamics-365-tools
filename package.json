@@ -33,6 +33,7 @@
     "onCommand:dynamics365Tools.bindResource",
     "onCommand:dynamics365Tools.publishResource",
     "onCommand:dynamics365Tools.signInInteractive",
+    "onCommand:dynamics365Tools.signOut",
     "onCommand:dynamics365Tools.setEnvironmentCredentials",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
@@ -73,6 +74,11 @@
       {
         "command": "dynamics365Tools.signInInteractive",
         "title": "Sign In (Interactive)",
+        "category": "Dynamics 365 Tools"
+      },
+      {
+        "command": "dynamics365Tools.signOut",
+        "title": "Sign Out",
         "category": "Dynamics 365 Tools"
       }
     ],
@@ -126,6 +132,9 @@
         },
         {
           "command": "dynamics365Tools.signInInteractive"
+        },
+        {
+          "command": "dynamics365Tools.signOut"
         }
       ]
     }

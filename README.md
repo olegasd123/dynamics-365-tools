@@ -63,6 +63,7 @@ Notes:
 
 - **Interactive (default)**: run `Dynamics 365 Tools: Sign In (Interactive)` or publish; tokens are requested with the `/.default` scope for the environment URL (or `resource`).
 - **Client credentials**: run `Dynamics 365 Tools: Set Environment Credentials` to store `clientId`, `clientSecret`, and optional `tenantId` in Secret Storage. Set the environment `authType` to `clientSecret` to force this path.
+- **Sign out**: run `Dynamics 365 Tools: Sign Out` to clear the interactive session for an environment; you can also choose to remove any stored client credentials for it.
 - The extension remembers the last picked environment so you do not have to choose it every time.
 
 ### Bind resources
