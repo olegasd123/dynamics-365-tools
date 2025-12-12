@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { BindingSnapshot, Dynamics365Configuration, BindingEntry } from "../types";
-import { configurationSchema, bindingsSchema } from "./schemas";
+import { configurationSchema, bindingsSchema } from "../schemas";
 
 export const WEB_RESOURCE_SUPPORTED_EXTENSIONS = [
   ".js",

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { ConfigurationService } from "./configurationService";
-import { publishCacheSchema } from "./schemas";
+import { publishCacheSchema } from "../schemas";
 
 interface PublishCacheEntry {
   mtime: number;
