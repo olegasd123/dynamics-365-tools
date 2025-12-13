@@ -53,13 +53,13 @@ function buildDefaultRemotePath(relativePath: string, defaultPrefix?: string): s
   }
 
   const prefix = defaultPrefix.replace(/[\\/]+$/, "");
-  const segments = normalized.split("/").filter(Boolean);
-  const prefixIndex = segments.findIndex((segment) => segment === prefix);
-  const trimmed = prefixIndex >= 0 ? segments.slice(prefixIndex).join("/") : normalized;
-
-  if (trimmed === prefix || trimmed.startsWith(`${prefix}/`)) {
-    return trimmed;
+  if (!prefix) {
+    return normalized;
   }
 
-  return `${prefix}/${trimmed}`;
+  if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
+    return normalized;
+  }
+
+  return `${prefix}/${normalized}`;
 }
