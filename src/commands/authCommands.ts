@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../services/configurationService";
-import { UiService } from "../services/uiService";
+import { SolutionService } from "../services/solutionService";
 import { SecretService } from "../services/secretService";
 import { AuthService } from "../services/authService";
 import { LastSelectionService } from "../services/lastSelectionService";
 
 export async function setEnvironmentCredentials(
   configuration: ConfigurationService,
-  ui: UiService,
+  ui: SolutionService,
   secrets: SecretService,
 ): Promise<void> {
   const config = await configuration.loadConfiguration();
@@ -49,7 +49,7 @@ export async function setEnvironmentCredentials(
 
 export async function signInInteractive(
   configuration: ConfigurationService,
-  ui: UiService,
+  ui: SolutionService,
   auth: AuthService,
   lastSelection: LastSelectionService,
 ): Promise<void> {
@@ -69,7 +69,7 @@ export async function signInInteractive(
 
 export async function signOut(
   configuration: ConfigurationService,
-  ui: UiService,
+  ui: SolutionService,
   auth: AuthService,
   secrets: SecretService,
   lastSelection: LastSelectionService,

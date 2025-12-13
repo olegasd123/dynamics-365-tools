@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { ConfigurationService } from "../services/configurationService";
 import { BindingService } from "../services/bindingService";
-import { UiService } from "../services/uiService";
+import { SolutionService } from "../services/solutionService";
 import { PublisherService } from "../services/publisherService";
 import { SecretService } from "../services/secretService";
 import { AuthService } from "../services/authService";
@@ -17,7 +17,7 @@ export async function openInCrm(
   uri: vscode.Uri | undefined,
   configuration: ConfigurationService,
   bindings: BindingService,
-  ui: UiService,
+  ui: SolutionService,
   publisher: PublisherService,
   secrets: SecretService,
   auth: AuthService,

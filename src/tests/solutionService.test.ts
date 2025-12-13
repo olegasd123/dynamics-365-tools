@@ -1,10 +1,10 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
-import { UiService } from "../services/uiService";
+import { SolutionService } from "../services/solutionService";
 
 test("pickEnvironment shows error and returns undefined when list is empty", async () => {
-  const ui = new UiService();
+  const ui = new SolutionService();
   const messages = (vscode.window as any).__messages;
   messages.error.length = 0;
 
@@ -15,7 +15,7 @@ test("pickEnvironment shows error and returns undefined when list is empty", asy
 });
 
 test("pickEnvironment marks default environment as picked", async () => {
-  const ui = new UiService();
+  const ui = new SolutionService();
   const originalQuickPick = (vscode.window as any).showQuickPick;
   let receivedItems: any[] | undefined;
   (vscode.window as any).showQuickPick = async (items: any[]) => {
@@ -41,12 +41,12 @@ test("pickEnvironment marks default environment as picked", async () => {
 });
 
 test("promptSolution uses quick pick when solutions exist", async () => {
-  const ui = new UiService();
+  const ui = new SolutionService();
   const originalQuickPick = (vscode.window as any).showQuickPick;
   let receivedItems: any[] | undefined;
   (vscode.window as any).showQuickPick = async (items: any[]) => {
     receivedItems = items;
-    return items[1];
+    return items.find((item) => item.solution?.name === "Feature");
   };
 
   try {
@@ -56,17 +56,46 @@ test("promptSolution uses quick pick when solutions exist", async () => {
     ]);
 
     assert.strictEqual(solution?.name, "Feature");
-    assert.strictEqual(receivedItems?.[0].label, "new_");
-    assert.strictEqual(receivedItems?.[1].label, "feat_");
+    assert.strictEqual(receivedItems?.[0].label, "Core");
+    assert.strictEqual(receivedItems?.[1].label, "Feature");
+    assert.ok(receivedItems?.some((item) => item.label === "Default solution"));
+    assert.strictEqual(receivedItems?.[receivedItems.length - 1].label, "Other solution…");
   } finally {
     (vscode.window as any).showQuickPick = originalQuickPick;
   }
 });
 
-test("promptSolution falls back to input box when no solutions configured", async () => {
-  const ui = new UiService();
+test("promptSolution allows selecting the default solution when none configured", async () => {
+  const ui = new SolutionService();
   const originalInputBox = (vscode.window as any).showInputBox;
+  const originalQuickPick = (vscode.window as any).showQuickPick;
+  let receivedItems: any[] | undefined;
+  (vscode.window as any).showQuickPick = async (items: any[]) => {
+    receivedItems = items;
+    return items.find((item) => item.label === "Default solution");
+  };
+
+  try {
+    const solution = await ui.promptSolution([]);
+
+    assert.deepStrictEqual(solution, {
+      name: "Default",
+      prefix: "new_",
+    });
+    assert.strictEqual(receivedItems?.[0].label, "Default solution");
+  } finally {
+    (vscode.window as any).showQuickPick = originalQuickPick;
+    (vscode.window as any).showInputBox = originalInputBox;
+  }
+});
+
+test("promptSolution lets user enter a custom solution via quick pick", async () => {
+  const ui = new SolutionService();
+  const originalInputBox = (vscode.window as any).showInputBox;
+  const originalQuickPick = (vscode.window as any).showQuickPick;
   (vscode.window as any).showInputBox = async () => "EnteredSolution";
+  (vscode.window as any).showQuickPick = async (items: any[]) =>
+    items.find((item) => item.manualEntry);
 
   try {
     const solution = await ui.promptSolution([]);
@@ -76,6 +105,7 @@ test("promptSolution falls back to input box when no solutions configured", asyn
       prefix: "",
     });
   } finally {
+    (vscode.window as any).showQuickPick = originalQuickPick;
     (vscode.window as any).showInputBox = originalInputBox;
   }
 });

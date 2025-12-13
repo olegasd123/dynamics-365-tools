@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../services/configurationService";
 import { BindingService } from "../services/bindingService";
-import { UiService } from "../services/uiService";
+import { SolutionService } from "../services/solutionService";
 import { PublisherService } from "../services/publisherService";
 import { SecretService } from "../services/secretService";
 import { AuthService } from "../services/authService";
@@ -22,7 +22,7 @@ const FOLDER_PUBLISH_CONCURRENCY = 4;
 export async function publishLastResource(
   configuration: ConfigurationService,
   bindings: BindingService,
-  ui: UiService,
+  ui: SolutionService,
   publisher: PublisherService,
   secrets: SecretService,
   auth: AuthService,
@@ -89,7 +89,7 @@ export async function openResourceMenu(
   uri: vscode.Uri | undefined,
   configuration: ConfigurationService,
   bindings: BindingService,
-  ui: UiService,
+  ui: SolutionService,
   publisher: PublisherService,
   secrets: SecretService,
   auth: AuthService,
@@ -154,7 +154,7 @@ export async function publishResource(
   uri: vscode.Uri | undefined,
   configuration: ConfigurationService,
   bindings: BindingService,
-  ui: UiService,
+  ui: SolutionService,
   publisher: PublisherService,
   secrets: SecretService,
   auth: AuthService,
@@ -226,7 +226,7 @@ async function publishFlow(
   binding: BindingEntry,
   targetUri: vscode.Uri,
   configuration: ConfigurationService,
-  ui: UiService,
+  ui: SolutionService,
   publisher: PublisherService,
   secrets: SecretService,
   auth: AuthService,
@@ -267,7 +267,7 @@ async function publishFolder(
   supportedExtensions: Set<string>,
   configuration: ConfigurationService,
   bindings: BindingService,
-  ui: UiService,
+  ui: SolutionService,
   publisher: PublisherService,
   secrets: SecretService,
   auth: AuthService,

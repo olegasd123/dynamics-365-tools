@@ -20,6 +20,9 @@ export interface SolutionConfig {
   prefix: string;
 }
 
+/** Built-in solution unique name used by Dynamics 365 */
+export const DEFAULT_SOLUTION_NAME = "Default";
+
 export interface Dynamics365Configuration {
   environments: EnvironmentConfig[];
   solutions: SolutionConfig[];

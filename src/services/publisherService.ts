@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { BindingEntry, EnvironmentConfig } from "../types";
+import { BindingEntry, DEFAULT_SOLUTION_NAME, EnvironmentConfig } from "../types";
 import { EnvironmentCredentials } from "./secretService";
 import { PublishCacheService } from "./publishCacheService";
 import * as crypto from "crypto";
@@ -346,13 +346,13 @@ export class PublisherService {
     solutionName: string,
     remotePath: string,
     userAgent?: string,
-  ): Promise<{ solutionId: string; existingId?: string }> {
+  ): Promise<{ solutionId?: string; existingId?: string }> {
     const [solutionId, resources] = await Promise.all([
       this.getSolutionId(apiRoot, token, solutionName, userAgent),
       this.listWebResources(apiRoot, token, remotePath, userAgent),
     ]);
 
-    if (!solutionId) {
+    if (!solutionId && !this.isDefaultSolution(solutionName)) {
       throw new Error(`Solution ${solutionName} not found.`);
     }
 
@@ -493,6 +493,11 @@ export class PublisherService {
     solutionId?: string,
     userAgent?: string,
   ): Promise<void> {
+    if (this.isDefaultSolution(solutionName)) {
+      this.output.appendLine("  ↷ skipping solution add for default solution");
+      return;
+    }
+
     const targetSolutionId =
       solutionId ?? (await this.getSolutionId(apiRoot, token, solutionName, userAgent));
     if (!targetSolutionId) {
@@ -606,6 +611,10 @@ export class PublisherService {
 
   private trimGuid(value: string): string {
     return value.replace(/[{}]/g, "");
+  }
+
+  private isDefaultSolution(solutionName: string): boolean {
+    return solutionName.trim().toLowerCase() === DEFAULT_SOLUTION_NAME.toLowerCase();
   }
 
   private async publishWebResource(

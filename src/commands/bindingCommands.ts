@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../services/configurationService";
 import { BindingService } from "../services/bindingService";
-import { UiService } from "../services/uiService";
+import { SolutionService } from "../services/solutionService";
 import { BindingEntry } from "../types";
 import { resolveTargetUri } from "./common";
 
@@ -9,7 +9,7 @@ export async function addBinding(
   uri: vscode.Uri | undefined,
   configuration: ConfigurationService,
   bindings: BindingService,
-  ui: UiService,
+  ui: SolutionService,
 ): Promise<void> {
   const targetUri = await resolveTargetUri(uri);
   if (!targetUri) {

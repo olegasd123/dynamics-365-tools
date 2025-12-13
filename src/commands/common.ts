@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../services/configurationService";
-import { UiService } from "../services/uiService";
+import { SolutionService } from "../services/solutionService";
 import { SecretService } from "../services/secretService";
 import { AuthService } from "../services/authService";
 import { LastSelectionService } from "../services/lastSelectionService";
@@ -22,7 +22,7 @@ export async function resolveTargetUri(uri?: vscode.Uri): Promise<vscode.Uri | u
 
 export async function pickEnvironmentAndAuth(
   configuration: ConfigurationService,
-  ui: UiService,
+  ui: SolutionService,
   secrets: SecretService,
   auth: AuthService,
   lastSelection: LastSelectionService,

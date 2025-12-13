@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "./services/configurationService";
 import { BindingService } from "./services/bindingService";
-import { UiService } from "./services/uiService";
+import { SolutionService } from "./services/solutionService";
 import { PublisherService } from "./services/publisherService";
 import { SecretService } from "./services/secretService";
 import { AuthService } from "./services/authService";
@@ -18,7 +18,7 @@ import { WebResourceService } from "./services/webResourceService";
 export async function activate(context: vscode.ExtensionContext) {
   const configuration = new ConfigurationService();
   const bindings = new BindingService(configuration);
-  const ui = new UiService();
+  const ui = new SolutionService();
   const publisher = new PublisherService();
   const secrets = new SecretService(context.secrets);
   const auth = new AuthService();
