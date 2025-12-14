@@ -7,8 +7,6 @@ dist/
 
 # VS Code settings (keep project configs)
 .vscode/*
-!.vscode/xrm.config.json
-!.vscode/xrm.bindings.json
 !.vscode/launch.json
 !.vscode/tasks.json
 
