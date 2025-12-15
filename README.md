@@ -20,6 +20,7 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 - **Folder publish extras**: up to 4 files publish in parallel, unchanged files are skipped using `.vscode/dynamics365tools.publishCache.json`, and you can cancel from the progress notification.
 - **Auth options**: interactive sign-in (default) or client credentials stored securely; per-environment `authType` control.
 - **Output channel logging** with clear summaries and a “copy error details” action when something fails.
+- **Plugin explorer & assemblies**: browse plugin assemblies, plugin types, steps, and images in VS Code. Register new assemblies or update existing ones directly from the explorer.
 
 ### Install
 
@@ -101,6 +102,14 @@ File bindings win over folder bindings when both cover the same file.
 - Unchanged files in a folder publish are skipped using `.vscode/dynamics365tools.publishCache.json` (based on content hash, size, and mtime).
 - Quick publish: click the status bar item (cloud upload) or run `Dynamics 365 Tools: Publish Last Resource` to republish the most recent file or folder with the same environment and binding.
 - Open a published web resource in classic CRM: right-click the bound file → `Dynamics 365 Tools` → `Open in Power Apps`, choose the environment, and the extension opens the classic web resource editor URL for that solution and resource.
+
+### Manage plugins
+
+- Open the **Dynamics 365 Plugins** view in the Explorer to browse assemblies → plugin types → steps → images for any configured environment.
+- Use the view title actions (refresh/register) or the Command Palette commands:
+  - `Dynamics 365 Tools: Register Plugin Assembly` uploads a `.dll` to the selected environment and adds it to your chosen solution.
+  - `Dynamics 365 Tools: Update Plugin Assembly` replaces the content of an existing assembly with a new `.dll`.
+  - `Dynamics 365 Tools: Generate Strong Name Key (Public Key Token)` creates a `.snk` using the local `sn` tool and shows the public key token for signing your assemblies.
 
 ### Supported file types
 

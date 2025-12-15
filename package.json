@@ -36,6 +36,10 @@
     "onCommand:dynamics365Tools.signInInteractive",
     "onCommand:dynamics365Tools.signOut",
     "onCommand:dynamics365Tools.setEnvironmentCredentials",
+    "onCommand:dynamics365Tools.plugins.registerAssembly",
+    "onCommand:dynamics365Tools.plugins.updateAssembly",
+    "onCommand:dynamics365Tools.plugins.generatePublicKeyToken",
+    "onCommand:dynamics365Tools.plugins.refreshExplorer",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
   ],
@@ -85,6 +89,26 @@
       {
         "command": "dynamics365Tools.signOut",
         "title": "Sign Out",
+        "category": "Dynamics 365 Tools"
+      },
+      {
+        "command": "dynamics365Tools.plugins.registerAssembly",
+        "title": "Register Plugin Assembly",
+        "category": "Dynamics 365 Tools"
+      },
+      {
+        "command": "dynamics365Tools.plugins.updateAssembly",
+        "title": "Update Plugin Assembly",
+        "category": "Dynamics 365 Tools"
+      },
+      {
+        "command": "dynamics365Tools.plugins.refreshExplorer",
+        "title": "Refresh Plugin Explorer",
+        "category": "Dynamics 365 Tools"
+      },
+      {
+        "command": "dynamics365Tools.plugins.generatePublicKeyToken",
+        "title": "Generate Strong Name Key (Public Key Token)",
         "category": "Dynamics 365 Tools"
       }
     ],
@@ -148,6 +172,45 @@
         },
         {
           "command": "dynamics365Tools.signOut"
+        },
+        {
+          "command": "dynamics365Tools.plugins.registerAssembly"
+        },
+        {
+          "command": "dynamics365Tools.plugins.updateAssembly"
+        },
+        {
+          "command": "dynamics365Tools.plugins.refreshExplorer"
+        },
+        {
+          "command": "dynamics365Tools.plugins.generatePublicKeyToken"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dynamics365Tools.plugins.refreshExplorer",
+          "when": "view == dynamics365Tools.pluginExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "dynamics365Tools.plugins.registerAssembly",
+          "when": "view == dynamics365Tools.pluginExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dynamics365Tools.plugins.updateAssembly",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginAssembly",
+          "group": "inline"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "dynamics365Tools.pluginExplorer",
+          "name": "Dynamics 365 Plugins"
         }
       ]
     }

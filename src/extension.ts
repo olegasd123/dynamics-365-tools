@@ -14,6 +14,13 @@ import { addBinding } from "./commands/bindingCommands";
 import { editConfiguration } from "./commands/configCommands";
 import { setEnvironmentCredentials, signInInteractive, signOut } from "./commands/authCommands";
 import { WebResourceService } from "./services/webResourceService";
+import { EnvironmentConnectionService } from "./services/environmentConnectionService";
+import { PluginExplorerProvider } from "./plugins/pluginExplorer";
+import {
+  generatePublicKeyToken,
+  registerPluginAssembly,
+  updatePluginAssembly,
+} from "./commands/pluginCommands";
 
 export async function activate(context: vscode.ExtensionContext) {
   const configuration = new ConfigurationService();
@@ -26,6 +33,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const lastSelection = new LastSelectionService(context.workspaceState);
   const publishCache = new PublishCacheService(configuration);
   const webResources = new WebResourceService();
+  const connections = new EnvironmentConnectionService(auth, secrets);
+  const pluginExplorer = new PluginExplorerProvider(configuration, connections);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("dynamics365Tools.openResourceMenu", async (uri?: vscode.Uri) =>
@@ -97,6 +106,38 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("dynamics365Tools.signOut", async () =>
       signOut(configuration, ui, auth, secrets, lastSelection),
     ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.registerAssembly", async () =>
+      registerPluginAssembly(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+      ),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.updateAssembly",
+      async (node) =>
+        updatePluginAssembly(
+          configuration,
+          ui,
+          secrets,
+          auth,
+          lastSelection,
+          connections,
+          pluginExplorer,
+          node,
+        ),
+    ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.refreshExplorer", () =>
+      pluginExplorer.refresh(),
+    ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.generatePublicKeyToken", async () =>
+      generatePublicKeyToken(configuration),
+    ),
+    vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", pluginExplorer),
     statusBar,
   );
 }
