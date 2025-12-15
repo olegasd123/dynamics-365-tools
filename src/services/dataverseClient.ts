@@ -16,6 +16,10 @@ export class DataverseClient {
     return this.request<T>("PATCH", path, body);
   }
 
+  async delete(path: string): Promise<void> {
+    await this.request<void>("DELETE", path);
+  }
+
   get apiRoot(): string {
     return this.connection.apiRoot;
   }

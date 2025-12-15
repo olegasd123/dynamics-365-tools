@@ -21,6 +21,14 @@ import {
   registerPluginAssembly,
   updatePluginAssembly,
 } from "./commands/pluginCommands";
+import {
+  createPluginImage,
+  createPluginStep,
+  deletePluginImage,
+  deletePluginStep,
+  editPluginImage,
+  editPluginStep,
+} from "./commands/pluginStepCommands";
 
 export async function activate(context: vscode.ExtensionContext) {
   const configuration = new ConfigurationService();
@@ -129,13 +137,43 @@ export async function activate(context: vscode.ExtensionContext) {
           connections,
           pluginExplorer,
           node,
-        ),
+      ),
     ),
     vscode.commands.registerCommand("dynamics365Tools.plugins.refreshExplorer", () =>
       pluginExplorer.refresh(),
     ),
     vscode.commands.registerCommand("dynamics365Tools.plugins.generatePublicKeyToken", async () =>
       generatePublicKeyToken(configuration),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.createStep",
+      async (node) =>
+        createPluginStep(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.editStep",
+      async (node) =>
+        editPluginStep(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.deleteStep",
+      async (node) =>
+        deletePluginStep(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.createImage",
+      async (node) =>
+        createPluginImage(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.editImage",
+      async (node) =>
+        editPluginImage(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    ),
+    vscode.commands.registerCommand(
+      "dynamics365Tools.plugins.deleteImage",
+      async (node) =>
+        deletePluginImage(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
     ),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", pluginExplorer),
     statusBar,

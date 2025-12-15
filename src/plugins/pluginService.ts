@@ -200,6 +200,186 @@ export class PluginService {
     };
   }
 
+  async createStep(pluginTypeId: string, input: {
+    name: string;
+    messageName: string;
+    primaryEntity?: string;
+    stage: number;
+    mode: number;
+    rank?: number;
+    filteringAttributes?: string;
+    description?: string;
+  }): Promise<string> {
+    const normalizedPluginTypeId = this.normalizeGuid(pluginTypeId);
+    const messageId = await this.resolveSdkMessageId(input.messageName);
+    if (!messageId) {
+      throw new Error(`SDK message '${input.messageName}' not found.`);
+    }
+
+    const filterId = input.primaryEntity
+      ? await this.resolveSdkMessageFilterId(messageId, input.primaryEntity)
+      : undefined;
+
+    const payload: Record<string, unknown> = {
+      name: input.name,
+      stage: input.stage,
+      mode: input.mode,
+      rank: input.rank ?? 1,
+      filteringattributes: input.filteringAttributes ?? "",
+      description: input.description ?? "",
+      supporteddeployment: 0, // server only
+      invocationsource: 0, // parent pipeline
+      "eventhandler@odata.bind": `/plugintypes(${normalizedPluginTypeId})`,
+      "sdkmessageid@odata.bind": `/sdkmessages(${messageId})`,
+    };
+
+    if (filterId) {
+      payload["sdkmessagefilterid@odata.bind"] = `/sdkmessagefilters(${filterId})`;
+    }
+
+    const response = await this.client.post<{ sdkmessageprocessingstepid?: string }>(
+      "/sdkmessageprocessingsteps",
+      payload,
+    );
+    const id = response.sdkmessageprocessingstepid;
+    if (!id) {
+      throw new Error("Step created but no identifier returned.");
+    }
+    return this.normalizeGuid(id);
+  }
+
+  async updateStep(stepId: string, input: Partial<{
+    name: string;
+    stage: number;
+    mode: number;
+    rank: number;
+    filteringAttributes: string;
+    description: string;
+    messageName: string;
+    primaryEntity: string;
+  }>): Promise<void> {
+    const normalizedStepId = this.normalizeGuid(stepId);
+    const payload: Record<string, unknown> = {};
+
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.stage !== undefined) payload.stage = input.stage;
+    if (input.mode !== undefined) payload.mode = input.mode;
+    if (input.rank !== undefined) payload.rank = input.rank;
+    if (input.filteringAttributes !== undefined) payload.filteringattributes = input.filteringAttributes;
+    if (input.description !== undefined) payload.description = input.description;
+
+    if (input.messageName) {
+      const messageId = await this.resolveSdkMessageId(input.messageName);
+      if (!messageId) {
+        throw new Error(`SDK message '${input.messageName}' not found.`);
+      }
+      payload["sdkmessageid@odata.bind"] = `/sdkmessages(${messageId})`;
+    }
+
+    if (input.primaryEntity) {
+      const messageId =
+        input.messageName && payload["sdkmessageid@odata.bind"]
+          ? this.extractIdFromBind(payload["sdkmessageid@odata.bind"] as string)
+          : await this.getStepMessageId(normalizedStepId);
+      if (!messageId) {
+        throw new Error("Cannot update primary entity without message.");
+      }
+      const filterId = await this.resolveSdkMessageFilterId(messageId, input.primaryEntity);
+      payload["sdkmessagefilterid@odata.bind"] = filterId
+        ? `/sdkmessagefilters(${filterId})`
+        : null;
+    }
+
+    await this.client.patch(`/sdkmessageprocessingsteps(${normalizedStepId})`, payload);
+  }
+
+  async deleteStep(stepId: string): Promise<void> {
+    const normalizedStepId = this.normalizeGuid(stepId);
+    await this.client.delete(`/sdkmessageprocessingsteps(${normalizedStepId})`);
+  }
+
+  async createImage(stepId: string, input: {
+    name: string;
+    type: number;
+    entityAlias: string;
+    attributes?: string;
+    messagePropertyName?: string;
+  }): Promise<string> {
+    const normalizedStepId = this.normalizeGuid(stepId);
+    const payload = {
+      name: input.name,
+      imagetype: input.type,
+      entityalias: input.entityAlias,
+      attributes: input.attributes ?? "",
+      messagepropertyname: input.messagePropertyName ?? "Target",
+      "sdkmessageprocessingstepid@odata.bind": `/sdkmessageprocessingsteps(${normalizedStepId})`,
+    };
+
+    const response = await this.client.post<{ sdkmessageprocessingstepimageid?: string }>(
+      "/sdkmessageprocessingstepimages",
+      payload,
+    );
+    const id = response.sdkmessageprocessingstepimageid;
+    if (!id) {
+      throw new Error("Image created but no identifier returned.");
+    }
+    return this.normalizeGuid(id);
+  }
+
+  async updateImage(imageId: string, input: Partial<{
+    name: string;
+    type: number;
+    entityAlias: string;
+    attributes: string;
+    messagePropertyName: string;
+  }>): Promise<void> {
+    const normalizedImageId = this.normalizeGuid(imageId);
+    const payload: Record<string, unknown> = {};
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.type !== undefined) payload.imagetype = input.type;
+    if (input.entityAlias !== undefined) payload.entityalias = input.entityAlias;
+    if (input.attributes !== undefined) payload.attributes = input.attributes;
+    if (input.messagePropertyName !== undefined) payload.messagepropertyname = input.messagePropertyName;
+
+    await this.client.patch(`/sdkmessageprocessingstepimages(${normalizedImageId})`, payload);
+  }
+
+  async deleteImage(imageId: string): Promise<void> {
+    const normalizedImageId = this.normalizeGuid(imageId);
+    await this.client.delete(`/sdkmessageprocessingstepimages(${normalizedImageId})`);
+  }
+
+  private async resolveSdkMessageId(messageName: string): Promise<string | undefined> {
+    const filter = encodeURIComponent(`name eq '${messageName.replace(/'/g, "''")}'`);
+    const url = `/sdkmessages?$select=sdkmessageid,name&$filter=${filter}&$top=1`;
+    const response = await this.client.get<{ value?: Array<{ sdkmessageid?: string }> }>(url);
+    const id = response.value?.[0]?.sdkmessageid;
+    return id ? this.normalizeGuid(id) : undefined;
+  }
+
+  private async resolveSdkMessageFilterId(messageId: string, primaryEntity: string): Promise<string | undefined> {
+    const normalizedMessageId = this.normalizeGuid(messageId);
+    const filter = encodeURIComponent(
+      `_sdkmessageid_value eq ${normalizedMessageId} and primaryobjecttypecode eq '${primaryEntity.replace(/'/g, "''")}'`,
+    );
+    const url = `/sdkmessagefilters?$select=sdkmessagefilterid,primaryobjecttypecode&$filter=${filter}&$top=1`;
+    const response = await this.client.get<{ value?: Array<{ sdkmessagefilterid?: string }> }>(url);
+    const id = response.value?.[0]?.sdkmessagefilterid;
+    return id ? this.normalizeGuid(id) : undefined;
+  }
+
+  private extractIdFromBind(bind: string): string | undefined {
+    const match = bind.match(/\(([0-9a-fA-F-]{36})\)/);
+    return match?.[1];
+  }
+
+  private async getStepMessageId(stepId: string): Promise<string | undefined> {
+    const url = `/sdkmessageprocessingsteps(${stepId})?$select=sdkmessageprocessingstepid&$expand=sdkmessageid($select=sdkmessageid)`;
+    const response = await this.client.get<{ sdkmessageid?: { sdkmessageid?: string } }>(url);
+    const id = response.sdkmessageid?.sdkmessageid;
+    return id ? this.normalizeGuid(id) : undefined;
+  }
+
   private normalizeGuid(value: string): string {
     return value.replace(/[{}]/g, "");
   }

@@ -177,7 +177,7 @@ export class PluginAssemblyNode extends vscode.TreeItem {
   }
 }
 
-class PluginTypeNode extends vscode.TreeItem {
+export class PluginTypeNode extends vscode.TreeItem {
   readonly contextValue = "d365PluginType";
 
   constructor(
@@ -191,7 +191,7 @@ class PluginTypeNode extends vscode.TreeItem {
   }
 }
 
-class PluginStepNode extends vscode.TreeItem {
+export class PluginStepNode extends vscode.TreeItem {
   readonly contextValue = "d365PluginStep";
 
   constructor(
@@ -205,7 +205,7 @@ class PluginStepNode extends vscode.TreeItem {
   }
 }
 
-class PluginImageNode extends vscode.TreeItem {
+export class PluginImageNode extends vscode.TreeItem {
   readonly contextValue = "d365PluginImage";
 
   constructor(
