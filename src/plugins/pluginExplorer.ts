@@ -1,11 +1,14 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../services/configurationService";
 import { EnvironmentConnectionService } from "../services/environmentConnectionService";
-import { DataverseClient } from "../services/dataverseClient";
+import { DataverseClient, isDefaultSolution } from "../services/dataverseClient";
 import { SolutionComponentService } from "../services/solutionComponentService";
 import { PluginService } from "./pluginService";
 import { PluginAssembly, PluginImage, PluginStep, PluginType } from "./models";
-import { EnvironmentConfig } from "../types";
+import { EnvironmentConfig, SolutionConfig } from "../types";
+
+const SOLUTION_FILTER_STATE_KEY = "d365Tools.plugins.filterConfiguredSolutions";
+const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.plugins.filterConfiguredSolutions";
 
 export type PluginExplorerNode =
   | EnvironmentNode
@@ -19,14 +22,29 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
     PluginExplorerNode | undefined | void
   >();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
+  private filterByConfiguredSolutions = true;
 
   constructor(
     private readonly configuration: ConfigurationService,
     private readonly connections: EnvironmentConnectionService,
+    private readonly state: vscode.Memento,
   ) {}
+
+  async initialize(): Promise<void> {
+    this.filterByConfiguredSolutions = this.state.get<boolean>(SOLUTION_FILTER_STATE_KEY, true);
+    await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
+    this.updateFilterContext();
+  }
 
   refresh(node?: PluginExplorerNode): void {
     this.onDidChangeTreeDataEmitter.fire(node);
+  }
+
+  async toggleSolutionFilter(): Promise<void> {
+    this.filterByConfiguredSolutions = !this.filterByConfiguredSolutions;
+    await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
+    this.updateFilterContext();
+    this.refresh();
   }
 
   getTreeItem(element: PluginExplorerNode): vscode.TreeItem {
@@ -69,7 +87,9 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
     }
 
     try {
-      const assemblies = await service.listAssemblies();
+      const config = await this.configuration.loadConfiguration();
+      const solutionNames = this.getSolutionNamesForFiltering(config.solutions);
+      const assemblies = await service.listAssemblies({ solutionNames });
       return assemblies.map((assembly) => new PluginAssemblyNode(env, assembly));
     } catch (error) {
       void vscode.window.showErrorMessage(
@@ -136,6 +156,25 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
     }
   }
 
+  private getSolutionNamesForFiltering(
+    solutions: SolutionConfig[],
+  ): string[] | undefined {
+    if (!this.filterByConfiguredSolutions) {
+      return undefined;
+    }
+
+    if (solutions.some((solution) => isDefaultSolution(solution.name))) {
+      return undefined;
+    }
+
+    const names = solutions
+      .map((solution) => solution.name?.trim())
+      .filter((name): name is string => Boolean(name))
+      .filter((name) => !isDefaultSolution(name));
+
+    return names.length ? names : undefined;
+  }
+
   private async getPluginService(env: EnvironmentConfig): Promise<PluginService | undefined> {
     try {
       const connection = await this.connections.createConnection(env);
@@ -151,6 +190,14 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
       );
       return undefined;
     }
+  }
+
+  private updateFilterContext(): void {
+    void vscode.commands.executeCommand(
+      "setContext",
+      SOLUTION_FILTER_CONTEXT_KEY,
+      this.filterByConfiguredSolutions,
+    );
   }
 }
 

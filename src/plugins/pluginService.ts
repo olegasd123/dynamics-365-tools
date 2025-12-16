@@ -53,32 +53,23 @@ export class PluginService {
     });
   }
 
-  async listAssemblies(): Promise<PluginAssembly[]> {
-    const url =
-      "/pluginassemblies?$select=pluginassemblyid,name,version,isolationmode,publickeytoken,culture,sourcetype&$orderby=name";
-    const response = await this.client.get<{
-      value?: Array<{
-        pluginassemblyid?: string;
-        name?: string;
-        version?: string;
-        isolationmode?: number;
-        publickeytoken?: string;
-        culture?: string;
-        sourcetype?: number;
-      }>;
-    }>(url);
+  async listAssemblies(options?: { solutionNames?: string[] }): Promise<PluginAssembly[]> {
+    const assemblies = await this.fetchAssemblies();
+    const solutionNames = options?.solutionNames?.map((name) => name.trim()).filter(Boolean);
+    if (!solutionNames?.length) {
+      return assemblies;
+    }
 
-    return (response.value ?? [])
-      .filter((item) => item.pluginassemblyid && item.name)
-      .map((item) => ({
-        id: this.normalizeGuid(item.pluginassemblyid!),
-        name: item.name ?? "",
-        version: item.version,
-        isolationMode: item.isolationmode,
-        publicKeyToken: item.publickeytoken,
-        culture: item.culture,
-        sourceType: item.sourcetype,
-      }));
+    const ids = await this.solutionComponents.listComponentIdsForSolutions(
+      SolutionComponentType.PluginAssembly,
+      solutionNames,
+    );
+
+    if (!ids.size) {
+      return [];
+    }
+
+    return assemblies.filter((assembly) => ids.has(assembly.id));
   }
 
   async listPluginTypes(assemblyId: string): Promise<PluginType[]> {
@@ -371,6 +362,34 @@ export class PluginService {
   private extractIdFromBind(bind: string): string | undefined {
     const match = bind.match(/\(([0-9a-fA-F-]{36})\)/);
     return match?.[1];
+  }
+
+  private async fetchAssemblies(): Promise<PluginAssembly[]> {
+    const url =
+      "/pluginassemblies?$select=pluginassemblyid,name,version,isolationmode,publickeytoken,culture,sourcetype&$orderby=name";
+    const response = await this.client.get<{
+      value?: Array<{
+        pluginassemblyid?: string;
+        name?: string;
+        version?: string;
+        isolationmode?: number;
+        publickeytoken?: string;
+        culture?: string;
+        sourcetype?: number;
+      }>;
+    }>(url);
+
+    return (response.value ?? [])
+      .filter((item) => item.pluginassemblyid && item.name)
+      .map((item) => ({
+        id: this.normalizeGuid(item.pluginassemblyid!),
+        name: item.name ?? "",
+        version: item.version,
+        isolationMode: item.isolationmode,
+        publicKeyToken: item.publickeytoken,
+        culture: item.culture,
+        sourceType: item.sourcetype,
+      }));
   }
 
   private async getStepMessageId(stepId: string): Promise<string | undefined> {
