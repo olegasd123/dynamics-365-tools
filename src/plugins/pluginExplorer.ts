@@ -41,7 +41,15 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
   }
 
   async toggleSolutionFilter(): Promise<void> {
-    this.filterByConfiguredSolutions = !this.filterByConfiguredSolutions;
+    await this.setSolutionFilter(!this.filterByConfiguredSolutions);
+  }
+
+  async setSolutionFilter(enabled: boolean): Promise<void> {
+    if (this.filterByConfiguredSolutions === enabled) {
+      return;
+    }
+
+    this.filterByConfiguredSolutions = enabled;
     await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
     this.updateFilterContext();
     this.refresh();

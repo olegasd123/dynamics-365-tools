@@ -46,6 +46,8 @@
     "onCommand:dynamics365Tools.plugins.editImage",
     "onCommand:dynamics365Tools.plugins.deleteImage",
     "onCommand:dynamics365Tools.plugins.toggleSolutionFilter",
+    "onCommand:dynamics365Tools.plugins.enableSolutionFilter",
+    "onCommand:dynamics365Tools.plugins.disableSolutionFilter",
     "onCommand:dynamics365Tools.plugins.refreshExplorer",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
@@ -121,6 +123,18 @@
         "title": "Show Configured Solutions Only",
         "category": "Dynamics 365 Tools",
         "icon": "$(filter)"
+      },
+      {
+        "command": "dynamics365Tools.plugins.enableSolutionFilter",
+        "title": "Show Configured Solutions Only",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dynamics365Tools.plugins.disableSolutionFilter",
+        "title": "Show Configured Solutions Only",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter-filled)"
       },
       {
         "command": "dynamics365Tools.plugins.generatePublicKeyToken",
@@ -262,8 +276,14 @@
       ],
       "view/title": [
         {
-          "command": "dynamics365Tools.plugins.toggleSolutionFilter",
-          "when": "view == dynamics365Tools.pluginExplorer",
+          "command": "dynamics365Tools.plugins.disableSolutionFilter",
+          "when": "view == dynamics365Tools.pluginExplorer && d365Tools.plugins.filterConfiguredSolutions",
+          "group": "navigation@0",
+          "toggled": "d365Tools.plugins.filterConfiguredSolutions"
+        },
+        {
+          "command": "dynamics365Tools.plugins.enableSolutionFilter",
+          "when": "view == dynamics365Tools.pluginExplorer && !d365Tools.plugins.filterConfiguredSolutions",
           "group": "navigation@0",
           "toggled": "d365Tools.plugins.filterConfiguredSolutions"
         },

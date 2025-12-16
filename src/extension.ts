@@ -150,6 +150,12 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("dynamics365Tools.plugins.toggleSolutionFilter", () =>
       pluginExplorer.toggleSolutionFilter(),
     ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.enableSolutionFilter", () =>
+      pluginExplorer.setSolutionFilter(true),
+    ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.disableSolutionFilter", () =>
+      pluginExplorer.setSolutionFilter(false),
+    ),
     vscode.commands.registerCommand("dynamics365Tools.plugins.generatePublicKeyToken", async () =>
       generatePublicKeyToken(configuration),
     ),
