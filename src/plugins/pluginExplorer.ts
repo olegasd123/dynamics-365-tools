@@ -147,7 +147,10 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
     }
   }
 
-  private async loadImages(env: EnvironmentConfig, step: PluginStep): Promise<PluginExplorerNode[]> {
+  private async loadImages(
+    env: EnvironmentConfig,
+    step: PluginStep,
+  ): Promise<PluginExplorerNode[]> {
     const service = await this.getPluginService(env);
     if (!service) {
       return [];
@@ -164,9 +167,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
     }
   }
 
-  private getSolutionNamesForFiltering(
-    solutions: SolutionConfig[],
-  ): string[] | undefined {
+  private getSolutionNamesForFiltering(solutions: SolutionConfig[]): string[] | undefined {
     if (!this.filterByConfiguredSolutions) {
       return undefined;
     }
@@ -312,9 +313,7 @@ function buildStepTooltip(step: PluginStep): vscode.MarkdownString {
     step.stage !== undefined ? `**Stage:** ${formatStepStage(step.stage)}` : undefined,
     step.mode !== undefined ? `**Mode:** ${formatStepMode(step.mode)}` : undefined,
     step.rank !== undefined ? `**Rank:** ${step.rank}` : undefined,
-    step.filteringAttributes
-      ? `**Filtering attributes:** ${step.filteringAttributes}`
-      : undefined,
+    step.filteringAttributes ? `**Filtering attributes:** ${step.filteringAttributes}` : undefined,
     step.status !== undefined ? `**Status:** ${formatStepStatus(step.status)}` : undefined,
   ].filter(Boolean);
 
@@ -334,9 +333,7 @@ function buildImageTooltip(image: PluginImage): vscode.MarkdownString {
     image.entityAlias ? `**Alias:** ${image.entityAlias}` : undefined,
     image.type !== undefined ? `**Type:** ${formatImageType(image.type)}` : undefined,
     image.attributes ? `**Attributes:** ${image.attributes}` : undefined,
-    image.messagePropertyName
-      ? `**Message property:** ${image.messagePropertyName}`
-      : undefined,
+    image.messagePropertyName ? `**Message property:** ${image.messagePropertyName}` : undefined,
   ].filter(Boolean);
   return new vscode.MarkdownString(parts.join("\n"));
 }

@@ -45,19 +45,19 @@ export class ConfigurationService {
             name: "dev",
             url: "https://your-dev.crm.dynamics.com",
             authType: "interactive",
-            createMissingWebResources: false,
+            createMissingComponents: false,
           },
           {
             name: "test",
             url: "https://your-test.crm.dynamics.com",
             authType: "interactive",
-            createMissingWebResources: false,
+            createMissingComponents: false,
           },
           {
             name: "prod",
             url: "https://your-prod.crm.dynamics.com",
             authType: "interactive",
-            createMissingWebResources: false,
+            createMissingComponents: false,
           },
         ],
         solutions: [

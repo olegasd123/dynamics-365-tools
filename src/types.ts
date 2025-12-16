@@ -9,8 +9,8 @@ export interface EnvironmentConfig {
   userAgentEnabled?: boolean;
   /** Preferred auth type; defaults to interactive */
   authType?: "interactive" | "clientSecret";
-  /** If false, publishing will fail instead of creating missing web resources */
-  createMissingWebResources?: boolean;
+  /** If true, new solution components (web resources, plugin assemblies) can be created */
+  createMissingComponents?: boolean;
 }
 
 export interface SolutionConfig {

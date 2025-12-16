@@ -37,14 +37,14 @@ Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit En
       "name": "dev",
       "url": "https://your-dev.crm.dynamics.com",
       "authType": "interactive",
-      "createMissingWebResources": true,
+      "createMissingComponents": true,
     },
     {
       "name": "prod",
       "url": "https://your-prod.crm.dynamics.com",
       "authType": "clientSecret",
       "resource": "https://your-prod.crm.dynamics.com",
-      "createMissingWebResources": false,
+      "createMissingComponents": false,
       "userAgentEnabled": true,
       "userAgent": "Dynamics365Tools-VSCode",
     },
@@ -59,7 +59,7 @@ Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit En
 Notes:
 
 - Set `resource` if the token audience is not the org URL. Turn on `userAgentEnabled` or set `userAgent` to add a custom header to every HTTP call.
-- `createMissingWebResources: false` blocks creation; publish will only update existing items for that environment.
+- `createMissingComponents: false` blocks creation; publish will only update existing web resources and will refuse new plugin assemblies for that environment.
 
 ### Authenticate
 

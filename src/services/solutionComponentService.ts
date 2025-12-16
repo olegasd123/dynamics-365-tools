@@ -98,7 +98,9 @@ export class SolutionComponentService {
       `componenttype eq ${componentType} and objectid eq ${normalizedComponentId} and _solutionid_value eq ${normalizedSolutionId}`,
     );
     const url = `/solutioncomponents?$select=solutioncomponentid&$filter=${filter}&$top=1`;
-    const response = await this.client.get<{ value?: Array<{ solutioncomponentid?: string }> }>(url);
+    const response = await this.client.get<{ value?: Array<{ solutioncomponentid?: string }> }>(
+      url,
+    );
     return Boolean(response.value?.length);
   }
 }

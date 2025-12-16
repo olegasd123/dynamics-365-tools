@@ -86,7 +86,9 @@ export class DataverseClient {
     );
   }
 
-  private withUserAgent<T extends Record<string, string>>(headers: T): T & { "User-Agent"?: string } {
+  private withUserAgent<T extends Record<string, string>>(
+    headers: T,
+  ): T & { "User-Agent"?: string } {
     const userAgent = this.connection.userAgent;
     if (!userAgent) {
       return headers;

@@ -245,7 +245,7 @@ test("publish aborts when remotePath matches multiple resources", async () => {
         solutionName: "CoreWebResources",
         kind: "file",
       },
-      { name: "dev", url: "https://example" },
+      { name: "dev", url: "https://example", createMissingComponents: true },
       { accessToken: "token" },
       vscode.Uri.file(file),
     );
@@ -372,7 +372,7 @@ test("publish creates a new web resource and adds it to the solution", async () 
         solutionName: "CoreWebResources",
         kind: "file",
       },
-      { name: "dev", url: "https://example" },
+      { name: "dev", url: "https://example", createMissingComponents: true },
       { accessToken: "token" },
       vscode.Uri.file(file),
     );
@@ -500,7 +500,7 @@ test("publish skips when cache reports unchanged", async () => {
   }
 });
 
-test("publish respects createMissingWebResources=false and skips missing resource", async () => {
+test("publish respects createMissingComponents=false and skips missing resource", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
   (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   const file = path.join(workspaceRoot, "script.js");
@@ -533,7 +533,7 @@ test("publish respects createMissingWebResources=false and skips missing resourc
         solutionName: "CoreWebResources",
         kind: "file",
       },
-      { name: "prod", url: "https://example.prod", createMissingWebResources: false },
+      { name: "prod", url: "https://example.prod", createMissingComponents: false },
       { accessToken: "token" },
       vscode.Uri.file(file),
     );

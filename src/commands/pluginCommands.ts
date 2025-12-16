@@ -45,6 +45,13 @@ export async function registerPluginAssembly(
     return;
   }
 
+  if (selection.env.createMissingComponents !== true) {
+    void vscode.window.showWarningMessage(
+      `Environment ${selection.env.name} is configured to block creating new solution components. Enable createMissingComponents to register plugin assemblies.`,
+    );
+    return;
+  }
+
   const assemblyFile = await vscode.window.showOpenDialog({
     canSelectFolders: false,
     canSelectMany: false,
@@ -85,9 +92,7 @@ export async function registerPluginAssembly(
     );
     explorer?.refresh();
   } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Failed to register plugin assembly: ${String(error)}`,
-    );
+    void vscode.window.showErrorMessage(`Failed to register plugin assembly: ${String(error)}`);
   }
 }
 
@@ -172,7 +177,8 @@ export async function updatePluginAssembly(
   }
 
   const lastDllPath = lastSelection.getLastAssemblyDllPath(env.name, assemblyId);
-  const workspaceRoot = configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceRoot =
+    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const defaultUri = lastDllPath
     ? vscode.Uri.file(lastDllPath)
     : workspaceRoot
@@ -207,7 +213,8 @@ export async function updatePluginAssembly(
 }
 
 export async function generatePublicKeyToken(configuration: ConfigurationService): Promise<void> {
-  const workspaceRoot = configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceRoot =
+    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
   const projectPick = await vscode.window.showOpenDialog({
     canSelectFiles: true,
@@ -300,7 +307,10 @@ async function generatePublicKeyTokenValue(
   }
 }
 
-async function ensureCsprojStrongName(csprojUri: vscode.Uri, keyFileRelative: string): Promise<void> {
+async function ensureCsprojStrongName(
+  csprojUri: vscode.Uri,
+  keyFileRelative: string,
+): Promise<void> {
   const content = (await vscode.workspace.fs.readFile(csprojUri)).toString();
   if (content.includes("<AssemblyOriginatorKeyFile")) {
     return;
@@ -312,7 +322,7 @@ async function ensureCsprojStrongName(csprojUri: vscode.Uri, keyFileRelative: st
     `    <AssemblyOriginatorKeyFile>${keyFileRelative}</AssemblyOriginatorKeyFile>`,
     "  </PropertyGroup>",
     "  <ItemGroup>",
-    `    <None Include=\"${keyFileRelative}\" />`,
+    `    <None Include="${keyFileRelative}" />`,
     "  </ItemGroup>",
   ].join("\n");
 
@@ -326,7 +336,12 @@ async function ensureCsprojStrongName(csprojUri: vscode.Uri, keyFileRelative: st
   await vscode.workspace.fs.writeFile(csprojUri, Buffer.from(updated, "utf8"));
 }
 
-type SnTool = { command: string; generateArgs: string[]; publicArgs: string[]; tokenArgs: string[] };
+type SnTool = {
+  command: string;
+  generateArgs: string[];
+  publicArgs: string[];
+  tokenArgs: string[];
+};
 
 async function resolveSnTool(): Promise<SnTool | undefined> {
   const candidates: SnTool[] = [

@@ -5,10 +5,7 @@ import { SolutionService } from "../services/solutionService";
 import { SecretService } from "../services/secretService";
 import { AuthService } from "../services/authService";
 import { LastSelectionService } from "../services/lastSelectionService";
-import {
-  EnvironmentAuthContext,
-  EnvironmentConnectionService,
-} from "../services/environmentConnectionService";
+import { EnvironmentConnectionService } from "../services/environmentConnectionService";
 import {
   PluginExplorerProvider,
   PluginImageNode,
@@ -30,7 +27,9 @@ export async function createPluginStep(
   node?: PluginTypeNode,
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage("Run this command from a plugin type in the Plugins explorer.");
+    void vscode.window.showInformationMessage(
+      "Run this command from a plugin type in the Plugins explorer.",
+    );
     return;
   }
 
@@ -80,7 +79,13 @@ export async function createPluginStep(
     ignoreFocusOut: true,
   });
 
-  const defaultName = buildStepDefaultName(node.pluginType.name, messageName, primaryEntity, stage, mode);
+  const defaultName = buildStepDefaultName(
+    node.pluginType.name,
+    messageName,
+    primaryEntity,
+    stage,
+    mode,
+  );
   const name = await vscode.window.showInputBox({
     prompt: "Step name",
     value: defaultName,
@@ -116,7 +121,9 @@ export async function editPluginStep(
   node?: PluginStepNode,
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage("Run this command from a plugin step in the Plugins explorer.");
+    void vscode.window.showInformationMessage(
+      "Run this command from a plugin step in the Plugins explorer.",
+    );
     return;
   }
 
@@ -201,7 +208,9 @@ export async function deletePluginStep(
   node?: PluginStepNode,
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage("Run this command from a plugin step in the Plugins explorer.");
+    void vscode.window.showInformationMessage(
+      "Run this command from a plugin step in the Plugins explorer.",
+    );
     return;
   }
 
@@ -244,7 +253,9 @@ export async function createPluginImage(
   node?: PluginStepNode,
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage("Run this command from a plugin step in the Plugins explorer.");
+    void vscode.window.showInformationMessage(
+      "Run this command from a plugin step in the Plugins explorer.",
+    );
     return;
   }
 
@@ -316,7 +327,9 @@ export async function editPluginImage(
   node?: PluginImageNode,
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage("Run this command from a plugin image in the Plugins explorer.");
+    void vscode.window.showInformationMessage(
+      "Run this command from a plugin image in the Plugins explorer.",
+    );
     return;
   }
 
@@ -388,7 +401,9 @@ export async function deletePluginImage(
   node?: PluginImageNode,
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage("Run this command from a plugin image in the Plugins explorer.");
+    void vscode.window.showInformationMessage(
+      "Run this command from a plugin image in the Plugins explorer.",
+    );
     return;
   }
 
@@ -471,7 +486,12 @@ async function pickStage(defaultStage?: number): Promise<number | undefined> {
     { label: "Post-operation", description: "After core operation", value: 40 },
   ];
   const pick = await vscode.window.showQuickPick(
-    options.map((o) => ({ label: o.label, description: o.description, value: o.value, picked: o.value === defaultStage })),
+    options.map((o) => ({
+      label: o.label,
+      description: o.description,
+      value: o.value,
+      picked: o.value === defaultStage,
+    })),
     { placeHolder: "Select pipeline stage" },
   );
   return pick?.value;
@@ -483,7 +503,12 @@ async function pickMode(defaultMode?: number): Promise<number | undefined> {
     { label: "Asynchronous", description: "Background", value: 1 },
   ];
   const pick = await vscode.window.showQuickPick(
-    options.map((o) => ({ label: o.label, description: o.description, value: o.value, picked: o.value === defaultMode })),
+    options.map((o) => ({
+      label: o.label,
+      description: o.description,
+      value: o.value,
+      picked: o.value === defaultMode,
+    })),
     { placeHolder: "Select execution mode" },
   );
   return pick?.value;

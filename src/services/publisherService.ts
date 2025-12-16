@@ -108,7 +108,7 @@ export class PublisherService {
       const displayName = path.posix.basename(remotePath);
 
       this.output.appendLine(`  ${fmt.resource(remotePath)} ← ${localPath}`);
-      const allowCreate = env.createMissingWebResources !== false;
+      const allowCreate = env.createMissingComponents === true;
 
       if (!existingId && !allowCreate) {
         this.output.appendLine(

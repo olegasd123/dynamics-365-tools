@@ -17,7 +17,11 @@ export class LastSelectionService {
     return this.state.get<string>(LAST_ENV_KEY);
   }
 
-  async setLastAssemblyDllPath(envName: string, assemblyId: string, filePath: string): Promise<void> {
+  async setLastAssemblyDllPath(
+    envName: string,
+    assemblyId: string,
+    filePath: string,
+  ): Promise<void> {
     const cache = this.state.get<Record<string, string>>(LAST_ASSEMBLY_PATHS_KEY) ?? {};
     cache[this.buildAssemblyKey(envName, assemblyId)] = filePath;
     await this.state.update(LAST_ASSEMBLY_PATHS_KEY, cache);

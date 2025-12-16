@@ -119,7 +119,9 @@ export class EnvironmentConnectionService {
     if (!response.ok) {
       const body = await response.text();
       const message = body || response.statusText;
-      throw new Error(`Failed to acquire client credentials token: ${message} (${response.status})`);
+      throw new Error(
+        `Failed to acquire client credentials token: ${message} (${response.status})`,
+      );
     }
 
     const parsed = (await response.json()) as { access_token?: string };

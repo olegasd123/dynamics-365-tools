@@ -130,18 +130,16 @@ export async function activate(context: vscode.ExtensionContext) {
         pluginExplorer,
       ),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.updateAssembly",
-      async (node) =>
-        updatePluginAssembly(
-          configuration,
-          ui,
-          secrets,
-          auth,
-          lastSelection,
-          connections,
-          pluginExplorer,
-          node,
+    vscode.commands.registerCommand("dynamics365Tools.plugins.updateAssembly", async (node) =>
+      updatePluginAssembly(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
       ),
     ),
     vscode.commands.registerCommand("dynamics365Tools.plugins.refreshExplorer", () =>
@@ -159,35 +157,77 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("dynamics365Tools.plugins.generatePublicKeyToken", async () =>
       generatePublicKeyToken(configuration),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.createStep",
-      async (node) =>
-        createPluginStep(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.createStep", async (node) =>
+      createPluginStep(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.editStep",
-      async (node) =>
-        editPluginStep(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.editStep", async (node) =>
+      editPluginStep(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.deleteStep",
-      async (node) =>
-        deletePluginStep(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.deleteStep", async (node) =>
+      deletePluginStep(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.createImage",
-      async (node) =>
-        createPluginImage(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.createImage", async (node) =>
+      createPluginImage(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.editImage",
-      async (node) =>
-        editPluginImage(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.editImage", async (node) =>
+      editPluginImage(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
     ),
-    vscode.commands.registerCommand(
-      "dynamics365Tools.plugins.deleteImage",
-      async (node) =>
-        deletePluginImage(configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer, node),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.deleteImage", async (node) =>
+      deletePluginImage(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
     ),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", pluginExplorer),
     statusBar,

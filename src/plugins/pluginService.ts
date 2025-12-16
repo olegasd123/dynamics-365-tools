@@ -27,9 +27,11 @@ export class PluginService {
       isolationmode: input.isolationMode ?? 2, // Sandbox
     };
 
-    const response = await this.client.post<{ pluginassemblyid?: string }>("/pluginassemblies", payload);
-    const id =
-      response.pluginassemblyid || (await this.findAssemblyByName(input.name))?.id;
+    const response = await this.client.post<{ pluginassemblyid?: string }>(
+      "/pluginassemblies",
+      payload,
+    );
+    const id = response.pluginassemblyid || (await this.findAssemblyByName(input.name))?.id;
 
     if (!id) {
       throw new Error("Plugin assembly created but no identifier returned by Dataverse.");
@@ -133,8 +135,7 @@ export class PluginService {
   async listImages(stepId: string): Promise<PluginImage[]> {
     const normalizedStepId = this.normalizeGuid(stepId);
     const filter = encodeURIComponent(`_sdkmessageprocessingstepid_value eq ${normalizedStepId}`);
-    const url =
-      `/sdkmessageprocessingstepimages?$select=sdkmessageprocessingstepimageid,name,imagetype,entityalias,attributes,messagepropertyname&$filter=${filter}`;
+    const url = `/sdkmessageprocessingstepimages?$select=sdkmessageprocessingstepimageid,name,imagetype,entityalias,attributes,messagepropertyname&$filter=${filter}`;
     const response = await this.client.get<{
       value?: Array<{
         sdkmessageprocessingstepimageid?: string;
@@ -161,8 +162,7 @@ export class PluginService {
   async findAssemblyByName(name: string): Promise<PluginAssembly | undefined> {
     const escapedName = name.replace(/'/g, "''");
     const filter = encodeURIComponent(`name eq '${escapedName}'`);
-    const url =
-      `/pluginassemblies?$select=pluginassemblyid,name,version,isolationmode,publickeytoken,culture,sourcetype&$filter=${filter}&$top=1`;
+    const url = `/pluginassemblies?$select=pluginassemblyid,name,version,isolationmode,publickeytoken,culture,sourcetype&$filter=${filter}&$top=1`;
     const response = await this.client.get<{
       value?: Array<{
         pluginassemblyid?: string;
@@ -191,16 +191,19 @@ export class PluginService {
     };
   }
 
-  async createStep(pluginTypeId: string, input: {
-    name: string;
-    messageName: string;
-    primaryEntity?: string;
-    stage: number;
-    mode: number;
-    rank?: number;
-    filteringAttributes?: string;
-    description?: string;
-  }): Promise<string> {
+  async createStep(
+    pluginTypeId: string,
+    input: {
+      name: string;
+      messageName: string;
+      primaryEntity?: string;
+      stage: number;
+      mode: number;
+      rank?: number;
+      filteringAttributes?: string;
+      description?: string;
+    },
+  ): Promise<string> {
     const normalizedPluginTypeId = this.normalizeGuid(pluginTypeId);
     const messageId = await this.resolveSdkMessageId(input.messageName);
     if (!messageId) {
@@ -239,16 +242,19 @@ export class PluginService {
     return this.normalizeGuid(id);
   }
 
-  async updateStep(stepId: string, input: Partial<{
-    name: string;
-    stage: number;
-    mode: number;
-    rank: number;
-    filteringAttributes: string;
-    description: string;
-    messageName: string;
-    primaryEntity: string;
-  }>): Promise<void> {
+  async updateStep(
+    stepId: string,
+    input: Partial<{
+      name: string;
+      stage: number;
+      mode: number;
+      rank: number;
+      filteringAttributes: string;
+      description: string;
+      messageName: string;
+      primaryEntity: string;
+    }>,
+  ): Promise<void> {
     const normalizedStepId = this.normalizeGuid(stepId);
     const payload: Record<string, unknown> = {};
 
@@ -256,7 +262,8 @@ export class PluginService {
     if (input.stage !== undefined) payload.stage = input.stage;
     if (input.mode !== undefined) payload.mode = input.mode;
     if (input.rank !== undefined) payload.rank = input.rank;
-    if (input.filteringAttributes !== undefined) payload.filteringattributes = input.filteringAttributes;
+    if (input.filteringAttributes !== undefined)
+      payload.filteringattributes = input.filteringAttributes;
     if (input.description !== undefined) payload.description = input.description;
 
     if (input.messageName) {
@@ -289,13 +296,16 @@ export class PluginService {
     await this.client.delete(`/sdkmessageprocessingsteps(${normalizedStepId})`);
   }
 
-  async createImage(stepId: string, input: {
-    name: string;
-    type: number;
-    entityAlias: string;
-    attributes?: string;
-    messagePropertyName?: string;
-  }): Promise<string> {
+  async createImage(
+    stepId: string,
+    input: {
+      name: string;
+      type: number;
+      entityAlias: string;
+      attributes?: string;
+      messagePropertyName?: string;
+    },
+  ): Promise<string> {
     const normalizedStepId = this.normalizeGuid(stepId);
     const payload = {
       name: input.name,
@@ -317,20 +327,24 @@ export class PluginService {
     return this.normalizeGuid(id);
   }
 
-  async updateImage(imageId: string, input: Partial<{
-    name: string;
-    type: number;
-    entityAlias: string;
-    attributes: string;
-    messagePropertyName: string;
-  }>): Promise<void> {
+  async updateImage(
+    imageId: string,
+    input: Partial<{
+      name: string;
+      type: number;
+      entityAlias: string;
+      attributes: string;
+      messagePropertyName: string;
+    }>,
+  ): Promise<void> {
     const normalizedImageId = this.normalizeGuid(imageId);
     const payload: Record<string, unknown> = {};
     if (input.name !== undefined) payload.name = input.name;
     if (input.type !== undefined) payload.imagetype = input.type;
     if (input.entityAlias !== undefined) payload.entityalias = input.entityAlias;
     if (input.attributes !== undefined) payload.attributes = input.attributes;
-    if (input.messagePropertyName !== undefined) payload.messagepropertyname = input.messagePropertyName;
+    if (input.messagePropertyName !== undefined)
+      payload.messagepropertyname = input.messagePropertyName;
 
     await this.client.patch(`/sdkmessageprocessingstepimages(${normalizedImageId})`, payload);
   }
@@ -348,7 +362,10 @@ export class PluginService {
     return id ? this.normalizeGuid(id) : undefined;
   }
 
-  private async resolveSdkMessageFilterId(messageId: string, primaryEntity: string): Promise<string | undefined> {
+  private async resolveSdkMessageFilterId(
+    messageId: string,
+    primaryEntity: string,
+  ): Promise<string | undefined> {
     const normalizedMessageId = this.normalizeGuid(messageId);
     const filter = encodeURIComponent(
       `_sdkmessageid_value eq ${normalizedMessageId} and primaryobjecttypecode eq '${primaryEntity.replace(/'/g, "''")}'`,
