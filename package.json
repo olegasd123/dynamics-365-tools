@@ -306,16 +306,6 @@
           "command": "dynamics365Tools.plugins.registerAssembly",
           "when": "view == dynamics365Tools.pluginExplorer",
           "group": "navigation@2"
-        },
-        {
-          "command": "dynamics365Tools.plugins.createStep",
-          "when": "view == dynamics365Tools.pluginExplorer",
-          "group": "navigation@3"
-        },
-        {
-          "command": "dynamics365Tools.plugins.createImage",
-          "when": "view == dynamics365Tools.pluginExplorer",
-          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -364,18 +354,18 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "dynamics365tools-plugins",
-          "title": "Dynamics 365 Plugins",
+          "id": "dynamics365tools-utility",
+          "title": "Dynamics 365 Tools",
           "icon": "assets/icon.png"
         }
       ]
     },
     "views": {
-      "dynamics365tools-plugins": [
+      "dynamics365tools-utility": [
         {
           "id": "dynamics365Tools.pluginExplorer",
           "name": "Plugins",
-          "contextualTitle": "Dynamics 365 Plugins"
+          "contextualTitle": "Dynamics 365 Tools"
         }
       ]
     }
