@@ -13,6 +13,7 @@ export interface PluginType {
   name: string;
   friendlyName?: string;
   typeName?: string;
+  modifiedOn?: string;
 }
 
 export interface PluginStep {

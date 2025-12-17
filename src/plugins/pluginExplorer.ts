@@ -240,8 +240,8 @@ export class PluginTypeNode extends vscode.TreeItem {
     readonly env: EnvironmentConfig,
     readonly pluginType: PluginType,
   ) {
-    super(pluginType.friendlyName || pluginType.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.description = pluginType.typeName;
+    super(pluginType.name, vscode.TreeItemCollapsibleState.Collapsed);
+    this.description = formatDateTimeWithoutSeconds(pluginType.modifiedOn);
     this.tooltip = buildTypeTooltip(pluginType);
     this.iconPath = new vscode.ThemeIcon("symbol-class");
   }
@@ -289,10 +289,12 @@ function buildAssemblyTooltip(assembly: PluginAssembly): vscode.MarkdownString {
 }
 
 function buildTypeTooltip(pluginType: PluginType): vscode.MarkdownString {
+  const modifiedOn = formatDateTimeWithoutSeconds(pluginType.modifiedOn);
   const parts = [
     `**Name:** ${pluginType.name}`,
     pluginType.friendlyName ? `**Friendly name:** ${pluginType.friendlyName}` : undefined,
     pluginType.typeName ? `**Type:** ${pluginType.typeName}` : undefined,
+    modifiedOn ? `**Modified on:** ${modifiedOn}` : undefined,
   ].filter(Boolean);
   return new vscode.MarkdownString(parts.join("\n"));
 }
@@ -336,6 +338,26 @@ function buildImageTooltip(image: PluginImage): vscode.MarkdownString {
     image.messagePropertyName ? `**Message property:** ${image.messagePropertyName}` : undefined,
   ].filter(Boolean);
   return new vscode.MarkdownString(parts.join("\n"));
+}
+
+function formatDateTimeWithoutSeconds(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
 function formatIsolationMode(value?: number): string {

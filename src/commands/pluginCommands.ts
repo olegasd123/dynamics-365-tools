@@ -18,10 +18,7 @@ import { DataverseClient } from "../services/dataverseClient";
 import { SolutionComponentService } from "../services/solutionComponentService";
 import { PluginService } from "../plugins/pluginService";
 import { PluginAssemblyNode } from "../plugins/pluginExplorer";
-import {
-  PluginRegistrationManager,
-  PluginSyncResult,
-} from "../plugins/pluginRegistrationManager";
+import { PluginRegistrationManager, PluginSyncResult } from "../plugins/pluginRegistrationManager";
 
 const execFileAsync = promisify(execFile);
 

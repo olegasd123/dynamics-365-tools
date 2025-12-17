@@ -147,13 +147,14 @@ export class PluginService {
   async listPluginTypes(assemblyId: string): Promise<PluginType[]> {
     const normalizedAssemblyId = this.normalizeGuid(assemblyId);
     const filter = encodeURIComponent(`_pluginassemblyid_value eq ${normalizedAssemblyId}`);
-    const url = `/plugintypes?$select=plugintypeid,name,typename,friendlyname&$filter=${filter}`;
+    const url = `/plugintypes?$select=plugintypeid,name,typename,friendlyname,modifiedon&$filter=${filter}`;
     const response = await this.client.get<{
       value?: Array<{
         plugintypeid?: string;
         name?: string;
         typename?: string;
         friendlyname?: string;
+        modifiedon?: string;
       }>;
     }>(url);
 
@@ -164,6 +165,7 @@ export class PluginService {
         name: item.name ?? "",
         friendlyName: item.friendlyname,
         typeName: item.typename,
+        modifiedOn: item.modifiedon,
       }));
   }
 
