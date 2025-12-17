@@ -79,13 +79,7 @@ export async function createPluginStep(
     ignoreFocusOut: true,
   });
 
-  const defaultName = buildStepDefaultName(
-    node.pluginType.name,
-    messageName,
-    primaryEntity,
-    stage,
-    mode,
-  );
+  const defaultName = buildStepDefaultName(node.pluginType.name, messageName, primaryEntity);
   const name = await vscode.window.showInputBox({
     prompt: "Step name",
     value: defaultName,
@@ -470,13 +464,9 @@ function buildStepDefaultName(
   typeName: string,
   message: string,
   entity: string | undefined,
-  stage: number,
-  mode: number,
 ): string {
-  const stageLabel = formatStage(stage);
-  const modeLabel = formatMode(mode);
-  const entityLabel = entity ? entity : "global";
-  return `${typeName} - ${message} (${entityLabel}, ${stageLabel}, ${modeLabel})`;
+  const entityLabel = entity || "global";
+  return `(Step) ${typeName}: ${message} of ${entityLabel}`;
 }
 
 async function pickStage(defaultStage?: number): Promise<number | undefined> {
@@ -525,28 +515,4 @@ async function pickImageType(defaultType?: number): Promise<number | undefined> 
     { placeHolder: "Select image type" },
   );
   return pick?.value;
-}
-
-function formatStage(stage: number): string {
-  switch (stage) {
-    case 10:
-      return "Pre-validation";
-    case 20:
-      return "Pre-operation";
-    case 40:
-      return "Post-operation";
-    default:
-      return "Stage";
-  }
-}
-
-function formatMode(mode: number): string {
-  switch (mode) {
-    case 0:
-      return "Sync";
-    case 1:
-      return "Async";
-    default:
-      return "Mode";
-  }
 }
