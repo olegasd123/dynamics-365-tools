@@ -323,6 +323,8 @@ export class PluginService {
       description: string;
       messageName: string;
       primaryEntity: string;
+      status: number;
+      statusReason: number;
     }>,
   ): Promise<void> {
     const normalizedStepId = this.normalizeGuid(stepId);
@@ -335,6 +337,8 @@ export class PluginService {
     if (input.filteringAttributes !== undefined)
       payload.filteringattributes = input.filteringAttributes;
     if (input.description !== undefined) payload.description = input.description;
+    if (input.status !== undefined) payload.statecode = input.status;
+    if (input.statusReason !== undefined) payload.statuscode = input.statusReason;
 
     if (input.messageName) {
       const messageId = await this.resolveSdkMessageId(input.messageName);
@@ -358,6 +362,14 @@ export class PluginService {
         : null;
     }
 
+    await this.client.patch(`/sdkmessageprocessingsteps(${normalizedStepId})`, payload);
+  }
+
+  async setStepState(stepId: string, enabled: boolean): Promise<void> {
+    const normalizedStepId = this.normalizeGuid(stepId);
+    const payload = enabled
+      ? { statecode: 0, statuscode: 1 } // Enabled
+      : { statecode: 1, statuscode: 2 }; // Disabled
     await this.client.patch(`/sdkmessageprocessingsteps(${normalizedStepId})`, payload);
   }
 

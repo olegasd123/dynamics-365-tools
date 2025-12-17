@@ -29,6 +29,8 @@ import {
   deletePluginStep,
   editPluginImage,
   editPluginStep,
+  enablePluginStep,
+  disablePluginStep,
 } from "./commands/pluginStepCommands";
 import { PluginAssemblyIntrospector } from "./plugins/pluginAssemblyIntrospector";
 import { PluginRegistrationManager } from "./plugins/pluginRegistrationManager";
@@ -190,6 +192,30 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("dynamics365Tools.plugins.editStep", async (node) =>
       editPluginStep(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
+    ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.enableStep", async (node) =>
+      enablePluginStep(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginExplorer,
+        node,
+      ),
+    ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.disableStep", async (node) =>
+      disablePluginStep(
         configuration,
         ui,
         secrets,

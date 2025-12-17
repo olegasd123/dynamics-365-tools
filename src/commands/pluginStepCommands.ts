@@ -191,6 +191,64 @@ export async function editPluginStep(
   }
 }
 
+export async function enablePluginStep(
+  configuration: ConfigurationService,
+  ui: SolutionService,
+  secrets: SecretService,
+  auth: AuthService,
+  lastSelection: LastSelectionService,
+  connections: EnvironmentConnectionService,
+  explorer: PluginExplorerProvider,
+  node?: PluginStepNode,
+): Promise<void> {
+  await setPluginStepState(
+    {
+      action: "enable",
+      confirmation: undefined,
+      successMessage: (name) => `Plugin step ${name} enabled.`,
+      placeHolder: "Select environment to enable a plugin step",
+    },
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    connections,
+    explorer,
+    node,
+    true,
+  );
+}
+
+export async function disablePluginStep(
+  configuration: ConfigurationService,
+  ui: SolutionService,
+  secrets: SecretService,
+  auth: AuthService,
+  lastSelection: LastSelectionService,
+  connections: EnvironmentConnectionService,
+  explorer: PluginExplorerProvider,
+  node?: PluginStepNode,
+): Promise<void> {
+  await setPluginStepState(
+    {
+      action: "disable",
+      confirmation: "Disable",
+      successMessage: (name) => `Plugin step ${name} disabled.`,
+      placeHolder: "Select environment to disable a plugin step",
+    },
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    connections,
+    explorer,
+    node,
+    false,
+  );
+}
+
 export async function deletePluginStep(
   configuration: ConfigurationService,
   ui: SolutionService,
@@ -519,4 +577,72 @@ async function pickImageType(defaultType?: number): Promise<number | undefined> 
     { placeHolder: "Select image type" },
   );
   return pick?.value;
+}
+
+async function setPluginStepState(
+  options: {
+    action: string;
+    confirmation?: "Disable";
+    successMessage: (name: string) => string;
+    placeHolder: string;
+  },
+  configuration: ConfigurationService,
+  ui: SolutionService,
+  secrets: SecretService,
+  auth: AuthService,
+  lastSelection: LastSelectionService,
+  connections: EnvironmentConnectionService,
+  explorer: PluginExplorerProvider,
+  node: PluginStepNode | undefined,
+  enabled: boolean,
+): Promise<void> {
+  if (!node) {
+    void vscode.window.showInformationMessage(
+      `Run this command from a plugin step in the Plugins explorer to ${options.action} it.`,
+    );
+    return;
+  }
+
+  if (node.step.status !== undefined) {
+    const isEnabled = node.step.status === 0;
+    if (isEnabled === enabled) {
+      void vscode.window.showInformationMessage(
+        `Plugin step ${node.step.name} is already ${enabled ? "enabled" : "disabled"}.`,
+      );
+      return;
+    }
+  }
+
+  if (options.confirmation) {
+    const confirmation = await vscode.window.showWarningMessage(
+      `${options.confirmation} plugin step '${node.step.name}' in ${node.env.name}?`,
+      { modal: true },
+      options.confirmation,
+    );
+    if (confirmation !== options.confirmation) {
+      return;
+    }
+  }
+
+  const service = await resolveServiceForNode(
+    options.placeHolder,
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    connections,
+    node.env.name,
+  );
+  if (!service) return;
+
+  try {
+    await service.setStepState(node.step.id, enabled);
+    explorer.refresh();
+    void vscode.window.showInformationMessage(options.successMessage(node.step.name));
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Failed to ${options.action} plugin step ${node.step.name}: ${String(error)}`,
+    );
+  }
 }

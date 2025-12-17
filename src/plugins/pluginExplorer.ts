@@ -251,7 +251,7 @@ export class PluginTypeNode extends vscode.TreeItem {
 }
 
 export class PluginStepNode extends vscode.TreeItem {
-  readonly contextValue = "d365PluginStep";
+  contextValue: string;
 
   constructor(
     readonly env: EnvironmentConfig,
@@ -262,7 +262,8 @@ export class PluginStepNode extends vscode.TreeItem {
     super(pluginLabel, vscode.TreeItemCollapsibleState.Collapsed);
     this.description = buildStepDescription(step);
     this.tooltip = buildStepTooltip(pluginType, step);
-    this.iconPath = new vscode.ThemeIcon("run");
+    this.iconPath = buildStepIcon(step);
+    this.contextValue = buildStepContextValue(step);
   }
 }
 
@@ -327,6 +328,26 @@ function buildStepTooltip(pluginType: PluginType, step: PluginStep): vscode.Mark
   ].filter(Boolean);
 
   return new vscode.MarkdownString(lines.join("\n"));
+}
+
+function buildStepIcon(step: PluginStep): vscode.ThemeIcon {
+  if (step.status === 1) {
+    return new vscode.ThemeIcon("debug-pause");
+  }
+  if (step.status === 0) {
+    return new vscode.ThemeIcon("debug-start");
+  }
+  return new vscode.ThemeIcon("run");
+}
+
+function buildStepContextValue(step: PluginStep): string {
+  if (step.status === 1) {
+    return "d365PluginStep:disabled";
+  }
+  if (step.status === 0) {
+    return "d365PluginStep:enabled";
+  }
+  return "d365PluginStep";
 }
 
 function buildImageDescription(image: PluginImage): string | undefined {

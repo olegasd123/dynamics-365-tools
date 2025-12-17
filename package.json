@@ -162,6 +162,18 @@
         "icon": "$(edit)"
       },
       {
+        "command": "dynamics365Tools.plugins.enableStep",
+        "title": "Enable Plugin Step",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "dynamics365Tools.plugins.disableStep",
+        "title": "Disable Plugin Step",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(debug-pause)"
+      },
+      {
         "command": "dynamics365Tools.plugins.deleteStep",
         "title": "Delete Plugin Step",
         "category": "Dynamics 365 Tools",
@@ -272,6 +284,12 @@
           "command": "dynamics365Tools.plugins.editStep"
         },
         {
+          "command": "dynamics365Tools.plugins.enableStep"
+        },
+        {
+          "command": "dynamics365Tools.plugins.disableStep"
+        },
+        {
           "command": "dynamics365Tools.plugins.deleteStep"
         },
         {
@@ -326,18 +344,28 @@
         },
         {
           "command": "dynamics365Tools.plugins.editStep",
-          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
           "group": "inline@1"
         },
         {
-          "command": "dynamics365Tools.plugins.createImage",
-          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep",
+          "command": "dynamics365Tools.plugins.enableStep",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep:disabled",
           "group": "inline@2"
         },
         {
-          "command": "dynamics365Tools.plugins.deleteStep",
-          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep",
+          "command": "dynamics365Tools.plugins.disableStep",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep:enabled",
+          "group": "inline@2"
+        },
+        {
+          "command": "dynamics365Tools.plugins.createImage",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
           "group": "inline@3"
+        },
+        {
+          "command": "dynamics365Tools.plugins.deleteStep",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
+          "group": "inline@4"
         },
         {
           "command": "dynamics365Tools.plugins.editImage",
