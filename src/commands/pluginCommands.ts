@@ -18,6 +18,10 @@ import { DataverseClient } from "../services/dataverseClient";
 import { SolutionComponentService } from "../services/solutionComponentService";
 import { PluginService } from "../plugins/pluginService";
 import { PluginAssemblyNode } from "../plugins/pluginExplorer";
+import {
+  PluginRegistrationManager,
+  PluginSyncResult,
+} from "../plugins/pluginRegistrationManager";
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +32,7 @@ export async function registerPluginAssembly(
   auth: AuthService,
   lastSelection: LastSelectionService,
   connections: EnvironmentConnectionService,
+  registration: PluginRegistrationManager,
   explorer?: PluginExplorerProvider,
 ): Promise<void> {
   const config = await configuration.loadConfiguration();
@@ -77,18 +82,37 @@ export async function registerPluginAssembly(
     return;
   }
 
+  const assemblyPath = assemblyFile[0].fsPath;
   const content = await vscode.workspace.fs.readFile(assemblyFile[0]);
   const contentBase64 = Buffer.from(content).toString("base64");
 
   try {
     const service = await createPluginService(connections, selection.auth, selection.env);
-    await service.registerAssembly({
+    const assemblyId = await service.registerAssembly({
       name,
       contentBase64,
       solutionName: solution.name,
     });
+
+    let pluginSummary: string | undefined;
+    try {
+      const syncResult = await syncPluginsForAssembly({
+        registration,
+        pluginService: service,
+        assemblyId,
+        assemblyPath,
+        solutionName: solution.name,
+        allowCreate: true,
+      });
+      pluginSummary = syncResult;
+    } catch (syncError) {
+      void vscode.window.showErrorMessage(
+        `Assembly registered, but plugins failed to sync: ${String(syncError)}`,
+      );
+    }
+
     vscode.window.showInformationMessage(
-      `Plugin assembly ${name} has been registered in ${selection.env.name}.`,
+      buildAssemblySuccessMessage(name, selection.env.name, pluginSummary),
     );
     explorer?.refresh();
   } catch (error) {
@@ -103,6 +127,7 @@ export async function updatePluginAssembly(
   auth: AuthService,
   lastSelection: LastSelectionService,
   connections: EnvironmentConnectionService,
+  registration: PluginRegistrationManager,
   explorer?: PluginExplorerProvider,
   targetNode?: PluginAssemblyNode,
 ): Promise<void> {
@@ -203,8 +228,25 @@ export async function updatePluginAssembly(
   try {
     await service.updateAssembly(assemblyId, contentBase64);
     await lastSelection.setLastAssemblyDllPath(env.name, assemblyId, selectedPath);
+    let pluginSummary: string | undefined;
+    try {
+      const syncResult = await syncPluginsForAssembly({
+        registration,
+        pluginService: service,
+        assemblyId,
+        assemblyPath: selectedPath,
+        solutionName: undefined,
+        allowCreate: env.createMissingComponents === true,
+      });
+      pluginSummary = syncResult;
+    } catch (syncError) {
+      void vscode.window.showErrorMessage(
+        `Assembly updated, but plugins failed to sync: ${String(syncError)}`,
+      );
+    }
+
     vscode.window.showInformationMessage(
-      `Plugin assembly ${assemblyName} has been updated in ${env.name}.`,
+      buildAssemblySuccessMessage(assemblyName, env.name, pluginSummary, "updated"),
     );
     explorer?.refresh();
   } catch (error) {
@@ -334,6 +376,68 @@ async function ensureCsprojStrongName(
       : `${content.trimEnd()}\n${insertion}\n${closingTag}\n`;
 
   await vscode.workspace.fs.writeFile(csprojUri, Buffer.from(updated, "utf8"));
+}
+
+type PluginSyncContext = {
+  registration: PluginRegistrationManager;
+  pluginService: PluginService;
+  assemblyId: string;
+  assemblyPath: string;
+  solutionName?: string;
+  allowCreate?: boolean;
+};
+
+function buildAssemblySuccessMessage(
+  assemblyName: string | undefined,
+  envName: string,
+  pluginSummary?: string,
+  action: "registered" | "updated" = "registered",
+): string {
+  const normalizedName = assemblyName ?? "assembly";
+  const base = `Plugin assembly ${normalizedName} has been ${action} in ${envName}.`;
+  return pluginSummary ? `${base} ${pluginSummary}` : base;
+}
+
+async function syncPluginsForAssembly(context: PluginSyncContext): Promise<string | undefined> {
+  const title = `Syncing plugins for ${path.basename(context.assemblyPath)}`;
+  const result = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title,
+    },
+    () =>
+      context.registration.syncPluginTypes({
+        pluginService: context.pluginService,
+        assemblyId: context.assemblyId,
+        assemblyPath: context.assemblyPath,
+        solutionName: context.solutionName,
+        allowCreate: context.allowCreate,
+      }),
+  );
+
+  return formatPluginSyncResult(result, context.allowCreate);
+}
+
+function formatPluginSyncResult(
+  result: PluginSyncResult,
+  allowCreate?: boolean,
+): string | undefined {
+  const parts: string[] = [];
+  if (result.created.length) parts.push(`${result.created.length} created`);
+  if (result.updated.length) parts.push(`${result.updated.length} updated`);
+  if (result.removed.length) parts.push(`${result.removed.length} removed`);
+  if (result.skippedCreation.length) {
+    parts.push(`${result.skippedCreation.length} skipped (creation disabled)`);
+  }
+
+  if (!parts.length) {
+    if (allowCreate === false && result.skippedCreation.length) {
+      return "Plugins: creation skipped by environment settings.";
+    }
+    return "Plugins: no changes detected.";
+  }
+
+  return `Plugins: ${parts.join(", ")}.`;
 }
 
 type SnTool = {

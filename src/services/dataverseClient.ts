@@ -36,6 +36,7 @@ export class DataverseClient {
         Authorization: `Bearer ${this.connection.token}`,
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(method === "POST" ? { Prefer: "return=representation" } : {}),
       }),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });

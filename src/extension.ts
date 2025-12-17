@@ -21,6 +21,7 @@ import {
   registerPluginAssembly,
   updatePluginAssembly,
 } from "./commands/pluginCommands";
+import { deletePluginType } from "./commands/pluginTypeCommands";
 import {
   createPluginImage,
   createPluginStep,
@@ -29,6 +30,8 @@ import {
   editPluginImage,
   editPluginStep,
 } from "./commands/pluginStepCommands";
+import { PluginAssemblyIntrospector } from "./plugins/pluginAssemblyIntrospector";
+import { PluginRegistrationManager } from "./plugins/pluginRegistrationManager";
 
 export async function activate(context: vscode.ExtensionContext) {
   const configuration = new ConfigurationService();
@@ -42,6 +45,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const publishCache = new PublishCacheService(configuration);
   const webResources = new WebResourceService();
   const connections = new EnvironmentConnectionService(auth, secrets);
+  const pluginAssemblyIntrospector = new PluginAssemblyIntrospector(context.extensionPath);
+  const pluginRegistration = new PluginRegistrationManager(pluginAssemblyIntrospector);
   const pluginExplorer = new PluginExplorerProvider(
     configuration,
     connections,
@@ -127,11 +132,25 @@ export async function activate(context: vscode.ExtensionContext) {
         auth,
         lastSelection,
         connections,
+        pluginRegistration,
         pluginExplorer,
       ),
     ),
     vscode.commands.registerCommand("dynamics365Tools.plugins.updateAssembly", async (node) =>
       updatePluginAssembly(
+        configuration,
+        ui,
+        secrets,
+        auth,
+        lastSelection,
+        connections,
+        pluginRegistration,
+        pluginExplorer,
+        node,
+      ),
+    ),
+    vscode.commands.registerCommand("dynamics365Tools.plugins.deletePluginType", async (node) =>
+      deletePluginType(
         configuration,
         ui,
         secrets,

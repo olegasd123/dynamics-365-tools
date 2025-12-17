@@ -13,6 +13,22 @@ export interface AssemblyRegistrationInput {
   sourceType?: number;
 }
 
+export interface PluginTypeRegistrationInput {
+  name: string;
+  typeName: string;
+  friendlyName?: string;
+  description?: string;
+  solutionName?: string;
+}
+
+export interface PluginTypeUpdateInput {
+  name?: string;
+  typeName?: string;
+  friendlyName?: string;
+  description?: string;
+  solutionName?: string;
+}
+
 export class PluginService {
   constructor(
     private readonly client: DataverseClient,
@@ -53,6 +69,60 @@ export class PluginService {
     await this.client.patch(`/pluginassemblies(${normalizedId})`, {
       content: contentBase64,
     });
+  }
+
+  async createPluginType(assemblyId: string, input: PluginTypeRegistrationInput): Promise<string> {
+    const normalizedAssemblyId = this.normalizeGuid(assemblyId);
+    const payload: Record<string, unknown> = {
+      name: input.name,
+      typename: input.typeName,
+      friendlyname: input.friendlyName ?? input.name,
+      description: input.description ?? "",
+      "pluginassemblyid@odata.bind": `/pluginassemblies(${normalizedAssemblyId})`,
+    };
+
+    const response = await this.client.post<{ plugintypeid?: string }>("/plugintypes", payload);
+    const id = response.plugintypeid;
+    if (!id) {
+      throw new Error("Plugin type created but no identifier returned.");
+    }
+
+    if (input.solutionName) {
+      await this.solutionComponents.ensureInSolution(
+        id,
+        SolutionComponentType.PluginType,
+        input.solutionName,
+      );
+    }
+
+    return this.normalizeGuid(id);
+  }
+
+  async updatePluginType(id: string, input: PluginTypeUpdateInput): Promise<void> {
+    const normalizedId = this.normalizeGuid(id);
+    const payload: Record<string, unknown> = {};
+
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.typeName !== undefined) payload.typename = input.typeName;
+    if (input.friendlyName !== undefined) payload.friendlyname = input.friendlyName;
+    if (input.description !== undefined) payload.description = input.description;
+
+    if (Object.keys(payload).length) {
+      await this.client.patch(`/plugintypes(${normalizedId})`, payload);
+    }
+
+    if (input.solutionName) {
+      await this.solutionComponents.ensureInSolution(
+        normalizedId,
+        SolutionComponentType.PluginType,
+        input.solutionName,
+      );
+    }
+  }
+
+  async deletePluginType(id: string): Promise<void> {
+    const normalizedId = this.normalizeGuid(id);
+    await this.client.delete(`/plugintypes(${normalizedId})`);
   }
 
   async listAssemblies(options?: { solutionNames?: string[] }): Promise<PluginAssembly[]> {
@@ -352,6 +422,19 @@ export class PluginService {
   async deleteImage(imageId: string): Promise<void> {
     const normalizedImageId = this.normalizeGuid(imageId);
     await this.client.delete(`/sdkmessageprocessingstepimages(${normalizedImageId})`);
+  }
+
+  async deletePluginTypeCascade(pluginTypeId: string): Promise<void> {
+    const steps = await this.listSteps(pluginTypeId);
+    for (const step of steps) {
+      const images = await this.listImages(step.id);
+      for (const image of images) {
+        await this.deleteImage(image.id);
+      }
+      await this.deleteStep(step.id);
+    }
+
+    await this.deletePluginType(pluginTypeId);
   }
 
   private async resolveSdkMessageId(messageName: string): Promise<string | undefined> {

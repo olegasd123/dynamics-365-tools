@@ -20,7 +20,7 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 - **Folder publish extras**: up to 4 files publish in parallel, unchanged files are skipped using `.vscode/dynamics365tools.publishCache.json`, and you can cancel from the progress notification.
 - **Auth options**: interactive sign-in (default) or client credentials stored securely; per-environment `authType` control.
 - **Output channel logging** with clear summaries and a “copy error details” action when something fails.
-- **Plugin explorer & assemblies**: browse plugin assemblies, plugin types, steps, and images in VS Code. Register new assemblies or update existing ones directly from the explorer.
+- **Plugin explorer & assemblies**: browse plugin assemblies, plugin types, steps, and images in VS Code. Register new assemblies or update existing ones directly from the explorer; plugins inside the assembly are auto-discovered and synced.
 
 ### Install
 
@@ -110,6 +110,8 @@ File bindings win over folder bindings when both cover the same file.
   - `Dynamics 365 Tools: Generate Strong Name Key (Public Key Token)` creates a `.snk` using the local `sn` tool and shows the public key token for signing your assemblies.
   - `Dynamics 365 Tools: Register Plugin Assembly` uploads a `.dll` to the selected environment and adds it to your chosen solution.
   - `Dynamics 365 Tools: Update Plugin Assembly` replaces the content of an existing assembly with a new `.dll`.
+  - Plugin classes are auto-discovered via `System.Reflection.MetadataLoadContext` when you register or update an assembly. New plugin types are created (respecting `createMissingComponents`), existing ones are updated, and types removed from the assembly are deleted in Dataverse.
+  - Use the trash icon next to a plugin type in the Plugins explorer to remove it (steps/images are deleted with the type).
 
 ### Supported file types
 

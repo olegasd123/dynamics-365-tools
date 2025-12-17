@@ -45,6 +45,7 @@
     "onCommand:dynamics365Tools.plugins.createImage",
     "onCommand:dynamics365Tools.plugins.editImage",
     "onCommand:dynamics365Tools.plugins.deleteImage",
+    "onCommand:dynamics365Tools.plugins.deletePluginType",
     "onCommand:dynamics365Tools.plugins.toggleSolutionFilter",
     "onCommand:dynamics365Tools.plugins.enableSolutionFilter",
     "onCommand:dynamics365Tools.plugins.disableSolutionFilter",
@@ -111,6 +112,12 @@
         "title": "Update Plugin Assembly",
         "category": "Dynamics 365 Tools",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "dynamics365Tools.plugins.deletePluginType",
+        "title": "Delete Plugin",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(trash)"
       },
       {
         "command": "dynamics365Tools.plugins.refreshExplorer",
@@ -247,6 +254,9 @@
           "command": "dynamics365Tools.plugins.updateAssembly"
         },
         {
+          "command": "dynamics365Tools.plugins.deletePluginType"
+        },
+        {
           "command": "dynamics365Tools.plugins.refreshExplorer"
         },
         {
@@ -316,6 +326,11 @@
         },
         {
           "command": "dynamics365Tools.plugins.createStep",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginType",
+          "group": "inline"
+        },
+        {
+          "command": "dynamics365Tools.plugins.deletePluginType",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginType",
           "group": "inline"
         },
