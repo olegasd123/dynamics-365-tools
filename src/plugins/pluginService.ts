@@ -293,7 +293,7 @@ export class PluginService {
       description: input.description ?? "",
       supporteddeployment: 0, // server only
       invocationsource: 0, // parent pipeline
-      "eventhandler@odata.bind": `/plugintypes(${normalizedPluginTypeId})`,
+      "eventhandler_plugintype@odata.bind": `/plugintypes(${normalizedPluginTypeId})`,
       "sdkmessageid@odata.bind": `/sdkmessages(${messageId})`,
     };
 
