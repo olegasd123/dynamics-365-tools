@@ -1,48 +1,15 @@
-export interface EnvironmentConfig {
-  name: string;
-  url: string;
-  /** Optional resource/audience to request tokens for; defaults to url */
-  resource?: string;
-  /** Optional user agent to send with HTTP requests */
-  userAgent?: string;
-  /** Opt-in flag to include user agent in HTTP requests */
-  userAgentEnabled?: boolean;
-  /** Preferred auth type; defaults to interactive */
-  authType?: "interactive" | "clientSecret";
-  /** If true, new solution components (web resources, plugin assemblies) can be created */
-  createMissingComponents?: boolean;
-}
+export { DEFAULT_SOLUTION_NAME } from "./features/config/constants";
 
-export interface SolutionConfig {
-  /** Unique solution name (CRM solution unique name) */
-  name: string;
-  /** Publisher prefix used for web resource paths, e.g. new_ */
-  prefix: string;
-}
-
-/** Built-in solution unique name used by Dynamics 365 */
-export const DEFAULT_SOLUTION_NAME = "Default";
-
-export interface Dynamics365Configuration {
-  environments: EnvironmentConfig[];
-  solutions: SolutionConfig[];
-  /** Supported web resource file extensions (lowercase, dot-prefixed) */
-}
-
-export interface BindingEntry {
-  /** Absolute path to the bound resource */
-  relativeLocalPath: string;
-  /** CRM web resource path, e.g. new_/account/form.js */
-  remotePath: string;
-  /** Solution unique name */
-  solutionName: string;
-  /** folder or file binding */
-  kind: "file" | "folder";
-}
-
-export interface BindingSnapshot {
-  bindings: BindingEntry[];
-}
+export type {
+  BindingEntry,
+  BindingSnapshot,
+  Dynamics365Configuration,
+  EnvironmentConfig,
+  NormalizedEnvironmentConfig,
+  PublishCache,
+  PublishCacheEntry,
+  SolutionConfig,
+} from "./features/config/schema";
 
 export interface PublishContext {
   credentialsMissing: boolean;

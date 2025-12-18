@@ -4,7 +4,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import { ConfigurationService } from "../services/configurationService";
+import { ConfigurationService } from "../features/config/configurationService";
 
 test("createBinding stores workspace-relative path when inside workspace", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-config-"));

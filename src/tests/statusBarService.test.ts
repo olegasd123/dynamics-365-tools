@@ -2,7 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
 import * as vscode from "vscode";
-import { StatusBarService } from "../services/statusBarService";
+import { StatusBarService } from "../platform/vscode/statusBar";
 
 test("setLastPublish renders status bar entry with environment and solution", () => {
   const calls: string[] = [];

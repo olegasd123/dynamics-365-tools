@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
-import { LastSelectionService } from "../services/lastSelectionService";
+import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 
 class MemoryMemento implements vscode.Memento {
   private map = new Map<string, unknown>();
