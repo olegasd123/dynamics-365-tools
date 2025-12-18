@@ -49,6 +49,13 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
   if (primaryEntityPick.cancelled) return;
   const primaryEntity = primaryEntityPick.value;
 
+  const filteringAttributesPick = await pickFilteringAttributes(
+    service,
+    primaryEntity ?? undefined,
+  );
+  if (filteringAttributesPick.cancelled) return;
+  const filteringAttributes = filteringAttributesPick.value;
+
   const stage = await pickStage();
   if (stage === undefined) return;
 
@@ -63,12 +70,6 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
   });
   if (rankValue === undefined) return;
   const rank = Number(rankValue) || 1;
-
-  const filteringAttributes = await vscode.window.showInputBox({
-    prompt: "Filtering attributes (comma-separated, optional)",
-    placeHolder: "name,emailaddress1",
-    ignoreFocusOut: true,
-  });
 
   const defaultName = buildStepDefaultName(node.pluginType.name, messageName, primaryEntity);
   const name = await vscode.window.showInputBox({
@@ -128,6 +129,14 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
   if (primaryEntityPick.cancelled) return;
   const primaryEntity = primaryEntityPick.value;
 
+  const filteringAttributesPick = await pickFilteringAttributes(
+    service,
+    primaryEntity ?? undefined,
+    node.step.filteringAttributes ?? "",
+  );
+  if (filteringAttributesPick.cancelled) return;
+  const filteringAttributes = filteringAttributesPick.value;
+
   const stage = await pickStage(node.step.stage);
   if (stage === undefined) return;
 
@@ -142,12 +151,6 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
   });
   if (rankValue === undefined) return;
   const rank = Number(rankValue) || 1;
-
-  const filteringAttributes = await vscode.window.showInputBox({
-    prompt: "Filtering attributes (comma-separated, optional)",
-    value: node.step.filteringAttributes ?? "",
-    ignoreFocusOut: true,
-  });
 
   const name = await vscode.window.showInputBox({
     prompt: "Step name",
@@ -473,6 +476,8 @@ type MessagePickItem = vscode.QuickPickItem & { isCustom?: boolean };
 
 type PrimaryEntityPick = { value?: string; cancelled: boolean };
 type PrimaryEntityPickItem = vscode.QuickPickItem & { type: "entity" | "custom" | "none" };
+type FilteringAttributesPick = { value?: string; cancelled: boolean };
+type FilteringPickItem = vscode.QuickPickItem & { pickType: "attribute" | "custom" };
 
 async function pickMessageName(
   service: PluginService,
@@ -609,6 +614,91 @@ async function promptForPrimaryEntity(defaultValue?: string): Promise<PrimaryEnt
   }
   const trimmed = value.trim();
   return { value: trimmed || undefined, cancelled: false };
+}
+
+async function pickFilteringAttributes(
+  service: PluginService,
+  primaryEntity?: string,
+  defaultValue?: string,
+): Promise<FilteringAttributesPick> {
+  if (!primaryEntity) {
+    return promptForFilteringAttributes(defaultValue);
+  }
+
+  let attributes: string[] = [];
+  try {
+    attributes = await service.listEntityAttributeLogicalNames(primaryEntity);
+  } catch (error) {
+    void vscode.window.showWarningMessage(
+      `Unable to load attributes. Enter them manually. ${String(error)}`,
+    );
+    return promptForFilteringAttributes(defaultValue);
+  }
+
+  if (!attributes.length) {
+    return promptForFilteringAttributes(defaultValue);
+  }
+
+  const defaults = parseFilteringAttributes(defaultValue);
+  const items: FilteringPickItem[] = attributes
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .map((attr) => ({
+      label: attr,
+      pickType: "attribute" as const,
+      picked: defaults.has(attr),
+    }));
+
+  items.unshift({
+    label: "Enter custom list...",
+    description: "Type attributes manually",
+    pickType: "custom",
+  });
+
+  const selection = await vscode.window.showQuickPick(items, {
+    placeHolder: "Select filtering attributes",
+    matchOnDescription: true,
+    canPickMany: true,
+    ignoreFocusOut: true,
+  });
+
+  if (!selection) return { value: defaultValue, cancelled: true };
+
+  if (selection.some((item) => (item as FilteringPickItem).pickType === "custom")) {
+    return promptForFilteringAttributes(defaultValue);
+  }
+
+  const chosen = selection
+    .filter((item) => (item as FilteringPickItem).pickType === "attribute")
+    .map((item) => item.label)
+    .filter(Boolean);
+  return { value: chosen.join(","), cancelled: false };
+}
+
+async function promptForFilteringAttributes(
+  defaultValue?: string,
+): Promise<FilteringAttributesPick> {
+  const value = await vscode.window.showInputBox({
+    prompt: "Filtering attributes (comma-separated, optional)",
+    placeHolder: "name,emailaddress1",
+    value: defaultValue ?? "",
+    ignoreFocusOut: true,
+  });
+  if (value === undefined) {
+    return { value: undefined, cancelled: true };
+  }
+  const trimmed = value.trim();
+  return { value: trimmed || undefined, cancelled: false };
+}
+
+function parseFilteringAttributes(value?: string): Set<string> {
+  if (!value) return new Set();
+  return new Set(
+    value
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean),
+  );
 }
 
 async function pickStage(defaultStage?: number): Promise<number | undefined> {

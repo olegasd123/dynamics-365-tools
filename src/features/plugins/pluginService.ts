@@ -235,14 +235,12 @@ export class PluginService {
       value?: Array<{ name?: string }>;
       "@odata.nextLink"?: string;
     };
-    let nextUrl:
-      | string
-      | undefined = "/sdkmessages?$select=name&$orderby=name&$filter=isprivate eq false&$top=200";
+    let nextUrl: string | undefined =
+      "/sdkmessages?$select=name&$orderby=name&$filter=isprivate eq false&$top=200";
 
     while (nextUrl) {
-      const response: SdkMessageListResponse = await this.client.get<SdkMessageListResponse>(
-        nextUrl,
-      );
+      const response: SdkMessageListResponse =
+        await this.client.get<SdkMessageListResponse>(nextUrl);
 
       names.push(
         ...(response.value ?? [])
@@ -262,13 +260,34 @@ export class PluginService {
       "@odata.nextLink"?: string;
     };
 
-    let nextUrl:
-      | string
-      | undefined =
-        "/EntityDefinitions?$select=LogicalName";
+    let nextUrl: string | undefined = "/EntityDefinitions?$select=LogicalName";
 
     while (nextUrl) {
       const response: EntityListResponse = await this.client.get<EntityListResponse>(nextUrl);
+      names.push(
+        ...(response.value ?? [])
+          .map((item) => item.LogicalName)
+          .filter((name): name is string => Boolean(name)),
+      );
+      nextUrl = response["@odata.nextLink"];
+    }
+
+    return Array.from(new Set(names));
+  }
+
+  async listEntityAttributeLogicalNames(entityLogicalName: string): Promise<string[]> {
+    const names: string[] = [];
+    type AttributeListResponse = {
+      value?: Array<{ LogicalName?: string }>;
+      "@odata.nextLink"?: string;
+    };
+
+    const escapedEntity = entityLogicalName.replace(/'/g, "''");
+    let nextUrl: string | undefined =
+      `/EntityDefinitions(LogicalName='${escapedEntity}')/Attributes?$select=LogicalName&$top=500`;
+
+    while (nextUrl) {
+      const response: AttributeListResponse = await this.client.get<AttributeListResponse>(nextUrl);
       names.push(
         ...(response.value ?? [])
           .map((item) => item.LogicalName)
