@@ -236,7 +236,7 @@ export class PluginService {
       "@odata.nextLink"?: string;
     };
     let nextUrl: string | undefined =
-      "/sdkmessages?$select=name&$orderby=name&$filter=isprivate eq false&$top=200";
+      "/sdkmessages?$select=name&$orderby=name&$filter=isprivate eq false";
 
     while (nextUrl) {
       const response: SdkMessageListResponse =
