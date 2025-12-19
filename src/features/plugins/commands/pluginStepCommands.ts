@@ -17,6 +17,7 @@ import {
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
+import { PluginStep } from "../models";
 
 export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
@@ -290,7 +291,7 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
 
   const messagePropertyName = await vscode.window.showInputBox({
     prompt: "Message property name",
-    value: "Target",
+    value: getDefaultMessagePropertyName(node.step),
     ignoreFocusOut: true,
   });
   if (!messagePropertyName) return;
@@ -358,7 +359,7 @@ export async function editPluginImage(ctx: CommandContext, node?: PluginImageNod
 
   const messagePropertyName = await vscode.window.showInputBox({
     prompt: "Message property name",
-    value: node.image.messagePropertyName ?? "Target",
+    value: node.image.messagePropertyName ?? getDefaultMessagePropertyName(node.step),
     ignoreFocusOut: true,
   });
   if (!messagePropertyName) return;
@@ -750,6 +751,14 @@ async function pickImageType(defaultType?: number): Promise<number | undefined> 
     { placeHolder: "Select image type" },
   );
   return pick?.value;
+}
+
+function getDefaultMessagePropertyName(step: PluginStep): string {
+  const message = step.messageName?.toLowerCase();
+  if (message === "create") {
+    return "Id";
+  }
+  return "Target";
 }
 
 async function setPluginStepState(
