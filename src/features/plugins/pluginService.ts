@@ -455,6 +455,10 @@ export class PluginService {
 
   async deleteStep(stepId: string): Promise<void> {
     const normalizedStepId = this.normalizeGuid(stepId);
+    const images = await this.listImages(normalizedStepId);
+    for (const image of images) {
+      await this.deleteImage(image.id);
+    }
     await this.client.delete(`/sdkmessageprocessingsteps(${normalizedStepId})`);
   }
 
@@ -519,10 +523,6 @@ export class PluginService {
   async deletePluginTypeCascade(pluginTypeId: string): Promise<void> {
     const steps = await this.listSteps(pluginTypeId);
     for (const step of steps) {
-      const images = await this.listImages(step.id);
-      for (const image of images) {
-        await this.deleteImage(image.id);
-      }
       await this.deleteStep(step.id);
     }
 
