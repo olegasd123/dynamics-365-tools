@@ -72,7 +72,8 @@
       {
         "command": "dynamics365Tools.configureEnvironments",
         "title": "Edit Environments & Solutions",
-        "category": "Dynamics 365 Tools"
+        "category": "Dynamics 365 Tools",
+        "icon": "$(gear)"
       },
       {
         "command": "dynamics365Tools.bindResource",
@@ -328,26 +329,31 @@
       ],
       "view/title": [
         {
+          "command": "dynamics365Tools.configureEnvironments",
+          "when": "view == dynamics365Tools.pluginExplorer",
+          "group": "navigation@1"
+        },
+        {
           "command": "dynamics365Tools.plugins.disableSolutionFilter",
           "when": "view == dynamics365Tools.pluginExplorer && d365Tools.plugins.filterConfiguredSolutions",
-          "group": "navigation@0",
+          "group": "navigation@2",
           "toggled": "d365Tools.plugins.filterConfiguredSolutions"
         },
         {
           "command": "dynamics365Tools.plugins.enableSolutionFilter",
           "when": "view == dynamics365Tools.pluginExplorer && !d365Tools.plugins.filterConfiguredSolutions",
-          "group": "navigation@0",
+          "group": "navigation@2",
           "toggled": "d365Tools.plugins.filterConfiguredSolutions"
         },
         {
           "command": "dynamics365Tools.plugins.refreshExplorer",
           "when": "view == dynamics365Tools.pluginExplorer",
-          "group": "navigation@1"
+          "group": "navigation@3"
         },
         {
           "command": "dynamics365Tools.plugins.registerAssembly",
           "when": "view == dynamics365Tools.pluginExplorer",
-          "group": "navigation@2"
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [

@@ -15,7 +15,8 @@ export type PluginExplorerNode =
   | PluginAssemblyNode
   | PluginTypeNode
   | PluginStepNode
-  | PluginImageNode;
+  | PluginImageNode
+  | MissingConfigurationNode;
 
 export class EnvironmentNode extends vscode.TreeItem {
   constructor(readonly env: EnvironmentConfig) {
@@ -87,6 +88,21 @@ export class PluginImageNode extends vscode.TreeItem {
   }
 }
 
+export class MissingConfigurationNode extends vscode.TreeItem {
+  readonly contextValue = "d365PluginConfigMissing";
+
+  constructor() {
+    super("Create dynamics365tools.config.json", vscode.TreeItemCollapsibleState.None);
+    this.description = "Open or create configuration";
+    this.tooltip = "Create or open .vscode/dynamics365tools.config.json";
+    this.iconPath = new vscode.ThemeIcon("gear");
+    this.command = {
+      command: "dynamics365Tools.configureEnvironments",
+      title: "Open Dynamics 365 Tools configuration",
+    };
+  }
+}
+
 export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExplorerNode> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
     PluginExplorerNode | undefined | void
@@ -154,7 +170,10 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
   }
 
   private async loadEnvironments(): Promise<PluginExplorerNode[]> {
-    const config = await this.configuration.loadConfiguration();
+    const config = await this.configuration.loadExistingConfiguration();
+    if (!config) {
+      return [new MissingConfigurationNode()];
+    }
     return config.environments.map((env) => new EnvironmentNode(env));
   }
 

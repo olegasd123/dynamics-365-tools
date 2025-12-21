@@ -11,4 +11,5 @@ export async function editConfiguration(ctx: CommandContext): Promise<void> {
     "dynamics365tools.config.json",
   );
   await vscode.window.showTextDocument(uri);
+  ctx.pluginExplorer.refresh();
 }

@@ -61,6 +61,23 @@ test("getRelativeToWorkspace returns input when no workspace is open", () => {
   assert.strictEqual(service.getRelativeToWorkspace(absolutePath), absolutePath);
 });
 
+test("loadExistingConfiguration does not create config when missing", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-config-"));
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const service = new ConfigurationService();
+
+  const loaded = await service.loadExistingConfiguration();
+  assert.strictEqual(loaded, undefined);
+
+  const configPath = path.join(workspaceRoot, ".vscode", "dynamics365tools.config.json");
+  const exists = await fs
+    .stat(configPath)
+    .then(() => true)
+    .catch(() => false);
+  assert.strictEqual(exists, false);
+  await fs.rm(workspaceRoot, { recursive: true, force: true });
+});
+
 test("loadConfiguration normalizes legacy solutionName property", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-config-"));
   (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];

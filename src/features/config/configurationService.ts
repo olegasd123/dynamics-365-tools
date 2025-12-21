@@ -36,50 +36,59 @@ export class ConfigurationService {
   }
 
   async loadConfiguration(): Promise<Dynamics365Configuration> {
+    const existing = await this.loadExistingConfiguration();
+    if (existing) {
+      return existing;
+    }
+
+    const defaults: Dynamics365Configuration = {
+      environments: [
+        {
+          name: "dev",
+          url: "https://your-dev.crm.dynamics.com",
+          authType: "interactive",
+          createMissingComponents: false,
+          userAgentEnabled: false,
+        },
+        {
+          name: "test",
+          url: "https://your-test.crm.dynamics.com",
+          authType: "interactive",
+          createMissingComponents: false,
+          userAgentEnabled: false,
+        },
+        {
+          name: "prod",
+          url: "https://your-prod.crm.dynamics.com",
+          authType: "interactive",
+          createMissingComponents: false,
+          userAgentEnabled: false,
+        },
+      ],
+      solutions: [
+        {
+          name: "CoreWebResources",
+          prefix: "new_",
+        },
+        {
+          name: "ComponentWebResources",
+          prefix: "cmp_",
+        },
+      ],
+    };
+    await this.saveConfiguration(defaults);
+    return defaults;
+  }
+
+  async loadExistingConfiguration(): Promise<Dynamics365Configuration | undefined> {
     const uri = this.getConfigUri();
     const exists = await this.exists(uri);
     if (!exists) {
-      const defaults: Dynamics365Configuration = {
-        environments: [
-          {
-            name: "dev",
-            url: "https://your-dev.crm.dynamics.com",
-            authType: "interactive",
-            createMissingComponents: false,
-            userAgentEnabled: false,
-          },
-          {
-            name: "test",
-            url: "https://your-test.crm.dynamics.com",
-            authType: "interactive",
-            createMissingComponents: false,
-            userAgentEnabled: false,
-          },
-          {
-            name: "prod",
-            url: "https://your-prod.crm.dynamics.com",
-            authType: "interactive",
-            createMissingComponents: false,
-            userAgentEnabled: false,
-          },
-        ],
-        solutions: [
-          {
-            name: "CoreWebResources",
-            prefix: "new_",
-          },
-          {
-            name: "ComponentWebResources",
-            prefix: "cmp_",
-          },
-        ],
-      };
-      await this.saveConfiguration(defaults);
-      return defaults;
+      return undefined;
     }
 
     const content = await vscode.workspace.fs.readFile(uri);
-    return configurationSchema.parse(this.parseJson(content, "dynamics365tools.config.json"));
+    return configurationSchema.parse(this.parseJson(content, CONFIG_FILENAME));
   }
 
   async saveConfiguration(config: Dynamics365Configuration): Promise<void> {
