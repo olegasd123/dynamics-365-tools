@@ -17,11 +17,7 @@ const collectTests = (dir) => {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       files.push(...collectTests(fullPath));
-    } else if (
-      entry.isFile() &&
-      entry.name.endsWith(".test.js") &&
-      hasTestsSegment(fullPath)
-    ) {
+    } else if (entry.isFile() && entry.name.endsWith(".test.js") && hasTestsSegment(fullPath)) {
       files.push(fullPath);
     }
   }
@@ -38,7 +34,7 @@ if (!testFiles.length) {
 const child = spawn(
   process.execPath,
   ["--require", path.join(__dirname, "shims/register.js"), "--test", ...testFiles],
-  { stdio: "inherit", env: process.env }
+  { stdio: "inherit", env: process.env },
 );
 
 child.on("close", (code) => {
