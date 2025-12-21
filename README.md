@@ -16,11 +16,12 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 - **Solution-aware bindings** for files or folders saved in `.vscode/dynamics365tools.bindings.json`; file bindings override folder bindings when both exist.
 - **Explorer context menu** `Dynamics 365 Tools` → `Publish Resource` / `Bind Resource`; bound folders publish all supported files inside.
 - **Open in Power Apps** directly from the Explorer `Dynamics 365 Tools` menu to jump to the Web Resources list for the bound solution.
-- **Publish last resource** from the status bar (cloud icon) or via `Dynamics 365 Tools: Publish Last Resource`; remembers the last environment used.
+- **Publish last resource** from the status bar (file code icon) or via `Dynamics 365 Tools: Publish Last Resource`; remembers the last environment used.
 - **Folder publish extras**: up to 4 files publish in parallel, unchanged files are skipped using `.vscode/dynamics365tools.publishCache.json`, and you can cancel from the progress notification.
 - **Auth options**: interactive sign-in (default) or client credentials stored securely; per-environment `authType` control.
 - **Output channel logging** with clear summaries and a “copy error details” action when something fails.
 - **Plugin explorer & assemblies**: browse plugin assemblies, plugin types, steps, and images in VS Code. Register new assemblies or update existing ones directly from the explorer; plugins inside the assembly are auto-discovered and synced.
+  - Quick publish plugin assemblies from the status bar (package icon) or via `Dynamics 365 Tools: Publish Last Plugin Assembly`; reuses the last environment and assembly you uploaded.
 
 ### Install
 
@@ -119,4 +120,5 @@ Supported: `.js`, `.css`, `.htm`, `.html`, `.xml`, `.json`, `.resx`, `.png`, `.j
 - Step and image commands (context menu or palette):
   - Create/edit/enable/disable/delete plugin steps; creation prompts for message, entity, stage, mode, rank, attributes, and solution. Deleting a step now also deletes all of its images first.
   - Create/edit/delete plugin images for a step; defaults include sensible aliases and message property names.
+  - Copy plugin step/image info straight from the Plugins explorer inline actions to get the formatted details on your clipboard.
 - Toggle “Show Configured Solutions Only” in the Plugins view title to filter plugin assemblies/types by the solutions listed in your config (skipping the default solution automatically).
