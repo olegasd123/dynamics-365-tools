@@ -441,9 +441,7 @@ export async function deletePluginImage(
   }
 }
 
-export async function copyStepDescription(
-  node?: PluginStepNode,
-): Promise<void> {
+export async function copyStepDescription(node?: PluginStepNode): Promise<void> {
   if (!node) {
     void vscode.window.showInformationMessage(
       "Run this command from a plugin step in the Plugins explorer.",
@@ -461,9 +459,7 @@ export async function copyStepDescription(
   void vscode.window.showInformationMessage("Step info copied to clipboard.");
 }
 
-export async function copyImageDescription(
-  node?: PluginImageNode,
-): Promise<void> {
+export async function copyImageDescription(node?: PluginImageNode): Promise<void> {
   if (!node) {
     void vscode.window.showInformationMessage(
       "Run this command from a plugin image in the Plugins explorer.",
@@ -820,7 +816,7 @@ function getImageTypeOptions(
 
 function asTooltipString(tooltip: string | vscode.MarkdownString | undefined): string | undefined {
   if (!tooltip) return undefined;
-  const raw = typeof tooltip === "string" ? tooltip : tooltip.value ?? "";
+  const raw = typeof tooltip === "string" ? tooltip : (tooltip.value ?? "");
   const cleaned = raw.replace(/\*\*/g, "").trim();
   return cleaned || undefined;
 }
