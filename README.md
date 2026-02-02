@@ -51,8 +51,8 @@ Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit En
     },
   ],
   "solutions": [
-    { "name": "CoreWebResources", "prefix": "cwr_" },
-    { "name": "ComponentWebResources", "prefix": "cmp_" },
+    { "name": "CoreWebResources", "prefix": "publisherPrefix_" },
+    { "name": "ComponentWebResources", "prefix": "publisherPrefix_" },
   ],
 }
 ```
@@ -73,20 +73,21 @@ Notes:
 - From Explorer: right-click a file or folder → `Dynamics 365 Tools` → `Bind Resource`.
 - From Command Palette: `Dynamics 365 Tools: Bind Resource` (uses the active file/folder).
 - The default remote path uses the publisher prefix from the selected solution when it matches the local path; you can overwrite it.
+- For folder bindings, the extension asks for an environment and compares supported local files with CRM web resources under the target `remotePath`. If counts differ, you get a short warning before the binding is saved.
 - Bindings are saved to `.vscode/dynamics365tools.bindings.json` for team sharing. Example:
 
 ```jsonc
 {
   "bindings": [
     {
-      "relativeLocalPath": "src/webresources/cwr_",
-      "remotePath": "cwr_",
+      "relativeLocalPath": "src/webresources/publisherPrefix_",
+      "remotePath": "publisherPrefix_",
       "solutionName": "CoreWebResources",
       "kind": "folder",
     },
     {
-      "relativeLocalPath": "src/webresources/cwr_/contact/form.js",
-      "remotePath": "cwr_/contact/form.js",
+      "relativeLocalPath": "src/webresources/publisherPrefix_/contact/form.js",
+      "remotePath": "publisherPrefix_/contact/form.js",
       "solutionName": "CoreWebResources",
       "kind": "file",
     },

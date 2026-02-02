@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
-import { BindingEntry } from "../../config/domain/models";
-import { resolveTargetUri } from "../../../platform/vscode/commandUtils";
+import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
+import { pickEnvironmentAndAuth, resolveTargetUri } from "../../../platform/vscode/commandUtils";
+import { DataverseClient } from "../../dataverse/dataverseClient";
+import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
+import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
   const { configuration, bindings, ui } = ctx;
@@ -25,6 +29,13 @@ export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefine
   const remotePath = await ui.promptRemotePath(defaultRemote);
   if (!remotePath) {
     return;
+  }
+
+  if (kind === "folder") {
+    const canCreate = await confirmFolderBinding(ctx, targetUri, remotePath, config);
+    if (!canCreate) {
+      return;
+    }
   }
 
   const binding: BindingEntry = {
@@ -56,4 +67,97 @@ function buildDefaultRemotePath(relativePath: string, defaultPrefix?: string): s
   }
 
   return `${prefix}/${normalized}`;
+}
+
+async function confirmFolderBinding(
+  ctx: CommandContext,
+  folderUri: vscode.Uri,
+  remotePath: string,
+  config: Dynamics365Configuration,
+): Promise<boolean> {
+  const { configuration, ui, secrets, auth, lastSelection, connections } = ctx;
+  const supportedFiles = await collectSupportedFiles(folderUri, buildSupportedSet());
+  if (!supportedFiles.length) {
+    return true;
+  }
+
+  const authContext = await pickEnvironmentAndAuth(
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment to compare local and CRM resources" },
+  );
+  if (!authContext) {
+    return false;
+  }
+
+  const connection = await connections.createConnection(authContext.env, authContext.auth);
+  if (!connection) {
+    return false;
+  }
+
+  const localRemotePaths = supportedFiles.map((file) => {
+    const relative = path.relative(folderUri.fsPath, file.fsPath);
+    return joinRemote(remotePath, relative);
+  });
+
+  try {
+    const client = new DataverseClient(connection);
+    const crmResources = await listWebResourceNamesByPrefix(client, remotePath);
+    const summary = compareFolderBindingResources(localRemotePaths, crmResources);
+    if (!summary.hasDifferences) {
+      return true;
+    }
+
+    const decision = await vscode.window.showWarningMessage(
+      `Binding check for ${authContext.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
+      "Create Binding",
+      "Cancel",
+    );
+    return decision === "Create Binding";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const decision = await vscode.window.showWarningMessage(
+      `Could not compare local files with CRM resources: ${message}. Continue creating binding?`,
+      "Create Binding",
+      "Cancel",
+    );
+    return decision === "Create Binding";
+  }
+}
+
+function joinRemote(base: string, relative: string): string {
+  const normalizedBase = normalizeRemotePath(base);
+  const normalizedRelative = relative.replace(/\\/g, "/");
+  return normalizedRelative ? `${normalizedBase}/${normalizedRelative}` : normalizedBase;
+}
+
+async function listWebResourceNamesByPrefix(
+  client: DataverseClient,
+  remotePath: string,
+): Promise<string[]> {
+  const normalized = normalizeRemotePath(remotePath);
+  const escaped = normalized.replace(/'/g, "''");
+  const filter = encodeURIComponent(`(name eq '${escaped}' or startswith(name,'${escaped}/'))`);
+  let url = `/webresourceset?$select=name&$filter=${filter}&$top=5000`;
+  const resources = new Set<string>();
+
+  while (url) {
+    const response = await client.get<{
+      value?: Array<{ name?: string }>;
+      "@odata.nextLink"?: string;
+    }>(url);
+    for (const item of response.value ?? []) {
+      if (item.name?.trim()) {
+        resources.add(normalizeRemotePath(item.name));
+      }
+    }
+    url = response["@odata.nextLink"] ?? "";
+  }
+
+  return [...resources];
 }
