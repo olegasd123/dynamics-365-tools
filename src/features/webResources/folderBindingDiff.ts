@@ -4,6 +4,8 @@ export interface FolderBindingDiffSummary {
   matchCount: number;
   onlyLocalCount: number;
   onlyCrmCount: number;
+  onlyLocal: string[];
+  onlyCrm: string[];
   hasDifferences: boolean;
 }
 
@@ -11,8 +13,10 @@ export function compareFolderBindingResources(
   localRemotePaths: string[],
   crmRemotePaths: string[],
 ): FolderBindingDiffSummary {
-  const localSet = new Set(localRemotePaths.map((item) => normalizeRemotePath(item).toLowerCase()));
-  const crmSet = new Set(crmRemotePaths.map((item) => normalizeRemotePath(item).toLowerCase()));
+  const localMap = buildPathMap(localRemotePaths);
+  const crmMap = buildPathMap(crmRemotePaths);
+  const localSet = new Set(localMap.keys());
+  const crmSet = new Set(crmMap.keys());
 
   let matchCount = 0;
   for (const local of localSet) {
@@ -21,16 +25,24 @@ export function compareFolderBindingResources(
     }
   }
 
-  const onlyLocalCount = localSet.size - matchCount;
-  const onlyCrmCount = crmSet.size - matchCount;
+  const onlyLocal = [...localSet]
+    .filter((item) => !crmSet.has(item))
+    .map((item) => localMap.get(item) || item)
+    .sort();
+  const onlyCrm = [...crmSet]
+    .filter((item) => !localSet.has(item))
+    .map((item) => crmMap.get(item) || item)
+    .sort();
 
   return {
     localCount: localSet.size,
     crmCount: crmSet.size,
     matchCount,
-    onlyLocalCount,
-    onlyCrmCount,
-    hasDifferences: onlyLocalCount > 0 || onlyCrmCount > 0,
+    onlyLocalCount: onlyLocal.length,
+    onlyCrmCount: onlyCrm.length,
+    onlyLocal,
+    onlyCrm,
+    hasDifferences: onlyLocal.length > 0 || onlyCrm.length > 0,
   };
 }
 
@@ -41,4 +53,13 @@ export function normalizeRemotePath(remotePath: string): string {
     .replace(/\/+/g, "/")
     .replace(/^\/+/, "")
     .replace(/\/+$/, "");
+}
+
+function buildPathMap(paths: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const raw of paths) {
+    const normalized = normalizeRemotePath(raw);
+    map.set(normalized.toLowerCase(), normalized);
+  }
+  return map;
 }

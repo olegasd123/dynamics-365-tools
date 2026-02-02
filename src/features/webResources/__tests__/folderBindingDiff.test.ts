@@ -1,12 +1,12 @@
 import assert from "node:assert";
 import test from "node:test";
-import {
-  compareFolderBindingResources,
-  normalizeRemotePath,
-} from "../folderBindingDiff";
+import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
 test("normalizeRemotePath keeps CRM path format stable", () => {
-  assert.strictEqual(normalizeRemotePath("  new_\\folder//sub///file.js "), "new_/folder/sub/file.js");
+  assert.strictEqual(
+    normalizeRemotePath("  new_\\folder//sub///file.js "),
+    "new_/folder/sub/file.js",
+  );
   assert.strictEqual(normalizeRemotePath("/new_/folder/"), "new_/folder");
 });
 

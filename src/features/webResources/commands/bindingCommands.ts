@@ -7,6 +7,8 @@ import { DataverseClient } from "../../dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
+const bindingOutput = vscode.window.createOutputChannel("Dynamics 365 Tools Binding");
+
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
   const { configuration, bindings, ui } = ctx;
   const targetUri = await resolveTargetUri(uri);
@@ -113,6 +115,13 @@ async function confirmFolderBinding(
       return true;
     }
 
+    logBindingDiff(
+      authContext.env.name,
+      folderUri.fsPath,
+      remotePath,
+      summary.onlyLocal,
+      summary.onlyCrm,
+    );
     const decision = await vscode.window.showWarningMessage(
       `Binding check for ${authContext.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
       "Create Binding",
@@ -160,4 +169,34 @@ async function listWebResourceNamesByPrefix(
   }
 
   return [...resources];
+}
+
+function logBindingDiff(
+  environmentName: string,
+  localFolderPath: string,
+  remotePath: string,
+  onlyLocal: string[],
+  onlyCrm: string[],
+): void {
+  bindingOutput.appendLine("────────────────────────────────────────────────────────────────────");
+  bindingOutput.appendLine(`[${new Date().toISOString()}] Folder binding diff`);
+  bindingOutput.appendLine(`Environment: ${environmentName}`);
+  bindingOutput.appendLine(`Local folder: ${localFolderPath}`);
+  bindingOutput.appendLine(`Remote path: ${normalizeRemotePath(remotePath)}`);
+
+  if (onlyLocal.length) {
+    bindingOutput.appendLine("Only in local:");
+    for (const item of onlyLocal) {
+      bindingOutput.appendLine(`  - ${item}`);
+    }
+  }
+
+  if (onlyCrm.length) {
+    bindingOutput.appendLine("Only in CRM:");
+    for (const item of onlyCrm) {
+      bindingOutput.appendLine(`  - ${item}`);
+    }
+  }
+
+  bindingOutput.show(true);
 }
