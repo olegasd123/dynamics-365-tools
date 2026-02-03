@@ -57,10 +57,27 @@ Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit En
 }
 ```
 
+Config parameters:
+
+- `environments` (required): list of Dataverse environments you can publish to.
+  - `name` (required): short label shown in VS Code pickers (for example `dev`, `test`, `prod`).
+  - `url` (required): org base URL (for example `https://contoso.crm.dynamics.com`).
+  - `authType` (optional): `interactive` or `clientSecret`. If missing, interactive sign-in is used first.
+  - `resource` (optional): custom token audience/scope base. Use this only when your auth setup needs a different audience than `url`.
+  - `createMissingComponents` (optional, default `false`): when `true`, publish can create missing web resources and plugin components. When `false`, only existing components are updated.
+  - `userAgentEnabled` (optional, default `false`): enables `User-Agent` header on Dataverse and token HTTP calls.
+  - `userAgent` (optional): custom `User-Agent` value. If empty and `userAgentEnabled` is `true`, the extension uses `Dynamics365Tools-VSCode/<version>`.
+- `solutions` (required): list of Dataverse solutions used during bind/publish/plugin actions.
+  - `name` (required): solution unique name in Dataverse (for example `CoreWebResources`).
+  - `prefix` (required): web resource prefix for path defaults (for example `new_`, `cmp_`).
+  - `solutionName` (legacy optional alias): old key still accepted and mapped to `name`.
+
 Notes:
 
-- Set `resource` if the token audience is not the org URL. Turn on `userAgentEnabled` or set `userAgent` to add a custom header to every HTTP call.
-- `createMissingComponents: false` blocks creation; publish will only update existing web resources and will refuse new plugin assemblies for that environment.
+- Keep `authType: "interactive"` for local developer work. Use `authType: "clientSecret"` for CI or service accounts.
+- If `authType` is not `clientSecret`, the extension still can use stored client credentials as a fallback when interactive sign-in is unavailable.
+- `createMissingComponents: false` is safer for production: no new web resources or plugin assemblies are created by mistake, while still allowing them to be updated.
+- Turn on `userAgentEnabled` only if your proxy, gateway, or audit policy needs a custom client header.
 
 ### Authenticate
 
