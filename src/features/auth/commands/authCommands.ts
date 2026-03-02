@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
+import { buildDefaultEnvironmentUrl } from "../../../shared/environmentUrl";
 import {
   EnvironmentConfig,
   Dynamics365Configuration,
@@ -390,17 +391,4 @@ function validateUrl(value: string): string | undefined {
     return "URL must start with http:// or https://";
   }
   return undefined;
-}
-
-function buildDefaultEnvironmentUrl(authorizationName: string): string {
-  const normalized = authorizationName
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  if (!normalized) {
-    return "https://org.crm.dynamics.com";
-  }
-  return `https://${normalized}.crm.dynamics.com`;
 }

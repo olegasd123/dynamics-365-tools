@@ -6,7 +6,11 @@ import {
   publishResource,
 } from "../features/webResources/commands/publishCommands";
 import { addBinding } from "../features/webResources/commands/bindingCommands";
-import { editConfiguration } from "../features/config/commands/configCommands";
+import {
+  addEnvironment,
+  addSolution,
+  editConfiguration,
+} from "../features/config/commands/configCommands";
 import {
   setEnvironmentCredentials,
   signInInteractive,
@@ -52,6 +56,8 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     vscode.commands.registerCommand("dynamics365Tools.configureEnvironments", () =>
       editConfiguration(ctx),
     ),
+    vscode.commands.registerCommand("dynamics365Tools.addEnvironment", () => addEnvironment(ctx)),
+    vscode.commands.registerCommand("dynamics365Tools.addSolution", () => addSolution(ctx)),
     vscode.commands.registerCommand("dynamics365Tools.bindResource", (uri?: vscode.Uri) =>
       addBinding(ctx, uri),
     ),

@@ -30,6 +30,8 @@
   "activationEvents": [
     "onCommand:dynamics365Tools.openResourceMenu",
     "onCommand:dynamics365Tools.configureEnvironments",
+    "onCommand:dynamics365Tools.addEnvironment",
+    "onCommand:dynamics365Tools.addSolution",
     "onCommand:dynamics365Tools.bindResource",
     "onCommand:dynamics365Tools.openInCrm",
     "onCommand:dynamics365Tools.publishResource",
@@ -74,6 +76,18 @@
         "title": "Edit Environments & Solutions",
         "category": "Dynamics 365 Tools",
         "icon": "$(gear)"
+      },
+      {
+        "command": "dynamics365Tools.addEnvironment",
+        "title": "Add Environment",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dynamics365Tools.addSolution",
+        "title": "Add Solution",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(list-selection)"
       },
       {
         "command": "dynamics365Tools.bindResource",
@@ -262,6 +276,12 @@
         },
         {
           "command": "dynamics365Tools.configureEnvironments"
+        },
+        {
+          "command": "dynamics365Tools.addEnvironment"
+        },
+        {
+          "command": "dynamics365Tools.addSolution"
         },
         {
           "command": "dynamics365Tools.bindResource"

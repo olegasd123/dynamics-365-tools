@@ -31,6 +31,9 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 
 Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit Environments & Solutions`). Example:
 
+- Quick add environment: `Dynamics 365 Tools: Add Environment`.
+- Quick add solution from Dataverse: `Dynamics 365 Tools: Add Solution` (loads unmanaged solutions from selected environment).
+
 ```jsonc
 {
   "environments": [
