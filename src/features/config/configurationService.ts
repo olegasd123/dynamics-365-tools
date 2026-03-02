@@ -40,44 +40,10 @@ export class ConfigurationService {
     if (existing) {
       return existing;
     }
-
-    const defaults: Dynamics365Configuration = {
-      environments: [
-        {
-          name: "dev",
-          url: "https://your-dev.crm.dynamics.com",
-          authType: "interactive",
-          createMissingComponents: false,
-          userAgentEnabled: false,
-        },
-        {
-          name: "test",
-          url: "https://your-test.crm.dynamics.com",
-          authType: "interactive",
-          createMissingComponents: false,
-          userAgentEnabled: false,
-        },
-        {
-          name: "prod",
-          url: "https://your-prod.crm.dynamics.com",
-          authType: "interactive",
-          createMissingComponents: false,
-          userAgentEnabled: false,
-        },
-      ],
-      solutions: [
-        {
-          name: "CoreWebResources",
-          prefix: "new_",
-        },
-        {
-          name: "ComponentWebResources",
-          prefix: "cmp_",
-        },
-      ],
+    return {
+      environments: [],
+      solutions: [],
     };
-    await this.saveConfiguration(defaults);
-    return defaults;
   }
 
   async loadExistingConfiguration(): Promise<Dynamics365Configuration | undefined> {

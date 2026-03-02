@@ -92,13 +92,13 @@ export class MissingConfigurationNode extends vscode.TreeItem {
   readonly contextValue = "d365PluginConfigMissing";
 
   constructor() {
-    super("Create dynamics365tools.config.json", vscode.TreeItemCollapsibleState.None);
-    this.description = "Open or create configuration";
-    this.tooltip = "Create or open .vscode/dynamics365tools.config.json";
-    this.iconPath = new vscode.ThemeIcon("gear");
+    super("Add a new environment", vscode.TreeItemCollapsibleState.None);
+    this.description = "Sign in and save environment to config";
+    this.tooltip = "Run Sign In (Interactive) to add environment configuration";
+    this.iconPath = new vscode.ThemeIcon("add");
     this.command = {
-      command: "dynamics365Tools.configureEnvironments",
-      title: "Open Dynamics 365 Tools configuration",
+      command: "dynamics365Tools.signInInteractive",
+      title: "Sign In (Interactive)",
     };
   }
 }
@@ -189,8 +189,11 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
       const assemblies = await service.listAssemblies({ solutionNames });
       return assemblies.map((assembly) => new PluginAssemblyNode(env, assembly));
     } catch (error) {
+      const message = String(error);
       void vscode.window.showErrorMessage(
-        `Failed to load plugin assemblies from ${env.name}: ${String(error)}`,
+        isUserNotMemberError(message)
+          ? `Failed to load plugin assemblies from ${env.name}: account has no access. Run 'Dynamics 365 Tools: Sign In (Interactive)' and select the correct account for this environment.`
+          : `Failed to load plugin assemblies from ${env.name}: ${message}`,
       );
       return [];
     }
@@ -483,4 +486,11 @@ function formatImageType(value?: number): string {
     default:
       return "Unknown";
   }
+}
+
+function isUserNotMemberError(message: string): boolean {
+  return (
+    message.includes("0x80072560") ||
+    message.toLowerCase().includes("user is not a member of the organization")
+  );
 }

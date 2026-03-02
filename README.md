@@ -31,6 +31,9 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 
 Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit Environments & Solutions`). Example:
 
+- Quick add environment: `Dynamics 365 Tools: Add Environment`.
+- Quick add solution from Dataverse: `Dynamics 365 Tools: Add Solution` (loads unmanaged solutions from selected environment).
+
 ```jsonc
 {
   "environments": [
@@ -81,8 +84,8 @@ Notes:
 
 ### Authenticate
 
-- **Interactive (default)**: run `Dynamics 365 Tools: Sign In (Interactive)` or publish; tokens are requested with the `/.default` scope for the environment URL (or `resource`).
-- **Client credentials**: run `Dynamics 365 Tools: Set Environment Credentials` to store `clientId`, `clientSecret`, and optional `tenantId` in Secret Storage. Set the environment `authType` to `clientSecret` to force this path.
+- **Interactive (default)**: run `Dynamics 365 Tools: Sign In (Interactive)`, then pick a saved authorization or create a new one. The command can create `.vscode/dynamics365tools.config.json` with the selected environment when the file does not exist.
+- **Client credentials**: run `Dynamics 365 Tools: Set Environment Credentials`, then pick a saved authorization or create a new one. The command stores `clientId`, `clientSecret`, and optional `tenantId` in Secret Storage.
 - **Sign out**: run `Dynamics 365 Tools: Sign Out` to clear the interactive session for an environment; you can also choose to remove any stored client credentials for it.
 
 ### Bind resources

@@ -40,8 +40,8 @@ export const solutionSchema = solutionSchemaBase
   }));
 
 export const configurationSchema = z.object({
-  environments: z.array(environmentSchema),
-  solutions: z.array(solutionSchema),
+  environments: z.array(environmentSchema).default([]),
+  solutions: z.array(solutionSchema).default([]),
 });
 
 export const bindingEntrySchema = z.object({

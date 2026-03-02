@@ -78,6 +78,23 @@ test("loadExistingConfiguration does not create config when missing", async () =
   await fs.rm(workspaceRoot, { recursive: true, force: true });
 });
 
+test("loadConfiguration returns empty config and does not create file when missing", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-config-"));
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const service = new ConfigurationService();
+
+  const loaded = await service.loadConfiguration();
+  assert.deepStrictEqual(loaded, { environments: [], solutions: [] });
+
+  const configPath = path.join(workspaceRoot, ".vscode", "dynamics365tools.config.json");
+  const exists = await fs
+    .stat(configPath)
+    .then(() => true)
+    .catch(() => false);
+  assert.strictEqual(exists, false);
+  await fs.rm(workspaceRoot, { recursive: true, force: true });
+});
+
 test("loadConfiguration normalizes legacy solutionName property", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-config-"));
   (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
@@ -96,5 +113,25 @@ test("loadConfiguration normalizes legacy solutionName property", async () => {
 
   const loaded = await service.loadConfiguration();
   assert.strictEqual(loaded.solutions[0].name, "LegacySolution");
+  await fs.rm(workspaceRoot, { recursive: true, force: true });
+});
+
+test("loadConfiguration defaults missing solutions to empty array", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-config-"));
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const service = new ConfigurationService();
+  const config = {
+    environments: [{ name: "dev", url: "https://example" }],
+  };
+
+  const configUri = vscode.Uri.joinPath(
+    vscode.Uri.file(workspaceRoot),
+    ".vscode",
+    "dynamics365tools.config.json",
+  );
+  await vscode.workspace.fs.writeFile(configUri, Buffer.from(JSON.stringify(config, null, 2)));
+
+  const loaded = await service.loadConfiguration();
+  assert.deepStrictEqual(loaded.solutions, []);
   await fs.rm(workspaceRoot, { recursive: true, force: true });
 });
