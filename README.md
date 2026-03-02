@@ -12,7 +12,7 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 
 ### Main features
 
-- **Multi-environment config** stored in `.vscode/dynamics365tools.config.json` (dev/test/prod, etc.), with optional custom resource/audience and opt-in user agent header.
+- **Multi-environment config** stored in `.vscode/dynamics365tools.config.json`, with optional custom resource/audience and opt-in user agent header.
 - **Solution-aware bindings** for files or folders saved in `.vscode/dynamics365tools.bindings.json`; file bindings override folder bindings when both exist.
 - **Explorer context menu** `Dynamics 365 Tools` → `Publish Resource` / `Bind Resource`; bound folders publish all supported files inside.
 - **Open in Power Apps** directly from the Explorer `Dynamics 365 Tools` menu to jump to the Web Resources list for the bound solution.
@@ -29,10 +29,10 @@ Publish Dynamics 365 web resources straight from VS Code. Bind local files or fo
 
 ### Configure environments and solutions
 
-Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit Environments & Solutions`). Example:
+Create config by running `Dynamics 365 Tools: Add Environment` or `Dynamics 365 Tools: Sign In (Interactive)`, then edit `.vscode/dynamics365tools.config.json` if needed.
 
 - Quick add environment: `Dynamics 365 Tools: Add Environment`.
-- Quick add solution from Dataverse: `Dynamics 365 Tools: Add Solution` (loads unmanaged solutions from selected environment).
+- Quick add solution from Dataverse: `Dynamics 365 Tools: Add Solution` (loads unmanaged solutions from selected environment and uses publisher prefix automatically).
 
 ```jsonc
 {
@@ -62,7 +62,7 @@ Edit `.vscode/dynamics365tools.config.json` (or run `Dynamics 365 Tools: Edit En
 
 Config parameters:
 
-- `environments` (required): list of Dataverse environments you can publish to.
+- `environments` (optional, defaults to `[]`): list of Dataverse environments you can publish to.
   - `name` (required): short label shown in VS Code pickers (for example `dev`, `test`, `prod`).
   - `url` (required): org base URL (for example `https://contoso.crm.dynamics.com`).
   - `authType` (optional): `interactive` or `clientSecret`. If missing, interactive sign-in is used first.
@@ -70,9 +70,9 @@ Config parameters:
   - `createMissingComponents` (optional, default `false`): when `true`, publish can create missing web resources and plugin components. When `false`, only existing components are updated.
   - `userAgentEnabled` (optional, default `false`): enables `User-Agent` header on Dataverse and token HTTP calls.
   - `userAgent` (optional): custom `User-Agent` value. If empty and `userAgentEnabled` is `true`, the extension uses `Dynamics365Tools-VSCode/<version>`.
-- `solutions` (required): list of Dataverse solutions used during bind/publish/plugin actions.
+- `solutions` (optional, defaults to `[]`): list of Dataverse solutions used during bind/publish/plugin actions.
   - `name` (required): solution unique name in Dataverse (for example `CoreWebResources`).
-  - `prefix` (required): web resource prefix for path defaults (for example `new_`, `cmp_`).
+  - `prefix` (required): web resource prefix for path defaults (for example `new_`, `cmp_`). `Add Solution` saves this from publisher prefix and normalizes it to end with `_`.
   - `solutionName` (legacy optional alias): old key still accepted and mapped to `name`.
 
 Notes:
