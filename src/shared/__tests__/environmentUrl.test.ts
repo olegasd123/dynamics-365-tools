@@ -8,7 +8,7 @@ test("buildDefaultEnvironmentUrl builds crm host from environment name", () => {
 
 test("buildDefaultEnvironmentUrl normalizes invalid chars", () => {
   assert.strictEqual(
-    buildDefaultEnvironmentUrl(" Synergie DEV "),
-    "https://synergie-dev.crm.dynamics.com",
+    buildDefaultEnvironmentUrl(" Contoso DEV "),
+    "https://contoso-dev.crm.dynamics.com",
   );
 });
