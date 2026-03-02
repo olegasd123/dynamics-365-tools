@@ -8,7 +8,7 @@
       "runtimeExecutable": "${execPath}",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "${workspaceFolder}/../dynamics-365-tools-crm-dev"
+        "${workspaceFolder}/../advanced-find"
       ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "npm: compile"

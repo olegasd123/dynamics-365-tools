@@ -6,8 +6,14 @@ import { AuthService } from "../authService";
 test("getAccessToken requests scope built from resource when provided", async () => {
   const auth = new AuthService();
   let capturedScopes: string[] = [];
-  (vscode.authentication as any).getSession = async (_providerId: string, scopes: string[]) => {
+  let capturedOptions: any;
+  (vscode.authentication as any).getSession = async (
+    _providerId: string,
+    scopes: string[],
+    options: any,
+  ) => {
     capturedScopes = scopes;
+    capturedOptions = options;
     return { accessToken: "token-from-session" };
   };
 
@@ -19,6 +25,33 @@ test("getAccessToken requests scope built from resource when provided", async ()
 
   assert.strictEqual(token, "token-from-session");
   assert.deepStrictEqual(capturedScopes, ["https://alt.resource/.default"]);
+  assert.deepStrictEqual(capturedOptions, { createIfNone: true });
+});
+
+test("getAccessToken can force a new interactive session", async () => {
+  const auth = new AuthService();
+  let capturedOptions: any;
+  (vscode.authentication as any).getSession = async (
+    _providerId: string,
+    _scopes: string[],
+    options: any,
+  ) => {
+    capturedOptions = options;
+    return { accessToken: "token-from-session" };
+  };
+
+  const token = await auth.getAccessToken(
+    {
+      name: "contoso",
+      url: "https://contoso.crm.dynamics.com",
+    },
+    { forceNewSession: true },
+  );
+
+  assert.strictEqual(token, "token-from-session");
+  assert.deepStrictEqual(capturedOptions, {
+    forceNewSession: true,
+  });
 });
 
 test("getAccessToken surfaces errors as window error and returns undefined", async () => {

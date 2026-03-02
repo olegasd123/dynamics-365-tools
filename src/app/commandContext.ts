@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { AuthService } from "../features/auth/authService";
+import type { AuthorizationStore } from "../features/auth/authorizationStore";
 import type { SecretService } from "../features/auth/secretService";
 import type { ConfigurationService } from "../features/config/configurationService";
 import type { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
@@ -20,6 +21,7 @@ export interface CommandContext {
   ui: SolutionPicker;
 
   auth: AuthService;
+  authorizations: AuthorizationStore;
   secrets: SecretService;
   lastSelection: LastSelectionService;
 

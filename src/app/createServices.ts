@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { AuthService } from "../features/auth/authService";
+import { AuthorizationStore } from "../features/auth/authorizationStore";
 import { SecretService } from "../features/auth/secretService";
 import { ConfigurationService } from "../features/config/configurationService";
 import { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
@@ -24,6 +25,7 @@ export async function createServices(
 
   const secrets = new SecretService(extensionContext.secrets);
   const auth = new AuthService();
+  const authorizations = new AuthorizationStore(extensionContext.globalState);
   const lastSelection = new LastSelectionService(extensionContext.workspaceState);
 
   const publishCache = new PublishCacheService(configuration);
@@ -52,6 +54,7 @@ export async function createServices(
     ui,
     secrets,
     auth,
+    authorizations,
     lastSelection,
     bindings,
     publishCache,

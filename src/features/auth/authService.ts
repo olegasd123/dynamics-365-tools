@@ -1,14 +1,28 @@
 import * as vscode from "vscode";
 import { EnvironmentConfig } from "../config/domain/models";
 
+export interface InteractiveSignInOptions {
+  forceNewSession?: boolean;
+  clearSessionPreference?: boolean;
+}
+
 export class AuthService {
-  async getAccessToken(env: EnvironmentConfig): Promise<string | undefined> {
+  async getAccessToken(
+    env: EnvironmentConfig,
+    options: InteractiveSignInOptions = {},
+  ): Promise<string | undefined> {
     const scope = this.buildScope(env);
     try {
+      const sessionOptions: vscode.AuthenticationGetSessionOptions = options.forceNewSession
+        ? { forceNewSession: true }
+        : { createIfNone: true };
+      if (options.clearSessionPreference) {
+        sessionOptions.clearSessionPreference = true;
+      }
       const session = await vscode.authentication.getSession("microsoft", [scope], {
-        createIfNone: true,
+        ...sessionOptions,
       });
-      return session.accessToken;
+      return session?.accessToken;
     } catch (error) {
       vscode.window.showErrorMessage(
         `Interactive sign-in failed for ${env.name}: ${String(error)}`,
