@@ -92,13 +92,13 @@ export class MissingConfigurationNode extends vscode.TreeItem {
   readonly contextValue = "d365PluginConfigMissing";
 
   constructor() {
-    super("Create dynamics365tools.config.json", vscode.TreeItemCollapsibleState.None);
-    this.description = "Open or create configuration";
-    this.tooltip = "Create or open .vscode/dynamics365tools.config.json";
-    this.iconPath = new vscode.ThemeIcon("gear");
+    super("Add a new environment", vscode.TreeItemCollapsibleState.None);
+    this.description = "Sign in and save environment to config";
+    this.tooltip = "Run Sign In (Interactive) to add environment configuration";
+    this.iconPath = new vscode.ThemeIcon("add");
     this.command = {
-      command: "dynamics365Tools.configureEnvironments",
-      title: "Open Dynamics 365 Tools configuration",
+      command: "dynamics365Tools.signInInteractive",
+      title: "Sign In (Interactive)",
     };
   }
 }

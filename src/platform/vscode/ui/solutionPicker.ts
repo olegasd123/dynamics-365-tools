@@ -15,7 +15,7 @@ export class SolutionPicker {
   ): Promise<EnvironmentConfig | undefined> {
     if (!environments.length) {
       vscode.window.showErrorMessage(
-        "No environments configured. Run 'Dynamics 365 Tools: Edit Environments & Solutions' first.",
+        "No environments configured. Run 'Dynamics 365 Tools: Add Environment' or 'Dynamics 365 Tools: Sign In (Interactive)' first.",
       );
       return undefined;
     }
