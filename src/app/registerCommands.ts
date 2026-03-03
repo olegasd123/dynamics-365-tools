@@ -36,95 +36,81 @@ import {
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import { CommandContext } from "./commandContext";
+import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 
 export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
+  const register = (
+    commandId: string,
+    handler: (...args: any[]) => Promise<unknown> | unknown,
+    options?: CommandRunOptions,
+  ): vscode.Disposable =>
+    vscode.commands.registerCommand(commandId, (...args: any[]) =>
+      runCommandWithHealthCheck(ctx, commandId, () => handler(...args), options),
+    );
+
+  const webResourceCommandOptions: CommandRunOptions = {
+    validateBindings: true,
+  };
+
   const disposables: vscode.Disposable[] = [];
 
   disposables.push(
-    vscode.commands.registerCommand("dynamics365Tools.openResourceMenu", (uri?: vscode.Uri) =>
-      openResourceMenu(ctx, uri),
+    register(
+      "dynamics365Tools.openResourceMenu",
+      (uri?: vscode.Uri) => openResourceMenu(ctx, uri),
+      webResourceCommandOptions,
     ),
-    vscode.commands.registerCommand("dynamics365Tools.openInCrm", (uri?: vscode.Uri) =>
-      openInCrm(ctx, uri),
+    register(
+      "dynamics365Tools.openInCrm",
+      (uri?: vscode.Uri) => openInCrm(ctx, uri),
+      webResourceCommandOptions,
     ),
-    vscode.commands.registerCommand("dynamics365Tools.publishResource", (uri?: vscode.Uri) =>
-      publishResource(ctx, uri),
+    register(
+      "dynamics365Tools.publishResource",
+      (uri?: vscode.Uri) => publishResource(ctx, uri),
+      webResourceCommandOptions,
     ),
-    vscode.commands.registerCommand("dynamics365Tools.publishLastResource", () =>
-      publishLastResource(ctx),
+    register(
+      "dynamics365Tools.publishLastResource",
+      () => publishLastResource(ctx),
+      webResourceCommandOptions,
     ),
-    vscode.commands.registerCommand("dynamics365Tools.configureEnvironments", () =>
-      editConfiguration(ctx),
+    register("dynamics365Tools.configureEnvironments", () => editConfiguration(ctx)),
+    register("dynamics365Tools.addEnvironment", () => addEnvironment(ctx)),
+    register("dynamics365Tools.addSolution", () => addSolution(ctx)),
+    register(
+      "dynamics365Tools.bindResource",
+      (uri?: vscode.Uri) => addBinding(ctx, uri),
+      webResourceCommandOptions,
     ),
-    vscode.commands.registerCommand("dynamics365Tools.addEnvironment", () => addEnvironment(ctx)),
-    vscode.commands.registerCommand("dynamics365Tools.addSolution", () => addSolution(ctx)),
-    vscode.commands.registerCommand("dynamics365Tools.bindResource", (uri?: vscode.Uri) =>
-      addBinding(ctx, uri),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.setEnvironmentCredentials", () =>
-      setEnvironmentCredentials(ctx),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.signInInteractive", () =>
-      signInInteractive(ctx),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.signOut", () => signOut(ctx)),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.registerAssembly", () =>
-      registerPluginAssembly(ctx),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.publishLastAssembly", () =>
-      publishLastPluginAssembly(ctx),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.updateAssembly", (node) =>
-      updatePluginAssembly(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.deletePluginType", (node) =>
-      deletePluginType(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.refreshExplorer", () =>
-      ctx.pluginExplorer.refresh(),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.toggleSolutionFilter", () =>
+    register("dynamics365Tools.setEnvironmentCredentials", () => setEnvironmentCredentials(ctx)),
+    register("dynamics365Tools.signInInteractive", () => signInInteractive(ctx)),
+    register("dynamics365Tools.signOut", () => signOut(ctx)),
+    register("dynamics365Tools.plugins.registerAssembly", () => registerPluginAssembly(ctx)),
+    register("dynamics365Tools.plugins.publishLastAssembly", () => publishLastPluginAssembly(ctx)),
+    register("dynamics365Tools.plugins.updateAssembly", (node) => updatePluginAssembly(ctx, node)),
+    register("dynamics365Tools.plugins.deletePluginType", (node) => deletePluginType(ctx, node)),
+    register("dynamics365Tools.plugins.refreshExplorer", () => ctx.pluginExplorer.refresh()),
+    register("dynamics365Tools.plugins.toggleSolutionFilter", () =>
       ctx.pluginExplorer.toggleSolutionFilter(),
     ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.enableSolutionFilter", () =>
+    register("dynamics365Tools.plugins.enableSolutionFilter", () =>
       ctx.pluginExplorer.setSolutionFilter(true),
     ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.disableSolutionFilter", () =>
+    register("dynamics365Tools.plugins.disableSolutionFilter", () =>
       ctx.pluginExplorer.setSolutionFilter(false),
     ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.generatePublicKeyToken", () =>
-      generatePublicKeyToken(ctx),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.createStep", (node) =>
-      createPluginStep(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.editStep", (node) =>
-      editPluginStep(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.enableStep", (node) =>
-      enablePluginStep(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.disableStep", (node) =>
-      disablePluginStep(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.deleteStep", (node) =>
-      deletePluginStep(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.createImage", (node) =>
-      createPluginImage(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.copyStepDescription", (node) =>
-      copyStepDescription(node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.copyImageDescription", (node) =>
-      copyImageDescription(node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.editImage", (node) =>
-      editPluginImage(ctx, node),
-    ),
-    vscode.commands.registerCommand("dynamics365Tools.plugins.deleteImage", (node) =>
-      deletePluginImage(ctx, node),
-    ),
+    register("dynamics365Tools.plugins.generatePublicKeyToken", () => generatePublicKeyToken(ctx)),
+    register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.editStep", (node) => editPluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.enableStep", (node) => enablePluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.disableStep", (node) => disablePluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.deleteStep", (node) => deletePluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.createImage", (node) => createPluginImage(ctx, node)),
+    register("dynamics365Tools.plugins.copyStepDescription", (node) => copyStepDescription(node)),
+    register("dynamics365Tools.plugins.copyImageDescription", (node) => copyImageDescription(node)),
+    register("dynamics365Tools.plugins.editImage", (node) => editPluginImage(ctx, node)),
+    register("dynamics365Tools.plugins.deleteImage", (node) => deletePluginImage(ctx, node)),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
     ctx.statusBar,
     ctx.assemblyStatusBar,

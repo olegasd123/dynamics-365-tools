@@ -76,6 +76,17 @@ export class ConfigurationService {
     return bindingsSchema.parse(this.parseJson(content, "dynamics365tools.bindings.json"));
   }
 
+  async loadExistingBindings(): Promise<BindingSnapshot | undefined> {
+    const uri = this.getBindingsUri();
+    const exists = await this.exists(uri);
+    if (!exists) {
+      return undefined;
+    }
+
+    const content = await vscode.workspace.fs.readFile(uri);
+    return bindingsSchema.parse(this.parseJson(content, "dynamics365tools.bindings.json"));
+  }
+
   async saveBindings(snapshot: BindingSnapshot): Promise<void> {
     const uri = this.getBindingsUri();
     await this.ensureVscodeFolder();

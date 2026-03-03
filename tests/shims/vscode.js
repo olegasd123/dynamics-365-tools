@@ -81,6 +81,7 @@ const window = {
     };
     return task({ report: () => {} }, token);
   },
+  setStatusBarMessage: () => ({ dispose: () => {} }),
   createOutputChannel: () => {
     const lines = [];
     return {
@@ -131,6 +132,7 @@ const authentication = {
 
 const commands = {
   registerCommand: () => ({ dispose: () => {} }),
+  executeCommand: async () => undefined,
 };
 
 const ProgressLocation = {
