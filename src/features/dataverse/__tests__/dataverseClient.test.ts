@@ -115,6 +115,42 @@ test("request surfaces detailed errors with correlation id", async () => {
   }
 });
 
+test("request surfaces network fetch error details", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = (async () => {
+    const socketError = new Error("socket hang up") as Error & { code?: string };
+    socketError.code = "ECONNRESET";
+    const fetchError = new Error("fetch failed") as Error & { cause?: unknown };
+    fetchError.cause = socketError;
+    throw fetchError;
+  }) as any;
+
+  try {
+    const connection: EnvironmentConnection = {
+      env: { name: "dev" } as any,
+      apiRoot: "https://example/api/data/v9.2",
+      token: "token",
+    };
+    const client = new DataverseClient(connection);
+    await assert.rejects(
+      client.get("/whoops"),
+      (error: any) =>
+        error.message.includes(
+          "Dataverse GET /whoops: Network request failed for https://example/api/data/v9.2/whoops: fetch failed",
+        ) &&
+        error.code === "ECONNRESET" &&
+        error.requestMethod === "GET" &&
+        error.requestPath === "/whoops" &&
+        error.requestUrl === "https://example/api/data/v9.2/whoops" &&
+        error.causeCode === "ECONNRESET" &&
+        error.causeMessage === "fetch failed" &&
+        typeof error.causeChain === "string",
+    );
+  } finally {
+    global.fetch = originalFetch!;
+  }
+});
+
 test("getCreatedId returns ids from body or headers", async () => {
   const connection: EnvironmentConnection = {
     env: { name: "dev" } as any,

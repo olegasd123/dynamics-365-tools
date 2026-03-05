@@ -442,11 +442,29 @@ export class WebResourcePublisher {
     const correlationId = (error as any)?.correlationId as string | undefined;
     const status = (error as any)?.status as number | undefined;
     const rawBody = (error as any)?.rawBody as string | undefined;
+    const requestMethod = (error as any)?.requestMethod as string | undefined;
+    const requestPath = (error as any)?.requestPath as string | undefined;
+    const requestUrl = (error as any)?.requestUrl as string | undefined;
+    const causeName = (error as any)?.causeName as string | undefined;
+    const causeMessage = (error as any)?.causeMessage as string | undefined;
+    const causeCode = (error as any)?.causeCode as string | undefined;
+    const causeChain = (error as any)?.causeChain as string | undefined;
+    const causeStack = (error as any)?.causeStack as string | undefined;
+    const request = requestMethod
+      ? `${requestMethod}${requestPath ? ` ${requestPath}` : ""}`
+      : requestPath;
+    const causeLabel = [causeName, causeMessage].filter(Boolean).join(": ");
     const sections = [
       `Message: ${base}`,
       code ? `Code: ${code}` : undefined,
       status ? `Status: ${status}` : undefined,
       correlationId ? `CorrelationId: ${correlationId}` : undefined,
+      request ? `Request: ${request}` : undefined,
+      requestUrl ? `Url: ${requestUrl}` : undefined,
+      causeCode ? `CauseCode: ${causeCode}` : undefined,
+      causeLabel ? `Cause: ${causeLabel}` : undefined,
+      causeChain ? `CauseChain: ${causeChain}` : undefined,
+      causeStack ? `CauseStack: ${causeStack}` : undefined,
       rawBody ? `Response: ${rawBody}` : undefined,
     ].filter(Boolean);
     return sections.join("\n");
