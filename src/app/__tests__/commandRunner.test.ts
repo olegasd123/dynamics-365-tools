@@ -67,6 +67,40 @@ test("runCommandWithHealthCheck runs command when checks pass", async () => {
   assert.ok(statusMessage.includes("Publish Resource"));
 });
 
+test("runCommandWithHealthCheck does not block on unresolved error notification", async () => {
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
+  clearMessages();
+  const ctx = createContext();
+
+  const originalShowErrorMessage = vscode.window.showErrorMessage;
+  (vscode.window as any).showErrorMessage = () => new Promise(() => {});
+
+  let timeoutHandle: NodeJS.Timeout | undefined;
+
+  try {
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error("runCommandWithHealthCheck timed out on unresolved error message")),
+        1000,
+      );
+    });
+
+    const result = await Promise.race([
+      runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
+        throw new Error("boom");
+      }),
+      timeout,
+    ]);
+
+    assert.strictEqual(result, undefined);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
+  }
+});
+
 test("runCommandWithHealthCheck can reset invalid configuration", async () => {
   (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
   clearMessages();
