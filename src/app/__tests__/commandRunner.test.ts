@@ -80,8 +80,7 @@ test("runCommandWithHealthCheck does not block on unresolved error notification"
   try {
     const timeout = new Promise<never>((_resolve, reject) => {
       timeoutHandle = setTimeout(
-        () =>
-          reject(new Error("runCommandWithHealthCheck timed out on unresolved error message")),
+        () => reject(new Error("runCommandWithHealthCheck timed out on unresolved error message")),
         1000,
       );
     });

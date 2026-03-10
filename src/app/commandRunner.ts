@@ -49,11 +49,14 @@ export async function runCommandWithHealthCheck(
         `${commandLabel} is already running. Wait for completion, or reload VS Code if it looks stuck.`,
         RELOAD_WINDOW_ACTION,
       )
-      .then(async (action) => {
-        if (action === RELOAD_WINDOW_ACTION) {
-          await vscode.commands.executeCommand("workbench.action.reloadWindow");
-        }
-      }, () => undefined);
+      .then(
+        async (action) => {
+          if (action === RELOAD_WINDOW_ACTION) {
+            await vscode.commands.executeCommand("workbench.action.reloadWindow");
+          }
+        },
+        () => undefined,
+      );
     return undefined;
   }
 
@@ -73,11 +76,14 @@ export async function runCommandWithHealthCheck(
     const message = error instanceof Error ? error.message : String(error);
     void vscode.window
       .showErrorMessage(`${commandLabel} failed. ${message}`, RELOAD_WINDOW_ACTION)
-      .then(async (action) => {
-        if (action === RELOAD_WINDOW_ACTION) {
-          await vscode.commands.executeCommand("workbench.action.reloadWindow");
-        }
-      }, () => undefined);
+      .then(
+        async (action) => {
+          if (action === RELOAD_WINDOW_ACTION) {
+            await vscode.commands.executeCommand("workbench.action.reloadWindow");
+          }
+        },
+        () => undefined,
+      );
     return undefined;
   } finally {
     RUNNING_COMMANDS.delete(commandId);
