@@ -44,13 +44,16 @@ export async function runCommandWithHealthCheck(
   }
 
   if (!normalizedOptions.allowConcurrent && RUNNING_COMMANDS.has(commandId)) {
-    const action = await vscode.window.showWarningMessage(
-      `${commandLabel} is already running. Wait for completion, or reload VS Code if it looks stuck.`,
-      RELOAD_WINDOW_ACTION,
-    );
-    if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
-    }
+    void vscode.window
+      .showWarningMessage(
+        `${commandLabel} is already running. Wait for completion, or reload VS Code if it looks stuck.`,
+        RELOAD_WINDOW_ACTION,
+      )
+      .then(async (action) => {
+        if (action === RELOAD_WINDOW_ACTION) {
+          await vscode.commands.executeCommand("workbench.action.reloadWindow");
+        }
+      }, () => undefined);
     return undefined;
   }
 
@@ -68,13 +71,13 @@ export async function runCommandWithHealthCheck(
     return await execution;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const action = await vscode.window.showErrorMessage(
-      `${commandLabel} failed. ${message}`,
-      RELOAD_WINDOW_ACTION,
-    );
-    if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
-    }
+    void vscode.window
+      .showErrorMessage(`${commandLabel} failed. ${message}`, RELOAD_WINDOW_ACTION)
+      .then(async (action) => {
+        if (action === RELOAD_WINDOW_ACTION) {
+          await vscode.commands.executeCommand("workbench.action.reloadWindow");
+        }
+      }, () => undefined);
     return undefined;
   } finally {
     RUNNING_COMMANDS.delete(commandId);
