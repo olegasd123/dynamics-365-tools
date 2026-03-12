@@ -29,19 +29,36 @@ export async function ensureSupportedResource(
 export async function collectSupportedFiles(
   folder: vscode.Uri,
   supportedExtensions: Set<string>,
+  cancellationToken?: vscode.CancellationToken,
 ): Promise<vscode.Uri[]> {
-  const entries = await vscode.workspace.fs.readDirectory(folder);
   const files: vscode.Uri[] = [];
+  const pendingFolders: vscode.Uri[] = [folder];
 
-  for (const [name, type] of entries) {
-    const child = vscode.Uri.joinPath(folder, name);
-    if (type === vscode.FileType.Directory) {
-      files.push(...(await collectSupportedFiles(child, supportedExtensions)));
-    } else if (
-      type === vscode.FileType.File &&
-      isSupportedExtension(path.extname(name).toLowerCase(), supportedExtensions)
-    ) {
-      files.push(child);
+  while (pendingFolders.length) {
+    if (cancellationToken?.isCancellationRequested) {
+      break;
+    }
+
+    const currentFolder = pendingFolders.pop();
+    if (!currentFolder) {
+      break;
+    }
+
+    const entries = await vscode.workspace.fs.readDirectory(currentFolder);
+    for (const [name, type] of entries) {
+      if (cancellationToken?.isCancellationRequested) {
+        break;
+      }
+
+      const child = vscode.Uri.joinPath(currentFolder, name);
+      if (type === vscode.FileType.Directory) {
+        pendingFolders.push(child);
+      } else if (
+        type === vscode.FileType.File &&
+        isSupportedExtension(path.extname(name).toLowerCase(), supportedExtensions)
+      ) {
+        files.push(child);
+      }
     }
   }
 

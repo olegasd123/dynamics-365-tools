@@ -56,6 +56,12 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
   const supportedExtensions = buildSupportedSet();
   const binding = (await bindings.getBinding(last.targetUri)) ?? last.binding;
   const preferredEnvName = last.environment.name;
+  const configuredEnvironment =
+    config.environments.find((env) => env.name === preferredEnvName) ?? last.environment;
+
+  if (!(await confirmPublishTarget(last.targetUri, configuredEnvironment, last.isFolder))) {
+    return;
+  }
 
   if (last.isFolder) {
     await publishFolder(
@@ -74,7 +80,6 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
       publishCache,
       config,
       preferredEnvName,
-      (env) => confirmPublishTarget(last.targetUri, env, true),
     );
     return;
   }
@@ -92,7 +97,6 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
     publishCache,
     config,
     preferredEnvName,
-    (env) => confirmPublishTarget(last.targetUri, env, false),
   );
 }
 
@@ -253,7 +257,6 @@ async function publishFlow(
   publishCache: PublishCacheService,
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
-  confirmPublish?: (env: EnvironmentConfig) => Promise<boolean>,
 ) {
   const publishAuth = await pickEnvironmentAndAuth(
     configuration,
@@ -265,10 +268,6 @@ async function publishFlow(
     preferredEnvName,
   );
   if (!publishAuth) {
-    return;
-  }
-
-  if (confirmPublish && !(await confirmPublish(publishAuth.env))) {
     return;
   }
 
@@ -300,14 +299,7 @@ async function publishFolder(
   publishCache: PublishCacheService,
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
-  confirmPublish?: (env: EnvironmentConfig) => Promise<boolean>,
 ): Promise<void> {
-  const files = await collectSupportedFiles(folderUri, supportedExtensions);
-  if (!files.length) {
-    vscode.window.showInformationMessage("No supported web resource files found in this folder.");
-    return;
-  }
-
   const publishAuth = await pickEnvironmentAndAuth(
     configuration,
     ui,
@@ -318,10 +310,6 @@ async function publishFolder(
     preferredEnvName,
   );
   if (!publishAuth) {
-    return;
-  }
-
-  if (confirmPublish && !(await confirmPublish(publishAuth.env))) {
     return;
   }
 
@@ -340,7 +328,23 @@ async function publishFolder(
       title: `Publishing to ${publishAuth.env.name}…`,
       cancellable: true,
     },
-    async (_progress, cancellationToken) => {
+    async (progress, cancellationToken) => {
+      progress.report({ message: "Scanning folder..." });
+      const files = await collectSupportedFiles(folderUri, supportedExtensions, cancellationToken);
+      if (cancellationToken.isCancellationRequested) {
+        vscode.window.showWarningMessage(
+          `Dynamics 365 Tools publish to ${publishAuth.env.name} cancelled: no files were processed.`,
+        );
+        return;
+      }
+      if (!files.length) {
+        vscode.window.showInformationMessage(
+          "No supported web resource files found in this folder.",
+        );
+        return;
+      }
+
+      progress.report({ message: `Publishing ${files.length} file(s)...` });
       files.sort((a, b) => a.fsPath.localeCompare(b.fsPath));
       const totals = { created: 0, updated: 0, skipped: 0, failed: 0 };
       let nextIndex = 0;
