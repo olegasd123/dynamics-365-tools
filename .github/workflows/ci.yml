@@ -4,6 +4,7 @@ permissions:
   contents: write
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -37,7 +38,7 @@ jobs:
 
   publish:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
     steps:
@@ -65,7 +66,10 @@ jobs:
       - name: Push version bump
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: git push --follow-tags
+        run: |
+          git fetch origin main --tags
+          git rebase origin/main
+          git push --follow-tags
 
       - name: Publish to VS Code Marketplace
         env:
