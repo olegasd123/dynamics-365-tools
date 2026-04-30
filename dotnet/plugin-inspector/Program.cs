@@ -83,7 +83,7 @@ class Program
                 continue;
             }
 
-            if (!IsPluginType(type, pluginInterface))
+            if (!IsPluginType(type, pluginInterface) && !IsCodeActivityType(type))
             {
                 continue;
             }
@@ -161,6 +161,32 @@ class Program
         {
             return false;
         }
+    }
+
+    private static bool IsCodeActivityType(Type type)
+    {
+        try
+        {
+            var current = type.BaseType;
+            while (current != null)
+            {
+                var fullName = current.FullName;
+                if (fullName == "System.Activities.CodeActivity" ||
+                    fullName == "System.Activities.CodeActivity`1")
+                {
+                    Debug($"[inspector] workflow activity detected: {type.FullName}");
+                    return true;
+                }
+
+                current = current.BaseType;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        return false;
     }
 
     private static string? GetFriendlyName(Type type)

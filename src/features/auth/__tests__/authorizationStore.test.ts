@@ -65,7 +65,7 @@ test("toEnvironment applies fallback auth type", () => {
     url: "https://fabrikam.crm.dynamics.com",
     resource: undefined,
     authType: "interactive",
-    createMissingComponents: false,
+    manageMissingComponents: false,
     userAgentEnabled: false,
   });
 });

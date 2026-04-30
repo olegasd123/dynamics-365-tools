@@ -59,7 +59,7 @@ export class AuthorizationStore {
       url: profile.url,
       resource: profile.resource,
       authType: profile.authType ?? fallbackAuthType,
-      createMissingComponents: false,
+      manageMissingComponents: false,
       userAgentEnabled: false,
     };
   }

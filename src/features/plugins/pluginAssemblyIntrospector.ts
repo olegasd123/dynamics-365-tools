@@ -72,7 +72,7 @@ export class PluginAssemblyIntrospector {
   }
 
   private async doEnsureInspectorBuilt(): Promise<void> {
-    if (await this.fileExists(this.inspectorOutputPath)) {
+    if (!(await this.shouldBuildInspector())) {
       return;
     }
 
@@ -107,5 +107,32 @@ export class PluginAssemblyIntrospector {
     } catch {
       return false;
     }
+  }
+
+  private async shouldBuildInspector(): Promise<boolean> {
+    let outputStat: Awaited<ReturnType<typeof fs.stat>>;
+    try {
+      outputStat = await fs.stat(this.inspectorOutputPath);
+    } catch {
+      return true;
+    }
+
+    const sourcePaths = [
+      this.inspectorProjectPath,
+      path.join(path.dirname(this.inspectorProjectPath), "Program.cs"),
+    ];
+
+    for (const sourcePath of sourcePaths) {
+      try {
+        const sourceStat = await fs.stat(sourcePath);
+        if (sourceStat.mtimeMs > outputStat.mtimeMs) {
+          return true;
+        }
+      } catch {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

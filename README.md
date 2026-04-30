@@ -41,14 +41,14 @@ Create config by running `Dynamics 365 Tools: Add Environment` or `Dynamics 365 
       "name": "dev",
       "url": "https://your-dev.crm.dynamics.com",
       "authType": "interactive",
-      "createMissingComponents": true,
+      "manageMissingComponents": true,
     },
     {
       "name": "prod",
       "url": "https://your-prod.crm.dynamics.com",
       "authType": "clientSecret",
       "resource": "https://your-prod.crm.dynamics.com",
-      "createMissingComponents": false,
+      "manageMissingComponents": false,
       "userAgentEnabled": true,
       "userAgent": "Dynamics365Tools-VSCode",
     },
@@ -67,7 +67,7 @@ Config parameters:
   - `url` (required): org base URL (for example `https://contoso.crm.dynamics.com`).
   - `authType` (optional): `interactive` or `clientSecret`. If missing, interactive sign-in is used first.
   - `resource` (optional): custom token audience/scope base. Use this only when your auth setup needs a different audience than `url`.
-  - `createMissingComponents` (optional, default `false`): when `true`, publish can create missing web resources and plugin components. When `false`, only existing components are updated.
+  - `manageMissingComponents` (optional, default `false`): when `true`, publish can create missing web resources and plugin components, and plugin sync can delete plugin types that are not in the assembly. When `false`, only existing components are updated.
   - `userAgentEnabled` (optional, default `false`): enables `User-Agent` header on Dataverse and token HTTP calls.
   - `userAgent` (optional): custom `User-Agent` value. If empty and `userAgentEnabled` is `true`, the extension uses `Dynamics365Tools-VSCode/<version>`.
 - `solutions` (optional, defaults to `[]`): list of Dataverse solutions used during bind/publish/plugin actions.
@@ -79,7 +79,7 @@ Notes:
 
 - Keep `authType: "interactive"` for local developer work. Use `authType: "clientSecret"` for CI or service accounts.
 - If `authType` is not `clientSecret`, the extension still can use stored client credentials as a fallback when interactive sign-in is unavailable.
-- `createMissingComponents: false` is safer for production: no new web resources or plugin assemblies are created by mistake, while still allowing them to be updated.
+- `manageMissingComponents: false` is safer for production: no new web resources or plugin assemblies are created by mistake, while still allowing them to be updated.
 - Turn on `userAgentEnabled` only if your proxy, gateway, or audit policy needs a custom client header.
 
 ### Authenticate
@@ -136,7 +136,7 @@ Supported: `.js`, `.css`, `.htm`, `.html`, `.xml`, `.json`, `.resx`, `.png`, `.j
   - `Dynamics 365 Tools: Generate Strong Name Key (Public Key Token)` creates a `.snk` using the local `sn` tool and shows the public key token for signing your assemblies.
   - `Dynamics 365 Tools: Register Plugin Assembly` uploads a `.dll` to the selected environment and adds it to your chosen solution.
   - `Dynamics 365 Tools: Update Plugin Assembly` replaces the content of an existing assembly with a new `.dll`.
-  - Plugin classes are auto-discovered via `System.Reflection.MetadataLoadContext` when you register or update an assembly. New plugin types are created (respecting `createMissingComponents`), existing ones are updated, and types removed from the assembly are deleted in Dataverse.
+  - Plugin and CodeActivity classes are auto-discovered via `System.Reflection.MetadataLoadContext` when you register or update an assembly. New plugin types are created only when `manageMissingComponents` is `true`, existing ones are updated, and types removed from the assembly are deleted only when `manageMissingComponents` is `true`.
   - Use the trash icon next to a plugin type in the Plugins explorer to remove it (steps and images are deleted with the type).
 - Step and image commands (context menu or palette):
   - Create/edit/enable/disable/delete plugin steps; creation prompts for message, entity, stage, mode, rank, attributes, and solution. Deleting a step now also deletes all of its images first.

@@ -47,9 +47,9 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     return;
   }
 
-  if (selection.env.createMissingComponents !== true) {
+  if (selection.env.manageMissingComponents !== true) {
     void vscode.window.showWarningMessage(
-      `Environment ${selection.env.name} is configured to block creating new solution components. Enable createMissingComponents to register plugin assemblies.`,
+      `Environment ${selection.env.name} is configured to block missing component management. Enable manageMissingComponents to register plugin assemblies.`,
     );
     return;
   }
@@ -92,6 +92,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     });
 
     let pluginSummary: string | undefined;
+    let pluginSyncFailed = false;
     try {
       const syncResult = await syncPluginsForAssembly({
         registration: pluginRegistration,
@@ -99,13 +100,14 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
         assemblyId,
         assemblyPath,
         solutionName: solution.name,
-        allowCreate: true,
+        manageMissingComponents: true,
       });
       pluginSummary = syncResult;
     } catch (syncError) {
       void vscode.window.showErrorMessage(
         `Assembly registered, but plugins failed to sync: ${String(syncError)}`,
       );
+      pluginSyncFailed = true;
     }
 
     await lastSelection.setLastAssemblyDllPath(selection.env.name, assemblyId, assemblyPath);
@@ -115,9 +117,11 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
       assemblyUri: vscode.Uri.file(assemblyPath),
       environment: selection.env,
     });
-    vscode.window.showInformationMessage(
-      buildAssemblySuccessMessage(name, selection.env.name, pluginSummary),
-    );
+    if (!pluginSyncFailed) {
+      vscode.window.showInformationMessage(
+        buildAssemblySuccessMessage(name, selection.env.name, pluginSummary),
+      );
+    }
     pluginExplorer?.refresh();
   } catch (error) {
     void vscode.window.showErrorMessage(`Failed to register plugin assembly: ${String(error)}`);
@@ -230,7 +234,7 @@ export async function updatePluginAssembly(
   }
 
   const assemblyUri = assemblyFile[0];
-  const allowCreate = env.createMissingComponents === true;
+  const manageMissingComponents = env.manageMissingComponents === true;
 
   try {
     await updateAssemblyFromUri({
@@ -238,7 +242,7 @@ export async function updatePluginAssembly(
       assemblyName,
       assemblyUri,
       env,
-      allowCreate,
+      manageMissingComponents,
       pluginService: service,
       pluginRegistration,
       pluginExplorer,
@@ -317,7 +321,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
       assemblyName: last.assemblyName,
       assemblyUri: last.assemblyUri,
       env: selection.env,
-      allowCreate: selection.env.createMissingComponents === true,
+      manageMissingComponents: selection.env.manageMissingComponents === true,
       pluginService: service,
       pluginRegistration,
       pluginExplorer,
@@ -460,7 +464,7 @@ type PluginSyncContext = {
   assemblyId: string;
   assemblyPath: string;
   solutionName?: string;
-  allowCreate?: boolean;
+  manageMissingComponents?: boolean;
 };
 
 function buildAssemblySuccessMessage(
@@ -487,11 +491,11 @@ async function syncPluginsForAssembly(context: PluginSyncContext): Promise<strin
         assemblyId: context.assemblyId,
         assemblyPath: context.assemblyPath,
         solutionName: context.solutionName,
-        allowCreate: context.allowCreate,
+        manageMissingComponents: context.manageMissingComponents,
       }),
   );
 
-  return formatPluginSyncResult(result, context.allowCreate);
+  return formatPluginSyncResult(result);
 }
 
 type AssemblyUpdateContext = {
@@ -499,7 +503,7 @@ type AssemblyUpdateContext = {
   assemblyName?: string;
   assemblyUri: vscode.Uri;
   env: EnvironmentConfig;
-  allowCreate: boolean;
+  manageMissingComponents: boolean;
   pluginService: PluginService;
   pluginRegistration: PluginRegistrationManager;
   pluginExplorer?: PluginExplorerProvider;
@@ -526,12 +530,20 @@ async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<vo
       assemblyId: context.assemblyId,
       assemblyPath: context.assemblyUri.fsPath,
       solutionName: undefined,
-      allowCreate: context.allowCreate,
+      manageMissingComponents: context.manageMissingComponents,
     });
   } catch (syncError) {
     void vscode.window.showErrorMessage(
       `Assembly updated, but plugins failed to sync: ${String(syncError)}`,
     );
+    context.assemblyStatusBar.setLastPublish({
+      assemblyId: context.assemblyId,
+      assemblyName: context.assemblyName,
+      assemblyUri: context.assemblyUri,
+      environment: context.env,
+    });
+    context.pluginExplorer?.refresh();
+    return;
   }
 
   context.assemblyStatusBar.setLastPublish({
@@ -561,26 +573,35 @@ async function confirmAssemblyPublish(
   return choice === "Publish";
 }
 
-function formatPluginSyncResult(
-  result: PluginSyncResult,
-  allowCreate?: boolean,
-): string | undefined {
+function formatPluginSyncResult(result: PluginSyncResult): string | undefined {
   const parts: string[] = [];
   if (result.created.length) parts.push(`${result.created.length} created`);
   if (result.updated.length) parts.push(`${result.updated.length} updated`);
   if (result.removed.length) parts.push(`${result.removed.length} removed`);
   if (result.skippedCreation.length) {
-    parts.push(`${result.skippedCreation.length} skipped (creation disabled)`);
+    parts.push(
+      `${result.skippedCreation.length} creation skipped (manageMissingComponents is false): ${formatPluginNames(
+        result.skippedCreation,
+      )}`,
+    );
+  }
+  if (result.skippedRemoval.length) {
+    parts.push(
+      `${result.skippedRemoval.length} removal skipped (manageMissingComponents is false): ${formatPluginNames(
+        result.skippedRemoval,
+      )}`,
+    );
   }
 
   if (!parts.length) {
-    if (allowCreate === false && result.skippedCreation.length) {
-      return "Plugins: creation skipped by environment settings.";
-    }
     return "Plugins: no changes detected.";
   }
 
   return `Plugins: ${parts.join(", ")}.`;
+}
+
+function formatPluginNames(plugins: Array<{ typeName?: string; name?: string }>): string {
+  return plugins.map((plugin) => plugin.typeName || plugin.name || "unknown").join(", ");
 }
 
 type SnTool = {

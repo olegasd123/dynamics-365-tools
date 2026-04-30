@@ -108,11 +108,11 @@ export class WebResourcePublisher {
       const displayName = path.posix.basename(remotePath);
 
       this.output.appendLine(`  ${fmt.resource(remotePath)} ← ${localPath}`);
-      const allowCreate = env.createMissingComponents === true;
+      const canManageMissing = env.manageMissingComponents === true;
 
-      if (!existingId && !allowCreate) {
+      if (!existingId && !canManageMissing) {
         this.output.appendLine(
-          `  ✗ Resource does not exist and creation is disabled for ${fmt.env(env.name)}`,
+          `  ✗ Resource does not exist and missing component management is disabled for ${fmt.env(env.name)}`,
         );
         result.skipped = 1;
         return result;
