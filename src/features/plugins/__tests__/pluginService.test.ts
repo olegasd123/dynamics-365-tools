@@ -333,7 +333,7 @@ test("listPluginTypes returns normalized ids and fields", async () => {
   const client = new FakeDataverseClient();
   client.addResponse(
     "GET",
-    "/plugintypes?$select=plugintypeid,name,typename,friendlyname&$filter=_pluginassemblyid_value%20eq%20assembly-id",
+    "/plugintypes?$select=plugintypeid,name,typename,friendlyname,isworkflowactivity&$filter=_pluginassemblyid_value%20eq%20assembly-id",
     {
       value: [
         {
@@ -341,6 +341,7 @@ test("listPluginTypes returns normalized ids and fields", async () => {
           name: "Name",
           typename: "Type",
           friendlyname: "Friendly",
+          isworkflowactivity: true,
         },
       ],
     },
@@ -350,7 +351,13 @@ test("listPluginTypes returns normalized ids and fields", async () => {
   const types = await service.listPluginTypes("assembly-id");
 
   assert.deepStrictEqual(types, [
-    { id: "id-1", name: "Name", friendlyName: "Friendly", typeName: "Type" },
+    {
+      id: "id-1",
+      name: "Name",
+      friendlyName: "Friendly",
+      typeName: "Type",
+      isWorkflowActivity: true,
+    },
   ]);
 });
 

@@ -14,6 +14,7 @@ export interface PluginType {
   name: string;
   friendlyName?: string;
   typeName?: string;
+  isWorkflowActivity?: boolean;
 }
 
 export interface PluginStep {

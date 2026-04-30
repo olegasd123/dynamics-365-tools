@@ -35,6 +35,10 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
     );
     return;
   }
+  if (node.pluginType.isWorkflowActivity) {
+    void vscode.window.showInformationMessage("Workflow activities cannot have plugin steps.");
+    return;
+  }
 
   const service = await resolveServiceForNode(
     "Select environment to create a plugin step",

@@ -389,7 +389,7 @@
         },
         {
           "command": "dynamics365Tools.plugins.deletePluginType",
-          "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginType",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginType/",
           "group": "inline@2"
         },
         {
