@@ -48,7 +48,12 @@ export class PluginTypeNode extends vscode.TreeItem {
     readonly env: EnvironmentConfig,
     readonly pluginType: PluginType,
   ) {
-    super(pluginType.name, vscode.TreeItemCollapsibleState.Collapsed);
+    super(
+      pluginType.name,
+      pluginType.isWorkflowActivity
+        ? vscode.TreeItemCollapsibleState.None
+        : vscode.TreeItemCollapsibleState.Collapsed,
+    );
     this.tooltip = buildTypeTooltip(pluginType);
     this.iconPath = new vscode.ThemeIcon("symbol-class");
     this.contextValue = pluginType.isWorkflowActivity
