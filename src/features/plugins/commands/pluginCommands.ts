@@ -594,7 +594,7 @@ function formatPluginSyncResult(result: PluginSyncResult): string | undefined {
   }
 
   if (!parts.length) {
-    return "Plugins: no changes detected.";
+    return "Plugins: no plugin types changes detected.";
   }
 
   return `Plugins: ${parts.join(", ")}.`;
