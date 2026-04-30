@@ -1,4 +1,3 @@
-
 - Format & validation:
   - `npm run format`
   - `npm run lint`
