@@ -372,7 +372,7 @@ function toNormalizedEnvironment(
     url: env.url.trim().replace(/\/+$/, ""),
     resource: env.resource?.trim() || undefined,
     authType: env.authType ?? fallbackAuthType,
-    createMissingComponents: env.createMissingComponents ?? false,
+    manageMissingComponents: env.manageMissingComponents ?? false,
     userAgentEnabled: env.userAgentEnabled ?? false,
     userAgent: env.userAgent,
   };

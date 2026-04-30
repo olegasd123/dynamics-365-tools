@@ -83,7 +83,7 @@ export async function addEnvironment(ctx: CommandContext): Promise<void> {
     url: normalizedUrl,
     resource: resource?.trim() || undefined,
     authType: authPick.authType,
-    createMissingComponents: false,
+    manageMissingComponents: false,
     userAgentEnabled: false,
   };
 
@@ -95,7 +95,7 @@ export async function addEnvironment(ctx: CommandContext): Promise<void> {
     nextEnvironments[existingIndex] = {
       ...existing,
       ...environment,
-      createMissingComponents: existing.createMissingComponents ?? false,
+      manageMissingComponents: existing.manageMissingComponents ?? false,
       userAgentEnabled: existing.userAgentEnabled ?? false,
     };
     action = "updated";

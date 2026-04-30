@@ -37,12 +37,14 @@ test("syncPluginTypes creates missing plugins, updates mismatches, and deletes o
     assemblyId: "assembly-id",
     assemblyPath: "/path/plugin.dll",
     solutionName: "Core",
+    manageMissingComponents: true,
   });
 
   assert.strictEqual(result.created.length, 1);
   assert.strictEqual(result.updated.length, 1);
   assert.strictEqual(result.removed.length, 1);
   assert.deepStrictEqual(result.skippedCreation, []);
+  assert.deepStrictEqual(result.skippedRemoval, []);
   assert.deepStrictEqual(created[0], {
     name: "Namespace.Class2",
     friendlyName: "Class2",
@@ -56,14 +58,17 @@ test("syncPluginTypes creates missing plugins, updates mismatches, and deletes o
   assert.deepStrictEqual(deleted, ["orphan"]);
 });
 
-test("syncPluginTypes skips creation when disabled", async () => {
+test("syncPluginTypes skips missing component changes when disabled", async () => {
+  const deleted: string[] = [];
   const pluginService = {
-    listPluginTypes: async () => [],
+    listPluginTypes: async () => [{ id: "orphan", name: "Old", typeName: "Namespace.Orphan" }],
     createPluginType: async () => {
       throw new Error("should not create");
     },
     updatePluginType: async () => {},
-    deletePluginTypeCascade: async () => {},
+    deletePluginTypeCascade: async (id: string) => {
+      deleted.push(id);
+    },
   };
 
   const introspector = {
@@ -75,11 +80,15 @@ test("syncPluginTypes skips creation when disabled", async () => {
     pluginService: pluginService as any,
     assemblyId: "assembly-id",
     assemblyPath: "/path/plugin.dll",
-    allowCreate: false,
+    manageMissingComponents: false,
   });
 
   assert.deepStrictEqual(result.created, []);
   assert.deepStrictEqual(result.updated, []);
   assert.deepStrictEqual(result.removed, []);
   assert.deepStrictEqual(result.skippedCreation, [{ typeName: "Namespace.Plugin", name: "Name" }]);
+  assert.deepStrictEqual(result.skippedRemoval, [
+    { id: "orphan", name: "Old", typeName: "Namespace.Orphan" },
+  ]);
+  assert.deepStrictEqual(deleted, []);
 });

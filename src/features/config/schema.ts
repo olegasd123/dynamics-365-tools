@@ -7,13 +7,13 @@ const environmentSchemaBase = z.object({
   userAgent: z.string().optional(),
   userAgentEnabled: z.boolean().optional(),
   authType: z.enum(["interactive", "clientSecret"]).optional(),
-  createMissingComponents: z.boolean().optional(),
+  manageMissingComponents: z.boolean().optional(),
 });
 
 export const environmentSchema = environmentSchemaBase.transform((env) => {
   return {
     ...env,
-    createMissingComponents: env.createMissingComponents ?? false,
+    manageMissingComponents: env.manageMissingComponents ?? false,
     userAgentEnabled: env.userAgentEnabled ?? false,
   };
 });

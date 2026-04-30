@@ -7,7 +7,7 @@ export interface PluginSyncOptions {
   assemblyId: string;
   assemblyPath: string;
   solutionName?: string;
-  allowCreate?: boolean;
+  manageMissingComponents?: boolean;
 }
 
 export interface PluginSyncResult {
@@ -15,6 +15,7 @@ export interface PluginSyncResult {
   updated: PluginType[];
   removed: PluginType[];
   skippedCreation: DiscoveredPluginType[];
+  skippedRemoval: PluginType[];
 }
 
 export class PluginRegistrationManager {
@@ -34,6 +35,8 @@ export class PluginRegistrationManager {
     const updated: PluginType[] = [];
     const removed: PluginType[] = [];
     const skippedCreation: DiscoveredPluginType[] = [];
+    const skippedRemoval: PluginType[] = [];
+    const canManageMissing = options.manageMissingComponents === true;
 
     for (const plugin of discovered) {
       const key = this.normalizeKey(plugin.typeName);
@@ -44,7 +47,7 @@ export class PluginRegistrationManager {
       const targetName = this.resolveTargetName(plugin);
       const match = existingByType.get(key);
       if (!match) {
-        if (options.allowCreate === false) {
+        if (!canManageMissing) {
           skippedCreation.push(plugin);
           continue;
         }
@@ -88,6 +91,11 @@ export class PluginRegistrationManager {
     }
 
     for (const orphan of existingByType.values()) {
+      if (!canManageMissing) {
+        skippedRemoval.push(orphan);
+        continue;
+      }
+
       try {
         await options.pluginService.deletePluginTypeCascade(orphan.id);
       } catch (error) {
@@ -98,7 +106,7 @@ export class PluginRegistrationManager {
       removed.push(orphan);
     }
 
-    return { created, updated, removed, skippedCreation };
+    return { created, updated, removed, skippedCreation, skippedRemoval };
   }
 
   private resolveTargetName(plugin: DiscoveredPluginType): string {
