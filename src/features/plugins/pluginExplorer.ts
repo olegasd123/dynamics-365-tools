@@ -42,7 +42,7 @@ export class PluginAssemblyNode extends vscode.TreeItem {
 }
 
 export class PluginTypeNode extends vscode.TreeItem {
-  readonly contextValue = "d365PluginType";
+  readonly contextValue: string;
 
   constructor(
     readonly env: EnvironmentConfig,
@@ -51,6 +51,9 @@ export class PluginTypeNode extends vscode.TreeItem {
     super(pluginType.name, vscode.TreeItemCollapsibleState.Collapsed);
     this.tooltip = buildTypeTooltip(pluginType);
     this.iconPath = new vscode.ThemeIcon("symbol-class");
+    this.contextValue = pluginType.isWorkflowActivity
+      ? "d365PluginType:workflowActivity"
+      : "d365PluginType";
   }
 }
 
