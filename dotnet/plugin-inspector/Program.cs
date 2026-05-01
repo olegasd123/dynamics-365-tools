@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
 
+record AssemblyIdentity(string Name, string? Version, string? Culture, string? PublicKeyToken);
 record PluginDescriptor(string TypeName, string Name, string? FriendlyName);
+record AssemblyInspection(AssemblyIdentity Assembly, IReadOnlyCollection<PluginDescriptor> Plugins);
 
 class Program
 {
@@ -34,9 +36,8 @@ class Program
 
         try
         {
-            var plugins = DiscoverPlugins(assemblyPath);
-            var payload = new { plugins };
-            Console.Write(JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            var inspection = InspectAssembly(assemblyPath);
+            Console.Write(JsonSerializer.Serialize(inspection, new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = false
@@ -50,7 +51,7 @@ class Program
         }
     }
 
-    private static IReadOnlyCollection<PluginDescriptor> DiscoverPlugins(string assemblyPath)
+    private static AssemblyInspection InspectAssembly(string assemblyPath)
     {
         var runtimePaths = GetRuntimeAssemblies();
         var assemblyDir = Path.GetDirectoryName(assemblyPath) ?? Environment.CurrentDirectory;
@@ -67,6 +68,7 @@ class Program
         using var context = new MetadataLoadContext(resolver, "mscorlib");
         Debug($"[inspector] loading assembly: {assemblyPath}");
         var assembly = context.LoadFromAssemblyPath(assemblyPath);
+        var identity = GetAssemblyIdentity(assembly);
         var pluginInterface = ResolveIPlugin(context);
         Debug(pluginInterface != null
             ? $"[inspector] resolved IPlugin: {pluginInterface.Assembly.FullName}"
@@ -102,7 +104,22 @@ class Program
             }
         }
 
-        return results;
+        return new AssemblyInspection(identity, results);
+    }
+
+    private static AssemblyIdentity GetAssemblyIdentity(Assembly assembly)
+    {
+        var name = assembly.GetName();
+        var tokenBytes = name.GetPublicKeyToken();
+        var token = tokenBytes == null || tokenBytes.Length == 0
+            ? null
+            : string.Concat(tokenBytes.Select(b => b.ToString("x2")));
+
+        return new AssemblyIdentity(
+            name.Name ?? string.Empty,
+            name.Version?.ToString(),
+            string.IsNullOrWhiteSpace(name.CultureName) ? null : name.CultureName,
+            token);
     }
 
     private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)

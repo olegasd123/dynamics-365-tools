@@ -11,9 +11,11 @@ import {
 } from "../../dataverse/environmentConnectionService";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
+import { PluginAssembly } from "../models";
 import { PluginService } from "../pluginService";
 import { PluginAssemblyNode, PluginExplorerProvider } from "../pluginExplorer";
 import { PluginRegistrationManager, PluginSyncResult } from "../pluginRegistrationManager";
+import { AssemblyIdentity, PluginAssemblyInspection } from "../pluginAssemblyIntrospector";
 import { AssemblyStatusBarService } from "../../../platform/vscode/statusBar";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
 import { EnvironmentConfig } from "../../config/domain/models";
@@ -382,11 +384,7 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
     const message = token
       ? `Strong name key created and project updated. Public key token: ${token}`
       : "Strong name key created and project updated. Failed to read public key token from sn output.";
-    const copyAction = token ? "Copy token" : undefined;
-    const selection = await vscode.window.showInformationMessage(message, copyAction ?? "OK");
-    if (selection === "Copy token" && token) {
-      await vscode.env.clipboard.writeText(token);
-    }
+    showPublicKeyTokenResult(message, token);
   } catch (error) {
     void vscode.window.showErrorMessage(
       `Failed to generate strong name key: ${error instanceof Error ? error.message : String(error)}`,
@@ -394,13 +392,32 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
   }
 }
 
-function extractToken(output?: string): string | undefined {
+export function showPublicKeyTokenResult(message: string, token?: string): void {
+  const copyAction = token ? "Copy token" : undefined;
+  void vscode.window.showInformationMessage(message, copyAction ?? "OK").then(
+    async (selection) => {
+      if (selection === copyAction && token) {
+        try {
+          await vscode.env.clipboard.writeText(token);
+        } catch (error) {
+          void vscode.window.showErrorMessage(
+            `Failed to copy public key token: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    },
+    () => undefined,
+  );
+}
+
+export function extractToken(output?: string): string | undefined {
   if (!output) {
     return undefined;
   }
   const match =
     output.match(/Public key token is\s+([0-9a-fA-F]+)/i) ||
-    output.match(/Public key token=(\w+)/i);
+    output.match(/Public key token=(\w+)/i) ||
+    output.match(/Public key token:\s*([0-9a-fA-F]+)/i);
   return match?.[1];
 }
 
@@ -511,7 +528,24 @@ type AssemblyUpdateContext = {
   lastSelection: LastSelectionService;
 };
 
+type AssemblyUpdateValidationContext = {
+  assemblyId: string;
+  assemblyUri: vscode.Uri;
+  pluginService: Pick<PluginService, "getAssembly" | "listPluginTypes">;
+  pluginRegistration: Pick<PluginRegistrationManager, "inspectAssembly">;
+};
+
 async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<void> {
+  const canUpdate = await validateAssemblyUpdateTarget({
+    assemblyId: context.assemblyId,
+    assemblyUri: context.assemblyUri,
+    pluginService: context.pluginService,
+    pluginRegistration: context.pluginRegistration,
+  });
+  if (!canUpdate) {
+    return;
+  }
+
   const content = await vscode.workspace.fs.readFile(context.assemblyUri);
   const contentBase64 = Buffer.from(content).toString("base64");
 
@@ -558,6 +592,121 @@ async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<vo
   context.pluginExplorer?.refresh();
 }
 
+export async function validateAssemblyUpdateTarget(
+  context: AssemblyUpdateValidationContext,
+): Promise<boolean> {
+  const [targetAssembly, localInspection] = await Promise.all([
+    context.pluginService.getAssembly(context.assemblyId),
+    context.pluginRegistration.inspectAssembly(context.assemblyUri.fsPath),
+  ]);
+
+  validateAssemblyIdentity(targetAssembly, localInspection.assembly);
+  showVersionChangeWarning(targetAssembly, localInspection.assembly);
+
+  return confirmPluginTypeOverlap(context, targetAssembly, localInspection);
+}
+
+export function validateAssemblyIdentity(
+  targetAssembly: PluginAssembly,
+  localAssembly: AssemblyIdentity,
+): void {
+  if (normalizeAssemblyName(targetAssembly.name) !== normalizeAssemblyName(localAssembly.name)) {
+    throw new Error(
+      `Selected CRM assembly is "${targetAssembly.name}", but the DLL is "${localAssembly.name}". Select the matching DLL for this assembly.`,
+    );
+  }
+
+  const targetToken = normalizePublicKeyToken(targetAssembly.publicKeyToken);
+  const localToken = normalizePublicKeyToken(localAssembly.publicKeyToken);
+  if (targetToken && targetToken !== localToken) {
+    throw new Error(
+      `Selected CRM assembly "${targetAssembly.name}" has public key token "${targetToken}", but the DLL has "${localToken ?? "none"}". Select the matching signed DLL.`,
+    );
+  }
+
+  const targetCulture = normalizeCulture(targetAssembly.culture);
+  const localCulture = normalizeCulture(localAssembly.culture);
+  if (targetCulture !== localCulture) {
+    throw new Error(
+      `Selected CRM assembly "${targetAssembly.name}" uses culture "${targetCulture ?? "neutral"}", but the DLL uses "${localCulture ?? "neutral"}". Select the matching DLL.`,
+    );
+  }
+}
+
+function showVersionChangeWarning(
+  targetAssembly: PluginAssembly,
+  localAssembly: AssemblyIdentity,
+): void {
+  const targetVersion = normalizeVersion(targetAssembly.version);
+  const localVersion = normalizeVersion(localAssembly.version);
+  if (targetVersion === localVersion) {
+    return;
+  }
+
+  void vscode.window.showWarningMessage(
+    `Plugin assembly version will change from ${targetVersion ?? "unknown"} to ${localVersion ?? "unknown"}.`,
+  );
+}
+
+async function confirmPluginTypeOverlap(
+  context: AssemblyUpdateValidationContext,
+  targetAssembly: PluginAssembly,
+  localInspection: PluginAssemblyInspection,
+): Promise<boolean> {
+  const existingTypes = await context.pluginService.listPluginTypes(context.assemblyId);
+  const existingTypeNames = existingTypes
+    .map((type) => normalizeTypeName(type.typeName))
+    .filter((typeName): typeName is string => Boolean(typeName));
+  if (!existingTypeNames.length) {
+    return true;
+  }
+
+  const localTypeNames = new Set(
+    localInspection.plugins
+      .map((type) => normalizeTypeName(type.typeName))
+      .filter((typeName): typeName is string => Boolean(typeName)),
+  );
+  const hasMatch = existingTypeNames.some((typeName) => localTypeNames.has(typeName));
+  if (hasMatch) {
+    return true;
+  }
+
+  const updateAnyway = "Update Anyway";
+  const result = await vscode.window.showWarningMessage(
+    `The DLL has no plugin types that match CRM assembly "${targetAssembly.name}". Continue only if this is expected.`,
+    { modal: true },
+    updateAnyway,
+  );
+
+  return result === updateAnyway;
+}
+
+function normalizeAssemblyName(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function normalizePublicKeyToken(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && normalized !== "none" && normalized !== "null" ? normalized : undefined;
+}
+
+function normalizeCulture(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && normalized !== "neutral" && normalized !== "none" && normalized !== "null"
+    ? normalized
+    : undefined;
+}
+
+function normalizeVersion(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function normalizeTypeName(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || undefined;
+}
+
 async function confirmAssemblyPublish(
   assemblyUri: vscode.Uri,
   env: EnvironmentConfig,
@@ -594,7 +743,7 @@ function formatPluginSyncResult(result: PluginSyncResult): string | undefined {
   }
 
   if (!parts.length) {
-    return "Plugins: no plugin types changes detected.";
+    return "Plugins: No plugin type changes detected.";
   }
 
   return `Plugins: ${parts.join(", ")}.`;

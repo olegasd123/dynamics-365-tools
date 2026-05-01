@@ -11,6 +11,18 @@ export interface DiscoveredPluginType {
   friendlyName?: string;
 }
 
+export interface AssemblyIdentity {
+  name: string;
+  version?: string;
+  culture?: string;
+  publicKeyToken?: string;
+}
+
+export interface PluginAssemblyInspection {
+  assembly: AssemblyIdentity;
+  plugins: DiscoveredPluginType[];
+}
+
 export class PluginAssemblyIntrospector {
   private readonly inspectorProjectPath: string;
   private readonly inspectorOutputPath: string;
@@ -34,7 +46,7 @@ export class PluginAssemblyIntrospector {
     );
   }
 
-  async discover(assemblyPath: string): Promise<DiscoveredPluginType[]> {
+  async inspect(assemblyPath: string): Promise<PluginAssemblyInspection> {
     await this.ensureInspectorBuilt();
 
     try {
@@ -46,18 +58,62 @@ export class PluginAssemblyIntrospector {
         throw new Error("Unexpected plugin inspector output.");
       }
 
-      return parsed.plugins
-        .map((plugin: Record<string, unknown>) => ({
-          typeName: String(plugin.typeName ?? plugin.typename ?? ""),
-          name: plugin.name ? String(plugin.name) : undefined,
-          friendlyName: plugin.friendlyName ? String(plugin.friendlyName) : undefined,
-        }))
-        .filter((plugin: DiscoveredPluginType) => plugin.typeName);
+      return {
+        assembly: this.parseAssemblyIdentity(parsed.assembly),
+        plugins: this.parsePlugins(parsed.plugins),
+      };
     } catch (error) {
       const stderr = (error as { stderr?: string })?.stderr;
       const message = stderr ? `${String(error)}: ${stderr}` : String(error);
       throw new Error(`Failed to inspect plugin assembly with MetadataLoadContext: ${message}`);
     }
+  }
+
+  async discover(assemblyPath: string): Promise<DiscoveredPluginType[]> {
+    const inspection = await this.inspect(assemblyPath);
+    return inspection.plugins;
+  }
+
+  private parseAssemblyIdentity(value: unknown): AssemblyIdentity {
+    if (!value || typeof value !== "object") {
+      throw new Error("Unexpected plugin inspector output.");
+    }
+
+    const record = value as Record<string, unknown>;
+    const name = String(record.name ?? "").trim();
+    if (!name) {
+      throw new Error("Unexpected plugin inspector output.");
+    }
+
+    return {
+      name,
+      version: this.optionalString(record.version),
+      culture: this.optionalString(record.culture),
+      publicKeyToken: this.optionalString(record.publicKeyToken),
+    };
+  }
+
+  private optionalString(value: unknown): string | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }
+
+  private parsePlugins(value: unknown): DiscoveredPluginType[] {
+    if (!Array.isArray(value)) {
+      throw new Error("Unexpected plugin inspector output.");
+    }
+
+    return value
+      .map((plugin: Record<string, unknown>) => ({
+        typeName: String(plugin.typeName ?? plugin.typename ?? ""),
+        name: plugin.name ? String(plugin.name) : undefined,
+        friendlyName: plugin.friendlyName ? String(plugin.friendlyName) : undefined,
+      }))
+      .filter((plugin: DiscoveredPluginType) => plugin.typeName);
   }
 
   private async ensureInspectorBuilt(): Promise<void> {

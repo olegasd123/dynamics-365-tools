@@ -255,6 +255,38 @@ test("updateAssembly patches content on normalized id", async () => {
   assert.deepStrictEqual(call.body, { content: "base64" });
 });
 
+test("getAssembly returns assembly metadata by id", async () => {
+  const client = new FakeDataverseClient();
+  const service = new PluginService(client as any, new FakeSolutionComponents() as any);
+  client.addResponse(
+    "GET",
+    "/pluginassemblies(assembly-id)?$select=pluginassemblyid,name,version,isolationmode,publickeytoken,culture,sourcetype,modifiedon",
+    {
+      pluginassemblyid: "{assembly-id}",
+      name: "Sample.Plugins",
+      version: "1.2.3.4",
+      isolationmode: 2,
+      publickeytoken: "abcdef1234567890",
+      culture: "neutral",
+      sourcetype: 0,
+      modifiedon: "2026-01-01T00:00:00Z",
+    },
+  );
+
+  const assembly = await service.getAssembly("{assembly-id}");
+
+  assert.deepStrictEqual(assembly, {
+    id: "assembly-id",
+    name: "Sample.Plugins",
+    version: "1.2.3.4",
+    isolationMode: 2,
+    publicKeyToken: "abcdef1234567890",
+    culture: "neutral",
+    sourceType: 0,
+    modifiedOn: "2026-01-01T00:00:00Z",
+  });
+});
+
 test("updatePluginType patches provided fields and adds to solution when changed", async () => {
   const client = new FakeDataverseClient();
   const components = new FakeSolutionComponents();
