@@ -71,6 +71,27 @@ export class PluginService {
     });
   }
 
+  async getAssembly(id: string): Promise<PluginAssembly> {
+    const normalizedId = this.normalizeGuid(id);
+    const url = `/pluginassemblies(${normalizedId})?$select=pluginassemblyid,name,version,isolationmode,publickeytoken,culture,sourcetype,modifiedon`;
+    const record = await this.client.get<{
+      pluginassemblyid?: string;
+      name?: string;
+      version?: string;
+      isolationmode?: number;
+      publickeytoken?: string;
+      culture?: string;
+      sourcetype?: number;
+      modifiedon?: string;
+    }>(url);
+
+    if (!record.pluginassemblyid || !record.name) {
+      throw new Error("Plugin assembly not found.");
+    }
+
+    return this.mapAssembly(record);
+  }
+
   async createPluginType(assemblyId: string, input: PluginTypeRegistrationInput): Promise<string> {
     const normalizedAssemblyId = this.normalizeGuid(assemblyId);
     const payload: Record<string, unknown> = {
@@ -576,16 +597,29 @@ export class PluginService {
 
     return (response.value ?? [])
       .filter((item) => item.pluginassemblyid && item.name)
-      .map((item) => ({
-        id: this.normalizeGuid(item.pluginassemblyid!),
-        name: item.name ?? "",
-        version: item.version,
-        isolationMode: item.isolationmode,
-        publicKeyToken: item.publickeytoken,
-        culture: item.culture,
-        sourceType: item.sourcetype,
-        modifiedOn: item.modifiedon,
-      }));
+      .map((item) => this.mapAssembly(item));
+  }
+
+  private mapAssembly(item: {
+    pluginassemblyid?: string;
+    name?: string;
+    version?: string;
+    isolationmode?: number;
+    publickeytoken?: string;
+    culture?: string;
+    sourcetype?: number;
+    modifiedon?: string;
+  }): PluginAssembly {
+    return {
+      id: this.normalizeGuid(item.pluginassemblyid!),
+      name: item.name ?? "",
+      version: item.version,
+      isolationMode: item.isolationmode,
+      publicKeyToken: item.publickeytoken,
+      culture: item.culture,
+      sourceType: item.sourcetype,
+      modifiedOn: item.modifiedon,
+    };
   }
 
   private async getStepMessageId(stepId: string): Promise<string | undefined> {

@@ -1,5 +1,9 @@
 import { PluginType } from "./models";
-import { DiscoveredPluginType, PluginAssemblyIntrospector } from "./pluginAssemblyIntrospector";
+import {
+  DiscoveredPluginType,
+  PluginAssemblyInspection,
+  PluginAssemblyIntrospector,
+} from "./pluginAssemblyIntrospector";
 import { PluginService, PluginTypeUpdateInput } from "./pluginService";
 
 export interface PluginSyncOptions {
@@ -20,6 +24,10 @@ export interface PluginSyncResult {
 
 export class PluginRegistrationManager {
   constructor(private readonly introspector: PluginAssemblyIntrospector) {}
+
+  inspectAssembly(assemblyPath: string): Promise<PluginAssemblyInspection> {
+    return this.introspector.inspect(assemblyPath);
+  }
 
   async syncPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
     const discovered = await this.introspector.discover(options.assemblyPath);
