@@ -2,6 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
 import {
+  extractToken,
   showPublicKeyTokenResult,
   validateAssemblyIdentity,
   validateAssemblyUpdateTarget,
@@ -152,4 +153,12 @@ test("showPublicKeyTokenResult copies token when action is selected", async () =
   }
 
   assert.strictEqual((vscode.env.clipboard as any).value, "abcdef1234567890");
+});
+
+test("extractToken reads Mono strong name output", () => {
+  const output = ["Mono StrongName - version 6.12.0.0", "Public Key Token: 7e306b4abba83daa"].join(
+    "\n",
+  );
+
+  assert.strictEqual(extractToken(output), "7e306b4abba83daa");
 });

@@ -410,13 +410,14 @@ export function showPublicKeyTokenResult(message: string, token?: string): void 
   );
 }
 
-function extractToken(output?: string): string | undefined {
+export function extractToken(output?: string): string | undefined {
   if (!output) {
     return undefined;
   }
   const match =
     output.match(/Public key token is\s+([0-9a-fA-F]+)/i) ||
-    output.match(/Public key token=(\w+)/i);
+    output.match(/Public key token=(\w+)/i) ||
+    output.match(/Public key token:\s*([0-9a-fA-F]+)/i);
   return match?.[1];
 }
 
