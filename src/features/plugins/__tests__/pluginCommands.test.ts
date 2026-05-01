@@ -1,7 +1,11 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
-import { validateAssemblyIdentity, validateAssemblyUpdateTarget } from "../commands/pluginCommands";
+import {
+  showPublicKeyTokenResult,
+  validateAssemblyIdentity,
+  validateAssemblyUpdateTarget,
+} from "../commands/pluginCommands";
 
 function clearMessages(): void {
   const messages = (vscode.window as any).__messages;
@@ -116,4 +120,36 @@ test("validateAssemblyUpdateTarget asks before updating with no plugin type over
   } finally {
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
   }
+});
+
+test("showPublicKeyTokenResult does not wait for notification selection", () => {
+  const originalShowInformationMessage = vscode.window.showInformationMessage;
+  let shownMessage = "";
+  (vscode.window as any).showInformationMessage = (message: string) => {
+    shownMessage = message;
+    return new Promise(() => {});
+  };
+
+  try {
+    showPublicKeyTokenResult("Strong name key created.", "abcdef1234567890");
+  } finally {
+    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
+  }
+
+  assert.strictEqual(shownMessage, "Strong name key created.");
+});
+
+test("showPublicKeyTokenResult copies token when action is selected", async () => {
+  const originalShowInformationMessage = vscode.window.showInformationMessage;
+  (vscode.window as any).showInformationMessage = async () => "Copy token";
+  (vscode.env.clipboard as any).value = "";
+
+  try {
+    showPublicKeyTokenResult("Strong name key created.", "abcdef1234567890");
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
+  }
+
+  assert.strictEqual((vscode.env.clipboard as any).value, "abcdef1234567890");
 });

@@ -135,6 +135,15 @@ const commands = {
   executeCommand: async () => undefined,
 };
 
+const env = {
+  clipboard: {
+    value: "",
+    async writeText(value) {
+      this.value = value;
+    },
+  },
+};
+
 const ProgressLocation = {
   Notification: 15,
 };
@@ -150,6 +159,7 @@ module.exports = {
   window,
   extensions,
   commands,
+  env,
   FileType,
   authentication,
   InMemorySecretStorage,

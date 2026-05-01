@@ -384,16 +384,30 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
     const message = token
       ? `Strong name key created and project updated. Public key token: ${token}`
       : "Strong name key created and project updated. Failed to read public key token from sn output.";
-    const copyAction = token ? "Copy token" : undefined;
-    const selection = await vscode.window.showInformationMessage(message, copyAction ?? "OK");
-    if (selection === "Copy token" && token) {
-      await vscode.env.clipboard.writeText(token);
-    }
+    showPublicKeyTokenResult(message, token);
   } catch (error) {
     void vscode.window.showErrorMessage(
       `Failed to generate strong name key: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+export function showPublicKeyTokenResult(message: string, token?: string): void {
+  const copyAction = token ? "Copy token" : undefined;
+  void vscode.window.showInformationMessage(message, copyAction ?? "OK").then(
+    async (selection) => {
+      if (selection === copyAction && token) {
+        try {
+          await vscode.env.clipboard.writeText(token);
+        } catch (error) {
+          void vscode.window.showErrorMessage(
+            `Failed to copy public key token: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    },
+    () => undefined,
+  );
 }
 
 function extractToken(output?: string): string | undefined {
