@@ -79,7 +79,7 @@ Notes:
 
 - Keep `authType: "interactive"` for local developer work. Use `authType: "clientSecret"` for CI or service accounts.
 - If `authType` is not `clientSecret`, the extension still can use stored client credentials as a fallback when interactive sign-in is unavailable.
-- `manageMissingComponents: false` is safer for production: no new web resources or plugin assemblies are created by mistake, while still allowing them to be updated.
+- `manageMissingComponents: false` is safer for production: no new web resources or plugin assemblies are created by mistake, while still allowing them to be updated. Use `manageMissingComponents: true` for development environment only.
 - Turn on `userAgentEnabled` only if your proxy, gateway, or audit policy needs a custom client header.
 
 ### Authenticate
