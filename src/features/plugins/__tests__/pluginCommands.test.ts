@@ -2,8 +2,10 @@ import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
 import {
+  AssemblyIdentityValidationError,
   extractToken,
   showPublicKeyTokenResult,
+  updateAssemblyFromFileDialog,
   validateAssemblyIdentity,
   validateAssemblyUpdateTarget,
 } from "../commands/pluginCommands";
@@ -16,6 +18,11 @@ function clearMessages(): void {
 }
 
 test("validateAssemblyIdentity blocks a different assembly name", () => {
+  assert.throws(
+    () =>
+      validateAssemblyIdentity({ id: "id", name: "Contoso.Plugins" }, { name: "Fabrikam.Plugins" }),
+    AssemblyIdentityValidationError,
+  );
   assert.throws(
     () =>
       validateAssemblyIdentity({ id: "id", name: "Contoso.Plugins" }, { name: "Fabrikam.Plugins" }),
@@ -121,6 +128,84 @@ test("validateAssemblyUpdateTarget asks before updating with no plugin type over
   } finally {
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
   }
+});
+
+test("updateAssemblyFromFileDialog shows a modal error and asks for the file again on assembly mismatch", async () => {
+  const originalShowOpenDialog = vscode.window.showOpenDialog;
+  const originalShowErrorMessage = vscode.window.showErrorMessage;
+  const originalReadFile = vscode.workspace.fs.readFile;
+
+  const selectedFiles = [
+    vscode.Uri.file("/workspace/Fabrikam.Plugins.dll"),
+    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
+  ];
+  const modalErrors: Array<{ message: string; modal?: boolean }> = [];
+  let updateCount = 0;
+  let lastPath = "";
+
+  (vscode.window as any).showOpenDialog = async () => {
+    const selected = selectedFiles.shift();
+    return selected ? [selected] : undefined;
+  };
+  (vscode.window as any).showErrorMessage = async (
+    message: string,
+    options?: { modal?: boolean },
+  ) => {
+    modalErrors.push({ message, modal: options?.modal });
+    return undefined;
+  };
+  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
+
+  const service = {
+    getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
+    listPluginTypes: async () => [],
+    updateAssembly: async () => {
+      updateCount += 1;
+    },
+  };
+  const registration = {
+    inspectAssembly: async (assemblyPath: string) => ({
+      assembly: {
+        name: assemblyPath.includes("Fabrikam") ? "Fabrikam.Plugins" : "Contoso.Plugins",
+      },
+      plugins: [],
+    }),
+    syncPluginTypes: async () => ({
+      created: [],
+      updated: [],
+      removed: [],
+      skippedCreation: [],
+      skippedRemoval: [],
+    }),
+  };
+
+  try {
+    await updateAssemblyFromFileDialog({
+      assemblyId: "assembly-id",
+      assemblyName: "Contoso.Plugins",
+      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+      manageMissingComponents: true,
+      pluginService: service as any,
+      pluginRegistration: registration as any,
+      assemblyStatusBar: { setLastPublish: () => undefined } as any,
+      lastSelection: {
+        setLastAssemblyDllPath: async (_envName: string, _assemblyId: string, path: string) => {
+          lastPath = path;
+        },
+      } as any,
+    });
+  } finally {
+    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
+    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
+    (vscode.workspace.fs as any).readFile = originalReadFile;
+  }
+
+  assert.strictEqual(selectedFiles.length, 0);
+  assert.strictEqual(updateCount, 1);
+  assert.strictEqual(lastPath, "/workspace/Contoso.Plugins.dll");
+  assert.strictEqual(modalErrors.length, 1);
+  assert.strictEqual(modalErrors[0].modal, true);
+  assert.match(modalErrors[0].message, /Selected CRM assembly is "Contoso\.Plugins"/);
 });
 
 test("showPublicKeyTokenResult does not wait for notification selection", () => {

@@ -224,36 +224,18 @@ export async function updatePluginAssembly(
       ? vscode.Uri.file(workspaceRoot)
       : undefined;
 
-  const assemblyFile = await vscode.window.showOpenDialog({
-    canSelectFolders: false,
-    canSelectMany: false,
-    filters: { Assemblies: ["dll"] },
+  await updateAssemblyFromFileDialog({
+    assemblyId,
+    assemblyName,
     defaultUri,
-    title: "Select updated plugin assembly (.dll)",
+    env,
+    manageMissingComponents: env.manageMissingComponents === true,
+    pluginService: service,
+    pluginRegistration,
+    pluginExplorer,
+    assemblyStatusBar,
+    lastSelection,
   });
-  if (!assemblyFile || !assemblyFile[0]) {
-    return;
-  }
-
-  const assemblyUri = assemblyFile[0];
-  const manageMissingComponents = env.manageMissingComponents === true;
-
-  try {
-    await updateAssemblyFromUri({
-      assemblyId,
-      assemblyName,
-      assemblyUri,
-      env,
-      manageMissingComponents,
-      pluginService: service,
-      pluginRegistration,
-      pluginExplorer,
-      assemblyStatusBar,
-      lastSelection,
-    });
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to update plugin assembly: ${String(error)}`);
-  }
 }
 
 export async function publishLastPluginAssembly(ctx: CommandContext): Promise<void> {
@@ -528,12 +510,49 @@ type AssemblyUpdateContext = {
   lastSelection: LastSelectionService;
 };
 
+type AssemblyUpdateFileDialogContext = Omit<AssemblyUpdateContext, "assemblyUri"> & {
+  defaultUri?: vscode.Uri;
+};
+
 type AssemblyUpdateValidationContext = {
   assemblyId: string;
   assemblyUri: vscode.Uri;
   pluginService: Pick<PluginService, "getAssembly" | "listPluginTypes">;
   pluginRegistration: Pick<PluginRegistrationManager, "inspectAssembly">;
 };
+
+export async function updateAssemblyFromFileDialog(
+  context: AssemblyUpdateFileDialogContext,
+): Promise<void> {
+  while (true) {
+    const assemblyFile = await vscode.window.showOpenDialog({
+      canSelectFolders: false,
+      canSelectMany: false,
+      filters: { Assemblies: ["dll"] },
+      defaultUri: context.defaultUri,
+      title: "Select updated plugin assembly (.dll)",
+    });
+    if (!assemblyFile || !assemblyFile[0]) {
+      return;
+    }
+
+    try {
+      await updateAssemblyFromUri({
+        ...context,
+        assemblyUri: assemblyFile[0],
+      });
+      return;
+    } catch (error) {
+      if (error instanceof AssemblyIdentityValidationError) {
+        await vscode.window.showErrorMessage(error.message, { modal: true });
+        continue;
+      }
+
+      void vscode.window.showErrorMessage(`Failed to update plugin assembly: ${String(error)}`);
+      return;
+    }
+  }
+}
 
 async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<void> {
   const canUpdate = await validateAssemblyUpdateTarget({
@@ -606,12 +625,19 @@ export async function validateAssemblyUpdateTarget(
   return confirmPluginTypeOverlap(context, targetAssembly, localInspection);
 }
 
+export class AssemblyIdentityValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AssemblyIdentityValidationError";
+  }
+}
+
 export function validateAssemblyIdentity(
   targetAssembly: PluginAssembly,
   localAssembly: AssemblyIdentity,
 ): void {
   if (normalizeAssemblyName(targetAssembly.name) !== normalizeAssemblyName(localAssembly.name)) {
-    throw new Error(
+    throw new AssemblyIdentityValidationError(
       `Selected CRM assembly is "${targetAssembly.name}", but the DLL is "${localAssembly.name}". Select the matching DLL for this assembly.`,
     );
   }
@@ -619,7 +645,7 @@ export function validateAssemblyIdentity(
   const targetToken = normalizePublicKeyToken(targetAssembly.publicKeyToken);
   const localToken = normalizePublicKeyToken(localAssembly.publicKeyToken);
   if (targetToken && targetToken !== localToken) {
-    throw new Error(
+    throw new AssemblyIdentityValidationError(
       `Selected CRM assembly "${targetAssembly.name}" has public key token "${targetToken}", but the DLL has "${localToken ?? "none"}". Select the matching signed DLL.`,
     );
   }
@@ -627,7 +653,7 @@ export function validateAssemblyIdentity(
   const targetCulture = normalizeCulture(targetAssembly.culture);
   const localCulture = normalizeCulture(localAssembly.culture);
   if (targetCulture !== localCulture) {
-    throw new Error(
+    throw new AssemblyIdentityValidationError(
       `Selected CRM assembly "${targetAssembly.name}" uses culture "${targetCulture ?? "neutral"}", but the DLL uses "${localCulture ?? "neutral"}". Select the matching DLL.`,
     );
   }
