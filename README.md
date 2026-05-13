@@ -136,7 +136,7 @@ Supported: `.js`, `.css`, `.htm`, `.html`, `.xml`, `.json`, `.resx`, `.png`, `.j
   - `Dynamics 365 Tools: Generate Strong Name Key (Public Key Token)` creates a `.snk` using the local `sn` tool and shows the public key token for signing your assemblies.
   - `Dynamics 365 Tools: Register Plugin Assembly` uploads a `.dll` to the selected environment and adds it to your chosen solution.
   - `Dynamics 365 Tools: Update Plugin Assembly` replaces the content of an existing assembly with a new `.dll`.
-  - Plugin and CodeActivity classes are auto-discovered via `System.Reflection.MetadataLoadContext` when you register or update an assembly. New plugin types are created only when `manageMissingComponents` is `true`, existing ones are updated, and types removed from the assembly are deleted only when `manageMissingComponents` is `true`.
+  - Plugin and CodeActivity classes are auto-discovered via `System.Reflection.MetadataLoadContext` when you register or update an assembly. New plugin types are created only when `manageMissingComponents` is `true`, existing ones are updated, and types removed from the assembly are deleted only when `manageMissingComponents` is `true`. Missing plugin types are deleted before an assembly update, because CRM blocks the update while the old type still points to the assembly.
   - Use the trash icon next to a plugin type in the Plugins explorer to remove it (steps and images are deleted with the type).
 - Step and image commands (context menu or palette):
   - Create/edit/enable/disable/delete plugin steps; creation prompts for message, entity, stage, mode, rank, attributes, and solution. Deleting a step now also deletes all of its images first.

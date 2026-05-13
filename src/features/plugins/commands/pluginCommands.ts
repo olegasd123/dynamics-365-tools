@@ -478,8 +478,12 @@ function buildAssemblySuccessMessage(
 }
 
 async function syncPluginsForAssembly(context: PluginSyncContext): Promise<string | undefined> {
+  return formatPluginSyncResult(await runPluginSyncForAssembly(context));
+}
+
+async function runPluginSyncForAssembly(context: PluginSyncContext): Promise<PluginSyncResult> {
   const title = `Syncing plugins for ${path.basename(context.assemblyPath)}`;
-  const result = await vscode.window.withProgress(
+  return vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
       title,
@@ -493,8 +497,29 @@ async function syncPluginsForAssembly(context: PluginSyncContext): Promise<strin
         manageMissingComponents: context.manageMissingComponents,
       }),
   );
+}
 
-  return formatPluginSyncResult(result);
+async function removeMissingPluginsBeforeAssemblyUpdate(
+  context: PluginSyncContext,
+): Promise<PluginSyncResult> {
+  if (context.manageMissingComponents !== true) {
+    return emptyPluginSyncResult();
+  }
+
+  return vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Removing missing plugins for ${path.basename(context.assemblyPath)}`,
+    },
+    () =>
+      context.registration.removeMissingPluginTypes({
+        pluginService: context.pluginService,
+        assemblyId: context.assemblyId,
+        assemblyPath: context.assemblyPath,
+        solutionName: context.solutionName,
+        manageMissingComponents: context.manageMissingComponents,
+      }),
+  );
 }
 
 type AssemblyUpdateContext = {
@@ -568,6 +593,15 @@ async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<vo
   const content = await vscode.workspace.fs.readFile(context.assemblyUri);
   const contentBase64 = Buffer.from(content).toString("base64");
 
+  const preUpdateSyncResult = await removeMissingPluginsBeforeAssemblyUpdate({
+    registration: context.pluginRegistration,
+    pluginService: context.pluginService,
+    assemblyId: context.assemblyId,
+    assemblyPath: context.assemblyUri.fsPath,
+    solutionName: undefined,
+    manageMissingComponents: context.manageMissingComponents,
+  });
+
   await context.pluginService.updateAssembly(context.assemblyId, contentBase64);
   await context.lastSelection.setLastAssemblyDllPath(
     context.env.name,
@@ -577,7 +611,7 @@ async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<vo
 
   let pluginSummary: string | undefined;
   try {
-    pluginSummary = await syncPluginsForAssembly({
+    const postUpdateSyncResult = await runPluginSyncForAssembly({
       registration: context.pluginRegistration,
       pluginService: context.pluginService,
       assemblyId: context.assemblyId,
@@ -585,6 +619,9 @@ async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<vo
       solutionName: undefined,
       manageMissingComponents: context.manageMissingComponents,
     });
+    pluginSummary = formatPluginSyncResult(
+      mergePluginSyncResults(preUpdateSyncResult, postUpdateSyncResult),
+    );
   } catch (syncError) {
     void vscode.window.showErrorMessage(
       `Assembly updated, but plugins failed to sync: ${String(syncError)}`,
@@ -773,6 +810,33 @@ function formatPluginSyncResult(result: PluginSyncResult): string | undefined {
   }
 
   return `Plugins: ${parts.join(", ")}.`;
+}
+
+function mergePluginSyncResults(
+  first: PluginSyncResult,
+  second: PluginSyncResult | undefined,
+): PluginSyncResult {
+  if (!second) {
+    return first;
+  }
+
+  return {
+    created: [...first.created, ...second.created],
+    updated: [...first.updated, ...second.updated],
+    removed: [...first.removed, ...second.removed],
+    skippedCreation: [...first.skippedCreation, ...second.skippedCreation],
+    skippedRemoval: [...first.skippedRemoval, ...second.skippedRemoval],
+  };
+}
+
+function emptyPluginSyncResult(): PluginSyncResult {
+  return {
+    created: [],
+    updated: [],
+    removed: [],
+    skippedCreation: [],
+    skippedRemoval: [],
+  };
 }
 
 function formatPluginNames(plugins: Array<{ typeName?: string; name?: string }>): string {
