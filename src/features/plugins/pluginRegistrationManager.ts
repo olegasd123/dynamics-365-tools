@@ -29,16 +29,12 @@ export class PluginRegistrationManager {
     return this.introspector.inspect(assemblyPath);
   }
 
-  async removeMissingPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
+  async listMissingPluginTypes(options: PluginSyncOptions): Promise<PluginType[]> {
     const discovered = await this.introspector.discover(options.assemblyPath);
     const existingByType = await this.getExistingPluginTypesByName(
       options.pluginService,
       options.assemblyId,
     );
-
-    const removed: PluginType[] = [];
-    const skippedRemoval: PluginType[] = [];
-    const canManageMissing = options.manageMissingComponents === true;
 
     for (const plugin of discovered) {
       const key = this.normalizeKey(plugin.typeName);
@@ -47,7 +43,16 @@ export class PluginRegistrationManager {
       }
     }
 
-    for (const orphan of existingByType.values()) {
+    return [...existingByType.values()];
+  }
+
+  async removeMissingPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
+    const missing = await this.listMissingPluginTypes(options);
+    const removed: PluginType[] = [];
+    const skippedRemoval: PluginType[] = [];
+    const canManageMissing = options.manageMissingComponents === true;
+
+    for (const orphan of missing) {
       if (!canManageMissing) {
         skippedRemoval.push(orphan);
         continue;

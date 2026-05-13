@@ -170,6 +170,7 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
       },
       plugins: [],
     }),
+    listMissingPluginTypes: async () => [],
     removeMissingPluginTypes: async () => ({
       created: [],
       updated: [],
@@ -217,12 +218,18 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
 
 test("updateAssemblyFromFileDialog removes missing plugin types before patching assembly", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
   const originalReadFile = vscode.workspace.fs.readFile;
   const calls: string[] = [];
+  let warning = "";
 
   (vscode.window as any).showOpenDialog = async () => [
     vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
   ];
+  (vscode.window as any).showWarningMessage = async (message: string) => {
+    warning = message;
+    return "Remove and Update";
+  };
   (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
@@ -240,6 +247,10 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
       assembly: { name: "Contoso.Plugins" },
       plugins: [{ typeName: "Contoso.Plugins.Kept" }],
     }),
+    listMissingPluginTypes: async () => {
+      calls.push("listMissingPluginTypes");
+      return [{ id: "old-type", name: "Old", typeName: "Contoso.Plugins.Old" }];
+    },
     removeMissingPluginTypes: async () => {
       calls.push("removeMissingPluginTypes");
       return {
@@ -277,10 +288,87 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
     });
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
     (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
-  assert.deepStrictEqual(calls, ["removeMissingPluginTypes", "updateAssembly", "syncPluginTypes"]);
+  assert.match(warning, /will remove 1 plugin type/);
+  assert.match(warning, /Contoso\.Plugins\.Old/);
+  assert.deepStrictEqual(calls, [
+    "listMissingPluginTypes",
+    "removeMissingPluginTypes",
+    "updateAssembly",
+    "syncPluginTypes",
+  ]);
+});
+
+test("updateAssemblyFromFileDialog cancels update when missing plugin removal is rejected", async () => {
+  const originalShowOpenDialog = vscode.window.showOpenDialog;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+  const originalReadFile = vscode.workspace.fs.readFile;
+  const calls: string[] = [];
+
+  (vscode.window as any).showOpenDialog = async () => [
+    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
+  ];
+  (vscode.window as any).showWarningMessage = async () => undefined;
+  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
+
+  const service = {
+    getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
+    listPluginTypes: async () => [],
+    updateAssembly: async () => {
+      calls.push("updateAssembly");
+    },
+  };
+  const registration = {
+    inspectAssembly: async () => ({
+      assembly: { name: "Contoso.Plugins" },
+      plugins: [{ typeName: "Contoso.Plugins.Kept" }],
+    }),
+    listMissingPluginTypes: async () => [{ id: "old-type", typeName: "Contoso.Plugins.Old" }],
+    removeMissingPluginTypes: async () => {
+      calls.push("removeMissingPluginTypes");
+      return {
+        created: [],
+        updated: [],
+        removed: [],
+        skippedCreation: [],
+        skippedRemoval: [],
+      };
+    },
+    syncPluginTypes: async () => {
+      calls.push("syncPluginTypes");
+      return {
+        created: [],
+        updated: [],
+        removed: [],
+        skippedCreation: [],
+        skippedRemoval: [],
+      };
+    },
+  };
+
+  try {
+    await updateAssemblyFromFileDialog({
+      assemblyId: "assembly-id",
+      assemblyName: "Contoso.Plugins",
+      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+      manageMissingComponents: true,
+      pluginService: service as any,
+      pluginRegistration: registration as any,
+      assemblyStatusBar: { setLastPublish: () => undefined } as any,
+      lastSelection: {
+        setLastAssemblyDllPath: async () => undefined,
+      } as any,
+    });
+  } finally {
+    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+    (vscode.workspace.fs as any).readFile = originalReadFile;
+  }
+
+  assert.deepStrictEqual(calls, []);
 });
 
 test("showPublicKeyTokenResult does not wait for notification selection", () => {
