@@ -29,14 +29,53 @@ export class PluginRegistrationManager {
     return this.introspector.inspect(assemblyPath);
   }
 
+  async listMissingPluginTypes(options: PluginSyncOptions): Promise<PluginType[]> {
+    const discovered = await this.introspector.discover(options.assemblyPath);
+    const existingByType = await this.getExistingPluginTypesByName(
+      options.pluginService,
+      options.assemblyId,
+    );
+
+    for (const plugin of discovered) {
+      const key = this.normalizeKey(plugin.typeName);
+      if (key) {
+        existingByType.delete(key);
+      }
+    }
+
+    return [...existingByType.values()];
+  }
+
+  async removeMissingPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
+    const missing = await this.listMissingPluginTypes(options);
+    const removed: PluginType[] = [];
+    const skippedRemoval: PluginType[] = [];
+    const canManageMissing = options.manageMissingComponents === true;
+
+    for (const orphan of missing) {
+      if (!canManageMissing) {
+        skippedRemoval.push(orphan);
+        continue;
+      }
+
+      try {
+        await options.pluginService.deletePluginTypeCascade(orphan.id);
+      } catch (error) {
+        throw new Error(
+          `Failed to delete plugin ${orphan.name ?? orphan.typeName}: ${String(error)}`,
+        );
+      }
+      removed.push(orphan);
+    }
+
+    return { created: [], updated: [], removed, skippedCreation: [], skippedRemoval };
+  }
+
   async syncPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
     const discovered = await this.introspector.discover(options.assemblyPath);
-    const existing = await options.pluginService.listPluginTypes(options.assemblyId);
-
-    const existingByType = new Map(
-      existing
-        .filter((type) => type.typeName)
-        .map((type) => [this.normalizeKey(type.typeName!), type]),
+    const existingByType = await this.getExistingPluginTypesByName(
+      options.pluginService,
+      options.assemblyId,
     );
 
     const created: PluginType[] = [];
@@ -134,5 +173,17 @@ export class PluginRegistrationManager {
 
   private normalizeKey(value?: string): string | undefined {
     return value?.trim().toLowerCase();
+  }
+
+  private async getExistingPluginTypesByName(
+    pluginService: PluginService,
+    assemblyId: string,
+  ): Promise<Map<string, PluginType>> {
+    const existing = await pluginService.listPluginTypes(assemblyId);
+    return new Map(
+      existing
+        .filter((type) => type.typeName)
+        .map((type) => [this.normalizeKey(type.typeName!)!, type]),
+    );
   }
 }
