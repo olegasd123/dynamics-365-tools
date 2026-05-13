@@ -519,10 +519,13 @@ async function removeMissingPluginsBeforeAssemblyUpdate(
 
   const removeAndUpdate = "Remove and Update";
   const choice = await vscode.window.showWarningMessage(
-    `This update will remove ${missing.length} plugin type(s) from CRM because they are missing in the selected DLL. Related steps and images will also be deleted: ${formatPluginRemovalPreview(
-      missing,
-    )}.`,
-    { modal: true },
+    `Remove ${missing.length} missing plugin type(s) from CRM and update the assembly?`,
+    {
+      modal: true,
+      detail: `Related steps and images will also be deleted.\n\n${formatPluginRemovalPreview(
+        missing,
+      )}`,
+    },
     removeAndUpdate,
   );
   if (choice !== removeAndUpdate) {

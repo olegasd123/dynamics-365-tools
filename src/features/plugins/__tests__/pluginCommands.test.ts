@@ -222,12 +222,17 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
   const originalReadFile = vscode.workspace.fs.readFile;
   const calls: string[] = [];
   let warning = "";
+  let warningDetail = "";
 
   (vscode.window as any).showOpenDialog = async () => [
     vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
   ];
-  (vscode.window as any).showWarningMessage = async (message: string) => {
+  (vscode.window as any).showWarningMessage = async (
+    message: string,
+    options?: { detail?: string },
+  ) => {
     warning = message;
+    warningDetail = options?.detail ?? "";
     return "Remove and Update";
   };
   (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
@@ -292,8 +297,9 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
     (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
-  assert.match(warning, /will remove 1 plugin type/);
-  assert.match(warning, /Contoso\.Plugins\.Old/);
+  assert.match(warning, /Remove 1 missing plugin type/);
+  assert.match(warningDetail, /Related steps and images/);
+  assert.match(warningDetail, /Contoso\.Plugins\.Old/);
   assert.deepStrictEqual(calls, [
     "listMissingPluginTypes",
     "removeMissingPluginTypes",
