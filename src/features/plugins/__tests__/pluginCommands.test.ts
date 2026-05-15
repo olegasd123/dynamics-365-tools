@@ -5,6 +5,7 @@ import {
   AssemblyIdentityValidationError,
   extractToken,
   showPublicKeyTokenResult,
+  updatePluginAssembly,
   updateAssemblyFromFileDialog,
   validateAssemblyIdentity,
   validateAssemblyUpdateTarget,
@@ -214,6 +215,59 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
   assert.strictEqual(modalErrors.length, 1);
   assert.strictEqual(modalErrors[0].modal, true);
   assert.match(modalErrors[0].message, /Selected CRM assembly is "Contoso\.Plugins"/);
+});
+
+test("updatePluginAssembly opens file dialog in the last DLL folder", async () => {
+  const originalShowOpenDialog = vscode.window.showOpenDialog;
+  let dialogOptions: { defaultUri?: vscode.Uri } | undefined;
+
+  (vscode.window as any).showOpenDialog = async (options: { defaultUri?: vscode.Uri }) => {
+    dialogOptions = options;
+    return undefined;
+  };
+
+  const env = { name: "Dev", url: "https://dev.crm.dynamics.com" };
+  const lastPath = "/workspace/bin/Debug/net462/Contoso.Plugins.dll";
+
+  try {
+    await updatePluginAssembly(
+      {
+        configuration: {
+          loadConfiguration: async () => ({ environments: [env] }),
+          workspaceRoot: "/workspace",
+        },
+        ui: {},
+        secrets: {
+          getCredentials: async () => undefined,
+        },
+        auth: {
+          getAccessToken: async () => "token",
+        },
+        lastSelection: {
+          setLastEnvironment: async () => undefined,
+          getLastAssemblyDllPath: () => lastPath,
+        },
+        connections: {
+          createConnection: async () => ({
+            env,
+            apiRoot: "https://dev.crm.dynamics.com/api/data/v9.2",
+            token: "token",
+          }),
+        },
+        pluginRegistration: {},
+        pluginExplorer: {},
+        assemblyStatusBar: {},
+      } as any,
+      {
+        env,
+        assembly: { id: "assembly-id", name: "Contoso.Plugins" },
+      } as any,
+    );
+  } finally {
+    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
+  }
+
+  assert.strictEqual(dialogOptions?.defaultUri?.fsPath, "/workspace/bin/Debug/net462");
 });
 
 test("updateAssemblyFromFileDialog removes missing plugin types before patching assembly", async () => {
