@@ -54,3 +54,49 @@ test("PacCli parses JSON stdout when present", async () => {
   assert.deepStrictEqual(calls, [["some", "command", "--json"]]);
   assert.deepStrictEqual(result.parsed, { ok: true });
 });
+
+test("PacCli builds pcf init arguments", async () => {
+  const calls: Array<{ args: string[]; cwd?: string }> = [];
+  const runner = {
+    run: async (_command: string, args: string[], options: { cwd?: string }) => {
+      calls.push({ args, cwd: options.cwd });
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+      };
+    },
+  };
+
+  const pac = new PacCli(runner as any);
+  await pac.pcfInit(
+    {
+      namespace: "Contoso.Controls",
+      name: "LinearInput",
+      template: "field",
+      framework: "react",
+      runNpmInstall: true,
+    },
+    "/tmp/control",
+  );
+
+  assert.deepStrictEqual(calls, [
+    {
+      args: [
+        "pcf",
+        "init",
+        "--namespace",
+        "Contoso.Controls",
+        "--name",
+        "LinearInput",
+        "--template",
+        "field",
+        "--framework",
+        "react",
+        "--run-npm-install",
+      ],
+      cwd: "/tmp/control",
+    },
+  ]);
+});

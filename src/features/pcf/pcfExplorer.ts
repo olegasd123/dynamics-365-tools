@@ -1,7 +1,8 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { PcfControlProject, PcfToolchainStatus } from "./models";
+import { PcfBuildStatus, PcfControlProject, PcfToolchainStatus } from "./models";
 import { PacCli, detectTool } from "./pacCli";
+import { PcfBuildService } from "./pcfBuildService";
 import { PcfProjectLocator } from "./pcfProjectLocator";
 import { ProcessRunner } from "./processRunner";
 
@@ -90,8 +91,10 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
     private readonly locator: PcfProjectLocator,
     private readonly runner: ProcessRunner,
     private readonly pacCli: PacCli,
+    private readonly buildService: PcfBuildService,
   ) {
     this.locator.onDidChangeProjects(() => this.refresh());
+    this.buildService.onDidChangeStatus(() => this.refresh());
   }
 
   refresh(node?: PcfExplorerNode): void {
@@ -130,8 +133,13 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
         ),
         new PcfProjectInfoNode(
           "Build status",
-          element.project.hasNodeModules ? "ready" : "dependencies not installed",
-          element.project.hasNodeModules ? "pass" : "circle-slash",
+          this.formatBuildStatus(element.project),
+          this.getBuildStatusIcon(element.project),
+        ),
+        new PcfProjectInfoNode(
+          "Watch",
+          this.buildService.isWatching(element.project) ? "running" : "stopped",
+          this.buildService.isWatching(element.project) ? "sync" : "debug-stop",
         ),
       ];
     }
@@ -150,6 +158,28 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       this.toolchainStatus = { pac, node, npm, dotnet };
     }
     return this.toolchainStatus;
+  }
+
+  private formatBuildStatus(project: PcfControlProject): string {
+    const status = this.buildService.getBuildStatus(project);
+    if (status.kind === "never") {
+      return project.hasNodeModules ? "never built" : "dependencies not installed";
+    }
+    return formatBuildStatus(status);
+  }
+
+  private getBuildStatusIcon(project: PcfControlProject): string {
+    const status = this.buildService.getBuildStatus(project);
+    if (status.kind === "success") {
+      return "pass";
+    }
+    if (status.kind === "failed") {
+      return "error";
+    }
+    if (status.kind === "running") {
+      return "sync";
+    }
+    return project.hasNodeModules ? "circle-large-outline" : "circle-slash";
   }
 }
 
@@ -187,4 +217,17 @@ function formatToolStatus(result: {
     return result.version ?? "available";
   }
   return result.error ?? "missing";
+}
+
+function formatBuildStatus(status: PcfBuildStatus): string {
+  if (status.kind === "running") {
+    return "building";
+  }
+  if (status.kind === "success") {
+    return status.durationMs ? `built in ${status.durationMs}ms` : "built";
+  }
+  if (status.kind === "failed") {
+    return status.exitCode === undefined ? "failed" : `failed (${status.exitCode})`;
+  }
+  return "never built";
 }

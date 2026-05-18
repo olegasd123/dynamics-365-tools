@@ -59,3 +59,20 @@ export interface PcfToolchainStatus {
   npm: ToolDetectionResult;
   dotnet: ToolDetectionResult;
 }
+
+export type PcfBuildStatusKind = "never" | "running" | "success" | "failed";
+
+export interface PcfBuildStatus {
+  kind: PcfBuildStatusKind;
+  finishedAt?: number;
+  durationMs?: number;
+  exitCode?: number;
+}
+
+export interface PcfInitOptions {
+  namespace: string;
+  name: string;
+  template: "field" | "dataset";
+  framework: "none" | "react";
+  runNpmInstall: boolean;
+}

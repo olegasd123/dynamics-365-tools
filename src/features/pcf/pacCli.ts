@@ -1,5 +1,5 @@
 import type * as vscode from "vscode";
-import { PacRunResult, ToolDetectionResult } from "./models";
+import { PacRunResult, PcfInitOptions, ToolDetectionResult } from "./models";
 import { ProcessRunner } from "./processRunner";
 
 export class PacCli {
@@ -15,6 +15,32 @@ export class PacCli {
   async help(args: string[]): Promise<string> {
     const result = await this.run([...args, "--help"]);
     return result.stdout || result.stderr;
+  }
+
+  async pcfInit(
+    opts: PcfInitOptions,
+    cwd: string,
+    onLine?: (line: string, stream: "stdout" | "stderr") => void,
+    token?: vscode.CancellationToken,
+  ): Promise<PacRunResult> {
+    const args = [
+      "pcf",
+      "init",
+      "--namespace",
+      opts.namespace,
+      "--name",
+      opts.name,
+      "--template",
+      opts.template,
+      "--framework",
+      opts.framework,
+    ];
+
+    if (opts.runNpmInstall) {
+      args.push("--run-npm-install");
+    }
+
+    return this.run(args, cwd, onLine, token);
   }
 
   async run(

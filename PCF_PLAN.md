@@ -535,7 +535,7 @@ offered for re-launch (but never auto-launched).
 
 The phasing keeps each step independently shippable.
 
-### Phase 1 — Discovery + toolchain/process plumbing (≈ 2 days)
+### Phase 1 [Done] — Discovery + toolchain/process plumbing (≈ 2 days)
 
 - `PacCli` wrapper + detection.
 - `ProcessRunner` for cancellable child processes, output streaming, exit-code
@@ -550,7 +550,7 @@ Exit criteria: open a workspace with PCF projects, see every control and its
 manifest properties in the tree. Toolchain node shows accurate pac/node/dotnet
 status.
 
-### Phase 2 — Build + Watch + Init (≈ 2–3 days)
+### Phase 2 [Done] — Build + Watch + Init (≈ 2–3 days)
 
 - `npmRunner` + `PcfBuildService` (with auto `npm install` prompt).
 - Watch mode + status bar.

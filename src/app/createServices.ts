@@ -4,9 +4,12 @@ import { AuthorizationStore } from "../features/auth/authorizationStore";
 import { SecretService } from "../features/auth/secretService";
 import { ConfigurationService } from "../features/config/configurationService";
 import { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
+import { NpmRunner } from "../features/pcf/npmRunner";
 import { PacCli } from "../features/pcf/pacCli";
+import { PcfBuildService } from "../features/pcf/pcfBuildService";
 import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
 import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
 import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
@@ -49,9 +52,17 @@ export async function createServices(
 
   const pcfProcessRunner = new ProcessRunner();
   const pacCli = new PacCli(pcfProcessRunner);
+  const npmRunner = new NpmRunner(pcfProcessRunner);
+  const pcfStatusBar = new PcfStatusBarService("dynamics365Tools.pcf.stopWatch");
+  const pcfBuildService = new PcfBuildService(npmRunner, pcfStatusBar);
   const pcfProjectLocator = new PcfProjectLocator();
   await pcfProjectLocator.initialize();
-  const pcfExplorer = new PcfExplorerProvider(pcfProjectLocator, pcfProcessRunner, pacCli);
+  const pcfExplorer = new PcfExplorerProvider(
+    pcfProjectLocator,
+    pcfProcessRunner,
+    pacCli,
+    pcfBuildService,
+  );
 
   const statusBar = new StatusBarService("dynamics365Tools.publishLastResource");
   const assemblyStatusBar = new AssemblyStatusBarService(
@@ -75,8 +86,11 @@ export async function createServices(
     pluginRegistration,
     pcfProcessRunner,
     pacCli,
+    npmRunner,
+    pcfBuildService,
     pcfProjectLocator,
     pcfExplorer,
+    pcfStatusBar,
     statusBar,
     assemblyStatusBar,
   };

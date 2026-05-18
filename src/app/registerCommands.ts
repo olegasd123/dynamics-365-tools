@@ -35,7 +35,14 @@ import {
   enablePluginStep,
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
-import { openPcfManifest, refreshPcfExplorer } from "../features/pcf/commands/pcfWorkspaceCommands";
+import {
+  buildPcfControl,
+  newPcfControl,
+  openPcfManifest,
+  refreshPcfExplorer,
+  stopPcfWatch,
+  watchPcfControl,
+} from "../features/pcf/commands/pcfWorkspaceCommands";
 import { CommandContext } from "./commandContext";
 import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 
@@ -118,10 +125,24 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.pcf.openManifest", (nodeOrUri) => openPcfManifest(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.pcf.newControl", () => newPcfControl(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.build", (nodeOrUri) => buildPcfControl(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.watch", (nodeOrUri) => watchPcfControl(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.stopWatch", (nodeOrUri) => stopPcfWatch(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
     ctx.pcfProjectLocator,
+    ctx.pcfBuildService,
     ctx.pcfProcessRunner,
+    ctx.pcfStatusBar,
     ctx.statusBar,
     ctx.assemblyStatusBar,
   );

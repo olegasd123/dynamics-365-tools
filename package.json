@@ -57,6 +57,10 @@
     "onCommand:dynamics365Tools.plugins.publishLastAssembly",
     "onCommand:dynamics365Tools.pcf.refreshExplorer",
     "onCommand:dynamics365Tools.pcf.openManifest",
+    "onCommand:dynamics365Tools.pcf.newControl",
+    "onCommand:dynamics365Tools.pcf.build",
+    "onCommand:dynamics365Tools.pcf.watch",
+    "onCommand:dynamics365Tools.pcf.stopWatch",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
   ],
@@ -246,6 +250,30 @@
         "title": "Open PCF Manifest",
         "category": "Dynamics 365 Tools",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.newControl",
+        "title": "New PCF Control",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.build",
+        "title": "Build PCF Control",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.watch",
+        "title": "Watch PCF Control",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.stopWatch",
+        "title": "Stop PCF Watch",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(debug-stop)"
       }
     ],
     "submenus": [
@@ -263,6 +291,16 @@
         },
         {
           "command": "dynamics365Tools.pcf.openManifest",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.build",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.watch",
           "group": "navigation@dynamics365ToolsPcf",
           "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         }
@@ -370,6 +408,18 @@
         },
         {
           "command": "dynamics365Tools.pcf.openManifest"
+        },
+        {
+          "command": "dynamics365Tools.pcf.newControl"
+        },
+        {
+          "command": "dynamics365Tools.pcf.build"
+        },
+        {
+          "command": "dynamics365Tools.pcf.watch"
+        },
+        {
+          "command": "dynamics365Tools.pcf.stopWatch"
         }
       ],
       "view/title": [
@@ -404,6 +454,11 @@
           "command": "dynamics365Tools.pcf.refreshExplorer",
           "when": "view == dynamics365Tools.pcfExplorer",
           "group": "navigation@1"
+        },
+        {
+          "command": "dynamics365Tools.pcf.newControl",
+          "when": "view == dynamics365Tools.pcfExplorer",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -471,6 +526,21 @@
           "command": "dynamics365Tools.pcf.openManifest",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@1"
+        },
+        {
+          "command": "dynamics365Tools.pcf.build",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@2"
+        },
+        {
+          "command": "dynamics365Tools.pcf.watch",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@3"
+        },
+        {
+          "command": "dynamics365Tools.pcf.stopWatch",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@4"
         }
       ]
     },

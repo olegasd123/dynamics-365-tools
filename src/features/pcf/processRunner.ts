@@ -9,6 +9,14 @@ export interface ProcessRunOptions {
   onLine?: (line: string, stream: "stdout" | "stderr") => void;
 }
 
+export interface RunningProcess {
+  readonly command: string;
+  readonly args: string[];
+  readonly cwd?: string;
+  readonly exited: Promise<ProcessRunResult>;
+  kill(): void;
+}
+
 export class ProcessRunner {
   private readonly running = new Set<ReturnType<typeof spawn>>();
 
@@ -17,22 +25,26 @@ export class ProcessRunner {
     args: string[] = [],
     options: ProcessRunOptions = {},
   ): Promise<ProcessRunResult> {
+    return this.start(command, args, options).exited;
+  }
+
+  start(command: string, args: string[] = [], options: ProcessRunOptions = {}): RunningProcess {
     const startedAt = Date.now();
 
-    return new Promise((resolve, reject) => {
-      const child = spawn(command, args, {
-        cwd: options.cwd,
-        env: options.env,
-        shell: false,
-      });
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      shell: false,
+    });
 
-      this.running.add(child);
-      let stdout = "";
-      let stderr = "";
-      let stdoutBuffer = "";
-      let stderrBuffer = "";
-      let settled = false;
+    this.running.add(child);
+    let stdout = "";
+    let stderr = "";
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+    let settled = false;
 
+    const exited = new Promise<ProcessRunResult>((resolve, reject) => {
       const finish = (exitCode: number): void => {
         if (settled) {
           return;
@@ -82,6 +94,18 @@ export class ProcessRunner {
         finish(code ?? 1);
       });
     });
+
+    return {
+      command,
+      args,
+      cwd: options.cwd,
+      exited,
+      kill: () => {
+        if (!child.killed) {
+          child.kill();
+        }
+      },
+    };
   }
 
   dispose(): void {
