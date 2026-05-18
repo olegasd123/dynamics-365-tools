@@ -18,6 +18,42 @@ export async function packageUnmanagedPcfControl(
   await packagePcfControl(ctx, nodeOrUri, false);
 }
 
+export async function deployLastPcfSolution(
+  ctx: CommandContext,
+  nodeOrUri?: PcfControlProjectNode | vscode.Uri,
+): Promise<void> {
+  const project = await resolvePcfProject(ctx, nodeOrUri);
+  if (!project) {
+    return;
+  }
+
+  const config = await ctx.configuration.loadConfiguration();
+  const env = await ctx.ui.pickEnvironment(
+    config.environments,
+    ctx.lastSelection.getLastEnvironment(),
+    { placeHolder: "Select environment for PCF solution deploy" },
+  );
+  if (!env) {
+    return;
+  }
+
+  await ctx.lastSelection.setLastEnvironment(env.name);
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Deploying last PCF solution package for ${project.fullName}`,
+      cancellable: true,
+    },
+    async (_progress, token) => {
+      const result = await ctx.pcfDeployService.deployLastPackage(project, env, { token });
+      if (result) {
+        await ctx.pcfProjectLocator.refresh();
+        ctx.pcfExplorer.refresh();
+      }
+    },
+  );
+}
+
 async function packagePcfControl(
   ctx: CommandContext,
   nodeOrUri: PcfControlProjectNode | vscode.Uri | undefined,

@@ -1,0 +1,151 @@
+import * as fs from "fs/promises";
+import * as path from "path";
+import * as vscode from "vscode";
+import { ConfigurationService } from "../config/configurationService";
+import { EnvironmentConfig } from "../config/domain/models";
+import { DataverseClient } from "../dataverse/dataverseClient";
+import { EnvironmentConnectionService } from "../dataverse/environmentConnectionService";
+import { SolutionImportError, SolutionImportService } from "../dataverse/solutionImportService";
+import { PcfControlProject } from "./models";
+import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
+
+export interface PcfDeployOptions {
+  overwriteUnmanagedCustomizations?: boolean;
+  publishWorkflows?: boolean;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  token?: vscode.CancellationToken;
+}
+
+export interface PcfDeployResult {
+  zipPath: string;
+  importJobId: string;
+  asyncOperationId?: string;
+  customControlIds: string[];
+  durationMs: number;
+}
+
+interface CustomControlListResponse {
+  value?: Array<{
+    customcontrolid?: string;
+    customControlId?: string;
+    name?: string;
+  }>;
+}
+
+export class PcfDeployService implements vscode.Disposable {
+  private readonly output = vscode.window.createOutputChannel("PCF Deploy");
+
+  constructor(
+    private readonly connections: EnvironmentConnectionService,
+    private readonly settings: PcfWorkspaceSettingsService,
+    private readonly configuration: ConfigurationService,
+  ) {}
+
+  async deployLastPackage(
+    project: PcfControlProject,
+    env: EnvironmentConfig,
+    options: PcfDeployOptions = {},
+  ): Promise<PcfDeployResult | undefined> {
+    const stored = (await this.settings.getProjectSettings(project)).lastPackagedZip;
+    if (!stored) {
+      vscode.window.showWarningMessage(
+        `No packaged solution is saved for ${project.fullName}. Package it first.`,
+      );
+      return undefined;
+    }
+
+    const zipPath = this.configuration.resolveLocalPath(stored);
+    let zipBytes: Buffer;
+    try {
+      zipBytes = await fs.readFile(zipPath);
+    } catch {
+      vscode.window.showErrorMessage(`Packaged solution was not found: ${zipPath}.`);
+      return undefined;
+    }
+
+    const connection = await this.connections.createConnection(env);
+    if (!connection) {
+      return undefined;
+    }
+
+    const client = new DataverseClient(connection);
+    const importer = new SolutionImportService(client);
+    this.output.show(true);
+    this.output.appendLine("");
+    this.output.appendLine(
+      `[${new Date().toISOString()}] Deploy ${project.fullName} to ${env.name} (${env.url})`,
+    );
+    this.output.appendLine(`Package: ${zipPath}`);
+
+    try {
+      const importResult = await importer.importSolution(zipBytes, {
+        overwriteUnmanagedCustomizations: options.overwriteUnmanagedCustomizations ?? false,
+        publishWorkflows: options.publishWorkflows ?? true,
+        timeoutMs: options.timeoutMs,
+        pollIntervalMs: options.pollIntervalMs,
+        token: options.token,
+        onStatus: (message) => this.output.appendLine(`  ${message}`),
+      });
+      this.output.appendLine(`Import job: ${importResult.importJobId}`);
+      if (importResult.asyncOperationId) {
+        this.output.appendLine(`Async operation: ${importResult.asyncOperationId}`);
+      }
+
+      const customControlIds = await this.findCustomControlIds(client, project.fullName);
+      if (customControlIds.length) {
+        this.output.appendLine(`Publishing ${customControlIds.length} custom control(s)`);
+        await importer.publishCustomControls(customControlIds);
+      } else {
+        this.output.appendLine(`No deployed custom control record found for ${project.fullName}`);
+      }
+
+      await this.settings.updateProjectSettings(project, { lastDeployedEnv: env.name });
+      vscode.window.showInformationMessage(
+        `PCF solution ${path.basename(zipPath)} deployed to ${env.name}.`,
+      );
+
+      return {
+        zipPath,
+        importJobId: importResult.importJobId,
+        asyncOperationId: importResult.asyncOperationId,
+        customControlIds,
+        durationMs: importResult.durationMs,
+      };
+    } catch (error) {
+      const message = describeDeployError(error);
+      this.output.appendLine(`Deploy failed: ${message}`);
+      vscode.window.showErrorMessage(`PCF deploy failed for ${project.fullName}: ${message}`);
+      return undefined;
+    }
+  }
+
+  dispose(): void {
+    this.output.dispose();
+  }
+
+  private async findCustomControlIds(client: DataverseClient, fullName: string): Promise<string[]> {
+    const response = await client.get<CustomControlListResponse>(
+      `/customcontrols?$select=customcontrolid,name&$filter=name eq '${escapeODataString(fullName)}'`,
+    );
+
+    return (response.value ?? [])
+      .map((record) => record.customcontrolid ?? record.customControlId)
+      .filter((id): id is string => Boolean(id?.trim()))
+      .map((id) => id.replace(/[{}]/g, "").trim());
+  }
+}
+
+function describeDeployError(error: unknown): string {
+  if (error instanceof SolutionImportError && error.errors.length) {
+    return error.errors.join("; ");
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function escapeODataString(value: string): string {
+  return value.replace(/'/g, "''");
+}

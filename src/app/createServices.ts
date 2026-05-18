@@ -7,6 +7,7 @@ import { EnvironmentConnectionService } from "../features/dataverse/environmentC
 import { NpmRunner } from "../features/pcf/npmRunner";
 import { PacCli } from "../features/pcf/pacCli";
 import { PcfBuildService } from "../features/pcf/pcfBuildService";
+import { PcfDeployService } from "../features/pcf/pcfDeployService";
 import { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentService";
 import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
 import { PcfPackageService } from "../features/pcf/pcfPackageService";
@@ -62,6 +63,7 @@ export async function createServices(
   const pcfEnvironmentService = new PcfEnvironmentService(connections);
   const pcfWorkspaceSettings = new PcfWorkspaceSettingsService(configuration);
   const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings);
+  const pcfDeployService = new PcfDeployService(connections, pcfWorkspaceSettings, configuration);
   const pcfPackageService = new PcfPackageService(
     pacCli,
     pcfProcessRunner,
@@ -105,6 +107,7 @@ export async function createServices(
     pacCli,
     npmRunner,
     pcfBuildService,
+    pcfDeployService,
     pcfEnvironmentService,
     pcfPackageService,
     pcfPushService,

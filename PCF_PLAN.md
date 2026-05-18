@@ -591,7 +591,7 @@ workspace projects show version drift or "in sync".
 Exit criteria: from a clean workspace, scaffold a control and build a managed
 or unmanaged solution zip with no manual command-line steps.
 
-### Phase 6 — Deploy packaged solution (release path) (≈ 3–4 days)
+### Phase 6 [Done] — Deploy packaged solution (release path) (≈ 3–4 days)
 
 - `SolutionImportService`: implement `ImportSolution`/`ImportSolutionAsync`,
   import-job polling, timeout handling, and import log/error parsing.

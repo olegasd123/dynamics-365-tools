@@ -63,6 +63,7 @@
     "onCommand:dynamics365Tools.pcf.push",
     "onCommand:dynamics365Tools.pcf.packageManaged",
     "onCommand:dynamics365Tools.pcf.packageUnmanaged",
+    "onCommand:dynamics365Tools.pcf.deployLast",
     "onCommand:dynamics365Tools.pcf.stopWatch",
     "onCommand:dynamics365Tools.pcf.toggleSolutionFilter",
     "onCommand:dynamics365Tools.pcf.enableSolutionFilter",
@@ -296,6 +297,12 @@
         "icon": "$(package)"
       },
       {
+        "command": "dynamics365Tools.pcf.deployLast",
+        "title": "Deploy Last PCF Solution Package",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(rocket)"
+      },
+      {
         "command": "dynamics365Tools.pcf.stopWatch",
         "title": "Stop PCF Watch",
         "category": "Dynamics 365 Tools",
@@ -372,6 +379,11 @@
         },
         {
           "command": "dynamics365Tools.pcf.packageUnmanaged",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.deployLast",
           "group": "navigation@dynamics365ToolsPcf",
           "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         }
@@ -497,6 +509,9 @@
         },
         {
           "command": "dynamics365Tools.pcf.packageUnmanaged"
+        },
+        {
+          "command": "dynamics365Tools.pcf.deployLast"
         },
         {
           "command": "dynamics365Tools.pcf.stopWatch"
@@ -657,6 +672,11 @@
           "command": "dynamics365Tools.pcf.packageUnmanaged",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@7"
+        },
+        {
+          "command": "dynamics365Tools.pcf.deployLast",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@8"
         },
         {
           "command": "dynamics365Tools.pcf.updateFromLocal",

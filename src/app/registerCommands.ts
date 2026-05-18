@@ -51,6 +51,7 @@ import {
   updatePcfFromLocal,
 } from "../features/pcf/commands/pcfExplorerCommands";
 import {
+  deployLastPcfSolution,
   packageManagedPcfControl,
   packageUnmanagedPcfControl,
 } from "../features/pcf/commands/pcfReleaseCommands";
@@ -162,6 +163,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
         validateConfiguration: false,
       },
     ),
+    register(
+      "dynamics365Tools.pcf.deployLast",
+      (nodeOrUri) => deployLastPcfSolution(ctx, nodeOrUri),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.pcf.stopWatch", (nodeOrUri) => stopPcfWatch(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
@@ -189,6 +197,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ctx.pcfProjectLocator,
     ctx.pcfBuildService,
     ctx.pcfPushService,
+    ctx.pcfDeployService,
     ctx.pcfPackageService,
     ctx.pcfProcessRunner,
     ctx.pcfStatusBar,
