@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { PcfBuildStatus, PcfControlProject } from "./models";
 import { NpmRunner } from "./npmRunner";
 import { PcfStatusBarService } from "./pcfStatusBar";
+import { PcfTelemetryService } from "./pcfTelemetry";
 import { RunningProcess } from "./processRunner";
 
 export interface PcfBuildOptions {
@@ -28,6 +29,7 @@ export class PcfBuildService implements vscode.Disposable {
   constructor(
     private readonly npmRunner: NpmRunner,
     private readonly statusBar: PcfStatusBarService,
+    private readonly telemetry?: PcfTelemetryService,
   ) {}
 
   getBuildStatus(project: PcfControlProject): PcfBuildStatus {
@@ -80,6 +82,7 @@ export class PcfBuildService implements vscode.Disposable {
           };
 
     this.setStatus(project, status);
+    this.telemetry?.build(project, result.exitCode === 0, result.durationMs);
     output.appendLine(
       result.exitCode === 0
         ? `Build finished in ${Date.now() - startedAt}ms.`

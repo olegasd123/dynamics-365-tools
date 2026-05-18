@@ -37,6 +37,7 @@ import {
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
   buildPcfControl,
+  editPcfConfig,
   newPcfControl,
   openPcfManifest,
   pushPcfControl,
@@ -46,6 +47,8 @@ import {
 } from "../features/pcf/commands/pcfWorkspaceCommands";
 import {
   copyPcfDeployedControlId,
+  setPcfWorkspaceFolderFilter,
+  syncPcfManifestVersionFromEnvironment,
   setPcfSolutionFilter,
   togglePcfSolutionFilter,
   updatePcfFromLocal,
@@ -137,6 +140,9 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.pcf.openManifest", (nodeOrUri) => openPcfManifest(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.pcf.editConfig", (nodeOrUri) => editPcfConfig(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
     register("dynamics365Tools.pcf.newControl", () => newPcfControl(ctx), {
       validateConfiguration: false,
     }),
@@ -182,9 +188,23 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.pcf.disableSolutionFilter", () => setPcfSolutionFilter(ctx, false), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.pcf.setWorkspaceFolderFilter",
+      () => setPcfWorkspaceFolderFilter(ctx),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.pcf.updateFromLocal", (node) => updatePcfFromLocal(ctx, node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
+      (node) => syncPcfManifestVersionFromEnvironment(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register(
       "dynamics365Tools.pcf.copyDeployedControlId",
       (node) => copyPcfDeployedControlId(node),
@@ -201,6 +221,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ctx.pcfPackageService,
     ctx.pcfProcessRunner,
     ctx.pcfStatusBar,
+    ctx.pcfTelemetry,
     ctx.statusBar,
     ctx.assemblyStatusBar,
   );

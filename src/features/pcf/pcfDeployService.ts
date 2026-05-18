@@ -7,6 +7,7 @@ import { DataverseClient } from "../dataverse/dataverseClient";
 import { EnvironmentConnectionService } from "../dataverse/environmentConnectionService";
 import { SolutionImportError, SolutionImportService } from "../dataverse/solutionImportService";
 import { PcfControlProject } from "./models";
+import { PcfTelemetryService } from "./pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
 
 export interface PcfDeployOptions {
@@ -40,6 +41,7 @@ export class PcfDeployService implements vscode.Disposable {
     private readonly connections: EnvironmentConnectionService,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly telemetry?: PcfTelemetryService,
   ) {}
 
   async deployLastPackage(
@@ -101,6 +103,7 @@ export class PcfDeployService implements vscode.Disposable {
       }
 
       await this.settings.updateProjectSettings(project, { lastDeployedEnv: env.name });
+      this.telemetry?.deploy(project, true, importResult.durationMs);
       vscode.window.showInformationMessage(
         `PCF solution ${path.basename(zipPath)} deployed to ${env.name}.`,
       );
@@ -115,6 +118,7 @@ export class PcfDeployService implements vscode.Disposable {
     } catch (error) {
       const message = describeDeployError(error);
       this.output.appendLine(`Deploy failed: ${message}`);
+      this.telemetry?.deploy(project, false);
       vscode.window.showErrorMessage(`PCF deploy failed for ${project.fullName}: ${message}`);
       return undefined;
     }

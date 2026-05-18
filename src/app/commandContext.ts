@@ -14,6 +14,7 @@ import type { PcfPackageService } from "../features/pcf/pcfPackageService";
 import type { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
 import type { PcfPushService } from "../features/pcf/pcfPushService";
 import type { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
+import type { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
 import type { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
 import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
@@ -59,6 +60,7 @@ export interface CommandContext {
   pcfProjectLocator: PcfProjectLocator;
   pcfExplorer: PcfExplorerProvider;
   pcfStatusBar: PcfStatusBarService;
+  pcfTelemetry: PcfTelemetryService;
 
   statusBar: StatusBarService;
   assemblyStatusBar: AssemblyStatusBarService;

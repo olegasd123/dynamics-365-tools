@@ -5,9 +5,8 @@ import { XMLParser } from "fast-xml-parser";
 import { EnvironmentConfig } from "../config/domain/models";
 import { PacCli } from "./pacCli";
 import { PcfControlProject } from "./models";
+import { PcfTelemetryService } from "./pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
-
-const SYNC_PAC_ACTION = "Sync pac to Environment";
 
 export class PcfPushService implements vscode.Disposable {
   private readonly output = vscode.window.createOutputChannel("PCF Push");
@@ -15,6 +14,7 @@ export class PcfPushService implements vscode.Disposable {
   constructor(
     private readonly pacCli: PacCli,
     private readonly settings: PcfWorkspaceSettingsService,
+    private readonly telemetry?: PcfTelemetryService,
   ) {}
 
   async resolvePublisherPrefix(project: PcfControlProject): Promise<string | undefined> {
@@ -50,22 +50,13 @@ export class PcfPushService implements vscode.Disposable {
     token?: vscode.CancellationToken,
   ): Promise<boolean> {
     const profile = await this.pacCli.whoami();
-    if (!profile?.url || sameEnvironmentUrl(profile.url, env.url)) {
+    if (profile?.url && sameEnvironmentUrl(profile.url, env.url)) {
       return true;
     }
 
-    const action = await vscode.window.showWarningMessage(
-      `pac is signed in to ${profile.url}, but push targets ${env.url}. The selected environment URL will still be passed to pac.`,
-      SYNC_PAC_ACTION,
-      "Continue",
-    );
-
-    if (action !== SYNC_PAC_ACTION) {
-      return action === "Continue";
-    }
-
     this.output.show(true);
-    this.output.appendLine(`[${new Date().toISOString()}] Sync pac auth to ${env.url}`);
+    const source = profile?.url ? ` from ${profile.url}` : "";
+    this.output.appendLine(`[${new Date().toISOString()}] Sync pac auth${source} to ${env.url}`);
     const result = await this.pacCli.authCreate(
       { url: env.url, name: "d365-tools" },
       (line, stream) => this.output.appendLine(stream === "stderr" ? `[stderr] ${line}` : line),
@@ -77,6 +68,7 @@ export class PcfPushService implements vscode.Disposable {
       return false;
     }
 
+    vscode.window.showInformationMessage(`pac auth profile synced to ${env.name}.`);
     return true;
   }
 
@@ -102,6 +94,8 @@ export class PcfPushService implements vscode.Disposable {
       (line, stream) => this.output.appendLine(stream === "stderr" ? `[stderr] ${line}` : line),
       token,
     );
+
+    this.telemetry?.push(project, result.exitCode === 0, result.durationMs);
 
     if (result.exitCode !== 0) {
       vscode.window.showErrorMessage(`PCF push failed for ${project.fullName}.`);

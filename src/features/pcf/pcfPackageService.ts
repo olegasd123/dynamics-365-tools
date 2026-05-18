@@ -8,6 +8,7 @@ import { PacCli } from "./pacCli";
 import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
 import { ProcessRunner } from "./processRunner";
 import { validatePublisherPrefix } from "./pcfPushService";
+import { PcfTelemetryService } from "./pcfTelemetry";
 
 export interface PcfPackageOptions {
   managed: boolean;
@@ -24,6 +25,7 @@ export class PcfPackageService implements vscode.Disposable {
     private readonly runner: ProcessRunner,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly telemetry?: PcfTelemetryService,
   ) {}
 
   async packageControl(
@@ -67,6 +69,7 @@ export class PcfPackageService implements vscode.Disposable {
     );
 
     if (result.exitCode !== 0) {
+      this.telemetry?.package(project, false, options.managed, result.durationMs);
       vscode.window.showErrorMessage(
         `PCF solution package failed for ${project.fullName} with exit code ${result.exitCode}.`,
       );
@@ -88,6 +91,7 @@ export class PcfPackageService implements vscode.Disposable {
       lastPackagedZip: storedZipPath,
       publisherPrefix: solution.publisherPrefix,
     });
+    this.telemetry?.package(project, true, options.managed, result.durationMs);
     this.output.appendLine(`Packaged solution: ${zipPath}`);
     vscode.window.showInformationMessage(
       `PCF solution package created for ${project.fullName}: ${storedZipPath}`,

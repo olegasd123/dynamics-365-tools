@@ -134,6 +134,26 @@ export async function openPcfManifest(
   await vscode.window.showTextDocument(uri);
 }
 
+export async function editPcfConfig(
+  ctx: CommandContext,
+  nodeOrUri?: PcfControlProjectNode | vscode.Uri,
+): Promise<void> {
+  const project = await resolveProject(ctx, nodeOrUri);
+  if (!project) {
+    return;
+  }
+
+  const configPath = path.join(project.rootUri, "pcfconfig.json");
+  if (!(await exists(configPath))) {
+    const defaultConfig = {
+      outDir: normalizeSlashes(path.relative(project.rootUri, project.outputDir)),
+    };
+    await fs.writeFile(configPath, `${JSON.stringify(defaultConfig, null, 2)}\n`, "utf8");
+  }
+
+  await vscode.window.showTextDocument(vscode.Uri.file(configPath));
+}
+
 export async function buildPcfControl(
   ctx: CommandContext,
   nodeOrUri?: PcfControlProjectNode | vscode.Uri,
@@ -390,7 +410,20 @@ async function isNonEmptyDirectory(folderPath: string): Promise<boolean> {
   }
 }
 
+async function exists(filePath: string): Promise<boolean> {
+  try {
+    await fs.stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isInsideProject(filePath: string, project: PcfControlProject): boolean {
   const relative = path.relative(project.rootUri, filePath);
   return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function normalizeSlashes(value: string): string {
+  return value.replace(/\\/g, "/");
 }

@@ -57,6 +57,7 @@
     "onCommand:dynamics365Tools.plugins.publishLastAssembly",
     "onCommand:dynamics365Tools.pcf.refreshExplorer",
     "onCommand:dynamics365Tools.pcf.openManifest",
+    "onCommand:dynamics365Tools.pcf.editConfig",
     "onCommand:dynamics365Tools.pcf.newControl",
     "onCommand:dynamics365Tools.pcf.build",
     "onCommand:dynamics365Tools.pcf.watch",
@@ -68,7 +69,9 @@
     "onCommand:dynamics365Tools.pcf.toggleSolutionFilter",
     "onCommand:dynamics365Tools.pcf.enableSolutionFilter",
     "onCommand:dynamics365Tools.pcf.disableSolutionFilter",
+    "onCommand:dynamics365Tools.pcf.setWorkspaceFolderFilter",
     "onCommand:dynamics365Tools.pcf.updateFromLocal",
+    "onCommand:dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
     "onCommand:dynamics365Tools.pcf.copyDeployedControlId",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
@@ -261,6 +264,12 @@
         "icon": "$(file-code)"
       },
       {
+        "command": "dynamics365Tools.pcf.editConfig",
+        "title": "Edit PCF Config",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(settings)"
+      },
+      {
         "command": "dynamics365Tools.pcf.newControl",
         "title": "New PCF Control",
         "category": "Dynamics 365 Tools",
@@ -327,10 +336,22 @@
         "icon": "$(filter-filled)"
       },
       {
+        "command": "dynamics365Tools.pcf.setWorkspaceFolderFilter",
+        "title": "Filter PCF Controls by Workspace Folder",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(folder-active)"
+      },
+      {
         "command": "dynamics365Tools.pcf.updateFromLocal",
         "title": "Update PCF Control from Local Project",
         "category": "Dynamics 365 Tools",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
+        "title": "Use Deployed PCF Version in Manifest",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(versions)"
       },
       {
         "command": "dynamics365Tools.pcf.copyDeployedControlId",
@@ -354,6 +375,11 @@
         },
         {
           "command": "dynamics365Tools.pcf.openManifest",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.editConfig",
           "group": "navigation@dynamics365ToolsPcf",
           "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         },
@@ -493,6 +519,9 @@
           "command": "dynamics365Tools.pcf.openManifest"
         },
         {
+          "command": "dynamics365Tools.pcf.editConfig"
+        },
+        {
           "command": "dynamics365Tools.pcf.newControl"
         },
         {
@@ -520,7 +549,13 @@
           "command": "dynamics365Tools.pcf.toggleSolutionFilter"
         },
         {
+          "command": "dynamics365Tools.pcf.setWorkspaceFolderFilter"
+        },
+        {
           "command": "dynamics365Tools.pcf.updateFromLocal"
+        },
+        {
+          "command": "dynamics365Tools.pcf.syncManifestVersionFromEnvironment"
         },
         {
           "command": "dynamics365Tools.pcf.copyDeployedControlId"
@@ -575,6 +610,11 @@
           "command": "dynamics365Tools.pcf.newControl",
           "when": "view == dynamics365Tools.pcfExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "dynamics365Tools.pcf.setWorkspaceFolderFilter",
+          "when": "view == dynamics365Tools.pcfExplorer",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -644,49 +684,59 @@
           "group": "inline@1"
         },
         {
-          "command": "dynamics365Tools.pcf.build",
+          "command": "dynamics365Tools.pcf.editConfig",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@2"
         },
         {
-          "command": "dynamics365Tools.pcf.watch",
+          "command": "dynamics365Tools.pcf.build",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@3"
         },
         {
-          "command": "dynamics365Tools.pcf.push",
+          "command": "dynamics365Tools.pcf.watch",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@4"
         },
         {
-          "command": "dynamics365Tools.pcf.stopWatch",
+          "command": "dynamics365Tools.pcf.push",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@5"
         },
         {
-          "command": "dynamics365Tools.pcf.packageManaged",
+          "command": "dynamics365Tools.pcf.stopWatch",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@6"
         },
         {
-          "command": "dynamics365Tools.pcf.packageUnmanaged",
+          "command": "dynamics365Tools.pcf.packageManaged",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@7"
         },
         {
-          "command": "dynamics365Tools.pcf.deployLast",
+          "command": "dynamics365Tools.pcf.packageUnmanaged",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@8"
         },
         {
+          "command": "dynamics365Tools.pcf.deployLast",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@9"
+        },
+        {
           "command": "dynamics365Tools.pcf.updateFromLocal",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfDeployedControl:matched",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfDeployedControl:matched:workspaceNewer",
           "group": "inline@1"
+        },
+        {
+          "command": "dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfDeployedControl:matched:(workspaceNewer|environmentNewer)/",
+          "group": "inline@2"
         },
         {
           "command": "dynamics365Tools.pcf.copyDeployedControlId",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfDeployedControl/",
-          "group": "inline@2"
+          "group": "inline@3"
         }
       ]
     },

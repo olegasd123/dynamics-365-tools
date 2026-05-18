@@ -51,6 +51,58 @@ test("PcfPushService pushes with selected environment and persists prefix", asyn
   assert.deepStrictEqual(updates, [{ publisherPrefix: "contoso", lastDeployedEnv: "dev" }]);
 });
 
+test("PcfPushService syncs pac auth when the profile targets another environment", async () => {
+  const authCreates: unknown[] = [];
+  const pac = {
+    whoami: async () => ({ url: "https://other.crm.dynamics.com" }),
+    authCreate: async (opts: unknown) => {
+      authCreates.push(opts);
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+      };
+    },
+  };
+  const service = new PcfPushService(pac as any, {} as any);
+
+  const ok = await service.warnForAuthMismatch({
+    name: "dev",
+    url: "https://dev.crm.dynamics.com",
+  });
+
+  assert.strictEqual(ok, true);
+  assert.deepStrictEqual(authCreates, [
+    { url: "https://dev.crm.dynamics.com", name: "d365-tools" },
+  ]);
+});
+
+test("PcfPushService does not sync pac auth when profile matches selected environment", async () => {
+  let authCreateCalls = 0;
+  const pac = {
+    whoami: async () => ({ url: "https://dev.crm.dynamics.com/" }),
+    authCreate: async () => {
+      authCreateCalls += 1;
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+      };
+    },
+  };
+  const service = new PcfPushService(pac as any, {} as any);
+
+  const ok = await service.warnForAuthMismatch({
+    name: "dev",
+    url: "https://dev.crm.dynamics.com",
+  });
+
+  assert.strictEqual(ok, true);
+  assert.strictEqual(authCreateCalls, 0);
+});
+
 function createProject(rootUri: string): PcfControlProject {
   return {
     rootUri,

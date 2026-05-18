@@ -17,6 +17,7 @@ import { ProcessRunner } from "./processRunner";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.pcf.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.pcf.filterConfiguredSolutions";
+const WORKSPACE_FOLDER_FILTER_STATE_KEY = "d365Tools.pcf.workspaceFolderFilterRoot";
 
 export type PcfExplorerNode =
   | PcfToolchainNode
@@ -47,10 +48,14 @@ export class PcfToolchainNode extends vscode.TreeItem {
 export class PcfWorkspaceNode extends vscode.TreeItem {
   readonly contextValue = "d365PcfWorkspace";
 
-  constructor(readonly count: number) {
+  constructor(
+    readonly count: number,
+    filterLabel?: string,
+  ) {
     super("Workspace", vscode.TreeItemCollapsibleState.Expanded);
     this.iconPath = new vscode.ThemeIcon("folder-library");
-    this.description = count === 1 ? "1 control" : `${count} controls`;
+    const countLabel = count === 1 ? "1 control" : `${count} controls`;
+    this.description = filterLabel ? `${countLabel} · ${filterLabel}` : countLabel;
   }
 }
 
@@ -123,14 +128,14 @@ export class PcfDeployedControlNode extends vscode.TreeItem {
     readonly control: DeployedPcfControl,
   ) {
     super(control.name, vscode.TreeItemCollapsibleState.None);
-    const drift = formatVersionDrift(control);
-    this.description = [control.version ? `v${control.version}` : undefined, drift]
+    const drift = getVersionDrift(control);
+    this.description = [control.version ? `v${control.version}` : undefined, drift?.label]
       .filter(Boolean)
       .join(" · ");
     this.tooltip = buildDeployedControlTooltip(control);
     this.iconPath = new vscode.ThemeIcon(control.workspaceMatch ? "link" : "cloud");
     this.contextValue = control.workspaceMatch
-      ? "d365PcfDeployedControl:matched"
+      ? `d365PcfDeployedControl:matched:${drift?.key ?? "matched"}`
       : "d365PcfDeployedControl";
   }
 }
@@ -166,6 +171,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
   private toolchainStatus?: PcfToolchainStatus;
   private filterByConfiguredSolutions = true;
+  private workspaceFolderFilterRoot?: string;
 
   constructor(
     private readonly configuration: ConfigurationService,
@@ -182,6 +188,10 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
 
   async initialize(): Promise<void> {
     this.filterByConfiguredSolutions = this.state.get<boolean>(SOLUTION_FILTER_STATE_KEY, true);
+    this.workspaceFolderFilterRoot = this.state.get<string | undefined>(
+      WORKSPACE_FOLDER_FILTER_STATE_KEY,
+      undefined,
+    );
     await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
     this.updateFilterContext();
   }
@@ -199,16 +209,17 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
 
   async getChildren(element?: PcfExplorerNode): Promise<PcfExplorerNode[]> {
     if (!element) {
+      const projects = this.getVisibleProjects();
       const roots: PcfExplorerNode[] = [
         new PcfToolchainNode(await this.getToolchainStatus()),
-        new PcfWorkspaceNode(this.locator.getProjects().length),
+        new PcfWorkspaceNode(projects.length, this.getWorkspaceFolderFilterLabel()),
       ];
       roots.push(...(await this.loadEnvironmentRoots()));
       return roots;
     }
 
     if (element instanceof PcfWorkspaceNode) {
-      const projects = this.locator.getProjects();
+      const projects = this.getVisibleProjects();
       return projects.length
         ? projects.map((project) => new PcfControlProjectNode(project))
         : [new PcfNoWorkspaceNode()];
@@ -254,6 +265,12 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
     this.filterByConfiguredSolutions = enabled;
     await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
     this.updateFilterContext();
+    this.refresh();
+  }
+
+  async setWorkspaceFolderFilter(rootUri: string | undefined): Promise<void> {
+    this.workspaceFolderFilterRoot = rootUri;
+    await this.state.update(WORKSPACE_FOLDER_FILTER_STATE_KEY, rootUri);
     this.refresh();
   }
 
@@ -312,7 +329,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       const solutionNames = this.getSolutionNamesForFiltering(config.solutions);
       const controls = await this.environmentService.listControls(env, {
         solutionNames,
-        workspaceProjects: this.locator.getProjects(),
+        workspaceProjects: this.getVisibleProjects(),
       });
       if (!controls?.length) {
         return [new PcfNoDeployedControlsNode()];
@@ -352,6 +369,28 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       SOLUTION_FILTER_CONTEXT_KEY,
       this.filterByConfiguredSolutions,
     );
+  }
+
+  private getVisibleProjects(): PcfControlProject[] {
+    const projects = this.locator.getProjects();
+    const root = this.workspaceFolderFilterRoot;
+    if (!root) {
+      return projects;
+    }
+
+    return projects.filter((project) => isInsideFolder(project.rootUri, root));
+  }
+
+  private getWorkspaceFolderFilterLabel(): string | undefined {
+    const root = this.workspaceFolderFilterRoot;
+    if (!root) {
+      return undefined;
+    }
+
+    const folder = vscode.workspace.workspaceFolders?.find((item) =>
+      samePath(item.uri.fsPath, root),
+    );
+    return folder?.name ?? path.basename(root);
   }
 }
 
@@ -418,17 +457,19 @@ function buildDeployedControlTooltip(control: DeployedPcfControl): string {
     .join("\n");
 }
 
-function formatVersionDrift(control: DeployedPcfControl): string | undefined {
+function getVersionDrift(control: DeployedPcfControl): { key: string; label: string } | undefined {
   const project = control.workspaceMatch;
   if (!project || !control.version) {
-    return project ? "matches workspace" : undefined;
+    return project ? { key: "matched", label: "matches workspace" } : undefined;
   }
 
   const comparison = compareVersions(project.version, control.version);
   if (comparison === 0) {
-    return "in sync";
+    return { key: "inSync", label: "in sync" };
   }
-  return comparison > 0 ? "workspace newer" : "environment newer";
+  return comparison > 0
+    ? { key: "workspaceNewer", label: "workspace newer" }
+    : { key: "environmentNewer", label: "environment newer" };
 }
 
 function compareVersions(left: string, right: string): number {
@@ -457,4 +498,13 @@ function isUserNotMemberError(message: string): boolean {
     message.includes("0x80072560") ||
     message.toLowerCase().includes("user is not a member of the organization")
   );
+}
+
+function isInsideFolder(filePath: string, folderPath: string): boolean {
+  const relative = path.relative(folderPath, filePath);
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function samePath(left: string, right: string): boolean {
+  return path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
 }

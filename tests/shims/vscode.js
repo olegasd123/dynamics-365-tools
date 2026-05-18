@@ -149,6 +149,14 @@ const env = {
     },
   },
   openExternal: async () => true,
+  createTelemetryLogger: () => ({
+    isUsageEnabled: true,
+    isErrorsEnabled: true,
+    onDidChangeEnableStates: () => ({ dispose: () => {} }),
+    logUsage: () => {},
+    logError: () => {},
+    dispose: () => {},
+  }),
 };
 
 class Position {
@@ -231,6 +239,25 @@ class EventEmitter {
   }
 }
 
+const TreeItemCollapsibleState = {
+  None: 0,
+  Collapsed: 1,
+  Expanded: 2,
+};
+
+class TreeItem {
+  constructor(label, collapsibleState = TreeItemCollapsibleState.None) {
+    this.label = label;
+    this.collapsibleState = collapsibleState;
+  }
+}
+
+class ThemeIcon {
+  constructor(id) {
+    this.id = id;
+  }
+}
+
 module.exports = {
   Uri,
   workspace,
@@ -249,4 +276,7 @@ module.exports = {
   EventEmitter,
   ProgressLocation,
   StatusBarAlignment,
+  TreeItem,
+  TreeItemCollapsibleState,
+  ThemeIcon,
 };

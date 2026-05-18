@@ -603,7 +603,7 @@ Exit criteria: deploy a packaged solution zip to a separate env and see the
 control surface in Power Apps with no manual steps after selecting the target
 environment.
 
-### Phase 7 — Polish / stretch
+### Phase 7 [Done] — Polish / stretch
 
 - Sync `pac` auth profile to bound env automatically.
 - Telemetry events for build/push/deploy success rates.

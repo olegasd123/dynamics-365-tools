@@ -14,6 +14,7 @@ import { PcfPackageService } from "../features/pcf/pcfPackageService";
 import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
 import { PcfPushService } from "../features/pcf/pcfPushService";
 import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
+import { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
 import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
@@ -59,16 +60,23 @@ export async function createServices(
   const pacCli = new PacCli(pcfProcessRunner);
   const npmRunner = new NpmRunner(pcfProcessRunner);
   const pcfStatusBar = new PcfStatusBarService("dynamics365Tools.pcf.stopWatch");
-  const pcfBuildService = new PcfBuildService(npmRunner, pcfStatusBar);
+  const pcfTelemetry = new PcfTelemetryService();
+  const pcfBuildService = new PcfBuildService(npmRunner, pcfStatusBar, pcfTelemetry);
   const pcfEnvironmentService = new PcfEnvironmentService(connections);
   const pcfWorkspaceSettings = new PcfWorkspaceSettingsService(configuration);
-  const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings);
-  const pcfDeployService = new PcfDeployService(connections, pcfWorkspaceSettings, configuration);
+  const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings, pcfTelemetry);
+  const pcfDeployService = new PcfDeployService(
+    connections,
+    pcfWorkspaceSettings,
+    configuration,
+    pcfTelemetry,
+  );
   const pcfPackageService = new PcfPackageService(
     pacCli,
     pcfProcessRunner,
     pcfWorkspaceSettings,
     configuration,
+    pcfTelemetry,
   );
   const pcfProjectLocator = new PcfProjectLocator();
   await pcfProjectLocator.initialize();
@@ -115,6 +123,7 @@ export async function createServices(
     pcfProjectLocator,
     pcfExplorer,
     pcfStatusBar,
+    pcfTelemetry,
     statusBar,
     assemblyStatusBar,
   };
