@@ -4,6 +4,10 @@ import type { AuthorizationStore } from "../features/auth/authorizationStore";
 import type { SecretService } from "../features/auth/secretService";
 import type { ConfigurationService } from "../features/config/configurationService";
 import type { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
+import type { PacCli } from "../features/pcf/pacCli";
+import type { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
+import type { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import type { BindingService } from "../features/webResources/bindingService";
@@ -34,6 +38,11 @@ export interface CommandContext {
 
   pluginExplorer: PluginExplorerProvider;
   pluginRegistration: PluginRegistrationManager;
+
+  pcfProcessRunner: ProcessRunner;
+  pacCli: PacCli;
+  pcfProjectLocator: PcfProjectLocator;
+  pcfExplorer: PcfExplorerProvider;
 
   statusBar: StatusBarService;
   assemblyStatusBar: AssemblyStatusBarService;

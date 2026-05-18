@@ -153,6 +153,30 @@ const StatusBarAlignment = {
   Right: 2,
 };
 
+class EventEmitter {
+  constructor() {
+    this.listeners = [];
+    this.event = (listener) => {
+      this.listeners.push(listener);
+      return {
+        dispose: () => {
+          this.listeners = this.listeners.filter((item) => item !== listener);
+        },
+      };
+    };
+  }
+
+  fire(value) {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+
+  dispose() {
+    this.listeners = [];
+  }
+}
+
 module.exports = {
   Uri,
   workspace,
@@ -163,6 +187,7 @@ module.exports = {
   FileType,
   authentication,
   InMemorySecretStorage,
+  EventEmitter,
   ProgressLocation,
   StatusBarAlignment,
 };

@@ -55,6 +55,8 @@
     "onCommand:dynamics365Tools.plugins.disableSolutionFilter",
     "onCommand:dynamics365Tools.plugins.refreshExplorer",
     "onCommand:dynamics365Tools.plugins.publishLastAssembly",
+    "onCommand:dynamics365Tools.pcf.refreshExplorer",
+    "onCommand:dynamics365Tools.pcf.openManifest",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
   ],
@@ -232,6 +234,18 @@
         "title": "Delete Plugin Image",
         "category": "Dynamics 365 Tools",
         "icon": "$(trash)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.refreshExplorer",
+        "title": "Refresh PCF Explorer",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.openManifest",
+        "title": "Open PCF Manifest",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(file-code)"
       }
     ],
     "submenus": [
@@ -246,6 +260,11 @@
           "submenu": "dynamics365Tools.resourceMenu",
           "group": "navigation@dynamics365Tools",
           "when": "resourceScheme == 'file' && (explorerResourceIsFolder || resourceExtname =~ /\\.(js|css|html|htm|xml|json|resx|png|jpg|jpeg|gif|xsl|xslt|ico|svg)$/)"
+        },
+        {
+          "command": "dynamics365Tools.pcf.openManifest",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         }
       ],
       "dynamics365Tools.resourceMenu": [
@@ -345,6 +364,12 @@
         },
         {
           "command": "dynamics365Tools.plugins.deleteImage"
+        },
+        {
+          "command": "dynamics365Tools.pcf.refreshExplorer"
+        },
+        {
+          "command": "dynamics365Tools.pcf.openManifest"
         }
       ],
       "view/title": [
@@ -374,6 +399,11 @@
           "command": "dynamics365Tools.plugins.registerAssembly",
           "when": "view == dynamics365Tools.pluginExplorer",
           "group": "navigation@4"
+        },
+        {
+          "command": "dynamics365Tools.pcf.refreshExplorer",
+          "when": "view == dynamics365Tools.pcfExplorer",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -436,6 +466,11 @@
           "command": "dynamics365Tools.plugins.deleteImage",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginImage",
           "group": "inline@2"
+        },
+        {
+          "command": "dynamics365Tools.pcf.openManifest",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@1"
         }
       ]
     },
@@ -453,6 +488,11 @@
         {
           "id": "dynamics365Tools.pluginExplorer",
           "name": "Plugins",
+          "contextualTitle": "Dynamics 365 Tools"
+        },
+        {
+          "id": "dynamics365Tools.pcfExplorer",
+          "name": "PCF Controls",
           "contextualTitle": "Dynamics 365 Tools"
         }
       ]
@@ -479,6 +519,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.8.0",
     "zod": "^4.1.13"
   }
 }

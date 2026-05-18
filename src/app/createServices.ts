@@ -4,6 +4,10 @@ import { AuthorizationStore } from "../features/auth/authorizationStore";
 import { SecretService } from "../features/auth/secretService";
 import { ConfigurationService } from "../features/config/configurationService";
 import { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
+import { PacCli } from "../features/pcf/pacCli";
+import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
+import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
@@ -43,6 +47,12 @@ export async function createServices(
   );
   await pluginExplorer.initialize();
 
+  const pcfProcessRunner = new ProcessRunner();
+  const pacCli = new PacCli(pcfProcessRunner);
+  const pcfProjectLocator = new PcfProjectLocator();
+  await pcfProjectLocator.initialize();
+  const pcfExplorer = new PcfExplorerProvider(pcfProjectLocator, pcfProcessRunner, pacCli);
+
   const statusBar = new StatusBarService("dynamics365Tools.publishLastResource");
   const assemblyStatusBar = new AssemblyStatusBarService(
     "dynamics365Tools.plugins.publishLastAssembly",
@@ -63,6 +73,10 @@ export async function createServices(
     connections,
     pluginExplorer,
     pluginRegistration,
+    pcfProcessRunner,
+    pacCli,
+    pcfProjectLocator,
+    pcfExplorer,
     statusBar,
     assemblyStatusBar,
   };
