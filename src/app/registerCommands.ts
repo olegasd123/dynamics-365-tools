@@ -44,6 +44,12 @@ import {
   stopPcfWatch,
   watchPcfControl,
 } from "../features/pcf/commands/pcfWorkspaceCommands";
+import {
+  copyPcfDeployedControlId,
+  setPcfSolutionFilter,
+  togglePcfSolutionFilter,
+  updatePcfFromLocal,
+} from "../features/pcf/commands/pcfExplorerCommands";
 import { CommandContext } from "./commandContext";
 import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 
@@ -141,6 +147,25 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.pcf.stopWatch", (nodeOrUri) => stopPcfWatch(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.pcf.toggleSolutionFilter", () => togglePcfSolutionFilter(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.enableSolutionFilter", () => setPcfSolutionFilter(ctx, true), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.disableSolutionFilter", () => setPcfSolutionFilter(ctx, false), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.updateFromLocal", (node) => updatePcfFromLocal(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.pcf.copyDeployedControlId",
+      (node) => copyPcfDeployedControlId(node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
     ctx.pcfProjectLocator,

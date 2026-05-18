@@ -62,6 +62,11 @@
     "onCommand:dynamics365Tools.pcf.watch",
     "onCommand:dynamics365Tools.pcf.push",
     "onCommand:dynamics365Tools.pcf.stopWatch",
+    "onCommand:dynamics365Tools.pcf.toggleSolutionFilter",
+    "onCommand:dynamics365Tools.pcf.enableSolutionFilter",
+    "onCommand:dynamics365Tools.pcf.disableSolutionFilter",
+    "onCommand:dynamics365Tools.pcf.updateFromLocal",
+    "onCommand:dynamics365Tools.pcf.copyDeployedControlId",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
   ],
@@ -281,6 +286,36 @@
         "title": "Stop PCF Watch",
         "category": "Dynamics 365 Tools",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.toggleSolutionFilter",
+        "title": "Toggle PCF Solution Filter",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.enableSolutionFilter",
+        "title": "Filter PCF Controls by Configured Solutions",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.disableSolutionFilter",
+        "title": "Show All PCF Controls",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter-filled)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.updateFromLocal",
+        "title": "Update PCF Control from Local Project",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.copyDeployedControlId",
+        "title": "Copy PCF Control ID",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(copy)"
       }
     ],
     "submenus": [
@@ -435,6 +470,15 @@
         },
         {
           "command": "dynamics365Tools.pcf.stopWatch"
+        },
+        {
+          "command": "dynamics365Tools.pcf.toggleSolutionFilter"
+        },
+        {
+          "command": "dynamics365Tools.pcf.updateFromLocal"
+        },
+        {
+          "command": "dynamics365Tools.pcf.copyDeployedControlId"
         }
       ],
       "view/title": [
@@ -471,9 +515,21 @@
           "group": "navigation@1"
         },
         {
+          "command": "dynamics365Tools.pcf.disableSolutionFilter",
+          "when": "view == dynamics365Tools.pcfExplorer && d365Tools.pcf.filterConfiguredSolutions",
+          "group": "navigation@2",
+          "toggled": "d365Tools.pcf.filterConfiguredSolutions"
+        },
+        {
+          "command": "dynamics365Tools.pcf.enableSolutionFilter",
+          "when": "view == dynamics365Tools.pcfExplorer && !d365Tools.pcf.filterConfiguredSolutions",
+          "group": "navigation@2",
+          "toggled": "d365Tools.pcf.filterConfiguredSolutions"
+        },
+        {
           "command": "dynamics365Tools.pcf.newControl",
           "when": "view == dynamics365Tools.pcfExplorer",
-          "group": "navigation@2"
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -561,6 +617,16 @@
           "command": "dynamics365Tools.pcf.stopWatch",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@5"
+        },
+        {
+          "command": "dynamics365Tools.pcf.updateFromLocal",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfDeployedControl:matched",
+          "group": "inline@1"
+        },
+        {
+          "command": "dynamics365Tools.pcf.copyDeployedControlId",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfDeployedControl/",
+          "group": "inline@2"
         }
       ]
     },

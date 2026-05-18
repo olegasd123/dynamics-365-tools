@@ -1,17 +1,33 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { PcfBuildStatus, PcfControlProject, PcfToolchainStatus } from "./models";
+import { ConfigurationService } from "../config/configurationService";
+import { EnvironmentConfig, SolutionConfig } from "../config/domain/models";
+import { isDefaultSolution } from "../dataverse/dataverseClient";
+import {
+  PcfBuildStatus,
+  DeployedPcfControl,
+  PcfControlProject,
+  PcfToolchainStatus,
+} from "./models";
 import { PacCli, detectTool } from "./pacCli";
 import { PcfBuildService } from "./pcfBuildService";
+import { PcfEnvironmentService } from "./pcfEnvironmentService";
 import { PcfProjectLocator } from "./pcfProjectLocator";
 import { ProcessRunner } from "./processRunner";
+
+const SOLUTION_FILTER_STATE_KEY = "d365Tools.pcf.filterConfiguredSolutions";
+const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.pcf.filterConfiguredSolutions";
 
 export type PcfExplorerNode =
   | PcfToolchainNode
   | PcfWorkspaceNode
   | PcfControlProjectNode
   | PcfProjectInfoNode
-  | PcfNoWorkspaceNode;
+  | PcfNoWorkspaceNode
+  | PcfEnvironmentNode
+  | PcfDeployedControlNode
+  | PcfNoDeployedControlsNode
+  | PcfMissingConfigurationNode;
 
 export class PcfToolchainNode extends vscode.TreeItem {
   readonly contextValue = "d365PcfToolchain";
@@ -80,21 +96,94 @@ export class PcfNoWorkspaceNode extends vscode.TreeItem {
   }
 }
 
+export class PcfEnvironmentNode extends vscode.TreeItem {
+  readonly contextValue = "d365PcfEnvironment";
+
+  constructor(
+    readonly env: EnvironmentConfig,
+    readonly filterByConfiguredSolutions: boolean,
+  ) {
+    super(`Environment: ${env.name}`, vscode.TreeItemCollapsibleState.Collapsed);
+    this.iconPath = new vscode.ThemeIcon("cloud");
+    this.description = filterByConfiguredSolutions ? "filtered" : env.url;
+    this.tooltip = [
+      env.url,
+      filterByConfiguredSolutions
+        ? "Filtered to configured solutions unless Default is configured."
+        : "Showing all deployed controls.",
+    ].join("\n");
+  }
+}
+
+export class PcfDeployedControlNode extends vscode.TreeItem {
+  readonly contextValue: string;
+
+  constructor(
+    readonly env: EnvironmentConfig,
+    readonly control: DeployedPcfControl,
+  ) {
+    super(control.name, vscode.TreeItemCollapsibleState.None);
+    const drift = formatVersionDrift(control);
+    this.description = [control.version ? `v${control.version}` : undefined, drift]
+      .filter(Boolean)
+      .join(" · ");
+    this.tooltip = buildDeployedControlTooltip(control);
+    this.iconPath = new vscode.ThemeIcon(control.workspaceMatch ? "link" : "cloud");
+    this.contextValue = control.workspaceMatch
+      ? "d365PcfDeployedControl:matched"
+      : "d365PcfDeployedControl";
+  }
+}
+
+export class PcfNoDeployedControlsNode extends vscode.TreeItem {
+  readonly contextValue = "d365PcfNoDeployedControls";
+
+  constructor() {
+    super("No deployed PCF controls found", vscode.TreeItemCollapsibleState.None);
+    this.description = "Refresh or change the solution filter";
+    this.iconPath = new vscode.ThemeIcon("search");
+  }
+}
+
+export class PcfMissingConfigurationNode extends vscode.TreeItem {
+  readonly contextValue = "d365PcfConfigMissing";
+
+  constructor() {
+    super("Add an environment to see deployed PCF controls", vscode.TreeItemCollapsibleState.None);
+    this.description = "Configure environments";
+    this.iconPath = new vscode.ThemeIcon("add");
+    this.command = {
+      command: "dynamics365Tools.configureEnvironments",
+      title: "Configure Environments",
+    };
+  }
+}
+
 export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerNode> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
     PcfExplorerNode | undefined | void
   >();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
   private toolchainStatus?: PcfToolchainStatus;
+  private filterByConfiguredSolutions = true;
 
   constructor(
+    private readonly configuration: ConfigurationService,
+    private readonly state: vscode.Memento,
     private readonly locator: PcfProjectLocator,
     private readonly runner: ProcessRunner,
     private readonly pacCli: PacCli,
     private readonly buildService: PcfBuildService,
+    private readonly environmentService: PcfEnvironmentService,
   ) {
     this.locator.onDidChangeProjects(() => this.refresh());
     this.buildService.onDidChangeStatus(() => this.refresh());
+  }
+
+  async initialize(): Promise<void> {
+    this.filterByConfiguredSolutions = this.state.get<boolean>(SOLUTION_FILTER_STATE_KEY, true);
+    await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
+    this.updateFilterContext();
   }
 
   refresh(node?: PcfExplorerNode): void {
@@ -110,10 +199,12 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
 
   async getChildren(element?: PcfExplorerNode): Promise<PcfExplorerNode[]> {
     if (!element) {
-      return [
+      const roots: PcfExplorerNode[] = [
         new PcfToolchainNode(await this.getToolchainStatus()),
         new PcfWorkspaceNode(this.locator.getProjects().length),
       ];
+      roots.push(...(await this.loadEnvironmentRoots()));
+      return roots;
     }
 
     if (element instanceof PcfWorkspaceNode) {
@@ -144,7 +235,26 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       ];
     }
 
+    if (element instanceof PcfEnvironmentNode) {
+      return this.loadDeployedControls(element.env);
+    }
+
     return [];
+  }
+
+  async toggleSolutionFilter(): Promise<void> {
+    await this.setSolutionFilter(!this.filterByConfiguredSolutions);
+  }
+
+  async setSolutionFilter(enabled: boolean): Promise<void> {
+    if (this.filterByConfiguredSolutions === enabled) {
+      return;
+    }
+
+    this.filterByConfiguredSolutions = enabled;
+    await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
+    this.updateFilterContext();
+    this.refresh();
   }
 
   private async getToolchainStatus(): Promise<PcfToolchainStatus> {
@@ -180,6 +290,68 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       return "sync";
     }
     return project.hasNodeModules ? "circle-large-outline" : "circle-slash";
+  }
+
+  private async loadEnvironmentRoots(): Promise<PcfExplorerNode[]> {
+    const config = await this.configuration.loadExistingConfiguration();
+    if (!config) {
+      return [new PcfMissingConfigurationNode()];
+    }
+    if (!config.environments.length) {
+      return [new PcfMissingConfigurationNode()];
+    }
+
+    return config.environments.map(
+      (env) => new PcfEnvironmentNode(env, this.filterByConfiguredSolutions),
+    );
+  }
+
+  private async loadDeployedControls(env: EnvironmentConfig): Promise<PcfExplorerNode[]> {
+    try {
+      const config = await this.configuration.loadConfiguration();
+      const solutionNames = this.getSolutionNamesForFiltering(config.solutions);
+      const controls = await this.environmentService.listControls(env, {
+        solutionNames,
+        workspaceProjects: this.locator.getProjects(),
+      });
+      if (!controls?.length) {
+        return [new PcfNoDeployedControlsNode()];
+      }
+      return controls.map((control) => new PcfDeployedControlNode(env, control));
+    } catch (error) {
+      const message = String(error);
+      void vscode.window.showErrorMessage(
+        isUserNotMemberError(message)
+          ? `Failed to load PCF controls from ${env.name}: account has no access. Run 'Dynamics 365 Tools: Sign In (Interactive)' and select the correct account for this environment.`
+          : `Failed to load PCF controls from ${env.name}: ${message}`,
+      );
+      return [];
+    }
+  }
+
+  private getSolutionNamesForFiltering(solutions: SolutionConfig[]): string[] | undefined {
+    if (!this.filterByConfiguredSolutions) {
+      return undefined;
+    }
+
+    if (solutions.some((solution) => isDefaultSolution(solution.name))) {
+      return undefined;
+    }
+
+    const names = solutions
+      .map((solution) => solution.name?.trim())
+      .filter((name): name is string => Boolean(name))
+      .filter((name) => !isDefaultSolution(name));
+
+    return names.length ? names : undefined;
+  }
+
+  private updateFilterContext(): void {
+    void vscode.commands.executeCommand(
+      "setContext",
+      SOLUTION_FILTER_CONTEXT_KEY,
+      this.filterByConfiguredSolutions,
+    );
   }
 }
 
@@ -230,4 +402,59 @@ function formatBuildStatus(status: PcfBuildStatus): string {
     return status.exitCode === undefined ? "failed" : `failed (${status.exitCode})`;
   }
   return "never built";
+}
+
+function buildDeployedControlTooltip(control: DeployedPcfControl): string {
+  return [
+    control.name,
+    control.version ? `Version: ${control.version}` : undefined,
+    `Managed: ${control.managed ? "yes" : "no"}`,
+    `ID: ${control.customControlId}`,
+    control.workspaceMatch
+      ? `Matches workspace project: ${control.workspaceMatch.rootUri}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatVersionDrift(control: DeployedPcfControl): string | undefined {
+  const project = control.workspaceMatch;
+  if (!project || !control.version) {
+    return project ? "matches workspace" : undefined;
+  }
+
+  const comparison = compareVersions(project.version, control.version);
+  if (comparison === 0) {
+    return "in sync";
+  }
+  return comparison > 0 ? "workspace newer" : "environment newer";
+}
+
+function compareVersions(left: string, right: string): number {
+  const leftParts = parseVersion(left);
+  const rightParts = parseVersion(right);
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const diff = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function parseVersion(value: string): number[] {
+  const match = value.match(/\d+(?:\.\d+)*/);
+  if (!match) {
+    return [];
+  }
+  return match[0].split(".").map((part) => Number.parseInt(part, 10));
+}
+
+function isUserNotMemberError(message: string): boolean {
+  return (
+    message.includes("0x80072560") ||
+    message.toLowerCase().includes("user is not a member of the organization")
+  );
 }
