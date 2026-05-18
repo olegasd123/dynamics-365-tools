@@ -161,3 +161,66 @@ test("PacCli parses active auth profile JSON", async () => {
     user: undefined,
   });
 });
+
+test("PacCli builds solution init arguments", async () => {
+  const calls: Array<{ args: string[]; cwd?: string }> = [];
+  const runner = {
+    run: async (_command: string, args: string[], options: { cwd?: string }) => {
+      calls.push({ args, cwd: options.cwd });
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+      };
+    },
+  };
+
+  const pac = new PacCli(runner as any);
+  await pac.solutionInit(
+    {
+      publisherName: "Contoso Publisher",
+      publisherPrefix: "contoso",
+    },
+    "/tmp/solution",
+  );
+
+  assert.deepStrictEqual(calls, [
+    {
+      args: [
+        "solution",
+        "init",
+        "--publisher-name",
+        "Contoso Publisher",
+        "--publisher-prefix",
+        "contoso",
+      ],
+      cwd: "/tmp/solution",
+    },
+  ]);
+});
+
+test("PacCli builds solution add-reference arguments", async () => {
+  const calls: Array<{ args: string[]; cwd?: string }> = [];
+  const runner = {
+    run: async (_command: string, args: string[], options: { cwd?: string }) => {
+      calls.push({ args, cwd: options.cwd });
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+      };
+    },
+  };
+
+  const pac = new PacCli(runner as any);
+  await pac.solutionAddReference({ path: "/tmp/control/Control.pcfproj" }, "/tmp/solution");
+
+  assert.deepStrictEqual(calls, [
+    {
+      args: ["solution", "add-reference", "--path", "/tmp/control/Control.pcfproj"],
+      cwd: "/tmp/solution",
+    },
+  ]);
+});

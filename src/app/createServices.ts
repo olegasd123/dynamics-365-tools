@@ -9,6 +9,7 @@ import { PacCli } from "../features/pcf/pacCli";
 import { PcfBuildService } from "../features/pcf/pcfBuildService";
 import { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentService";
 import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
+import { PcfPackageService } from "../features/pcf/pcfPackageService";
 import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
 import { PcfPushService } from "../features/pcf/pcfPushService";
 import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
@@ -61,6 +62,12 @@ export async function createServices(
   const pcfEnvironmentService = new PcfEnvironmentService(connections);
   const pcfWorkspaceSettings = new PcfWorkspaceSettingsService(configuration);
   const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings);
+  const pcfPackageService = new PcfPackageService(
+    pacCli,
+    pcfProcessRunner,
+    pcfWorkspaceSettings,
+    configuration,
+  );
   const pcfProjectLocator = new PcfProjectLocator();
   await pcfProjectLocator.initialize();
   const pcfExplorer = new PcfExplorerProvider(
@@ -99,6 +106,7 @@ export async function createServices(
     npmRunner,
     pcfBuildService,
     pcfEnvironmentService,
+    pcfPackageService,
     pcfPushService,
     pcfWorkspaceSettings,
     pcfProjectLocator,

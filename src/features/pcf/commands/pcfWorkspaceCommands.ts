@@ -258,7 +258,7 @@ function resolveManifestUri(
   return firstProject ? vscode.Uri.file(firstProject.manifestUri) : undefined;
 }
 
-async function resolveProject(
+export async function resolvePcfProject(
   ctx: CommandContext,
   nodeOrUri?: PcfControlProjectNode | vscode.Uri,
   options: { allowPick?: boolean } = {},
@@ -302,6 +302,8 @@ async function resolveProject(
 
   return pick.project;
 }
+
+const resolveProject = resolvePcfProject;
 
 async function pickParentFolder(): Promise<vscode.WorkspaceFolder | undefined> {
   const folders = vscode.workspace.workspaceFolders ?? [];

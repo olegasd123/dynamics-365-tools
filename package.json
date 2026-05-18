@@ -61,6 +61,8 @@
     "onCommand:dynamics365Tools.pcf.build",
     "onCommand:dynamics365Tools.pcf.watch",
     "onCommand:dynamics365Tools.pcf.push",
+    "onCommand:dynamics365Tools.pcf.packageManaged",
+    "onCommand:dynamics365Tools.pcf.packageUnmanaged",
     "onCommand:dynamics365Tools.pcf.stopWatch",
     "onCommand:dynamics365Tools.pcf.toggleSolutionFilter",
     "onCommand:dynamics365Tools.pcf.enableSolutionFilter",
@@ -282,6 +284,18 @@
         "icon": "$(cloud-upload)"
       },
       {
+        "command": "dynamics365Tools.pcf.packageManaged",
+        "title": "Package PCF Solution (Managed)",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(package)"
+      },
+      {
+        "command": "dynamics365Tools.pcf.packageUnmanaged",
+        "title": "Package PCF Solution (Unmanaged)",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(package)"
+      },
+      {
         "command": "dynamics365Tools.pcf.stopWatch",
         "title": "Stop PCF Watch",
         "category": "Dynamics 365 Tools",
@@ -348,6 +362,16 @@
         },
         {
           "command": "dynamics365Tools.pcf.push",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.packageManaged",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.packageUnmanaged",
           "group": "navigation@dynamics365ToolsPcf",
           "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         }
@@ -467,6 +491,12 @@
         },
         {
           "command": "dynamics365Tools.pcf.push"
+        },
+        {
+          "command": "dynamics365Tools.pcf.packageManaged"
+        },
+        {
+          "command": "dynamics365Tools.pcf.packageUnmanaged"
         },
         {
           "command": "dynamics365Tools.pcf.stopWatch"
@@ -617,6 +647,16 @@
           "command": "dynamics365Tools.pcf.stopWatch",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@5"
+        },
+        {
+          "command": "dynamics365Tools.pcf.packageManaged",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@6"
+        },
+        {
+          "command": "dynamics365Tools.pcf.packageUnmanaged",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@7"
         },
         {
           "command": "dynamics365Tools.pcf.updateFromLocal",

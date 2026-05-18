@@ -50,6 +50,10 @@ import {
   togglePcfSolutionFilter,
   updatePcfFromLocal,
 } from "../features/pcf/commands/pcfExplorerCommands";
+import {
+  packageManagedPcfControl,
+  packageUnmanagedPcfControl,
+} from "../features/pcf/commands/pcfReleaseCommands";
 import { CommandContext } from "./commandContext";
 import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 
@@ -144,6 +148,20 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.pcf.push", (nodeOrUri) => pushPcfControl(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.pcf.packageManaged",
+      (nodeOrUri) => packageManagedPcfControl(ctx, nodeOrUri),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.pcf.packageUnmanaged",
+      (nodeOrUri) => packageUnmanagedPcfControl(ctx, nodeOrUri),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.pcf.stopWatch", (nodeOrUri) => stopPcfWatch(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
@@ -171,6 +189,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ctx.pcfProjectLocator,
     ctx.pcfBuildService,
     ctx.pcfPushService,
+    ctx.pcfPackageService,
     ctx.pcfProcessRunner,
     ctx.pcfStatusBar,
     ctx.statusBar,

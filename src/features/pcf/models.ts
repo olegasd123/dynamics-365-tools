@@ -82,6 +82,23 @@ export interface PcfPushOptions {
   publisherPrefix: string;
 }
 
+export interface SolutionInitOptions {
+  publisherName: string;
+  publisherPrefix: string;
+}
+
+export interface SolutionAddReferenceOptions {
+  path: string;
+}
+
+export interface PcfPackageResult {
+  cdsProjectUri: string;
+  zipPath: string;
+  managed: boolean;
+  configuration: "Debug" | "Release";
+  durationMs: number;
+}
+
 export interface PacAuthProfile {
   name?: string;
   url?: string;

@@ -5,6 +5,8 @@ import {
   PacRunResult,
   PcfInitOptions,
   PcfPushOptions,
+  SolutionAddReferenceOptions,
+  SolutionInitOptions,
   ToolDetectionResult,
 } from "./models";
 import { ProcessRunner } from "./processRunner";
@@ -91,6 +93,36 @@ export class PacCli {
       onLine,
       token,
     );
+  }
+
+  async solutionInit(
+    opts: SolutionInitOptions,
+    cwd: string,
+    onLine?: (line: string, stream: "stdout" | "stderr") => void,
+    token?: vscode.CancellationToken,
+  ): Promise<PacRunResult> {
+    return this.run(
+      [
+        "solution",
+        "init",
+        "--publisher-name",
+        opts.publisherName,
+        "--publisher-prefix",
+        opts.publisherPrefix,
+      ],
+      cwd,
+      onLine,
+      token,
+    );
+  }
+
+  async solutionAddReference(
+    opts: SolutionAddReferenceOptions,
+    cwd: string,
+    onLine?: (line: string, stream: "stdout" | "stderr") => void,
+    token?: vscode.CancellationToken,
+  ): Promise<PacRunResult> {
+    return this.run(["solution", "add-reference", "--path", opts.path], cwd, onLine, token);
   }
 
   async run(

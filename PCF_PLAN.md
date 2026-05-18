@@ -570,7 +570,7 @@ TS errors in the Problems panel.
 Exit criteria: push a control to the bound env from VS Code and confirm from
 `pac` output that the target environment is the selected bound environment.
 
-### Phase 4 — Environment explorer (≈ 2 days)
+### Phase 4 [Done] — Environment explorer (≈ 2 days)
 
 - `PcfEnvironmentService` listing `customcontrols`, with best-effort field
   handling.
@@ -582,7 +582,7 @@ Exit criteria: push a control to the bound env from VS Code and confirm from
 Exit criteria: refresh the env tree and see deployed controls; matched
 workspace projects show version drift or "in sync".
 
-### Phase 5 — Package (release path) (≈ 2–3 days)
+### Phase 5 [Done] — Package (release path) (≈ 2–3 days)
 
 - `PcfPackageService`: detect or scaffold `.cdsproj`, run `dotnet build`.
 - Capture the produced managed/unmanaged solution zip path from build output.

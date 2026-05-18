@@ -9,6 +9,7 @@ import type { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentServic
 import type { PacCli } from "../features/pcf/pacCli";
 import type { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
 import type { NpmRunner } from "../features/pcf/npmRunner";
+import type { PcfPackageService } from "../features/pcf/pcfPackageService";
 import type { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
 import type { PcfPushService } from "../features/pcf/pcfPushService";
 import type { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
@@ -50,6 +51,7 @@ export interface CommandContext {
   npmRunner: NpmRunner;
   pcfBuildService: PcfBuildService;
   pcfEnvironmentService: PcfEnvironmentService;
+  pcfPackageService: PcfPackageService;
   pcfPushService: PcfPushService;
   pcfWorkspaceSettings: PcfWorkspaceSettingsService;
   pcfProjectLocator: PcfProjectLocator;
