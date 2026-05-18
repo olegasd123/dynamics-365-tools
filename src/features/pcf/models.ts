@@ -76,3 +76,30 @@ export interface PcfInitOptions {
   framework: "none" | "react";
   runNpmInstall: boolean;
 }
+
+export interface PcfPushOptions {
+  environmentUrl: string;
+  publisherPrefix: string;
+}
+
+export interface PacAuthProfile {
+  name?: string;
+  url?: string;
+  user?: string;
+}
+
+export interface PacAuthCreateOptions {
+  url: string;
+  name: string;
+}
+
+export interface PcfWorkspaceProjectSettings {
+  publisherPrefix?: string;
+  lastPackagedZip?: string;
+  lastDeployedEnv?: string;
+}
+
+export interface PcfWorkspaceSettings {
+  projects: Record<string, PcfWorkspaceProjectSettings>;
+  watchProjects: string[];
+}

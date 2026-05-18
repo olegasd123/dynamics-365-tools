@@ -396,7 +396,7 @@ Header items:
      prefix in its `Solution.xml`, use it.
    - Otherwise prompt once, validate the prefix (`2-8` alphanumeric chars,
      starts with a letter, cannot start with `mscrm`), and persist per-project
-     in `.vscode/d365-tools/pcf.json`.
+     in `.vscode/dynamics365tools.pcf.json`.
 4. Run `pac pcf push --environment <bound-env-url> --publisher-prefix <p>`.
    Stream output, show progress.
 5. On success, refresh the workspace node. If the environment explorer feature
@@ -486,7 +486,7 @@ add only what is unique to _our_ surface:
 
 ## 11. Persistence
 
-Per-workspace settings live in `.vscode/d365-tools/pcf.json`:
+Per-workspace settings live in `.vscode/dynamics365tools.pcf.json`:
 
 ```json
 {
@@ -560,7 +560,7 @@ status.
 Exit criteria: scaffold a new control via the wizard, build it, run watch, see
 TS errors in the Problems panel.
 
-### Phase 3 — Push to env (dev loop) (≈ 1–2 days)
+### Phase 3 [Done] — Push to env (dev loop) (≈ 1–2 days)
 
 - `PcfPushService` wrapping
   `pac pcf push --environment <bound-env-url> --publisher-prefix <prefix>`.

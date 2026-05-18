@@ -39,6 +39,7 @@ import {
   buildPcfControl,
   newPcfControl,
   openPcfManifest,
+  pushPcfControl,
   refreshPcfExplorer,
   stopPcfWatch,
   watchPcfControl,
@@ -134,6 +135,9 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.pcf.watch", (nodeOrUri) => watchPcfControl(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.pcf.push", (nodeOrUri) => pushPcfControl(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
     register("dynamics365Tools.pcf.stopWatch", (nodeOrUri) => stopPcfWatch(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
@@ -141,6 +145,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
     ctx.pcfProjectLocator,
     ctx.pcfBuildService,
+    ctx.pcfPushService,
     ctx.pcfProcessRunner,
     ctx.pcfStatusBar,
     ctx.statusBar,

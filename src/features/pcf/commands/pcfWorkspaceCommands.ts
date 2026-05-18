@@ -179,6 +179,56 @@ export async function watchPcfControl(
   await ctx.pcfBuildService.startWatch(project);
 }
 
+export async function pushPcfControl(
+  ctx: CommandContext,
+  nodeOrUri?: PcfControlProjectNode | vscode.Uri,
+): Promise<void> {
+  if (!(await ensurePac(ctx))) {
+    return;
+  }
+
+  const project = await resolveProject(ctx, nodeOrUri);
+  if (!project) {
+    return;
+  }
+
+  const config = await ctx.configuration.loadConfiguration();
+  const env = await ctx.ui.pickEnvironment(
+    config.environments,
+    ctx.lastSelection.getLastEnvironment(),
+    { placeHolder: "Select environment for PCF push" },
+  );
+  if (!env) {
+    return;
+  }
+
+  await ctx.lastSelection.setLastEnvironment(env.name);
+  const publisherPrefix = await ctx.pcfPushService.resolvePublisherPrefix(project);
+  if (!publisherPrefix) {
+    return;
+  }
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Pushing ${project.fullName} to ${env.name}`,
+      cancellable: true,
+    },
+    async (_progress, token) => {
+      const canContinue = await ctx.pcfPushService.warnForAuthMismatch(env, token);
+      if (!canContinue) {
+        return;
+      }
+
+      const ok = await ctx.pcfPushService.push(project, env, publisherPrefix, token);
+      if (ok) {
+        await ctx.pcfProjectLocator.refresh();
+        ctx.pcfExplorer.refresh();
+      }
+    },
+  );
+}
+
 export async function stopPcfWatch(
   ctx: CommandContext,
   nodeOrUri?: PcfControlProjectNode | vscode.Uri,

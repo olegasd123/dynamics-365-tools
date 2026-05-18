@@ -9,7 +9,9 @@ import type { PacCli } from "../features/pcf/pacCli";
 import type { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
 import type { NpmRunner } from "../features/pcf/npmRunner";
 import type { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import type { PcfPushService } from "../features/pcf/pcfPushService";
 import type { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
+import type { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
 import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
@@ -46,6 +48,8 @@ export interface CommandContext {
   pacCli: PacCli;
   npmRunner: NpmRunner;
   pcfBuildService: PcfBuildService;
+  pcfPushService: PcfPushService;
+  pcfWorkspaceSettings: PcfWorkspaceSettingsService;
   pcfProjectLocator: PcfProjectLocator;
   pcfExplorer: PcfExplorerProvider;
   pcfStatusBar: PcfStatusBarService;

@@ -1,5 +1,12 @@
 import type * as vscode from "vscode";
-import { PacRunResult, PcfInitOptions, ToolDetectionResult } from "./models";
+import {
+  PacAuthCreateOptions,
+  PacAuthProfile,
+  PacRunResult,
+  PcfInitOptions,
+  PcfPushOptions,
+  ToolDetectionResult,
+} from "./models";
 import { ProcessRunner } from "./processRunner";
 
 export class PacCli {
@@ -15,6 +22,28 @@ export class PacCli {
   async help(args: string[]): Promise<string> {
     const result = await this.run([...args, "--help"]);
     return result.stdout || result.stderr;
+  }
+
+  async whoami(): Promise<PacAuthProfile | null> {
+    const result = await this.run(["auth", "who", "--json"]);
+    if (result.exitCode !== 0) {
+      return null;
+    }
+
+    return parseAuthProfile(result.parsed, result.stdout);
+  }
+
+  async authCreate(
+    opts: PacAuthCreateOptions,
+    onLine?: (line: string, stream: "stdout" | "stderr") => void,
+    token?: vscode.CancellationToken,
+  ): Promise<PacRunResult> {
+    return this.run(
+      ["auth", "create", "--url", opts.url, "--name", opts.name],
+      undefined,
+      onLine,
+      token,
+    );
   }
 
   async pcfInit(
@@ -41,6 +70,27 @@ export class PacCli {
     }
 
     return this.run(args, cwd, onLine, token);
+  }
+
+  async pcfPush(
+    opts: PcfPushOptions,
+    cwd: string,
+    onLine?: (line: string, stream: "stdout" | "stderr") => void,
+    token?: vscode.CancellationToken,
+  ): Promise<PacRunResult> {
+    return this.run(
+      [
+        "pcf",
+        "push",
+        "--environment",
+        opts.environmentUrl,
+        "--publisher-prefix",
+        opts.publisherPrefix,
+      ],
+      cwd,
+      onLine,
+      token,
+    );
   }
 
   async run(
@@ -103,4 +153,56 @@ function parseJsonPayload(stdout: string): unknown | undefined {
   } catch {
     return undefined;
   }
+}
+
+function parseAuthProfile(parsed: unknown, stdout: string): PacAuthProfile | null {
+  const fromJson = readAuthProfile(parsed);
+  if (fromJson) {
+    return fromJson;
+  }
+
+  const url = stdout.match(/https:\/\/[^\s"']+/i)?.[0];
+  if (!url) {
+    return null;
+  }
+  return { url };
+}
+
+function readAuthProfile(value: unknown): PacAuthProfile | null {
+  if (Array.isArray(value)) {
+    const selected =
+      value.find((item) => isRecord(item) && (item.active === true || item.isActive === true)) ??
+      value[0];
+    return readAuthProfile(selected);
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const source = isRecord(value.result) ? value.result : value;
+  const url = readString(
+    source.environmentUrl,
+    source.environment,
+    source.url,
+    source.resource,
+    source.dataverseUrl,
+  );
+  const name = readString(source.name, source.profileName);
+  const user = readString(source.user, source.username, source.userName);
+
+  return url || name || user ? { name, url, user } : null;
+}
+
+function readString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -60,6 +60,7 @@
     "onCommand:dynamics365Tools.pcf.newControl",
     "onCommand:dynamics365Tools.pcf.build",
     "onCommand:dynamics365Tools.pcf.watch",
+    "onCommand:dynamics365Tools.pcf.push",
     "onCommand:dynamics365Tools.pcf.stopWatch",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
@@ -270,6 +271,12 @@
         "icon": "$(debug-start)"
       },
       {
+        "command": "dynamics365Tools.pcf.push",
+        "title": "Push PCF Control to Environment",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "dynamics365Tools.pcf.stopWatch",
         "title": "Stop PCF Watch",
         "category": "Dynamics 365 Tools",
@@ -301,6 +308,11 @@
         },
         {
           "command": "dynamics365Tools.pcf.watch",
+          "group": "navigation@dynamics365ToolsPcf",
+          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
+        },
+        {
+          "command": "dynamics365Tools.pcf.push",
           "group": "navigation@dynamics365ToolsPcf",
           "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         }
@@ -417,6 +429,9 @@
         },
         {
           "command": "dynamics365Tools.pcf.watch"
+        },
+        {
+          "command": "dynamics365Tools.pcf.push"
         },
         {
           "command": "dynamics365Tools.pcf.stopWatch"
@@ -538,9 +553,14 @@
           "group": "inline@3"
         },
         {
-          "command": "dynamics365Tools.pcf.stopWatch",
+          "command": "dynamics365Tools.pcf.push",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
           "group": "inline@4"
+        },
+        {
+          "command": "dynamics365Tools.pcf.stopWatch",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "group": "inline@5"
         }
       ]
     },

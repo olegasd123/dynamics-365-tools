@@ -100,3 +100,64 @@ test("PacCli builds pcf init arguments", async () => {
     },
   ]);
 });
+
+test("PacCli builds pcf push arguments with explicit environment", async () => {
+  const calls: Array<{ args: string[]; cwd?: string }> = [];
+  const runner = {
+    run: async (_command: string, args: string[], options: { cwd?: string }) => {
+      calls.push({ args, cwd: options.cwd });
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+      };
+    },
+  };
+
+  const pac = new PacCli(runner as any);
+  await pac.pcfPush(
+    {
+      environmentUrl: "https://dev.crm.dynamics.com",
+      publisherPrefix: "contoso",
+    },
+    "/tmp/control",
+  );
+
+  assert.deepStrictEqual(calls, [
+    {
+      args: [
+        "pcf",
+        "push",
+        "--environment",
+        "https://dev.crm.dynamics.com",
+        "--publisher-prefix",
+        "contoso",
+      ],
+      cwd: "/tmp/control",
+    },
+  ]);
+});
+
+test("PacCli parses active auth profile JSON", async () => {
+  const runner = {
+    run: async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify([
+        { name: "old", url: "https://old.crm.dynamics.com" },
+        { name: "dev", url: "https://dev.crm.dynamics.com", active: true },
+      ]),
+      stderr: "",
+      durationMs: 10,
+    }),
+  };
+
+  const pac = new PacCli(runner as any);
+  const profile = await pac.whoami();
+
+  assert.deepStrictEqual(profile, {
+    name: "dev",
+    url: "https://dev.crm.dynamics.com",
+    user: undefined,
+  });
+});

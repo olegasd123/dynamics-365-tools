@@ -9,7 +9,9 @@ import { PacCli } from "../features/pcf/pacCli";
 import { PcfBuildService } from "../features/pcf/pcfBuildService";
 import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
 import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import { PcfPushService } from "../features/pcf/pcfPushService";
 import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
+import { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
 import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
@@ -55,6 +57,8 @@ export async function createServices(
   const npmRunner = new NpmRunner(pcfProcessRunner);
   const pcfStatusBar = new PcfStatusBarService("dynamics365Tools.pcf.stopWatch");
   const pcfBuildService = new PcfBuildService(npmRunner, pcfStatusBar);
+  const pcfWorkspaceSettings = new PcfWorkspaceSettingsService(configuration);
+  const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings);
   const pcfProjectLocator = new PcfProjectLocator();
   await pcfProjectLocator.initialize();
   const pcfExplorer = new PcfExplorerProvider(
@@ -88,6 +92,8 @@ export async function createServices(
     pacCli,
     npmRunner,
     pcfBuildService,
+    pcfPushService,
+    pcfWorkspaceSettings,
     pcfProjectLocator,
     pcfExplorer,
     pcfStatusBar,
