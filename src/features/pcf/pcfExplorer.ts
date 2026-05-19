@@ -60,10 +60,14 @@ export class PcfWorkspaceNode extends vscode.TreeItem {
 }
 
 export class PcfControlProjectNode extends vscode.TreeItem {
-  readonly contextValue = "d365PcfControlProject";
+  readonly contextValue: string;
 
-  constructor(readonly project: PcfControlProject) {
+  constructor(
+    readonly project: PcfControlProject,
+    isWatching = false,
+  ) {
     super(project.fullName, vscode.TreeItemCollapsibleState.Collapsed);
+    this.contextValue = `d365PcfControlProject:${isWatching ? "watching" : "stopped"}`;
     this.iconPath = new vscode.ThemeIcon("symbol-misc");
     this.description = `${project.controlType}, ${project.templateKind}`;
     this.tooltip = [
@@ -221,7 +225,9 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
     if (element instanceof PcfWorkspaceNode) {
       const projects = this.getVisibleProjects();
       return projects.length
-        ? projects.map((project) => new PcfControlProjectNode(project))
+        ? projects.map(
+            (project) => new PcfControlProjectNode(project, this.buildService.isWatching(project)),
+          )
         : [new PcfNoWorkspaceNode()];
     }
 

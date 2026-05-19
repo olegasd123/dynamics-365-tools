@@ -297,7 +297,7 @@
         "command": "dynamics365Tools.pcf.packageManaged",
         "title": "Package PCF Solution (Managed)",
         "category": "Dynamics 365 Tools",
-        "icon": "$(package)"
+        "icon": "$(lock)"
       },
       {
         "command": "dynamics365Tools.pcf.packageUnmanaged",
@@ -679,49 +679,39 @@
           "group": "inline@2"
         },
         {
-          "command": "dynamics365Tools.pcf.openManifest",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "command": "dynamics365Tools.pcf.watch",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject:stopped/",
           "group": "inline@1"
         },
         {
-          "command": "dynamics365Tools.pcf.editConfig",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
-          "group": "inline@2"
+          "command": "dynamics365Tools.pcf.stopWatch",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject:watching/",
+          "group": "inline@1"
         },
         {
           "command": "dynamics365Tools.pcf.build",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject/",
           "group": "inline@3"
         },
         {
-          "command": "dynamics365Tools.pcf.watch",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "command": "dynamics365Tools.pcf.push",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject/",
           "group": "inline@4"
         },
         {
-          "command": "dynamics365Tools.pcf.push",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "command": "dynamics365Tools.pcf.packageUnmanaged",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject/",
           "group": "inline@5"
         },
         {
-          "command": "dynamics365Tools.pcf.stopWatch",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
+          "command": "dynamics365Tools.pcf.packageManaged",
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject/",
           "group": "inline@6"
         },
         {
-          "command": "dynamics365Tools.pcf.packageManaged",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
-          "group": "inline@7"
-        },
-        {
-          "command": "dynamics365Tools.pcf.packageUnmanaged",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
-          "group": "inline@8"
-        },
-        {
           "command": "dynamics365Tools.pcf.deployLast",
-          "when": "view == dynamics365Tools.pcfExplorer && viewItem == d365PcfControlProject",
-          "group": "inline@9"
+          "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfControlProject/",
+          "group": "inline@7"
         },
         {
           "command": "dynamics365Tools.pcf.updateFromLocal",
