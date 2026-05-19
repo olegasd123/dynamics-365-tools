@@ -184,39 +184,6 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
   vscode.window.showInformationMessage(`PCF control ${namespace.trim()}.${name.trim()} created.`);
 }
 
-export async function openPcfManifest(
-  ctx: CommandContext,
-  nodeOrUri?: PcfControlProjectNode | vscode.Uri,
-): Promise<void> {
-  const uri = resolveManifestUri(ctx, nodeOrUri);
-  if (!uri) {
-    void vscode.window.showWarningMessage("Select a PCF control manifest first.");
-    return;
-  }
-
-  await vscode.window.showTextDocument(uri);
-}
-
-export async function editPcfConfig(
-  ctx: CommandContext,
-  nodeOrUri?: PcfControlProjectNode | vscode.Uri,
-): Promise<void> {
-  const project = await resolveProject(ctx, nodeOrUri);
-  if (!project) {
-    return;
-  }
-
-  const configPath = path.join(project.rootUri, "pcfconfig.json");
-  if (!(await exists(configPath))) {
-    const defaultConfig = {
-      outDir: normalizeSlashes(path.relative(project.rootUri, project.outputDir)),
-    };
-    await fs.writeFile(configPath, `${JSON.stringify(defaultConfig, null, 2)}\n`, "utf8");
-  }
-
-  await vscode.window.showTextDocument(vscode.Uri.file(configPath));
-}
-
 export async function buildPcfControl(
   ctx: CommandContext,
   nodeOrUri?: PcfControlProjectNode | vscode.Uri,
@@ -416,27 +383,6 @@ export async function normalizeGeneratedPcfPackageJson(projectRoot: string): Pro
 
   await fs.writeFile(packageJsonPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
   return true;
-}
-
-function resolveManifestUri(
-  ctx: CommandContext,
-  nodeOrUri?: PcfControlProjectNode | vscode.Uri,
-): vscode.Uri | undefined {
-  if (nodeOrUri instanceof PcfControlProjectNode) {
-    return vscode.Uri.file(nodeOrUri.project.manifestUri);
-  }
-
-  if (nodeOrUri instanceof vscode.Uri) {
-    return nodeOrUri;
-  }
-
-  const editorUri = vscode.window.activeTextEditor?.document.uri;
-  if (editorUri?.fsPath.endsWith("ControlManifest.Input.xml")) {
-    return editorUri;
-  }
-
-  const firstProject = ctx.pcfProjectLocator.getProjects()[0];
-  return firstProject ? vscode.Uri.file(firstProject.manifestUri) : undefined;
 }
 
 export async function resolvePcfProject(
@@ -705,10 +651,6 @@ async function exists(filePath: string): Promise<boolean> {
 function isInsideProject(filePath: string, project: PcfControlProject): boolean {
   const relative = path.relative(project.rootUri, filePath);
   return !relative.startsWith("..") && !path.isAbsolute(relative);
-}
-
-function normalizeSlashes(value: string): string {
-  return value.replace(/\\/g, "/");
 }
 
 function shouldUseBundlerModuleResolution(value: unknown): boolean {

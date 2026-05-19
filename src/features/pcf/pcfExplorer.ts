@@ -77,11 +77,6 @@ export class PcfControlProjectNode extends vscode.TreeItem {
       `Output: ${project.outputDir}`,
     ].join("\n");
     this.resourceUri = vscode.Uri.file(project.manifestUri);
-    this.command = {
-      command: "dynamics365Tools.pcf.openManifest",
-      title: "Open Manifest",
-      arguments: [this],
-    };
   }
 }
 

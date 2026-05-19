@@ -37,9 +37,7 @@ import {
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
   buildPcfControl,
-  editPcfConfig,
   newPcfControl,
-  openPcfManifest,
   pushPcfControl,
   refreshPcfExplorer,
   stopPcfWatch,
@@ -135,12 +133,6 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.plugins.editImage", (node) => editPluginImage(ctx, node)),
     register("dynamics365Tools.plugins.deleteImage", (node) => deletePluginImage(ctx, node)),
     register("dynamics365Tools.pcf.refreshExplorer", () => refreshPcfExplorer(ctx), {
-      validateConfiguration: false,
-    }),
-    register("dynamics365Tools.pcf.openManifest", (nodeOrUri) => openPcfManifest(ctx, nodeOrUri), {
-      validateConfiguration: false,
-    }),
-    register("dynamics365Tools.pcf.editConfig", (nodeOrUri) => editPcfConfig(ctx, nodeOrUri), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.pcf.newControl", () => newPcfControl(ctx), {

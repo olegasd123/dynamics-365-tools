@@ -56,8 +56,6 @@
     "onCommand:dynamics365Tools.plugins.refreshExplorer",
     "onCommand:dynamics365Tools.plugins.publishLastAssembly",
     "onCommand:dynamics365Tools.pcf.refreshExplorer",
-    "onCommand:dynamics365Tools.pcf.openManifest",
-    "onCommand:dynamics365Tools.pcf.editConfig",
     "onCommand:dynamics365Tools.pcf.newControl",
     "onCommand:dynamics365Tools.pcf.build",
     "onCommand:dynamics365Tools.pcf.watch",
@@ -258,18 +256,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "dynamics365Tools.pcf.openManifest",
-        "title": "Open PCF Manifest",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(file-code)"
-      },
-      {
-        "command": "dynamics365Tools.pcf.editConfig",
-        "title": "Edit PCF Config",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(settings)"
-      },
-      {
         "command": "dynamics365Tools.pcf.newControl",
         "title": "New PCF Control",
         "category": "Dynamics 365 Tools",
@@ -372,16 +358,6 @@
           "submenu": "dynamics365Tools.resourceMenu",
           "group": "navigation@dynamics365Tools",
           "when": "resourceScheme == 'file' && (explorerResourceIsFolder || resourceExtname =~ /\\.(js|css|html|htm|xml|json|resx|png|jpg|jpeg|gif|xsl|xslt|ico|svg)$/)"
-        },
-        {
-          "command": "dynamics365Tools.pcf.openManifest",
-          "group": "navigation@dynamics365ToolsPcf",
-          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
-        },
-        {
-          "command": "dynamics365Tools.pcf.editConfig",
-          "group": "navigation@dynamics365ToolsPcf",
-          "when": "resourceScheme == 'file' && resourceFilename == 'ControlManifest.Input.xml'"
         },
         {
           "command": "dynamics365Tools.pcf.build",
@@ -514,12 +490,6 @@
         },
         {
           "command": "dynamics365Tools.pcf.refreshExplorer"
-        },
-        {
-          "command": "dynamics365Tools.pcf.openManifest"
-        },
-        {
-          "command": "dynamics365Tools.pcf.editConfig"
         },
         {
           "command": "dynamics365Tools.pcf.newControl"
