@@ -5,7 +5,7 @@ import { SecretService } from "../features/auth/secretService";
 import { ConfigurationService } from "../features/config/configurationService";
 import { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
 import { NpmRunner } from "../features/pcf/npmRunner";
-import { PacCli } from "../features/pcf/pacCli";
+import { createPacCommandCandidates, PacCli } from "../features/pcf/pacCli";
 import { PcfBuildService } from "../features/pcf/pcfBuildService";
 import { PcfDeployService } from "../features/pcf/pcfDeployService";
 import { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentService";
@@ -57,7 +57,10 @@ export async function createServices(
   await pluginExplorer.initialize();
 
   const pcfProcessRunner = new ProcessRunner();
-  const pacCli = new PacCli(pcfProcessRunner);
+  const pacCli = new PacCli(
+    pcfProcessRunner,
+    createPacCommandCandidates(extensionContext.globalStorageUri.fsPath),
+  );
   const npmRunner = new NpmRunner(pcfProcessRunner);
   const pcfStatusBar = new PcfStatusBarService("dynamics365Tools.pcf.stopWatch");
   const pcfTelemetry = new PcfTelemetryService();

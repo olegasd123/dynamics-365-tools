@@ -1,14 +1,26 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
-import { PcfControlProject } from "../models";
+import { XMLParser } from "fast-xml-parser";
+import type { CommandContext } from "../../../app/commandContext";
+import type { PcfControlProject } from "../models";
 import { detectTool } from "../pacCli";
 import { PcfControlProjectNode } from "../pcfExplorer";
 
 type WorkspaceFolderPick = vscode.QuickPickItem & {
   folder: vscode.WorkspaceFolder;
 };
+
+const MANIFEST_FILENAME = "ControlManifest.Input.xml";
+const IGNORED_GENERATED_DIRECTORIES = new Set([
+  ".git",
+  ".vscode",
+  "bin",
+  "dist",
+  "node_modules",
+  "obj",
+  "out",
+]);
 
 export async function refreshPcfExplorer(ctx: CommandContext): Promise<void> {
   await ctx.pcfProjectLocator.refresh();
@@ -111,13 +123,23 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
   );
 
   if (result.exitCode !== 0) {
-    vscode.window.showErrorMessage(`Failed to create PCF control ${name.trim()}.`);
+    output.appendLine(`pac exited with code ${result.exitCode}.`);
+    await removeEmptyDirectory(targetRoot);
+    vscode.window.showErrorMessage(
+      `Failed to create PCF control ${name.trim()}. See PCF: New Control output.`,
+    );
     return;
   }
 
   await refreshPcfExplorer(ctx);
-  const indexUri = vscode.Uri.file(path.join(targetRoot, "index.ts"));
-  await vscode.window.showTextDocument(indexUri);
+  const sourceFile = await findGeneratedPcfSourceFile(targetRoot, name.trim());
+  if (sourceFile) {
+    await vscode.window.showTextDocument(vscode.Uri.file(sourceFile));
+  } else {
+    vscode.window.showWarningMessage(
+      `PCF control ${namespace.trim()}.${name.trim()} was created, but no source file was found.`,
+    );
+  }
   vscode.window.showInformationMessage(`PCF control ${namespace.trim()}.${name.trim()} created.`);
 }
 
@@ -410,6 +432,111 @@ async function isNonEmptyDirectory(folderPath: string): Promise<boolean> {
   }
 }
 
+async function removeEmptyDirectory(folderPath: string): Promise<void> {
+  try {
+    await fs.rmdir(folderPath);
+  } catch {
+    // Keep folders with generated files or folders we cannot remove.
+  }
+}
+
+export async function findGeneratedPcfSourceFile(
+  projectRoot: string,
+  controlName: string,
+): Promise<string | undefined> {
+  const directCandidates = [
+    path.join(projectRoot, controlName, "index.ts"),
+    path.join(projectRoot, "index.ts"),
+  ];
+
+  for (const candidate of directCandidates) {
+    if (await exists(candidate)) {
+      return candidate;
+    }
+  }
+
+  const manifests = await findGeneratedManifests(projectRoot);
+  for (const manifestPath of manifests) {
+    const codePath = await readFirstCodeResourcePath(manifestPath);
+    const candidate = path.resolve(path.dirname(manifestPath), codePath ?? "index.ts");
+    if (await exists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+async function findGeneratedManifests(root: string): Promise<string[]> {
+  const manifests: string[] = [];
+
+  async function visit(dir: string): Promise<void> {
+    let entries: Array<import("fs").Dirent>;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!IGNORED_GENERATED_DIRECTORIES.has(entry.name)) {
+          await visit(fullPath);
+        }
+      } else if (entry.isFile() && entry.name === MANIFEST_FILENAME) {
+        manifests.push(fullPath);
+      }
+    }
+  }
+
+  await visit(root);
+  return manifests.sort();
+}
+
+async function readFirstCodeResourcePath(manifestPath: string): Promise<string | undefined> {
+  try {
+    const content = await fs.readFile(manifestPath, "utf8");
+    const parsed = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "@_",
+      allowBooleanAttributes: true,
+    }).parse(content) as unknown;
+    const control = findControlNode(parsed);
+    const resources = isRecord(control?.resources) ? control.resources : undefined;
+    const codeResources = asArray(resources?.code).filter(isRecord);
+    return readAttribute(codeResources[0], "path");
+  } catch {
+    return undefined;
+  }
+}
+
+function findControlNode(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const manifest = value.manifest;
+  if (isRecord(manifest) && isRecord(manifest.control)) {
+    return manifest.control;
+  }
+
+  return isRecord(value.control) ? value.control : undefined;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : value === undefined ? [] : [value];
+}
+
+function readAttribute(value: unknown, name: string): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const attribute = value[`@_${name}`] ?? value[name];
+  return typeof attribute === "string" && attribute.trim() ? attribute.trim() : undefined;
+}
+
 async function exists(filePath: string): Promise<boolean> {
   try {
     await fs.stat(filePath);
@@ -426,4 +553,8 @@ function isInsideProject(filePath: string, project: PcfControlProject): boolean 
 
 function normalizeSlashes(value: string): string {
   return value.replace(/\\/g, "/");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

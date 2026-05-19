@@ -1,3 +1,4 @@
+import * as path from "path";
 import type * as vscode from "vscode";
 import {
   PacAuthCreateOptions,
@@ -11,13 +12,21 @@ import {
 } from "./models";
 import { ProcessRunner } from "./processRunner";
 
+const PAC_ENV: NodeJS.ProcessEnv = {
+  PAC_CLI_AUTH_DISABLE_OS_LOGIN: "true",
+};
+
 export class PacCli {
   private detection?: Promise<ToolDetectionResult>;
+  private command?: string;
 
-  constructor(private readonly runner: ProcessRunner) {}
+  constructor(
+    private readonly runner: ProcessRunner,
+    private readonly commandCandidates: readonly string[] = ["pac"],
+  ) {}
 
   detect(): Promise<ToolDetectionResult> {
-    this.detection ??= detectTool(this.runner, "pac", ["--version"]);
+    this.detection ??= this.detectAnyCandidate();
     return this.detection;
   }
 
@@ -131,12 +140,68 @@ export class PacCli {
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
     token?: vscode.CancellationToken,
   ): Promise<PacRunResult> {
-    const result = await this.runner.run("pac", args, { cwd, onLine, token });
+    const command = await this.resolveCommand();
+    const result = await this.runner.run(command, args, {
+      cwd,
+      env: { ...process.env, ...PAC_ENV },
+      onLine,
+      token,
+    });
     return {
       ...result,
       parsed: parseJsonPayload(result.stdout),
     };
   }
+
+  private async detectAnyCandidate(): Promise<ToolDetectionResult> {
+    const errors: string[] = [];
+
+    for (const candidate of uniqueStrings(this.commandCandidates)) {
+      const result = await detectTool(this.runner, candidate, []);
+      if (result.available) {
+        this.command = candidate;
+        return result;
+      }
+
+      if (result.error) {
+        errors.push(`${candidate}: ${result.error}`);
+      }
+    }
+
+    return {
+      available: false,
+      error: errors.join("; ") || "pac not found",
+    };
+  }
+
+  private async resolveCommand(): Promise<string> {
+    if (this.command) {
+      return this.command;
+    }
+
+    const result = await this.detect();
+    if (result.available && result.path) {
+      return result.path;
+    }
+
+    return this.commandCandidates[0] ?? "pac";
+  }
+}
+
+export function createPacCommandCandidates(extensionGlobalStoragePath?: string): string[] {
+  const candidates = ["pac"];
+  const storageRoot = extensionGlobalStoragePath ? path.dirname(extensionGlobalStoragePath) : "";
+  if (storageRoot) {
+    candidates.push(
+      path.join(
+        storageRoot,
+        "microsoft-isvexptools.powerplatform-vscode",
+        "pac",
+        getPacExecutableName(),
+      ),
+    );
+  }
+  return candidates;
 }
 
 export async function detectTool(
@@ -168,10 +233,11 @@ export async function detectTool(
 }
 
 function firstMeaningfulLine(output: string): string | undefined {
-  return output
+  const lines = output
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .find(Boolean);
+    .filter(Boolean);
+  return lines.find((line) => /^version:/i.test(line)) ?? lines[0];
 }
 
 function parseJsonPayload(stdout: string): unknown | undefined {
@@ -237,4 +303,12 @@ function readString(...values: unknown[]): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getPacExecutableName(): string {
+  return process.platform === "win32" ? "pac.exe" : "pac";
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return values.filter((value, index) => value && values.indexOf(value) === index);
 }

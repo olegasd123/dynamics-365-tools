@@ -59,7 +59,8 @@ export class PcfProjectLocator implements vscode.Disposable {
   }
 
   private async createProject(manifestUri: vscode.Uri): Promise<PcfControlProject> {
-    const rootUri = path.dirname(manifestUri.fsPath);
+    const manifestRoot = path.dirname(manifestUri.fsPath);
+    const rootUri = await resolveProjectRoot(manifestRoot);
     const manifestContent = await fs.readFile(manifestUri.fsPath, "utf8");
     const manifest = this.manifestReader.read(manifestContent);
     const packageJson = await readJsonFile(path.join(rootUri, "package.json"));
@@ -167,6 +168,40 @@ function resolveOutputDir(rootUri: string, controlName: string, pcfConfig: unkno
   return path.join(rootUri, "out", "controls", controlName);
 }
 
+async function resolveProjectRoot(manifestRoot: string): Promise<string> {
+  const pcfProjectRoot = await findNearestDirectoryWithFile(manifestRoot, (name) =>
+    name.endsWith(".pcfproj"),
+  );
+  if (pcfProjectRoot) {
+    return pcfProjectRoot;
+  }
+
+  return (
+    (await findNearestDirectoryWithFile(manifestRoot, (name) => name === "package.json")) ??
+    manifestRoot
+  );
+}
+
+async function findNearestDirectoryWithFile(
+  startDir: string,
+  matches: (name: string) => boolean,
+): Promise<string | undefined> {
+  let current = startDir;
+
+  while (true) {
+    const entries = await listDirectoryEntries(current);
+    if (entries.some((entry) => entry.isFile() && matches(entry.name))) {
+      return current;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return undefined;
+    }
+    current = parent;
+  }
+}
+
 async function findNearestCdsProject(projectRoot: string): Promise<string | undefined> {
   let current = projectRoot;
   while (true) {
@@ -184,12 +219,16 @@ async function findNearestCdsProject(projectRoot: string): Promise<string | unde
 }
 
 async function listCdsProjects(dir: string): Promise<string[]> {
+  const entries = await listDirectoryEntries(dir);
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".cdsproj"))
+    .map((entry) => path.join(dir, entry.name))
+    .sort();
+}
+
+async function listDirectoryEntries(dir: string): Promise<Array<import("fs").Dirent>> {
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".cdsproj"))
-      .map((entry) => path.join(dir, entry.name))
-      .sort();
+    return await fs.readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
