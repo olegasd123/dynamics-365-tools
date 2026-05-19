@@ -12,6 +12,9 @@ type WorkspaceFolderPick = vscode.QuickPickItem & {
 };
 
 const MANIFEST_FILENAME = "ControlManifest.Input.xml";
+const PCF_AJV_VERSION = "^8.20.0";
+const PCF_ESLINT_VERSION = "^9.34.0";
+const PCF_TYPES_PACKAGE = "powerapps-component-framework";
 const IGNORED_GENERATED_DIRECTORIES = new Set([
   ".git",
   ".vscode",
@@ -90,6 +93,10 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     return;
   }
 
+  if (install.runNpmInstall && !(await ensureNpm(ctx))) {
+    return;
+  }
+
   const targetRoot = path.join(parentFolder.uri.fsPath, name.trim());
   if (await isNonEmptyDirectory(targetRoot)) {
     vscode.window.showErrorMessage(`Folder ${targetRoot} already exists and is not empty.`);
@@ -114,7 +121,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
           name: name.trim(),
           template: template.label as "field" | "dataset",
           framework: framework.label as "none" | "react",
-          runNpmInstall: install.runNpmInstall,
+          runNpmInstall: false,
         },
         targetRoot,
         (line, stream) => output.appendLine(stream === "stderr" ? `[stderr] ${line}` : line),
@@ -129,6 +136,40 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
       `Failed to create PCF control ${name.trim()}. See PCF: New Control output.`,
     );
     return;
+  }
+
+  const normalizeResult = await normalizeGeneratedPcfProject(targetRoot);
+  if (normalizeResult.tsConfigChanged) {
+    output.appendLine("Updated tsconfig.json for current TypeScript versions.");
+  }
+  if (normalizeResult.packageJsonChanged) {
+    output.appendLine("Updated package.json for PCF build dependencies.");
+  }
+
+  if (install.runNpmInstall) {
+    const installResult = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Installing dependencies for ${name.trim()}`,
+        cancellable: true,
+      },
+      async (_progress, token) => {
+        output.appendLine("Running npm install...");
+        return ctx.pcfProcessRunner.run("npm", ["install"], {
+          cwd: targetRoot,
+          onLine: (line, stream) =>
+            output.appendLine(stream === "stderr" ? `[stderr] ${line}` : line),
+          token,
+        });
+      },
+    );
+
+    if (installResult.exitCode !== 0) {
+      output.appendLine(`npm install exited with code ${installResult.exitCode}.`);
+      vscode.window.showWarningMessage(
+        `PCF control ${namespace.trim()}.${name.trim()} was created, but npm install failed. See PCF: New Control output.`,
+      );
+    }
   }
 
   await refreshPcfExplorer(ctx);
@@ -277,6 +318,104 @@ export async function stopPcfWatch(
 ): Promise<void> {
   const project = await resolveProject(ctx, nodeOrUri, { allowPick: false });
   ctx.pcfBuildService.stopWatch(project);
+}
+
+export async function normalizeGeneratedPcfTsConfig(projectRoot: string): Promise<boolean> {
+  const tsConfigPath = path.join(projectRoot, "tsconfig.json");
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(await fs.readFile(tsConfigPath, "utf8"));
+  } catch {
+    return false;
+  }
+
+  if (!isRecord(parsed)) {
+    return false;
+  }
+
+  const compilerOptions = isRecord(parsed.compilerOptions) ? parsed.compilerOptions : {};
+  let changed = false;
+
+  if (!isRecord(parsed.compilerOptions)) {
+    parsed.compilerOptions = compilerOptions;
+    changed = true;
+  }
+
+  if (shouldUseBundlerModuleResolution(compilerOptions.moduleResolution)) {
+    compilerOptions.moduleResolution = "bundler";
+    changed = true;
+  }
+
+  if (ensureTypePackage(compilerOptions, PCF_TYPES_PACKAGE)) {
+    changed = true;
+  }
+
+  if (!changed) {
+    return false;
+  }
+
+  await fs.writeFile(tsConfigPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+  return true;
+}
+
+export interface PcfScaffoldNormalizeResult {
+  tsConfigChanged: boolean;
+  packageJsonChanged: boolean;
+}
+
+export async function normalizeGeneratedPcfProject(
+  projectRoot: string,
+): Promise<PcfScaffoldNormalizeResult> {
+  const [tsConfigChanged, packageJsonChanged] = await Promise.all([
+    normalizeGeneratedPcfTsConfig(projectRoot),
+    normalizeGeneratedPcfPackageJson(projectRoot),
+  ]);
+
+  return {
+    tsConfigChanged,
+    packageJsonChanged,
+  };
+}
+
+export async function normalizeGeneratedPcfPackageJson(projectRoot: string): Promise<boolean> {
+  const packageJsonPath = path.join(projectRoot, "package.json");
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(await fs.readFile(packageJsonPath, "utf8"));
+  } catch {
+    return false;
+  }
+
+  if (!isRecord(parsed)) {
+    return false;
+  }
+
+  const devDependencies = isRecord(parsed.devDependencies) ? parsed.devDependencies : {};
+  let changed = false;
+
+  if (!isRecord(parsed.devDependencies)) {
+    parsed.devDependencies = devDependencies;
+    changed = true;
+  }
+
+  if (devDependencies.eslint === undefined) {
+    devDependencies.eslint = PCF_ESLINT_VERSION;
+    changed = true;
+  }
+
+  if (devDependencies.ajv === undefined) {
+    devDependencies.ajv = PCF_AJV_VERSION;
+    changed = true;
+  }
+
+  if (!changed) {
+    return false;
+  }
+
+  await fs.writeFile(packageJsonPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+  return true;
 }
 
 function resolveManifestUri(
@@ -553,6 +692,37 @@ function isInsideProject(filePath: string, project: PcfControlProject): boolean 
 
 function normalizeSlashes(value: string): string {
   return value.replace(/\\/g, "/");
+}
+
+function shouldUseBundlerModuleResolution(value: unknown): boolean {
+  if (value === undefined) {
+    return true;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return ["node", "node10"].includes(value.toLowerCase());
+}
+
+function ensureTypePackage(compilerOptions: Record<string, unknown>, packageName: string): boolean {
+  const types = compilerOptions.types;
+  if (types === undefined) {
+    compilerOptions.types = [packageName];
+    return true;
+  }
+
+  if (!Array.isArray(types) || !types.every((item) => typeof item === "string")) {
+    return false;
+  }
+
+  if (types.includes(packageName)) {
+    return false;
+  }
+
+  types.push(packageName);
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
