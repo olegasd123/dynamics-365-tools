@@ -6,11 +6,16 @@ ribbon scopes, and follows the "take control of OOB buttons" workflow popularize
 by Ribbon Workbench: hide built-in buttons, then re-add them with our own
 EnableRules, DisplayRules, and Actions.
 
+The editor treats the original XML text as the source of truth. Parsed models are
+used for navigation, validation, and forms; saving is done by applying small text
+patches to known XML ranges. This keeps no-op saves stable and avoids dropping
+unknown ribbon data.
+
 ---
 
 ## 1. Goals & non-goals
 
-### Goals (v1)
+### Goals (first useful release)
 
 - Edit `RibbonDiffXml` for all five ribbon scopes:
   - **Application ribbon** (global)
@@ -21,19 +26,9 @@ EnableRules, DisplayRules, and Actions.
     `AppRibbon/RibbonDiffXml.xml` if present.
   - **Flat**: a single `customizations.xml` with `RibbonDiffXml` nodes embedded
     under each `<Entity>` and at the root for the application ribbon.
-- **Load ribbons from a solution `.zip` file** (Ribbon Workbench-style):
-  open a zip from disk, the editor unpacks ribbon-relevant files to a temp
-  workspace, edits happen there, and the user can save back into the zip
-  (replace original or save-as).
-- **Publish changes directly to a Dataverse environment**: pick a configured
-  environment, the editor packs the edited ribbon files into an unmanaged
-  solution zip, imports it via `ImportSolution`, and runs `PublishXml` for
-  the touched entities (and the application ribbon when applicable).
+- Save by patching only changed XML ranges; no-op saves must not rewrite files.
 - Add / edit / reorder / remove **custom** buttons in tabs and groups.
 - **Hide OOB buttons** (`<HideCustomAction>`).
-- **Override OOB commands** by id so built-in buttons (`Mscrm.SavePrimary`,
-  `Mscrm.AddNewRecordFromForm`, …) run our EnableRule / DisplayRule / Action
-  chain instead of the platform's.
 - Manage `CommandDefinitions`, `EnableRules`, `DisplayRules`, and `LocLabels`.
 - **JS action picker integrated with workspace web resources**: when defining
   a `JavaScriptFunction` action or rule, the library is picked from web
@@ -41,7 +36,22 @@ EnableRules, DisplayRules, and Actions.
   not free-typed.
 - Tree view in the activity bar, alongside the Plugin Explorer.
 
-### Non-goals (v1)
+### Follow-up goals
+
+- **Load ribbons from a solution `.zip` file** (Ribbon Workbench-style):
+  open a zip from disk, extract ribbon-relevant files to extension storage or a
+  temp folder, edit there, and save back into the zip by replace-original or
+  save-as.
+- **Publish changes directly to a Dataverse environment**: pick a configured
+  environment, pack the edited ribbon files into an unmanaged solution zip,
+  import it via the existing `SolutionImportService`, and run `PublishXml` for
+  touched entities and the application ribbon when applicable.
+- **Override OOB commands** by id so built-in buttons (`Mscrm.SavePrimary`,
+  `Mscrm.AddNewRecordFromForm`, …) run our EnableRule / DisplayRule / Action
+  chain instead of the platform's. This is advanced because it can replace
+  default platform behavior.
+
+### Non-goals (first useful release)
 
 - Visual canvas / drag-and-drop preview of the rendered ribbon.
 - Editing the OOB ribbon itself (we always diff against it, never modify it).
@@ -49,12 +59,13 @@ EnableRules, DisplayRules, and Actions.
   with a raw "add language" escape hatch — full localization deferred).
 - Editing `<Templates>` (we read/preserve them; authoring is deferred).
 - Editing managed solutions.
+- Environment pull/sync. The workspace XML remains the source of truth.
 
 ---
 
 ## 2. Background: what RibbonDiffXml actually contains
 
-For grounding, each `RibbonDiffXml` has up to four blocks:
+For grounding, each `RibbonDiffXml` has up to five blocks:
 
 ```xml
 <RibbonDiffXml>
@@ -100,19 +111,19 @@ two distinct things:
 
 ## 3. Source-of-ribbons model
 
-The editor maintains a **working set** of ribbon files independent of where
+The editor maintains a **working set** of ribbon documents independent of where
 they came from. A source is one of:
 
-| Source                  | Detection                                                                 | Save behavior                                  |
-| ----------------------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
-| Unpacked workspace      | `Entities/*/RibbonDiffXml.xml` or `Other/Customizations.xml` exists       | Write back in place.                           |
-| Flat `customizations.xml` | Single `customizations.xml` at workspace root or in a `solution/` folder | Patch `RibbonDiffXml` blocks in-place.         |
-| Imported solution `.zip` | User-triggered "Open ribbons from solution…" command                     | Extract to `.vscode/d365-tools/ribbons/<solutionName>/`, edit, repack on save. |
+| Source                    | Detection                                                                 | Save behavior                                  |
+| ------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
+| Unpacked workspace        | `Entities/*/RibbonDiffXml.xml` or `Other/Customizations.xml` exists       | Patch changed XML ranges in place.             |
+| Flat `customizations.xml` | Single `customizations.xml` at workspace root or in a `solution/` folder  | Patch `RibbonDiffXml` blocks in-place.         |
+| Imported solution `.zip`  | User-triggered "Open ribbons from solution…" command                      | Extract to extension storage or temp; save back with replace-original or save-as. |
 
 Detection is done by a `RibbonSourceLocator` service that scans the workspace
-once on activation and watches for relevant file changes. The `.zip` flow
-produces a synthetic source rooted at the temp extraction directory and is
-treated identically downstream.
+once on activation and watches for relevant file changes. The `.zip` flow is
+added after workspace editing is stable; it produces a synthetic source rooted
+outside the workspace unless the user chooses a save-as location.
 
 ---
 
@@ -123,14 +134,14 @@ New feature folder, mirroring existing conventions:
 ```
 src/features/ribbons/
   models.ts                       // domain types (see §5)
-  ribbonXmlSchema.ts              // zod schemas for parsed XML (mirrors pattern in config/)
+  ribbonDocument.ts               // parsed document + XML ranges
+  ribbonXmlReader.ts              // lenient XML scanner/parser for ribbons
+  ribbonPatchWriter.ts            // applies text patches to original XML
   ribbonSourceLocator.ts          // scans workspace, classifies layout, emits RibbonSource[]
-  ribbonRepository.ts             // load/save a single RibbonSource (read file → parse → model)
-  ribbonParser.ts                 // RibbonDiffXml string → Ribbon model
-  ribbonSerializer.ts             // Ribbon model → RibbonDiffXml string (preserves unknown nodes)
+  ribbonRepository.ts             // load/save a single RibbonSource (read file → parse → patch)
   oobCatalog.ts                   // static catalog of well-known Locations + OOB CommandIds
-  solutionZipService.ts           // open/save .zip solution sources (JSZip)
-  ribbonPublishService.ts         // pack working set into a solution zip + ImportSolution + PublishXml
+  solutionZipService.ts           // phase 3: open/save .zip solution sources (JSZip)
+  ribbonPublishService.ts         // phase 4: minimal zip + SolutionImportService + PublishXml
   ribbonEditorState.ts            // in-memory working set + dirty tracking + undo stack
   ribbonExplorer.ts               // vscode.TreeDataProvider (the activity-bar view)
   webview/
@@ -140,16 +151,17 @@ src/features/ribbons/
     ribbonExplorerCommands.ts     // refresh, openFile, openSolutionZip, etc.
     ribbonEditCommands.ts         // addCustomAction, hideOOB, addCommand, addRule, reorder, etc.
   __tests__/
-    ribbonParser.test.ts          // round-trip parse/serialize of representative XML fixtures
+    ribbonXmlReader.test.ts       // parse representative XML fixtures
+    ribbonPatchWriter.test.ts     // no-op stability + surgical patch tests
     ribbonRepository.test.ts
     ribbonSourceLocator.test.ts
 ```
 
 Wiring:
 
-- `createServices.ts` instantiates `RibbonSourceLocator`, `RibbonRepository`,
+- `src/app/createServices.ts` instantiates `RibbonSourceLocator`, `RibbonRepository`,
   `RibbonEditorState`, `SolutionZipService`.
-- `registerCommands.ts` registers ribbon commands + the tree view +
+- `src/app/registerCommands.ts` registers ribbon commands + the tree view +
   `ribbonFormPanel`.
 - `package.json` gets a new `views` entry under the existing
   `dynamics365tools-utility` viewsContainer, plus the new commands & context
@@ -157,33 +169,63 @@ Wiring:
 
 ### Dependencies to add
 
-- `fast-xml-parser` — XML parse/serialize that supports attribute order
-  preservation, which we need for clean diffs.
-- `jszip` — read/write the `.zip` solution source.
+- `fast-xml-parser` — already present. Use it only as a helper for reading
+  import logs or simple XML checks, not as the source-of-truth writer for
+  ribbon saves.
+- `jszip` — add in phase 3 only, to read/write the `.zip` solution source.
 
-Both are widely used, MIT-licensed, no native deps.
+Both libraries are widely used, MIT-licensed, no native deps.
 
 ---
 
 ## 5. Domain model (TypeScript)
 
-The model is a faithful, typed projection of `RibbonDiffXml`. It is **not**
-flattened — preserving the diff structure keeps serialization round-trippable.
+The model is a faithful, typed projection of `RibbonDiffXml`, but it is not the
+save format. The save format is the original XML plus a list of text patches.
+This is the main safety rule for real ribbon files.
+
+Entity ribbons are loaded as one `RibbonDocument`. `Form`, `HomepageGrid`, and
+`SubGrid` are views inferred from locations and command ids inside the same
+document. Application ribbons are separate documents.
 
 ```ts
 type RibbonScope = "Application" | "Form" | "HomepageGrid" | "SubGrid";
 
-interface Ribbon {
-  scope: RibbonScope;
+interface RibbonDocument {
+  id: string;
+  sourceId: string;
+  kind: "Application" | "Entity";
   entityLogicalName?: string;       // undefined for Application
+  fileUri: string;
+  sourceText: string;
+  ribbonRange: TextRange;
+  sections: RibbonSectionRanges;
+  views: RibbonView[];
+}
+
+interface RibbonView {
+  scope: RibbonScope;
   customActions: CustomAction[];
   hideActions: HideAction[];
   commandDefinitions: CommandDefinition[];
   enableRules: EnableRule[];
   displayRules: DisplayRule[];
   locLabels: LocLabel[];
-  templatesRaw?: string;            // preserved verbatim, not modeled in v1
-  unknownNodesRaw: UnknownNode[];   // forward-compat: anything we don't recognize is preserved
+  templatesRange?: TextRange;       // preserved, not modeled in the first release
+  unknownNodeRanges: TextRange[];   // forward-compat: preserved by not touching them
+}
+
+interface TextRange {
+  start: number;
+  end: number;
+}
+
+interface RibbonSectionRanges {
+  customActions?: TextRange;
+  templates?: TextRange;
+  commandDefinitions?: TextRange;
+  ruleDefinitions?: TextRange;
+  locLabels?: TextRange;
 }
 
 interface CustomAction {
@@ -191,6 +233,7 @@ interface CustomAction {
   location: string;                 // OOB attach point Id (picked from catalog or typed)
   sequence: number;
   commandUI: ButtonNode | GroupNode | TabNode | MenuSectionNode;
+  range: TextRange;
 }
 
 interface ButtonNode {
@@ -214,6 +257,7 @@ interface ImageRef {
 interface HideAction {
   hideActionId: string;             // OOB CustomAction Id to hide
   location: string;
+  range: TextRange;
 }
 
 interface CommandDefinition {
@@ -259,35 +303,55 @@ type RuleStep =
 interface LocLabel {
   id: string;
   titles: { languageCode: number; description: string }[];
+  range: TextRange;
 }
 ```
 
-The `unknownNodesRaw` / `Unknown` variants exist so the serializer can write
-back nodes we don't understand without dropping them. **This is the contract
-that makes the editor safe to use on real ribbons.**
+Unknown nodes and unknown attributes are preserved because the writer only
+touches ranges affected by the requested edit. **This is the contract that
+makes the editor safe to use on real ribbons.**
 
 ---
 
-## 6. Parser & serializer
+## 6. XML reader & patch writer
 
-`ribbonParser.ts` and `ribbonSerializer.ts` are pure functions over strings
+`ribbonXmlReader.ts` and `ribbonPatchWriter.ts` are pure functions over strings
 (no I/O). They sit behind `RibbonRepository`, which handles file/zip access.
 
 Requirements:
 
-1. **Round-trip stable on no-op edits.** A parse → serialize cycle on an
-   untouched file must produce byte-equivalent output, modulo whitespace
-   normalization the user opts into. This is enforced by test fixtures.
-2. **Attribute order preserved** for known nodes.
-3. **Unknown nodes/attributes preserved verbatim.** We never silently drop.
-4. **CDATA preserved** (some `<Title description="...">` values contain it).
-5. Embedded vs. standalone variants:
+1. **No-op saves write nothing.** If the user does not make an edit, the
+   repository does not rewrite the file.
+2. **Patch-based saves.** Each edit produces one or more `RibbonPatch` values:
+   insert a generated XML node, replace a known node range, delete a known node
+   range, or replace a known attribute range.
+3. **Attribute order is preserved by default.** Existing attributes stay in
+   their original order. New generated nodes use a stable order.
+4. **Unknown nodes/attributes/comments/CDATA are preserved verbatim.** We never
+   silently drop data we do not understand.
+5. **Reader can be lenient.** The reader may use `fast-xml-parser` for simple
+   structure checks, but it must also keep source ranges from the original text.
+   The writer must not serialize the whole parsed object back to XML.
+6. Embedded vs. standalone variants:
    - Unpacked: file is just `<RibbonDiffXml>…</RibbonDiffXml>`.
    - Flat: parser locates the right `<RibbonDiffXml>` inside `customizations.xml`
      and edits surgically — the rest of `customizations.xml` is untouched.
 
-Both are exercised in `__tests__/ribbonParser.test.ts` against fixtures from
-real-world entities (account, contact, plus a hand-crafted application ribbon).
+Core patch types:
+
+```ts
+type RibbonPatch =
+  | { kind: "insert"; offset: number; text: string }
+  | { kind: "replace"; range: TextRange; text: string }
+  | { kind: "delete"; range: TextRange };
+```
+
+The repository applies patches from the end of the file toward the beginning so
+earlier offsets stay valid.
+
+Both reader and writer are exercised in `__tests__/ribbonXmlReader.test.ts` and
+`__tests__/ribbonPatchWriter.test.ts` against fixtures from real-world entities
+(account, contact, plus a hand-crafted application ribbon).
 
 ---
 
@@ -307,7 +371,7 @@ Ribbons
 │   │   │   └── SubGrid
 │   │   └── 📄 contact
 │   │       └── …
-│   └── 🗂  my-solution.zip (loaded from file)
+│   └── 🗂  my-solution.zip (loaded from file, phase 3)
 │       └── … (same shape)
 │
 └── (per ribbon node, when expanded):
@@ -329,7 +393,9 @@ Ribbons
         └── <id> (<n> languages)
 ```
 
-Selection drives the form panel (§8). Inline actions on each node level (the
+Entity nodes group one physical ribbon document; `Form`, `HomepageGrid`, and
+`SubGrid` below it are filtered views of that same document. Selection drives
+the form panel (§8). Inline actions on each node level (the
 `view/item/context` menus already used for the plugin explorer):
 
 | Node                        | Inline actions                                    |
@@ -344,8 +410,8 @@ Selection drives the form panel (§8). Inline actions on each node level (the
 | Rule step                   | Edit, Delete, Move up/down                        |
 | LocLabel                    | Edit, Delete, Add language                        |
 
-A toolbar-level command **"Open Ribbons from Solution…"** prompts for a `.zip`
-and adds it as a source.
+A toolbar-level command **"Open Ribbons from Solution…"** is added in phase 3.
+It prompts for a `.zip` and adds it as a source.
 
 ---
 
@@ -367,8 +433,9 @@ Why a webview instead of chained `QuickPick`/`InputBox`:
 
 The webview is **synchronous with the tree**: it only edits; the canonical
 state lives in `RibbonEditorState`. Edits post messages back to the extension
-host, which mutates the model, persists changes via `RibbonRepository`, and
-broadcasts a refresh so the tree updates.
+host, which mutates the model, records pending `RibbonPatch` values, marks the
+source dirty, and broadcasts a refresh so the tree updates. `RibbonRepository`
+writes to disk only when the user runs Save.
 
 ---
 
@@ -378,15 +445,18 @@ When the user is editing a `JavaScriptFunction` action or a `CustomRule` step,
 the **Library** field is a combobox populated from `BindingService.listBindings()`:
 
 1. List all bound web resources of kind `file` with `.js` extension.
-2. Display: `<schemaName>` plus the workspace-relative path as secondary text.
-3. On selection, the model stores `WebResourceRef { uniqueName: <schemaName>, workspaceUri: <fsPath> }`.
+2. Display: `remotePath` plus `relativeLocalPath` as secondary text. In the
+   existing binding model, `remotePath` is the Dataverse web resource name and
+   `relativeLocalPath` is the workspace file path.
+3. On selection, the model stores
+   `WebResourceRef { uniqueName: <remotePath>, workspaceUri: <resolved local path> }`.
 4. **Function name** field gets a lightweight autocomplete: if the workspace
    file is resolvable and small enough, we grep top-level `function foo(…)`,
    `foo = function`, and `<namespace>.foo = function` declarations and suggest
    them. Pure best-effort; user can always type free-form.
 5. Unbound or external libraries are still editable via a "Type schema name
-   manually" escape hatch — required for v1 because not every JS reference will
-   be a workspace file (e.g. ClientCommon).
+   manually" escape hatch because not every JS reference will be a workspace
+   file (e.g. ClientCommon).
 
 This is the layer that makes this editor genuinely better than alternatives:
 no copy-pasting of `$webresource:` paths, no typos, suggestions match what is
@@ -410,11 +480,15 @@ This is the operation that drove the design, so it gets its own section.
 3. Editor appends a `<HideCustomAction>` with a generated `HideActionId`
    (`<prefix>.<entity>.<scope>.Hide.<oobId>`).
 
-### Override an OOB command
+### Override an OOB command (advanced follow-up)
 
 The "take control" pattern. The user wants `Mscrm.SavePrimary` to call their
 own JS first (e.g., custom validation), and only fall through to default
 behavior on success — or replace it entirely.
+
+This is not part of the first useful release. It can break expected platform
+behavior if the replacement command does not recreate the default action chain.
+Ship it after basic hide + custom button editing is stable.
 
 1. User picks **Override OOB Command** on a ribbon node.
 2. Form shows a combo of OOB command Ids (`Mscrm.SavePrimary`, …) from the
@@ -425,7 +499,7 @@ behavior on success — or replace it entirely.
 4. UI clearly labels these nodes as "OVERRIDE: Mscrm.SavePrimary" so they're
    visually distinct from custom commands.
 
-### "Always hide built-ins, then re-add"
+### "Always hide built-ins, then re-add" (follow-up)
 
 A composite action available from the ribbon node:
 **Hide all OOB buttons in this group → Add custom buttons mimicking them**.
@@ -457,12 +531,12 @@ always allows free-text override.
 ## 11. Persistence
 
 Save is **explicit** (Cmd/Ctrl+S in the form panel + a `Save` action on each
-Source node) — not on every keystroke. Saving an unpacked source rewrites the
-individual `RibbonDiffXml.xml` files; saving a flat source rewrites the
-ribbon blocks inside `customizations.xml`; saving a zip source rewrites the
-extracted files and **does not** automatically repack the zip — that's a
-separate `Save Solution Zip…` action so the user is in control of whether to
-overwrite the original.
+Source node) — not on every keystroke. Saving an unpacked source applies
+pending patches to the individual `RibbonDiffXml.xml` files; saving a flat
+source patches only the relevant ribbon blocks inside `customizations.xml`;
+saving a zip source updates the extracted copy and **does not** automatically
+repack the zip — that's a separate `Save Solution Zip…` action so the user is
+in control of whether to overwrite the original.
 
 A dirty-tracking layer in `RibbonEditorState` marks sources with unsaved
 changes; the tree decorates them (matching the `vscode.SourceControl` dirty
@@ -475,6 +549,10 @@ indicator look).
 Direct publish is an explicit, opt-in action — never automatic on save.
 Surfaced as **"Publish to Environment…"** on each Source node in the tree
 and on each individual ribbon node (publish just this one).
+
+Publish is a later phase. It should reuse the existing `DataverseClient`,
+`EnvironmentConnectionService`, `SolutionPicker`, and `SolutionImportService`
+instead of creating a second import/polling stack.
 
 ### Flow
 
@@ -498,13 +576,13 @@ and on each individual ribbon node (publish just this one).
      metadata (attributes, forms, …) is intentionally omitted so we
      never accidentally overwrite unrelated customizations.
    - `[Content_Types].xml` — standard boilerplate.
-5. `ImportSolution` (via `DataverseClient.post`) with the zip bytes,
-   `OverwriteUnmanagedCustomizations: true`, `PublishWorkflows: false`,
-   `ConvertToManaged: false`, `ImportJobId` generated up-front so we can
-   poll status.
-6. Poll `RetrieveFormattedImportJobResults` (or read the `ImportJob`
-   record) until completion. Surface progress via `vscode.window.withProgress`.
-7. On success: `PublishXml` with a `ParameterXml` containing
+5. `ImportSolution` through the existing `SolutionImportService`, with
+   `OverwriteUnmanagedCustomizations: true`, `PublishWorkflows: false`, and an
+   import job id generated up-front.
+6. Reuse the import job polling and error parsing already present in
+   `SolutionImportService`. Surface progress via `vscode.window.withProgress`.
+7. On success: extend the Dataverse import/publish layer with `PublishXml`
+   support for ribbons. The `ParameterXml` contains
    `<entities><entity>account</entity>…</entities>` plus `<ribbon />` when the
    application ribbon is included.
 8. On failure: parse import job XML to extract the error and show it in a
@@ -519,7 +597,7 @@ and on each individual ribbon node (publish just this one).
   `OverwriteUnmanagedCustomizations: true` is last-write-wins by design.
   We surface this as a confirmation dialog the first time per session.
 - It does not pull ribbons from the environment back into the workspace.
-  Out of scope for v1; the existing "Open Ribbons from Solution…" flow
+  Out of scope for the first publish release; the existing "Open Ribbons from Solution…" flow
   covers the inbound path when paired with the user manually exporting
   the solution.
 
@@ -560,7 +638,7 @@ and a per-source `vscode.DiagnosticCollection`:
 
 ---
 
-## 14. Open questions / assumptions (call these out before phase 2)
+## 14. Open questions / assumptions
 
 1. **AppRibbon location in unpacked layouts**: pp-cli historically uses
    `Other/Customizations.xml`; recent versions sometimes split it out. The
@@ -569,10 +647,10 @@ and a per-source `vscode.DiagnosticCollection`:
 2. **Solution zip merging**: when re-saving a zip, do we keep non-ribbon
    files (forms, sitemap, …) byte-identical? Assumption: yes — JSZip
    round-trip with original entries untouched. Tested via fixture.
-3. **Templates editing**: out of scope for v1 (preserved verbatim).
+3. **Templates editing**: out of scope for the first useful release (preserved verbatim).
    Confirm this is acceptable or it becomes phase 4.
 4. **Reorder of OOB buttons**: not explicitly checked in the OOB question.
-   Assumption: out of scope for v1 — users achieve effective reordering by
+   Assumption: out of scope for the first useful release — users achieve effective reordering by
    hiding the OOB and re-adding with a different `Sequence`. Easy to revisit.
 5. **Throwaway publish solutions**: do we delete them automatically after a
    successful publish, prompt the user, or leave them? Default assumption:
@@ -585,10 +663,23 @@ and a per-source `vscode.DiagnosticCollection`:
 
 The phasing keeps each step independently shippable.
 
+### Phase 0 — XML spike (≈ 1–2 days)
+
+- Collect 5–6 real ribbon fixtures.
+- Build `ribbonXmlReader` enough to locate `RibbonDiffXml`, major sections,
+  known nodes, attributes, and text ranges.
+- Build `ribbonPatchWriter` and prove:
+  - no-op saves write nothing;
+  - insert/replace/delete patches touch only expected ranges;
+  - unknown nodes, comments, CDATA, and whitespace survive.
+
+Exit criteria: fixture tests prove the patch-based approach before UI work
+starts.
+
 ### Phase 1 — Read-only foundation (≈ 3–4 days)
 
 - `RibbonSourceLocator` + workspace scan.
-- `ribbonParser.ts` + `ribbonSerializer.ts` with round-trip tests.
+- `ribbonXmlReader.ts` + `ribbonPatchWriter.ts` with fixture tests.
 - `RibbonRepository` for unpacked + flat sources.
 - `oobCatalog.ts` with the initial well-known list.
 - `RibbonExplorer` tree view rendering everything (no editing yet).
@@ -598,22 +689,21 @@ Exit criteria: open an unpacked solution in the workspace, see every ribbon
 and its full structure in the tree, drill into any node and see all its
 properties.
 
-### Phase 2 — Editing custom content + hide OOB + JS rules (≈ 4–5 days)
+### Phase 2 — First useful editing release (≈ 5–7 days)
 
-- All `add/edit/delete` form actions for: CustomAction (Button only),
-  HideAction, CommandDefinition, Action (JsFn + Url), EnableRule,
-  DisplayRule and their rule steps, LocLabel (single language).
-- **OOB command override** flow.
-- **Hide-OOB** flow + composite "hide all and stub replacements" wizard.
+- Add/edit/delete for: CustomAction (Button only), HideAction,
+  CommandDefinition, Action (JsFn + Url), simple EnableRule, simple
+  DisplayRule, and LocLabel (single language).
+- **Hide-OOB** flow.
 - Web-resource-picker (`BindingService`-backed) for JsFn libraries.
 - Validation diagnostics.
 - Save-on-demand for unpacked + flat sources.
 
 Exit criteria: build the "validate before save with custom JS, then save" use
 case end-to-end against a real entity ribbon in an unpacked solution. Hide
-OOB Save → re-add with same icon → command override calls our JS.
+OOB Save, re-add a custom button with the same icon, and call workspace JS.
 
-### Phase 3 — Solution `.zip` source + reorder + multi-language (≈ 2–3 days)
+### Phase 3 — Solution `.zip` source + reorder + multi-language (≈ 3–4 days)
 
 - `SolutionZipService` (JSZip) + zip source type.
 - "Open Ribbons from Solution…" command, "Save Solution Zip…" action.
@@ -623,11 +713,11 @@ OOB Save → re-add with same icon → command override calls our JS.
 Exit criteria: open a downloaded `solution.zip`, edit ribbons, save back to
 zip, import zip into an env — ribbon behaves as edited.
 
-### Phase 4 — Publish to environment (≈ 3–4 days)
+### Phase 4 — Publish to environment (≈ 4–5 days)
 
 - `RibbonPublishService` + minimal-zip builder (fixture-tested shape).
 - Env + solution picker reusing `EnvironmentConnectionService` UX.
-- `ImportSolution` invocation + `ImportJob` polling with progress UI.
+- `ImportSolution` invocation reusing `SolutionImportService`.
 - `PublishXml` per touched entity / app ribbon.
 - Pre-flight checks (entity exists in env, publisher available).
 - Error surfacing from the import job XML.
@@ -639,6 +729,8 @@ opening Power Apps.
 
 ### Phase 5 — Polish / stretch
 
+- OOB command override.
+- "Hide all and stub replacements" wizard.
 - Templates editor (or at minimum a "raw XML" escape hatch for unknown nodes).
 - Expanded `oobCatalog.ts` (community-sourced lists, per-version variants).
 - Reorder of OOB buttons (synthesized hide+re-add).
@@ -649,10 +741,11 @@ opening Power Apps.
 
 ## 16. Testing
 
-- **`ribbonParser.test.ts`**: byte-stable round-trip on 5–6 fixture files
-  covering: empty diff, full diff with all section types, embedded inside
-  `customizations.xml`, file containing unknown attributes & nodes (must
-  preserve), file with CDATA in LocLabel titles.
+- **`ribbonXmlReader.test.ts`**: read 5–6 fixture files covering: empty diff,
+  full diff with all section types, embedded inside `customizations.xml`,
+  unknown attributes & nodes, comments, and CDATA in LocLabel titles.
+- **`ribbonPatchWriter.test.ts`**: no-op writes nothing; insert/replace/delete
+  patches touch only expected ranges; unknown data stays byte-identical.
 - **`ribbonRepository.test.ts`**: unpacked source load/save, flat source
   surgical patch (assert other entities in `customizations.xml` are
   byte-identical after a save that touched only one).
@@ -663,24 +756,24 @@ opening Power Apps.
   expected by `ImportSolution`, asserted against a known-good fixture. Plus
   unit tests for the import-job error parser.
 - **Manual UI tests**: documented checklist in PR for tree rendering, form
-  flows, OOB override, hide+restub wizard, web-resource picker, validation
-  diagnostics. (Followed the project convention of "no automated UI tests
-  for VS Code views.")
+  flows, hide OOB, web-resource picker, validation diagnostics, and later
+  OOB override / hide+restub flows when those phases land. (Followed the
+  project convention of "no automated UI tests for VS Code views.")
 
 ---
 
 ## 17. Risks
 
-1. **XML round-trip stability** is the single biggest correctness risk. We
-   mitigate via fixture-based tests asserting byte-equivalence on no-op
-   edits, and by treating unknown nodes as opaque preserved strings.
+1. **XML write stability** is the single biggest correctness risk. We mitigate
+   by never serializing the whole ribbon from a parsed object, by applying
+   small text patches, and by fixture tests that assert byte-equivalence outside
+   changed ranges.
 2. **OOB catalog drift**: well-known Ids change rarely but do change across
    D365 versions. The catalog is plain data and free-text override is always
-   available; we accept this as low risk for v1.
+   available; we accept this as low risk for the first useful release.
 3. **Flat `customizations.xml` surgical edits**: we must edit only the
-   `RibbonDiffXml` blocks and leave the rest byte-identical. The serializer
-   takes a "patch region" rather than "rewrite document" approach. Covered
-   by tests.
+   `RibbonDiffXml` blocks and leave the rest byte-identical. The writer applies
+   patches to known ranges rather than rewriting the document. Covered by tests.
 4. **Web-resource picker accuracy**: bindings can be stale relative to the
    solution's actual web resources. We always allow free-text and surface
    "unresolved" warnings, never block save.
@@ -695,11 +788,10 @@ opening Power Apps.
 
 ## 18. Effort estimate
 
-Roughly **3–3.5 weeks** of focused implementation for phases 1–4 (the
-shippable v1, now including publish-to-environment). Phase 5 is
-open-ended.
+Roughly **1.5–2 weeks** for phases 0–2, which is the first useful release.
+Phases 3–4 add zip and publish support and are likely another **1.5–2 weeks**
+after the XML writer is proven. Phase 5 is open-ended.
 
-The two longest sub-tasks are (a) the parser/serializer round-trip work in
-phase 1 and (b) getting the `ImportSolution` zip shape right in phase 4 —
-both are correctness-critical and the place any saved time would come
-from cutting, but neither is safe to cut.
+The two longest sub-tasks are (a) the XML reader / patch writer work in phases
+0–1 and (b) getting the `ImportSolution` zip shape right in phase 4. Both are
+correctness-critical and are not safe places to cut scope.
