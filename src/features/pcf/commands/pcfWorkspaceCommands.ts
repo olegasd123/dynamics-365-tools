@@ -54,7 +54,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     prompt: "Control name",
     placeHolder: "LinearInput",
     ignoreFocusOut: true,
-    validateInput: validateControlName,
+    validateInput: (value) => validateNewPcfControlName(value, parentFolder.uri.fsPath),
   });
   if (!name) {
     return;
@@ -555,6 +555,23 @@ function validateControlName(value: string): string | undefined {
   if (!/^[A-Za-z][A-Za-z0-9]*$/.test(value.trim())) {
     return "Use letters and numbers. The first character must be a letter.";
   }
+  return undefined;
+}
+
+export async function validateNewPcfControlName(
+  value: string,
+  parentFolderPath: string,
+): Promise<string | undefined> {
+  const basicError = validateControlName(value);
+  if (basicError) {
+    return basicError;
+  }
+
+  const targetRoot = path.join(parentFolderPath, value.trim());
+  if (await isNonEmptyDirectory(targetRoot)) {
+    return `Folder ${targetRoot} already exists and is not empty.`;
+  }
+
   return undefined;
 }
 

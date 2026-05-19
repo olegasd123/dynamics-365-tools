@@ -7,6 +7,7 @@ import {
   findGeneratedPcfSourceFile,
   normalizeGeneratedPcfPackageJson,
   normalizeGeneratedPcfTsConfig,
+  validateNewPcfControlName,
 } from "../commands/pcfWorkspaceCommands";
 
 test("findGeneratedPcfSourceFile finds index.ts in the generated control subfolder", async () => {
@@ -195,5 +196,33 @@ test("normalizeGeneratedPcfPackageJson keeps existing eslint versions", async ()
     assert.strictEqual(packageJson.devDependencies.eslint, "^8.57.0");
   } finally {
     await fs.rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("validateNewPcfControlName reports an existing non-empty target folder", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-pcf-command-"));
+  const targetRoot = path.join(workspaceRoot, "LinearInput");
+  await fs.mkdir(targetRoot, { recursive: true });
+  await fs.writeFile(path.join(targetRoot, "existing.txt"), "used\n");
+
+  try {
+    const error = await validateNewPcfControlName("LinearInput", workspaceRoot);
+
+    assert.strictEqual(error, `Folder ${targetRoot} already exists and is not empty.`);
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("validateNewPcfControlName allows an empty target folder", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-pcf-command-"));
+  await fs.mkdir(path.join(workspaceRoot, "LinearInput"), { recursive: true });
+
+  try {
+    const error = await validateNewPcfControlName("LinearInput", workspaceRoot);
+
+    assert.strictEqual(error, undefined);
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });

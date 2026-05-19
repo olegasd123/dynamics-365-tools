@@ -592,24 +592,24 @@
         {
           "command": "dynamics365Tools.pcf.refreshExplorer",
           "when": "view == dynamics365Tools.pcfExplorer",
-          "group": "navigation@1"
+          "group": "navigation@2"
         },
         {
           "command": "dynamics365Tools.pcf.disableSolutionFilter",
           "when": "view == dynamics365Tools.pcfExplorer && d365Tools.pcf.filterConfiguredSolutions",
-          "group": "navigation@2",
+          "group": "navigation@3",
           "toggled": "d365Tools.pcf.filterConfiguredSolutions"
         },
         {
           "command": "dynamics365Tools.pcf.enableSolutionFilter",
           "when": "view == dynamics365Tools.pcfExplorer && !d365Tools.pcf.filterConfiguredSolutions",
-          "group": "navigation@2",
+          "group": "navigation@3",
           "toggled": "d365Tools.pcf.filterConfiguredSolutions"
         },
         {
           "command": "dynamics365Tools.pcf.newControl",
           "when": "view == dynamics365Tools.pcfExplorer",
-          "group": "navigation@3"
+          "group": "navigation@1"
         },
         {
           "command": "dynamics365Tools.pcf.setWorkspaceFolderFilter",
