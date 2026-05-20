@@ -36,6 +36,10 @@ import {
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
+  openRibbonFile,
+  refreshRibbonExplorer,
+} from "../features/ribbons/commands/ribbonExplorerCommands";
+import {
   buildPcfControl,
   newPcfControl,
   pushPcfControl,
@@ -122,6 +126,12 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       ctx.pluginExplorer.setSolutionFilter(false),
     ),
     register("dynamics365Tools.plugins.generatePublicKeyToken", () => generatePublicKeyToken(ctx)),
+    register("dynamics365Tools.ribbons.refreshExplorer", () => refreshRibbonExplorer(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
+      validateConfiguration: false,
+    }),
     register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),
     register("dynamics365Tools.plugins.editStep", (node) => editPluginStep(ctx, node)),
     register("dynamics365Tools.plugins.enableStep", (node) => enablePluginStep(ctx, node)),
@@ -206,6 +216,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
+    vscode.window.registerTreeDataProvider("dynamics365Tools.ribbonExplorer", ctx.ribbonExplorer),
     ctx.pcfProjectLocator,
     ctx.pcfBuildService,
     ctx.pcfPushService,

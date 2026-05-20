@@ -71,6 +71,8 @@
     "onCommand:dynamics365Tools.pcf.updateFromLocal",
     "onCommand:dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
     "onCommand:dynamics365Tools.pcf.copyDeployedControlId",
+    "onCommand:dynamics365Tools.ribbons.refreshExplorer",
+    "onCommand:dynamics365Tools.ribbons.openFile",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
   ],
@@ -344,6 +346,18 @@
         "title": "Copy PCF Control ID",
         "category": "Dynamics 365 Tools",
         "icon": "$(copy)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.refreshExplorer",
+        "title": "Refresh Ribbon Explorer",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.openFile",
+        "title": "Open Ribbon XML",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(go-to-file)"
       }
     ],
     "submenus": [
@@ -529,6 +543,12 @@
         },
         {
           "command": "dynamics365Tools.pcf.copyDeployedControlId"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.refreshExplorer"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.openFile"
         }
       ],
       "view/title": [
@@ -585,6 +605,11 @@
           "command": "dynamics365Tools.pcf.setWorkspaceFolderFilter",
           "when": "view == dynamics365Tools.pcfExplorer",
           "group": "navigation@4"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.refreshExplorer",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -697,6 +722,11 @@
           "command": "dynamics365Tools.pcf.copyDeployedControlId",
           "when": "view == dynamics365Tools.pcfExplorer && viewItem =~ /d365PcfDeployedControl/",
           "group": "inline@3"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.openFile",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonDocument",
+          "group": "inline@1"
         }
       ]
     },
@@ -719,6 +749,11 @@
         {
           "id": "dynamics365Tools.pcfExplorer",
           "name": "PCF Controls",
+          "contextualTitle": "Dynamics 365 Tools"
+        },
+        {
+          "id": "dynamics365Tools.ribbonExplorer",
+          "name": "Ribbons",
           "contextualTitle": "Dynamics 365 Tools"
         }
       ]

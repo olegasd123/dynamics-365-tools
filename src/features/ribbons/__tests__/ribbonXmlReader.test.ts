@@ -110,6 +110,10 @@ test("locates embedded RibbonDiffXml blocks in flat customizations XML", () => {
   });
 
   assert.strictEqual(documents.length, 2);
+  assert.strictEqual(documents[0].kind, "Entity");
+  assert.strictEqual(documents[0].entityLogicalName, "account");
+  assert.strictEqual(documents[1].kind, "Entity");
+  assert.strictEqual(documents[1].entityLogicalName, "contact");
   assert.ok(documents[0].ribbonRange.start > 0);
   assert.strictEqual(documents[1].views[0].customActions.length, 0);
 });

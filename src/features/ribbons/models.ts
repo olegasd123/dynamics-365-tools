@@ -1,5 +1,21 @@
 export type RibbonScope = "Application" | "Form" | "HomepageGrid" | "SubGrid";
 
+export type RibbonSourceKind = "unpacked" | "flat";
+
+export interface RibbonSource {
+  id: string;
+  kind: RibbonSourceKind;
+  name: string;
+  rootUri: string;
+  files: RibbonSourceFile[];
+}
+
+export interface RibbonSourceFile {
+  fileUri: string;
+  kind: "Application" | "Entity" | "Flat";
+  entityLogicalName?: string;
+}
+
 export interface TextRange {
   start: number;
   end: number;

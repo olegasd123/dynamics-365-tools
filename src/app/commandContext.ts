@@ -19,6 +19,9 @@ import type { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSe
 import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
+import type { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
+import type { RibbonRepository } from "../features/ribbons/ribbonRepository";
+import type { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
 import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
@@ -47,6 +50,10 @@ export interface CommandContext {
 
   pluginExplorer: PluginExplorerProvider;
   pluginRegistration: PluginRegistrationManager;
+
+  ribbonSourceLocator: RibbonSourceLocator;
+  ribbonRepository: RibbonRepository;
+  ribbonExplorer: RibbonExplorerProvider;
 
   pcfProcessRunner: ProcessRunner;
   pacCli: PacCli;

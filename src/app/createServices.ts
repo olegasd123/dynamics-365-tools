@@ -20,6 +20,9 @@ import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
+import { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
+import { RibbonRepository } from "../features/ribbons/ribbonRepository";
+import { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
 import { BindingService } from "../features/webResources/bindingService";
 import { PublishCacheService } from "../features/webResources/publishCacheService";
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
@@ -49,6 +52,13 @@ export async function createServices(
 
   const pluginAssemblyIntrospector = new PluginAssemblyIntrospector(extensionContext.extensionPath);
   const pluginRegistration = new PluginRegistrationManager(pluginAssemblyIntrospector);
+  const ribbonSourceLocator = new RibbonSourceLocator();
+  const ribbonRepository = new RibbonRepository();
+  const ribbonExplorer = new RibbonExplorerProvider(
+    configuration,
+    ribbonSourceLocator,
+    ribbonRepository,
+  );
   const pluginExplorer = new PluginExplorerProvider(
     configuration,
     connections,
@@ -114,6 +124,9 @@ export async function createServices(
     connections,
     pluginExplorer,
     pluginRegistration,
+    ribbonSourceLocator,
+    ribbonRepository,
+    ribbonExplorer,
     pcfProcessRunner,
     pacCli,
     npmRunner,

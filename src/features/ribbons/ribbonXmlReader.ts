@@ -37,6 +37,11 @@ interface OpenElement {
   parent?: OpenElement;
 }
 
+interface LocatedRibbon {
+  node: XmlElementRange;
+  ancestors: XmlElementRange[];
+}
+
 const SECTION_NAMES = new Set([
   "CustomActions",
   "Templates",
@@ -50,18 +55,21 @@ export function readRibbonDocuments(
   options: RibbonReadOptions = {},
 ): RibbonDocument[] {
   const roots = scanXmlElements(sourceText);
-  const ribbons = findElementsByName(roots, "RibbonDiffXml");
+  const ribbons = findRibbonElements(roots);
   const sourceId = options.sourceId ?? options.fileUri ?? "memory";
 
-  return ribbons.map((ribbon, index) => {
+  return ribbons.map(({ node: ribbon, ancestors }, index) => {
     const sections = getRibbonSections(ribbon);
-    const scope = options.kind === "Application" ? "Application" : inferScope(ribbon);
+    const parentEntityName = findParentEntityName(sourceText, ancestors);
+    const kind =
+      options.kind ?? (parentEntityName ? "Entity" : ("Application" as "Application" | "Entity"));
+    const scope = kind === "Application" ? "Application" : inferScope(ribbon);
 
     return {
       id: `${sourceId}:ribbon:${index}`,
       sourceId,
-      kind: options.kind ?? (scope === "Application" ? "Application" : "Entity"),
-      entityLogicalName: options.entityLogicalName,
+      kind,
+      entityLogicalName: options.entityLogicalName ?? parentEntityName,
       fileUri: options.fileUri ?? "",
       sourceText,
       ribbonRange: ribbon.range,
@@ -316,6 +324,47 @@ function findElementsByName(nodes: XmlElementRange[], name: string): XmlElementR
   }
 
   return matches;
+}
+
+function findRibbonElements(nodes: XmlElementRange[]): LocatedRibbon[] {
+  const matches: LocatedRibbon[] = [];
+  collectRibbonElements(nodes, [], matches);
+  return matches;
+}
+
+function collectRibbonElements(
+  nodes: XmlElementRange[],
+  ancestors: XmlElementRange[],
+  matches: LocatedRibbon[],
+): void {
+  for (const node of nodes) {
+    if (node.name === "RibbonDiffXml") {
+      matches.push({ node, ancestors });
+    }
+
+    collectRibbonElements(node.children, [...ancestors, node], matches);
+  }
+}
+
+function findParentEntityName(
+  sourceText: string,
+  ancestors: XmlElementRange[],
+): string | undefined {
+  for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+    const ancestor = ancestors[index];
+    if (ancestor.name !== "Entity") {
+      continue;
+    }
+
+    const name = getDirectChild(ancestor, "Name");
+    if (!name) {
+      return undefined;
+    }
+
+    return decodeXml(sourceText.slice(name.innerRange.start, name.innerRange.end).trim());
+  }
+
+  return undefined;
 }
 
 function getRibbonSections(ribbon: XmlElementRange): RibbonSectionRanges {
