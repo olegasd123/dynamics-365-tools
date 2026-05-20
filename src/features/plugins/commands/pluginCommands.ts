@@ -533,6 +533,11 @@ type PluginComponentDiff = {
   newTypes: DiscoveredPluginType[];
 };
 
+type PluginDeleteFailure = {
+  plugin: PluginType;
+  error: unknown;
+};
+
 export async function updateAssemblyFromFileDialog(
   context: AssemblyUpdateFileDialogContext,
 ): Promise<void> {
@@ -782,15 +787,23 @@ async function removeDeletedPluginTypesBeforeAssemblyUpdate(
     },
     async () => {
       const removed: PluginType[] = [];
+      const failures: PluginDeleteFailure[] = [];
       for (const plugin of deletedTypes) {
         try {
           await context.pluginService.deletePluginTypeCascade(plugin.id);
         } catch (error) {
-          throw new Error(
-            `Failed to delete plugin ${plugin.name ?? plugin.typeName}: ${String(error)}`,
-          );
+          failures.push({ plugin, error });
+          continue;
         }
         removed.push(plugin);
+      }
+
+      if (failures.length) {
+        throw new Error(
+          `Failed to delete ${failures.length} missing plugin type(s). Assembly was not updated because Dataverse still has plugin types that are missing from the DLL.\n${formatPluginDeleteFailures(
+            failures,
+          )}`,
+        );
       }
 
       return {
@@ -802,6 +815,20 @@ async function removeDeletedPluginTypesBeforeAssemblyUpdate(
       };
     },
   );
+}
+
+function formatPluginDeleteFailures(failures: PluginDeleteFailure[]): string {
+  const limit = 10;
+  const lines = failures.slice(0, limit).map(({ plugin, error }) => {
+    const name = plugin.typeName || plugin.name || "unknown";
+    return `- ${name}: ${String(error)}`;
+  });
+  const remaining = failures.length - lines.length;
+  if (remaining > 0) {
+    lines.push(`- and ${remaining} more`);
+  }
+
+  return lines.join("\n");
 }
 
 function buildPluginComponentDiff(

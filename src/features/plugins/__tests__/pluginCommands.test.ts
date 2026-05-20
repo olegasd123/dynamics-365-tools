@@ -367,6 +367,85 @@ test("updateAssemblyFromFileDialog cancels update when missing plugin removal is
   assert.deepStrictEqual(calls, []);
 });
 
+test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one delete fails", async () => {
+  const originalShowOpenDialog = vscode.window.showOpenDialog;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+  const originalShowErrorMessage = vscode.window.showErrorMessage;
+  const originalReadFile = vscode.workspace.fs.readFile;
+  const calls: string[] = [];
+  let error = "";
+
+  (vscode.window as any).showOpenDialog = async () => [
+    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
+  ];
+  (vscode.window as any).showWarningMessage = async () => "Remove and Update";
+  (vscode.window as any).showErrorMessage = async (message: string) => {
+    error = message;
+    return undefined;
+  };
+  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
+
+  const service = {
+    getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
+    listPluginTypes: async () => [
+      { id: "blocked-type", name: "Blocked", typeName: "Contoso.Plugins.Blocked" },
+      { id: "old-type", name: "Old", typeName: "Contoso.Plugins.Old" },
+      { id: "kept-type", name: "Kept", typeName: "Contoso.Plugins.Kept" },
+    ],
+    deletePluginTypeCascade: async (id: string) => {
+      calls.push(`delete:${id}`);
+      if (id === "blocked-type") {
+        throw new Error("workflow dependency");
+      }
+    },
+    updateAssembly: async () => {
+      calls.push("updateAssembly");
+    },
+  };
+  const registration = {
+    inspectAssembly: async () => ({
+      assembly: { name: "Contoso.Plugins" },
+      plugins: [{ typeName: "Contoso.Plugins.Kept" }],
+    }),
+    syncPluginTypes: async () => {
+      calls.push("syncPluginTypes");
+      return {
+        created: [],
+        updated: [],
+        removed: [],
+        skippedCreation: [],
+        skippedRemoval: [],
+      };
+    },
+  };
+
+  try {
+    await updateAssemblyFromFileDialog({
+      assemblyId: "assembly-id",
+      assemblyName: "Contoso.Plugins",
+      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+      manageMissingComponents: true,
+      pluginService: service as any,
+      pluginRegistration: registration as any,
+      assemblyStatusBar: { setLastPublish: () => undefined } as any,
+      lastSelection: {
+        setLastAssemblyDllPath: async () => undefined,
+      } as any,
+    });
+  } finally {
+    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
+    (vscode.workspace.fs as any).readFile = originalReadFile;
+  }
+
+  assert.deepStrictEqual(calls, ["delete:blocked-type", "delete:old-type"]);
+  assert.match(error, /Failed to update plugin assembly/);
+  assert.match(error, /Assembly was not updated/);
+  assert.match(error, /Contoso\.Plugins\.Blocked/);
+  assert.match(error, /workflow dependency/);
+});
+
 test("updateAssemblyFromFileDialog blocks deleted plugin types when missing management is disabled", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowErrorMessage = vscode.window.showErrorMessage;
