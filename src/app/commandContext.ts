@@ -4,6 +4,19 @@ import type { AuthorizationStore } from "../features/auth/authorizationStore";
 import type { SecretService } from "../features/auth/secretService";
 import type { ConfigurationService } from "../features/config/configurationService";
 import type { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
+import type { PcfBuildService } from "../features/pcf/pcfBuildService";
+import type { PcfDeployService } from "../features/pcf/pcfDeployService";
+import type { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentService";
+import type { PacCli } from "../features/pcf/pacCli";
+import type { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
+import type { NpmRunner } from "../features/pcf/npmRunner";
+import type { PcfPackageService } from "../features/pcf/pcfPackageService";
+import type { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import type { PcfPushService } from "../features/pcf/pcfPushService";
+import type { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
+import type { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
+import type { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
+import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import type { BindingService } from "../features/webResources/bindingService";
@@ -34,6 +47,20 @@ export interface CommandContext {
 
   pluginExplorer: PluginExplorerProvider;
   pluginRegistration: PluginRegistrationManager;
+
+  pcfProcessRunner: ProcessRunner;
+  pacCli: PacCli;
+  npmRunner: NpmRunner;
+  pcfBuildService: PcfBuildService;
+  pcfDeployService: PcfDeployService;
+  pcfEnvironmentService: PcfEnvironmentService;
+  pcfPackageService: PcfPackageService;
+  pcfPushService: PcfPushService;
+  pcfWorkspaceSettings: PcfWorkspaceSettingsService;
+  pcfProjectLocator: PcfProjectLocator;
+  pcfExplorer: PcfExplorerProvider;
+  pcfStatusBar: PcfStatusBarService;
+  pcfTelemetry: PcfTelemetryService;
 
   statusBar: StatusBarService;
   assemblyStatusBar: AssemblyStatusBarService;

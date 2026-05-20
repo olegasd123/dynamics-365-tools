@@ -4,6 +4,19 @@ import { AuthorizationStore } from "../features/auth/authorizationStore";
 import { SecretService } from "../features/auth/secretService";
 import { ConfigurationService } from "../features/config/configurationService";
 import { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
+import { NpmRunner } from "../features/pcf/npmRunner";
+import { createPacCommandCandidates, PacCli } from "../features/pcf/pacCli";
+import { PcfBuildService } from "../features/pcf/pcfBuildService";
+import { PcfDeployService } from "../features/pcf/pcfDeployService";
+import { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentService";
+import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
+import { PcfPackageService } from "../features/pcf/pcfPackageService";
+import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
+import { PcfPushService } from "../features/pcf/pcfPushService";
+import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
+import { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
+import { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
+import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
@@ -43,6 +56,44 @@ export async function createServices(
   );
   await pluginExplorer.initialize();
 
+  const pcfProcessRunner = new ProcessRunner();
+  const pacCli = new PacCli(
+    pcfProcessRunner,
+    createPacCommandCandidates(extensionContext.globalStorageUri.fsPath),
+  );
+  const npmRunner = new NpmRunner(pcfProcessRunner);
+  const pcfStatusBar = new PcfStatusBarService("dynamics365Tools.pcf.stopWatch");
+  const pcfTelemetry = new PcfTelemetryService();
+  const pcfBuildService = new PcfBuildService(npmRunner, pcfStatusBar, pcfTelemetry);
+  const pcfEnvironmentService = new PcfEnvironmentService(connections);
+  const pcfWorkspaceSettings = new PcfWorkspaceSettingsService(configuration);
+  const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings, pcfTelemetry);
+  const pcfDeployService = new PcfDeployService(
+    connections,
+    pcfWorkspaceSettings,
+    configuration,
+    pcfTelemetry,
+  );
+  const pcfPackageService = new PcfPackageService(
+    pacCli,
+    pcfProcessRunner,
+    pcfWorkspaceSettings,
+    configuration,
+    pcfTelemetry,
+  );
+  const pcfProjectLocator = new PcfProjectLocator();
+  await pcfProjectLocator.initialize();
+  const pcfExplorer = new PcfExplorerProvider(
+    configuration,
+    extensionContext.workspaceState,
+    pcfProjectLocator,
+    pcfProcessRunner,
+    pacCli,
+    pcfBuildService,
+    pcfEnvironmentService,
+  );
+  await pcfExplorer.initialize();
+
   const statusBar = new StatusBarService("dynamics365Tools.publishLastResource");
   const assemblyStatusBar = new AssemblyStatusBarService(
     "dynamics365Tools.plugins.publishLastAssembly",
@@ -63,6 +114,19 @@ export async function createServices(
     connections,
     pluginExplorer,
     pluginRegistration,
+    pcfProcessRunner,
+    pacCli,
+    npmRunner,
+    pcfBuildService,
+    pcfDeployService,
+    pcfEnvironmentService,
+    pcfPackageService,
+    pcfPushService,
+    pcfWorkspaceSettings,
+    pcfProjectLocator,
+    pcfExplorer,
+    pcfStatusBar,
+    pcfTelemetry,
     statusBar,
     assemblyStatusBar,
   };

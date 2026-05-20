@@ -2,6 +2,7 @@ import { DataverseClient, isDefaultSolution } from "./dataverseClient";
 
 export enum SolutionComponentType {
   WebResource = 61,
+  CustomControl = 66,
   PluginType = 90,
   PluginAssembly = 91,
   PluginStep = 92,

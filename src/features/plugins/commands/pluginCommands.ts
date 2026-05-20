@@ -11,11 +11,11 @@ import {
 } from "../../dataverse/environmentConnectionService";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
-import { PluginAssembly } from "../models";
+import { PluginAssembly, PluginType } from "../models";
 import { PluginService } from "../pluginService";
 import { PluginAssemblyNode, PluginExplorerProvider } from "../pluginExplorer";
 import { PluginRegistrationManager, PluginSyncResult } from "../pluginRegistrationManager";
-import { AssemblyIdentity, PluginAssemblyInspection } from "../pluginAssemblyIntrospector";
+import { AssemblyIdentity, DiscoveredPluginType } from "../pluginAssemblyIntrospector";
 import { AssemblyStatusBarService } from "../../../platform/vscode/statusBar";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
 import { EnvironmentConfig } from "../../config/domain/models";
@@ -499,55 +499,6 @@ async function runPluginSyncForAssembly(context: PluginSyncContext): Promise<Plu
   );
 }
 
-async function removeMissingPluginsBeforeAssemblyUpdate(
-  context: PluginSyncContext,
-): Promise<PluginSyncResult | undefined> {
-  if (context.manageMissingComponents !== true) {
-    return emptyPluginSyncResult();
-  }
-
-  const missing = await context.registration.listMissingPluginTypes({
-    pluginService: context.pluginService,
-    assemblyId: context.assemblyId,
-    assemblyPath: context.assemblyPath,
-    solutionName: context.solutionName,
-    manageMissingComponents: context.manageMissingComponents,
-  });
-  if (!missing.length) {
-    return emptyPluginSyncResult();
-  }
-
-  const removeAndUpdate = "Remove and Update";
-  const choice = await vscode.window.showWarningMessage(
-    `Remove ${missing.length} missing plugin type(s) from CRM and update the assembly?`,
-    {
-      modal: true,
-      detail: `Related steps and images will also be deleted.\n\n${formatPluginRemovalPreview(
-        missing,
-      )}`,
-    },
-    removeAndUpdate,
-  );
-  if (choice !== removeAndUpdate) {
-    return undefined;
-  }
-
-  return vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Removing missing plugins for ${path.basename(context.assemblyPath)}`,
-    },
-    () =>
-      context.registration.removeMissingPluginTypes({
-        pluginService: context.pluginService,
-        assemblyId: context.assemblyId,
-        assemblyPath: context.assemblyPath,
-        solutionName: context.solutionName,
-        manageMissingComponents: context.manageMissingComponents,
-      }),
-  );
-}
-
 type AssemblyUpdateContext = {
   assemblyId: string;
   assemblyName?: string;
@@ -570,6 +521,21 @@ type AssemblyUpdateValidationContext = {
   assemblyUri: vscode.Uri;
   pluginService: Pick<PluginService, "getAssembly" | "listPluginTypes">;
   pluginRegistration: Pick<PluginRegistrationManager, "inspectAssembly">;
+};
+
+type AssemblyUpdatePreflight = {
+  targetAssembly: PluginAssembly;
+  diff: PluginComponentDiff;
+};
+
+type PluginComponentDiff = {
+  deletedTypes: PluginType[];
+  newTypes: DiscoveredPluginType[];
+};
+
+type PluginDeleteFailure = {
+  plugin: PluginType;
+  error: unknown;
 };
 
 export async function updateAssemblyFromFileDialog(
@@ -606,30 +572,29 @@ export async function updateAssemblyFromFileDialog(
 }
 
 async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<void> {
-  const canUpdate = await validateAssemblyUpdateTarget({
+  const preflight = await prepareAssemblyUpdate({
     assemblyId: context.assemblyId,
     assemblyUri: context.assemblyUri,
     pluginService: context.pluginService,
     pluginRegistration: context.pluginRegistration,
   });
-  if (!canUpdate) {
-    return;
-  }
 
   const content = await vscode.workspace.fs.readFile(context.assemblyUri);
   const contentBase64 = Buffer.from(content).toString("base64");
 
-  const preUpdateSyncResult = await removeMissingPluginsBeforeAssemblyUpdate({
-    registration: context.pluginRegistration,
-    pluginService: context.pluginService,
-    assemblyId: context.assemblyId,
-    assemblyPath: context.assemblyUri.fsPath,
-    solutionName: undefined,
+  const confirmed = await confirmPluginComponentChanges({
+    assemblyName: context.assemblyName ?? preflight.targetAssembly.name,
+    diff: preflight.diff,
     manageMissingComponents: context.manageMissingComponents,
   });
-  if (!preUpdateSyncResult) {
+  if (!confirmed) {
     return;
   }
+
+  const preUpdateSyncResult = await removeDeletedPluginTypesBeforeAssemblyUpdate(
+    context,
+    preflight.diff.deletedTypes,
+  );
 
   await context.pluginService.updateAssembly(context.assemblyId, contentBase64);
   await context.lastSelection.setLastAssemblyDllPath(
@@ -680,6 +645,13 @@ async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<vo
 export async function validateAssemblyUpdateTarget(
   context: AssemblyUpdateValidationContext,
 ): Promise<boolean> {
+  await prepareAssemblyUpdate(context);
+  return true;
+}
+
+async function prepareAssemblyUpdate(
+  context: AssemblyUpdateValidationContext,
+): Promise<AssemblyUpdatePreflight> {
   const [targetAssembly, localInspection] = await Promise.all([
     context.pluginService.getAssembly(context.assemblyId),
     context.pluginRegistration.inspectAssembly(context.assemblyUri.fsPath),
@@ -688,7 +660,12 @@ export async function validateAssemblyUpdateTarget(
   validateAssemblyIdentity(targetAssembly, localInspection.assembly);
   showVersionChangeWarning(targetAssembly, localInspection.assembly);
 
-  return confirmPluginTypeOverlap(context, targetAssembly, localInspection);
+  const existingTypes = await context.pluginService.listPluginTypes(context.assemblyId);
+
+  return {
+    targetAssembly,
+    diff: buildPluginComponentDiff(existingTypes, localInspection.plugins),
+  };
 }
 
 export class AssemblyIdentityValidationError extends Error {
@@ -740,37 +717,151 @@ function showVersionChangeWarning(
   );
 }
 
-async function confirmPluginTypeOverlap(
-  context: AssemblyUpdateValidationContext,
-  targetAssembly: PluginAssembly,
-  localInspection: PluginAssemblyInspection,
-): Promise<boolean> {
-  const existingTypes = await context.pluginService.listPluginTypes(context.assemblyId);
-  const existingTypeNames = existingTypes
-    .map((type) => normalizeTypeName(type.typeName))
-    .filter((typeName): typeName is string => Boolean(typeName));
-  if (!existingTypeNames.length) {
+async function confirmPluginComponentChanges(context: {
+  assemblyName: string;
+  diff: PluginComponentDiff;
+  manageMissingComponents: boolean;
+}): Promise<boolean> {
+  const deletedCount = context.diff.deletedTypes.length;
+  const newCount = context.diff.newTypes.length;
+  if (!deletedCount && !newCount) {
     return true;
   }
 
-  const localTypeNames = new Set(
-    localInspection.plugins
-      .map((type) => normalizeTypeName(type.typeName))
-      .filter((typeName): typeName is string => Boolean(typeName)),
-  );
-  const hasMatch = existingTypeNames.some((typeName) => localTypeNames.has(typeName));
-  if (hasMatch) {
-    return true;
+  if (!context.manageMissingComponents && deletedCount) {
+    await vscode.window.showErrorMessage(
+      `Plugin assembly ${context.assemblyName} cannot be updated because ${deletedCount} plugin type(s) were removed from the DLL and manageMissingComponents is false.`,
+      {
+        modal: true,
+        detail: formatPluginComponentDiffDetail(context.diff, {
+          includeDeleteWarning: false,
+          includeManageMissingFalseBlock: true,
+          includeSkippedCreationNote: newCount > 0,
+        }),
+      },
+    );
+    return false;
   }
 
-  const updateAnyway = "Update Anyway";
-  const result = await vscode.window.showWarningMessage(
-    `The DLL has no plugin types that match CRM assembly "${targetAssembly.name}". Continue only if this is expected.`,
-    { modal: true },
-    updateAnyway,
-  );
+  if (!context.manageMissingComponents) {
+    const updateAssembly = "Update Assembly";
+    const choice = await vscode.window.showWarningMessage(
+      `Update plugin assembly ${context.assemblyName} without creating ${newCount} new plugin type(s)?`,
+      {
+        modal: true,
+        detail: formatPluginComponentDiffDetail(context.diff, {
+          includeSkippedCreationNote: true,
+        }),
+      },
+      updateAssembly,
+    );
+    return choice === updateAssembly;
+  }
 
-  return result === updateAnyway;
+  const action = deletedCount ? "Remove and Update" : "Update Assembly";
+  const choice = await vscode.window.showWarningMessage(
+    `Update plugin assembly ${context.assemblyName} and sync ${deletedCount + newCount} plugin type change(s)?`,
+    {
+      modal: true,
+      detail: formatPluginComponentDiffDetail(context.diff, {
+        includeDeleteWarning: deletedCount > 0,
+      }),
+    },
+    action,
+  );
+  return choice === action;
+}
+
+async function removeDeletedPluginTypesBeforeAssemblyUpdate(
+  context: AssemblyUpdateContext,
+  deletedTypes: PluginType[],
+): Promise<PluginSyncResult> {
+  if (!deletedTypes.length || context.manageMissingComponents !== true) {
+    return emptyPluginSyncResult();
+  }
+
+  return vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Removing missing plugins for ${path.basename(context.assemblyUri.fsPath)}`,
+    },
+    async () => {
+      const removed: PluginType[] = [];
+      const failures: PluginDeleteFailure[] = [];
+      for (const plugin of deletedTypes) {
+        try {
+          await context.pluginService.deletePluginTypeCascade(plugin.id);
+        } catch (error) {
+          failures.push({ plugin, error });
+          continue;
+        }
+        removed.push(plugin);
+      }
+
+      if (failures.length) {
+        throw new Error(
+          `Failed to delete ${failures.length} missing plugin type(s). Assembly was not updated because Dataverse still has plugin types that are missing from the DLL.\n${formatPluginDeleteFailures(
+            failures,
+          )}`,
+        );
+      }
+
+      return {
+        created: [],
+        updated: [],
+        removed,
+        skippedCreation: [],
+        skippedRemoval: [],
+      };
+    },
+  );
+}
+
+function formatPluginDeleteFailures(failures: PluginDeleteFailure[]): string {
+  const limit = 10;
+  const lines = failures.slice(0, limit).map(({ plugin, error }) => {
+    const name = plugin.typeName || plugin.name || "unknown";
+    return `- ${name}: ${String(error)}`;
+  });
+  const remaining = failures.length - lines.length;
+  if (remaining > 0) {
+    lines.push(`- and ${remaining} more`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildPluginComponentDiff(
+  existingTypes: PluginType[],
+  localPlugins: DiscoveredPluginType[],
+): PluginComponentDiff {
+  const existingByType = new Map<string, PluginType>();
+  for (const plugin of existingTypes) {
+    const key = normalizeTypeName(plugin.typeName);
+    if (key) {
+      existingByType.set(key, plugin);
+    }
+  }
+
+  const localKeys = new Set<string>();
+  const newTypes: DiscoveredPluginType[] = [];
+  for (const plugin of localPlugins) {
+    const key = normalizeTypeName(plugin.typeName);
+    if (!key || localKeys.has(key)) {
+      continue;
+    }
+
+    localKeys.add(key);
+    if (!existingByType.has(key)) {
+      newTypes.push(plugin);
+    }
+  }
+
+  const deletedTypes = [...existingByType.entries()]
+    .filter(([key]) => !localKeys.has(key))
+    .map(([, plugin]) => plugin);
+
+  return { deletedTypes, newTypes };
 }
 
 function normalizeAssemblyName(value: string | undefined): string {
@@ -872,13 +963,45 @@ function formatPluginNames(plugins: Array<{ typeName?: string; name?: string }>)
   return plugins.map((plugin) => plugin.typeName || plugin.name || "unknown").join(", ");
 }
 
-function formatPluginRemovalPreview(plugins: Array<{ typeName?: string; name?: string }>): string {
-  const limit = 10;
+function formatPluginComponentDiffDetail(
+  diff: PluginComponentDiff,
+  options: {
+    includeDeleteWarning?: boolean;
+    includeManageMissingFalseBlock?: boolean;
+    includeSkippedCreationNote?: boolean;
+  } = {},
+): string {
+  const sections: string[] = [];
+  if (options.includeManageMissingFalseBlock) {
+    sections.push("The assembly cannot be updated because manageMissingComponents is false.");
+  }
+  if (options.includeSkippedCreationNote) {
+    sections.push("New plugin types will not be created because manageMissingComponents is false.");
+  }
+  if (options.includeDeleteWarning && diff.deletedTypes.length) {
+    sections.push("Related steps and images will also be deleted.");
+  }
+  if (diff.deletedTypes.length) {
+    sections.push(`Removed from DLL:\n${formatPluginList(diff.deletedTypes)}`);
+  }
+  if (diff.newTypes.length) {
+    sections.push(`New in DLL:\n${formatPluginList(diff.newTypes)}`);
+  }
+
+  return sections.join("\n\n");
+}
+
+function formatPluginList(plugins: Array<{ typeName?: string; name?: string }>): string {
+  const limit = 30;
   const names = plugins
     .slice(0, limit)
-    .map((plugin) => plugin.typeName || plugin.name || "unknown");
+    .map((plugin) => `- ${plugin.typeName || plugin.name || "unknown"}`);
   const remaining = plugins.length - names.length;
-  return remaining > 0 ? `${names.join(", ")}, and ${remaining} more` : names.join(", ");
+  if (remaining > 0) {
+    names.push(`- and ${remaining} more`);
+  }
+
+  return names.join("\n");
 }
 
 type SnTool = {

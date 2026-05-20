@@ -19,6 +19,10 @@ class Uri {
     return new Uri(fsPath);
   }
 
+  static parse(value) {
+    return new Uri(value);
+  }
+
   static joinPath(base, ...paths) {
     return Uri.file(path.join(base.fsPath, ...paths));
   }
@@ -73,6 +77,7 @@ const window = {
     return undefined;
   },
   showInputBox: async () => undefined,
+  showQuickPick: async () => undefined,
   showTextDocument: async () => undefined,
   withProgress: async (_options, task) => {
     const token = {
@@ -87,6 +92,7 @@ const window = {
     return {
       appendLine: (line) => lines.push(line),
       show: () => {},
+      dispose: () => {},
       logs: lines,
     };
   },
@@ -142,6 +148,62 @@ const env = {
       this.value = value;
     },
   },
+  openExternal: async () => true,
+  createTelemetryLogger: () => ({
+    isUsageEnabled: true,
+    isErrorsEnabled: true,
+    onDidChangeEnableStates: () => ({ dispose: () => {} }),
+    logUsage: () => {},
+    logError: () => {},
+    dispose: () => {},
+  }),
+};
+
+class Position {
+  constructor(line, character) {
+    this.line = line;
+    this.character = character;
+  }
+}
+
+class Range {
+  constructor(start, end) {
+    this.start = start;
+    this.end = end;
+  }
+}
+
+class Diagnostic {
+  constructor(range, message, severity) {
+    this.range = range;
+    this.message = message;
+    this.severity = severity;
+  }
+}
+
+const DiagnosticSeverity = {
+  Error: 0,
+  Warning: 1,
+  Information: 2,
+  Hint: 3,
+};
+
+const languages = {
+  createDiagnosticCollection: () => ({
+    entries: new Map(),
+    set(uri, diagnostics) {
+      this.entries.set(uri.fsPath, diagnostics);
+    },
+    delete(uri) {
+      this.entries.delete(uri.fsPath);
+    },
+    clear() {
+      this.entries.clear();
+    },
+    dispose() {
+      this.entries.clear();
+    },
+  }),
 };
 
 const ProgressLocation = {
@@ -153,6 +215,49 @@ const StatusBarAlignment = {
   Right: 2,
 };
 
+class EventEmitter {
+  constructor() {
+    this.listeners = [];
+    this.event = (listener) => {
+      this.listeners.push(listener);
+      return {
+        dispose: () => {
+          this.listeners = this.listeners.filter((item) => item !== listener);
+        },
+      };
+    };
+  }
+
+  fire(value) {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+
+  dispose() {
+    this.listeners = [];
+  }
+}
+
+const TreeItemCollapsibleState = {
+  None: 0,
+  Collapsed: 1,
+  Expanded: 2,
+};
+
+class TreeItem {
+  constructor(label, collapsibleState = TreeItemCollapsibleState.None) {
+    this.label = label;
+    this.collapsibleState = collapsibleState;
+  }
+}
+
+class ThemeIcon {
+  constructor(id) {
+    this.id = id;
+  }
+}
+
 module.exports = {
   Uri,
   workspace,
@@ -160,9 +265,18 @@ module.exports = {
   extensions,
   commands,
   env,
+  languages,
   FileType,
+  Position,
+  Range,
+  Diagnostic,
+  DiagnosticSeverity,
   authentication,
   InMemorySecretStorage,
+  EventEmitter,
   ProgressLocation,
   StatusBarAlignment,
+  TreeItem,
+  TreeItemCollapsibleState,
+  ThemeIcon,
 };

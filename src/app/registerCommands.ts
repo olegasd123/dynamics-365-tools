@@ -35,6 +35,27 @@ import {
   enablePluginStep,
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
+import {
+  buildPcfControl,
+  newPcfControl,
+  pushPcfControl,
+  refreshPcfExplorer,
+  stopPcfWatch,
+  watchPcfControl,
+} from "../features/pcf/commands/pcfWorkspaceCommands";
+import {
+  copyPcfDeployedControlId,
+  setPcfWorkspaceFolderFilter,
+  syncPcfManifestVersionFromEnvironment,
+  setPcfSolutionFilter,
+  togglePcfSolutionFilter,
+  updatePcfFromLocal,
+} from "../features/pcf/commands/pcfExplorerCommands";
+import {
+  deployLastPcfSolution,
+  packageManagedPcfControl,
+  packageUnmanagedPcfControl,
+} from "../features/pcf/commands/pcfReleaseCommands";
 import { CommandContext } from "./commandContext";
 import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 
@@ -111,7 +132,88 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.plugins.copyImageDescription", (node) => copyImageDescription(node)),
     register("dynamics365Tools.plugins.editImage", (node) => editPluginImage(ctx, node)),
     register("dynamics365Tools.plugins.deleteImage", (node) => deletePluginImage(ctx, node)),
+    register("dynamics365Tools.pcf.refreshExplorer", () => refreshPcfExplorer(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.newControl", () => newPcfControl(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.build", (nodeOrUri) => buildPcfControl(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.watch", (nodeOrUri) => watchPcfControl(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.push", (nodeOrUri) => pushPcfControl(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.pcf.packageManaged",
+      (nodeOrUri) => packageManagedPcfControl(ctx, nodeOrUri),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.pcf.packageUnmanaged",
+      (nodeOrUri) => packageUnmanagedPcfControl(ctx, nodeOrUri),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.pcf.deployLast",
+      (nodeOrUri) => deployLastPcfSolution(ctx, nodeOrUri),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register("dynamics365Tools.pcf.stopWatch", (nodeOrUri) => stopPcfWatch(ctx, nodeOrUri), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.toggleSolutionFilter", () => togglePcfSolutionFilter(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.enableSolutionFilter", () => setPcfSolutionFilter(ctx, true), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.pcf.disableSolutionFilter", () => setPcfSolutionFilter(ctx, false), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.pcf.setWorkspaceFolderFilter",
+      () => setPcfWorkspaceFolderFilter(ctx),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register("dynamics365Tools.pcf.updateFromLocal", (node) => updatePcfFromLocal(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
+      (node) => syncPcfManifestVersionFromEnvironment(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.pcf.copyDeployedControlId",
+      (node) => copyPcfDeployedControlId(node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
+    vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
+    ctx.pcfProjectLocator,
+    ctx.pcfBuildService,
+    ctx.pcfPushService,
+    ctx.pcfDeployService,
+    ctx.pcfPackageService,
+    ctx.pcfProcessRunner,
+    ctx.pcfStatusBar,
+    ctx.pcfTelemetry,
     ctx.statusBar,
     ctx.assemblyStatusBar,
   );
