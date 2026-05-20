@@ -694,7 +694,7 @@ The phasing keeps each step independently shippable. Mark each phase as [Done] w
 Exit criteria: fixture tests prove the patch-based approach before UI work
 starts.
 
-### Phase 1 — Read-only foundation (≈ 3–4 days)
+### Phase 1 — Read-only foundation (≈ 3–4 days) [Done]
 
 - `RibbonSourceLocator` + workspace scan.
 - `ribbonXmlReader.ts` + `ribbonPatchWriter.ts` with fixture tests.

@@ -31,7 +31,10 @@ test("loads unpacked source files with source metadata", async () => {
   assert.strictEqual(documents[0].sourceId, source.id);
   assert.strictEqual(documents[0].kind, "Entity");
   assert.strictEqual(documents[0].entityLogicalName, "account");
-  assert.strictEqual(documents[0].views[0].scope, "Form");
+  assert.deepStrictEqual(
+    documents[0].views.map((view) => view.scope),
+    ["Form", "HomepageGrid", "SubGrid"],
+  );
 });
 
 test("loads flat customizations XML and infers entity ribbons", async () => {

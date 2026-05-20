@@ -62,6 +62,10 @@ test("renders located ribbon documents as a read-only tree", async () => {
   assert.strictEqual(documents[0].label, "account");
 
   const views = await explorer.getChildren(documents[0]);
+  assert.deepStrictEqual(
+    views.map((view) => view.label),
+    ["Form", "HomepageGrid", "SubGrid"],
+  );
   const sections = await explorer.getChildren(views[0]);
   assert.ok(sections[0] instanceof RibbonSectionNode);
   assert.strictEqual(sections[0].label, "Custom Actions");

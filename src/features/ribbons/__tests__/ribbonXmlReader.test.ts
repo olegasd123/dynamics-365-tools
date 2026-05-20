@@ -75,6 +75,10 @@ test("reads major ribbon sections and known nodes with ranges", () => {
 
   assert.strictEqual(document.kind, "Entity");
   assert.strictEqual(document.entityLogicalName, "account");
+  assert.deepStrictEqual(
+    document.views.map((view) => view.scope),
+    ["Form", "HomepageGrid", "SubGrid"],
+  );
   assert.deepStrictEqual(Object.keys(document.sections).sort(), [
     "commandDefinitions",
     "customActions",
@@ -94,6 +98,73 @@ test("reads major ribbon sections and known nodes with ranges", () => {
   assert.strictEqual(view.displayRules[0].steps[0].kind, "EntityPrivilegeRule");
   assert.strictEqual(view.locLabels[0].titles[0].description, "Validate & Save");
   assert.strictEqual(view.unknownNodeRanges.length, 1);
+  assert.strictEqual(document.views[1].customActions.length, 0);
+  assert.strictEqual(document.views[2].customActions.length, 0);
+});
+
+test("projects entity ribbon nodes into scoped views", () => {
+  const multiScopeXml = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.Form.Button" Command="new.account.Form.Command" LabelLocId="new.account.Form.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="new.account.HomepageGrid.Button.CustomAction" Location="Mscrm.HomepageGrid.account.MainTab.Management.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.HomepageGrid.Button" Command="new.account.HomepageGrid.Command" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <HideCustomAction HideActionId="new.account.SubGrid.Hide.Refresh" Location="Mscrm.SubGrid.account.MainTab.Management.Controls._children" />
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Form.Command">
+      <EnableRules><EnableRule Id="new.account.Shared.Enable" /></EnableRules>
+    </CommandDefinition>
+    <CommandDefinition Id="new.account.HomepageGrid.Command" />
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules><EnableRule Id="new.account.Shared.Enable" /></EnableRules>
+  </RuleDefinitions>
+  <LocLabels>
+    <LocLabel Id="new.account.Form.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+
+  const [document] = readRibbonDocuments(multiScopeXml, {
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const [form, homepageGrid, subGrid] = document.views;
+
+  assert.deepStrictEqual(
+    form.customActions.map((action) => action.id),
+    ["new.account.Form.Button.CustomAction"],
+  );
+  assert.deepStrictEqual(
+    form.commandDefinitions.map((command) => command.id),
+    ["new.account.Form.Command"],
+  );
+  assert.deepStrictEqual(
+    form.enableRules.map((rule) => rule.id),
+    ["new.account.Shared.Enable"],
+  );
+  assert.deepStrictEqual(
+    form.locLabels.map((label) => label.id),
+    ["new.account.Form.Label"],
+  );
+  assert.deepStrictEqual(
+    homepageGrid.customActions.map((action) => action.id),
+    ["new.account.HomepageGrid.Button.CustomAction"],
+  );
+  assert.deepStrictEqual(
+    homepageGrid.commandDefinitions.map((command) => command.id),
+    ["new.account.HomepageGrid.Command"],
+  );
+  assert.deepStrictEqual(
+    subGrid.hideActions.map((action) => action.hideActionId),
+    ["new.account.SubGrid.Hide.Refresh"],
+  );
 });
 
 test("locates embedded RibbonDiffXml blocks in flat customizations XML", () => {

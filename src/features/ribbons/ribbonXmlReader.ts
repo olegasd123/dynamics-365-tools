@@ -49,6 +49,7 @@ const SECTION_NAMES = new Set([
   "RuleDefinitions",
   "LocLabels",
 ]);
+const ENTITY_SCOPES: RibbonScope[] = ["Form", "HomepageGrid", "SubGrid"];
 
 export function readRibbonDocuments(
   sourceText: string,
@@ -63,7 +64,7 @@ export function readRibbonDocuments(
     const parentEntityName = findParentEntityName(sourceText, ancestors);
     const kind =
       options.kind ?? (parentEntityName ? "Entity" : ("Application" as "Application" | "Entity"));
-    const scope = kind === "Application" ? "Application" : inferScope(ribbon);
+    const allView = buildRibbonView(sourceText, ribbon, sections, "Application");
 
     return {
       id: `${sourceId}:ribbon:${index}`,
@@ -74,7 +75,10 @@ export function readRibbonDocuments(
       sourceText,
       ribbonRange: ribbon.range,
       sections,
-      views: [buildRibbonView(sourceText, ribbon, sections, scope)],
+      views:
+        kind === "Application"
+          ? [allView]
+          : ENTITY_SCOPES.map((scope) => filterEntityView(allView, scope)),
     };
   });
 }
@@ -313,19 +317,6 @@ function readAttributes(
   return attributes;
 }
 
-function findElementsByName(nodes: XmlElementRange[], name: string): XmlElementRange[] {
-  const matches: XmlElementRange[] = [];
-
-  for (const node of nodes) {
-    if (node.name === name) {
-      matches.push(node);
-    }
-    matches.push(...findElementsByName(node.children, name));
-  }
-
-  return matches;
-}
-
 function findRibbonElements(nodes: XmlElementRange[]): LocatedRibbon[] {
   const matches: LocatedRibbon[] = [];
   collectRibbonElements(nodes, [], matches);
@@ -423,6 +414,96 @@ function buildRibbonView(
       .filter((child) => !SECTION_NAMES.has(child.name))
       .map((child) => child.range),
   };
+}
+
+function filterEntityView(view: RibbonView, scope: RibbonScope): RibbonView {
+  const customActions = view.customActions.filter((action) => customActionInScope(action, scope));
+  const hideActions = view.hideActions.filter((action) =>
+    belongsToScope([action.hideActionId, action.location], scope),
+  );
+  const commandIds = new Set(
+    customActions
+      .map((action) => (action.commandUI?.kind === "Button" ? action.commandUI.command : undefined))
+      .filter(isDefined),
+  );
+  const commandDefinitions = view.commandDefinitions.filter(
+    (command) => commandIds.has(command.id) || belongsToScope([command.id], scope),
+  );
+  const enableRuleIds = new Set(commandDefinitions.flatMap((command) => command.enableRuleRefs));
+  const displayRuleIds = new Set(commandDefinitions.flatMap((command) => command.displayRuleRefs));
+  const enableRules = view.enableRules.filter(
+    (rule) => enableRuleIds.has(rule.id) || belongsToScope([rule.id], scope),
+  );
+  const displayRules = view.displayRules.filter(
+    (rule) => displayRuleIds.has(rule.id) || belongsToScope([rule.id], scope),
+  );
+  const locLabelIds = new Set(
+    customActions.flatMap((action) =>
+      action.commandUI?.kind === "Button"
+        ? [
+            action.commandUI.labelLocId,
+            action.commandUI.toolTipTitleLocId,
+            action.commandUI.toolTipDescriptionLocId,
+          ].filter(isDefined)
+        : [],
+    ),
+  );
+  const locLabels = view.locLabels.filter(
+    (label) => locLabelIds.has(label.id) || belongsToScope([label.id], scope),
+  );
+
+  return {
+    ...view,
+    scope,
+    customActions,
+    hideActions,
+    commandDefinitions,
+    enableRules,
+    displayRules,
+    locLabels,
+  };
+}
+
+function customActionInScope(action: CustomAction, scope: RibbonScope): boolean {
+  return belongsToScope(
+    [
+      action.id,
+      action.location,
+      action.commandUI?.kind === "Unknown" ? action.commandUI.name : action.commandUI?.id,
+      action.commandUI?.kind === "Button" ? action.commandUI.command : undefined,
+    ],
+    scope,
+  );
+}
+
+function belongsToScope(values: Array<string | undefined>, scope: RibbonScope): boolean {
+  return textInScope(values, scope) || !hasAnyScope(values);
+}
+
+function textInScope(values: Array<string | undefined>, scope: RibbonScope): boolean {
+  const needle = scope.toLowerCase();
+  return values.some((value) => {
+    if (!value) {
+      return false;
+    }
+
+    return value.split(/[^A-Za-z0-9]+/).some((part) => part.toLowerCase() === needle);
+  });
+}
+
+function hasAnyScope(values: Array<string | undefined>): boolean {
+  const scopes = new Set(ENTITY_SCOPES.map((scope) => scope.toLowerCase()));
+  return values.some((value) => {
+    if (!value) {
+      return false;
+    }
+
+    return value.split(/[^A-Za-z0-9]+/).some((part) => scopes.has(part.toLowerCase()));
+  });
+}
+
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
 }
 
 function readCustomActions(sourceText: string, section: XmlElementRange): CustomAction[] {
@@ -728,26 +809,6 @@ function parameterKind(name: string): ActionParameter["kind"] {
   }
 
   return "String";
-}
-
-function inferScope(ribbon: XmlElementRange): RibbonScope {
-  const allLocations = findElementsByName(ribbon.children, "CustomAction")
-    .map((node) => attr(node, "Location"))
-    .join(" ");
-
-  if (allLocations.includes("HomepageGrid")) {
-    return "HomepageGrid";
-  }
-
-  if (allLocations.includes("SubGrid")) {
-    return "SubGrid";
-  }
-
-  if (allLocations.includes("Form")) {
-    return "Form";
-  }
-
-  return "Application";
 }
 
 function decodeXml(value: string): string {
