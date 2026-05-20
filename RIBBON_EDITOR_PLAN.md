@@ -679,7 +679,7 @@ and a per-source `vscode.DiagnosticCollection`:
 
 ## 15. Phased rollout
 
-The phasing keeps each step independently shippable.
+The phasing keeps each step independently shippable. Mark each phase as [Done] when it's completed.
 
 ### Phase 0 — XML spike (≈ 1–2 days) [Done]
 
