@@ -681,7 +681,7 @@ and a per-source `vscode.DiagnosticCollection`:
 
 The phasing keeps each step independently shippable.
 
-### Phase 0 — XML spike (≈ 1–2 days)
+### Phase 0 — XML spike (≈ 1–2 days) [Done]
 
 - Collect 5–6 real ribbon fixtures.
 - Build `ribbonXmlReader` enough to locate `RibbonDiffXml`, major sections,
