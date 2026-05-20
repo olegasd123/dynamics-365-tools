@@ -29,48 +29,6 @@ export class PluginRegistrationManager {
     return this.introspector.inspect(assemblyPath);
   }
 
-  async listMissingPluginTypes(options: PluginSyncOptions): Promise<PluginType[]> {
-    const discovered = await this.introspector.discover(options.assemblyPath);
-    const existingByType = await this.getExistingPluginTypesByName(
-      options.pluginService,
-      options.assemblyId,
-    );
-
-    for (const plugin of discovered) {
-      const key = this.normalizeKey(plugin.typeName);
-      if (key) {
-        existingByType.delete(key);
-      }
-    }
-
-    return [...existingByType.values()];
-  }
-
-  async removeMissingPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
-    const missing = await this.listMissingPluginTypes(options);
-    const removed: PluginType[] = [];
-    const skippedRemoval: PluginType[] = [];
-    const canManageMissing = options.manageMissingComponents === true;
-
-    for (const orphan of missing) {
-      if (!canManageMissing) {
-        skippedRemoval.push(orphan);
-        continue;
-      }
-
-      try {
-        await options.pluginService.deletePluginTypeCascade(orphan.id);
-      } catch (error) {
-        throw new Error(
-          `Failed to delete plugin ${orphan.name ?? orphan.typeName}: ${String(error)}`,
-        );
-      }
-      removed.push(orphan);
-    }
-
-    return { created: [], updated: [], removed, skippedCreation: [], skippedRemoval };
-  }
-
   async syncPluginTypes(options: PluginSyncOptions): Promise<PluginSyncResult> {
     const discovered = await this.introspector.discover(options.assemblyPath);
     const existingByType = await this.getExistingPluginTypesByName(

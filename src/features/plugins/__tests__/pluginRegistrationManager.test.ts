@@ -92,35 +92,3 @@ test("syncPluginTypes skips missing component changes when disabled", async () =
   ]);
   assert.deepStrictEqual(deleted, []);
 });
-
-test("removeMissingPluginTypes deletes only plugin types absent from the local assembly", async () => {
-  const deleted: string[] = [];
-  const pluginService = {
-    listPluginTypes: async () => [
-      { id: "kept", name: "Kept", typeName: "Namespace.Kept" },
-      { id: "removed", name: "Removed", typeName: "Namespace.Removed" },
-    ],
-    deletePluginTypeCascade: async (id: string) => {
-      deleted.push(id);
-    },
-  };
-
-  const introspector = {
-    discover: async () => [{ typeName: "Namespace.Kept", name: "Kept" }],
-  };
-
-  const manager = new PluginRegistrationManager(introspector as any);
-  const result = await manager.removeMissingPluginTypes({
-    pluginService: pluginService as any,
-    assemblyId: "assembly-id",
-    assemblyPath: "/path/plugin.dll",
-    manageMissingComponents: true,
-  });
-
-  assert.deepStrictEqual(deleted, ["removed"]);
-  assert.deepStrictEqual(result.removed, [
-    { id: "removed", name: "Removed", typeName: "Namespace.Removed" },
-  ]);
-  assert.deepStrictEqual(result.created, []);
-  assert.deepStrictEqual(result.updated, []);
-});

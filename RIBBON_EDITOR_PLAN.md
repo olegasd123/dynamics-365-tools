@@ -97,7 +97,7 @@ For grounding, each `RibbonDiffXml` has up to five blocks:
 </RibbonDiffXml>
 ```
 
-Key invariant: `RibbonDiffXml` is a *diff* against the OOB ribbon — it only
+Key invariant: `RibbonDiffXml` is a _diff_ against the OOB ribbon — it only
 contains the user's customizations. Everything else (the actual ribbon
 structure, OOB tabs/groups/buttons) is implicit. Our tree view therefore shows
 two distinct things:
@@ -114,11 +114,11 @@ two distinct things:
 The editor maintains a **working set** of ribbon documents independent of where
 they came from. A source is one of:
 
-| Source                    | Detection                                                                 | Save behavior                                  |
-| ------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
-| Unpacked workspace        | `Entities/*/RibbonDiffXml.xml` or `Other/Customizations.xml` exists       | Patch changed XML ranges in place.             |
-| Flat `customizations.xml` | Single `customizations.xml` at workspace root or in a `solution/` folder  | Patch `RibbonDiffXml` blocks in-place.         |
-| Imported solution `.zip`  | User-triggered "Open ribbons from solution…" command                      | Extract to extension storage or temp; save back with replace-original or save-as. |
+| Source                    | Detection                                                                | Save behavior                                                                     |
+| ------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Unpacked workspace        | `Entities/*/RibbonDiffXml.xml` or `Other/Customizations.xml` exists      | Patch changed XML ranges in place.                                                |
+| Flat `customizations.xml` | Single `customizations.xml` at workspace root or in a `solution/` folder | Patch `RibbonDiffXml` blocks in-place.                                            |
+| Imported solution `.zip`  | User-triggered "Open ribbons from solution…" command                     | Extract to extension storage or temp; save back with replace-original or save-as. |
 
 Detection is done by a `RibbonSourceLocator` service that scans the workspace
 once on activation and watches for relevant file changes. The `.zip` flow is
@@ -195,7 +195,7 @@ interface RibbonDocument {
   id: string;
   sourceId: string;
   kind: "Application" | "Entity";
-  entityLogicalName?: string;       // undefined for Application
+  entityLogicalName?: string; // undefined for Application
   fileUri: string;
   sourceText: string;
   ribbonRange: TextRange;
@@ -211,8 +211,8 @@ interface RibbonView {
   enableRules: EnableRule[];
   displayRules: DisplayRule[];
   locLabels: LocLabel[];
-  templatesRange?: TextRange;       // preserved, not modeled in the first release
-  unknownNodeRanges: TextRange[];   // forward-compat: preserved by not touching them
+  templatesRange?: TextRange; // preserved, not modeled in the first release
+  unknownNodeRanges: TextRange[]; // forward-compat: preserved by not touching them
 }
 
 interface TextRange {
@@ -229,8 +229,8 @@ interface RibbonSectionRanges {
 }
 
 interface CustomAction {
-  id: string;                       // e.g. "new.account.MainTab.NewGroup.MyButton.CustomAction"
-  location: string;                 // OOB attach point Id (picked from catalog or typed)
+  id: string; // e.g. "new.account.MainTab.NewGroup.MyButton.CustomAction"
+  location: string; // OOB attach point Id (picked from catalog or typed)
   sequence: number;
   commandUI: ButtonNode | GroupNode | TabNode | MenuSectionNode;
   range: TextRange;
@@ -239,9 +239,9 @@ interface CustomAction {
 interface ButtonNode {
   kind: "Button";
   id: string;
-  command: string;                  // CommandDefinition Id
-  labelLocId?: string;              // -> LocLabel.id
-  labelText?: string;               // inline fallback
+  command: string; // CommandDefinition Id
+  labelLocId?: string; // -> LocLabel.id
+  labelText?: string; // inline fallback
   toolTipTitleLocId?: string;
   toolTipDescriptionLocId?: string;
   image16x16?: ImageRef;
@@ -251,11 +251,11 @@ interface ButtonNode {
 }
 
 interface ImageRef {
-  webResourceUniqueName: string;    // resolves to $webresource:<name>
+  webResourceUniqueName: string; // resolves to $webresource:<name>
 }
 
 interface HideAction {
-  hideActionId: string;             // OOB CustomAction Id to hide
+  hideActionId: string; // OOB CustomAction Id to hide
   location: string;
   range: TextRange;
 }
@@ -268,13 +268,18 @@ interface CommandDefinition {
 }
 
 type CommandAction =
-  | { kind: "JavaScriptFunction"; library: WebResourceRef; functionName: string; parameters: ActionParameter[] }
+  | {
+      kind: "JavaScriptFunction";
+      library: WebResourceRef;
+      functionName: string;
+      parameters: ActionParameter[];
+    }
   | { kind: "Url"; address: string }
-  | { kind: "Unknown"; raw: string };  // forward-compat
+  | { kind: "Unknown"; raw: string }; // forward-compat
 
 interface WebResourceRef {
-  uniqueName: string;               // schema name in Dataverse, e.g. "new_/scripts/account.js"
-  workspaceUri?: string;            // resolved from BindingService when possible
+  uniqueName: string; // schema name in Dataverse, e.g. "new_/scripts/account.js"
+  workspaceUri?: string; // resolved from BindingService when possible
 }
 
 interface ActionParameter {
@@ -284,17 +289,30 @@ interface ActionParameter {
 
 interface EnableRule {
   id: string;
-  steps: RuleStep[];                // CustomRule (JsFunction), CommandClientTypeRule, FormStateRule, etc.
+  steps: RuleStep[]; // CustomRule (JsFunction), CommandClientTypeRule, FormStateRule, etc.
 }
 
 interface DisplayRule {
   id: string;
-  steps: RuleStep[];                // EntityPrivilegeRule, FormEntityContextRule, ValueRule, etc.
+  steps: RuleStep[]; // EntityPrivilegeRule, FormEntityContextRule, ValueRule, etc.
 }
 
 type RuleStep =
-  | { kind: "CustomRule"; library: WebResourceRef; functionName: string; default?: boolean; invertResult?: boolean; parameters: ActionParameter[] }
-  | { kind: "EntityPrivilegeRule"; entityName?: string; privilegeType: PrivilegeType; privilegeDepth?: PrivilegeDepth; invertResult?: boolean }
+  | {
+      kind: "CustomRule";
+      library: WebResourceRef;
+      functionName: string;
+      default?: boolean;
+      invertResult?: boolean;
+      parameters: ActionParameter[];
+    }
+  | {
+      kind: "EntityPrivilegeRule";
+      entityName?: string;
+      privilegeType: PrivilegeType;
+      privilegeDepth?: PrivilegeDepth;
+      invertResult?: boolean;
+    }
   | { kind: "ValueRule"; field: string; value: string; invertResult?: boolean }
   | { kind: "FormStateRule"; state: FormState; invertResult?: boolean }
   | { kind: "CommandClientTypeRule"; type: "Modern" | "Refresh" }
@@ -398,17 +416,17 @@ Entity nodes group one physical ribbon document; `Form`, `HomepageGrid`, and
 the form panel (§8). Inline actions on each node level (the
 `view/item/context` menus already used for the plugin explorer):
 
-| Node                        | Inline actions                                    |
-| --------------------------- | ------------------------------------------------- |
-| Source                      | Refresh, Save, Reload from disk                   |
-| Ribbon (scope/entity)       | Add Custom Action, Add Command Def, Add Rule, Hide OOB Button… |
-| Custom Action               | Edit, Delete, Move up/down                        |
-| Button                      | Edit, Delete, Replace icon, Change command        |
-| Hide Action                 | Delete                                            |
-| Command Definition          | Edit, Delete, Add Action, Add Rule ref            |
-| Enable/Display Rule         | Edit, Delete, Add step                            |
-| Rule step                   | Edit, Delete, Move up/down                        |
-| LocLabel                    | Edit, Delete, Add language                        |
+| Node                  | Inline actions                                                 |
+| --------------------- | -------------------------------------------------------------- |
+| Source                | Refresh, Save, Reload from disk                                |
+| Ribbon (scope/entity) | Add Custom Action, Add Command Def, Add Rule, Hide OOB Button… |
+| Custom Action         | Edit, Delete, Move up/down                                     |
+| Button                | Edit, Delete, Replace icon, Change command                     |
+| Hide Action           | Delete                                                         |
+| Command Definition    | Edit, Delete, Add Action, Add Rule ref                         |
+| Enable/Display Rule   | Edit, Delete, Add step                                         |
+| Rule step             | Edit, Delete, Move up/down                                     |
+| LocLabel              | Edit, Delete, Add language                                     |
 
 A toolbar-level command **"Open Ribbons from Solution…"** is added in phase 3.
 It prompts for a `.zip` and adds it as a source.
@@ -608,7 +626,7 @@ instead of creating a second import/polling stack.
   fixture-tested templates; offline-validate the zip we build against a
   known-good shape before each import.
 - **Component scoping**: omitting attribute/form definitions means the
-  imported solution must *only* reference components the env already has.
+  imported solution must _only_ reference components the env already has.
   We pre-flight `RetrieveEntity` for each target entity and fail fast with
   a clear error if any is missing in the env.
 - **Publisher prefix**: a thrown-away solution needs a publisher. We use
@@ -779,7 +797,7 @@ opening Power Apps.
    "unresolved" warnings, never block save.
 5. **Publish blast radius**: `OverwriteUnmanagedCustomizations: true` plus
    the wrong target solution can clobber someone else's in-flight ribbon
-   changes. Mitigated by (a) scoping the import zip to *only* ribbon
+   changes. Mitigated by (a) scoping the import zip to _only_ ribbon
    components — no attributes/forms/sitemap — and (b) a confirmation
    dialog the first time per session showing target env, target solution,
    and the list of entities being touched.
