@@ -23,6 +23,7 @@ import { PluginRegistrationManager } from "../features/plugins/pluginRegistratio
 import { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
 import { RibbonRepository } from "../features/ribbons/ribbonRepository";
 import { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
+import { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import { BindingService } from "../features/webResources/bindingService";
 import { PublishCacheService } from "../features/webResources/publishCacheService";
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
@@ -59,6 +60,7 @@ export async function createServices(
     ribbonSourceLocator,
     ribbonRepository,
   );
+  const ribbonFormPanel = new RibbonFormPanel();
   const pluginExplorer = new PluginExplorerProvider(
     configuration,
     connections,
@@ -127,6 +129,7 @@ export async function createServices(
     ribbonSourceLocator,
     ribbonRepository,
     ribbonExplorer,
+    ribbonFormPanel,
     pcfProcessRunner,
     pacCli,
     npmRunner,

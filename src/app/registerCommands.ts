@@ -216,7 +216,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
     vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
-    vscode.window.registerTreeDataProvider("dynamics365Tools.ribbonExplorer", ctx.ribbonExplorer),
+    createRibbonTreeView(ctx),
     ctx.pcfProjectLocator,
     ctx.pcfBuildService,
     ctx.pcfPushService,
@@ -225,9 +225,25 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ctx.pcfProcessRunner,
     ctx.pcfStatusBar,
     ctx.pcfTelemetry,
+    ctx.ribbonFormPanel,
     ctx.statusBar,
     ctx.assemblyStatusBar,
   );
 
   return disposables;
+}
+
+function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
+  const treeView = vscode.window.createTreeView("dynamics365Tools.ribbonExplorer", {
+    treeDataProvider: ctx.ribbonExplorer,
+  });
+
+  const selectionSubscription = treeView.onDidChangeSelection((event) => {
+    const [node] = event.selection;
+    if (node) {
+      ctx.ribbonFormPanel.show(node);
+    }
+  });
+
+  return vscode.Disposable.from(treeView, selectionSubscription);
 }

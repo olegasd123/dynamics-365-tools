@@ -22,6 +22,7 @@ import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer"
 import type { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
 import type { RibbonRepository } from "../features/ribbons/ribbonRepository";
 import type { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
+import type { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
@@ -54,6 +55,7 @@ export interface CommandContext {
   ribbonSourceLocator: RibbonSourceLocator;
   ribbonRepository: RibbonRepository;
   ribbonExplorer: RibbonExplorerProvider;
+  ribbonFormPanel: RibbonFormPanel;
 
   pcfProcessRunner: ProcessRunner;
   pacCli: PacCli;

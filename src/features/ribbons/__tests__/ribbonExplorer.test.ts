@@ -8,6 +8,7 @@ import { ConfigurationService } from "../../config/configurationService";
 import {
   RibbonDocumentNode,
   RibbonExplorerProvider,
+  RibbonItemNode,
   RibbonSectionNode,
   RibbonSourceNode,
 } from "../ribbonExplorer";
@@ -22,8 +23,27 @@ test("renders located ribbon documents as a read-only tree", async () => {
     "Entities/account/RibbonDiffXml.xml",
     `<RibbonDiffXml>
   <CustomActions>
-    <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children" />
+    <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.Form.Button" Command="new.account.Command" LabelText="Run" />
+      </CommandUIDefinition>
+    </CustomAction>
   </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Command">
+      <EnableRules><EnableRule Id="new.account.Enable" /></EnableRules>
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/account.js" FunctionName="run" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.account.Enable">
+        <CommandClientTypeRule Type="Modern" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
@@ -49,6 +69,22 @@ test("renders located ribbon documents as a read-only tree", async () => {
 
   const items = await explorer.getChildren(sections[0]);
   assert.strictEqual(items[0].label, "new.account.Form.Button.CustomAction");
+  assert.ok(items[0] instanceof RibbonItemNode);
+
+  const buttonNodes = await explorer.getChildren(items[0]);
+  assert.strictEqual(buttonNodes[0].label, "Button: new.account.Form.Button");
+
+  const commandSection = sections.find((section) => section.label === "Command Definitions");
+  assert.ok(commandSection);
+  const commands = await explorer.getChildren(commandSection);
+  const commandChildren = await explorer.getChildren(commands[0]);
+  assert.deepStrictEqual(
+    commandChildren.map((child) => child.label),
+    ["EnableRules", "DisplayRules", "Actions"],
+  );
+
+  const actionNodes = await explorer.getChildren(commandChildren[2]);
+  assert.strictEqual(actionNodes[0].label, "JavaScript: run");
 });
 
 async function makeWorkspace(): Promise<string> {
