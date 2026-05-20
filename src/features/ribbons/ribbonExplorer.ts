@@ -14,6 +14,7 @@ import {
   RibbonView,
   RuleStep,
 } from "./models";
+import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonRepository } from "./ribbonRepository";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
 
@@ -129,12 +130,14 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     private readonly configuration: ConfigurationService,
     private readonly locator: RibbonSourceLocator,
     private readonly repository: RibbonRepository,
+    private readonly diagnostics?: RibbonDiagnosticsService,
   ) {}
 
   refresh(node?: RibbonExplorerNode): void {
     if (!node) {
       this.sources = undefined;
       this.documentsBySourceId.clear();
+      this.diagnostics?.clear();
     }
 
     this.onDidChangeTreeDataEmitter.fire(node);
@@ -205,6 +208,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
 
     const documents = (await this.repository.loadSource(source)).sort(compareDocuments);
     this.documentsBySourceId.set(source.id, documents);
+    this.diagnostics?.validateDocuments([...this.documentsBySourceId.values()].flat());
     return documents;
   }
 }

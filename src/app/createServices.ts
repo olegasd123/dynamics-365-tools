@@ -20,6 +20,7 @@ import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
+import { RibbonDiagnosticsService } from "../features/ribbons/ribbonDiagnostics";
 import { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
 import { RibbonRepository } from "../features/ribbons/ribbonRepository";
 import { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
@@ -55,10 +56,12 @@ export async function createServices(
   const pluginRegistration = new PluginRegistrationManager(pluginAssemblyIntrospector);
   const ribbonSourceLocator = new RibbonSourceLocator();
   const ribbonRepository = new RibbonRepository();
+  const ribbonDiagnostics = new RibbonDiagnosticsService();
   const ribbonExplorer = new RibbonExplorerProvider(
     configuration,
     ribbonSourceLocator,
     ribbonRepository,
+    ribbonDiagnostics,
   );
   const ribbonFormPanel = new RibbonFormPanel();
   const pluginExplorer = new PluginExplorerProvider(
@@ -128,6 +131,7 @@ export async function createServices(
     pluginRegistration,
     ribbonSourceLocator,
     ribbonRepository,
+    ribbonDiagnostics,
     ribbonExplorer,
     ribbonFormPanel,
     pcfProcessRunner,

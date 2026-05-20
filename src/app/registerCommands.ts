@@ -225,6 +225,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ctx.pcfProcessRunner,
     ctx.pcfStatusBar,
     ctx.pcfTelemetry,
+    ctx.ribbonDiagnostics,
     ctx.ribbonFormPanel,
     ctx.statusBar,
     ctx.assemblyStatusBar,
