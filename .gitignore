@@ -7,6 +7,9 @@ dist/
 **/bin
 **/obj
 
+# Visual Studio Code settings and cache files
+**/*.lscache
+
 # VS Code settings (keep project configs)
 .vscode/*
 !.vscode/launch.json
@@ -18,6 +21,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-#Other
-.DS_Store
+# Environment variables
 .env
+
+# Other
+.DS_Store
