@@ -814,7 +814,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.openFile",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonDocument/ || viewItem =~ /d365RibbonSource:flat/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource:flat/ || viewItem =~ /d365RibbonDocument:application/)",
           "group": "inline@1"
         },
         {

@@ -60,7 +60,8 @@ export class RibbonDocumentNode extends vscode.TreeItem {
     dirty = false,
   ) {
     super(documentLabel(document), vscode.TreeItemCollapsibleState.Collapsed);
-    this.contextValue = dirty ? "d365RibbonDocument:dirty" : "d365RibbonDocument";
+    const kind = document.kind === "Application" ? "application" : "entity";
+    this.contextValue = dirty ? `d365RibbonDocument:${kind}:dirty` : `d365RibbonDocument:${kind}`;
     this.iconPath = new vscode.ThemeIcon(document.kind === "Application" ? "globe" : "file-code");
     this.description = `${document.kind === "Application" ? "Application" : "Entity"}${dirty ? " *" : ""}`;
     this.tooltip = document.fileUri;

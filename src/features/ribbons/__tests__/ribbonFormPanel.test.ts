@@ -36,7 +36,7 @@ test("renders selected ribbon document details with edit actions", () => {
   assert.strictEqual(panel.title, "Ribbon Document");
   assert.match(panel.webview.html, /account/);
   assert.match(panel.webview.html, /RibbonDiffXml\.xml/);
-  assert.match(panel.webview.html, /Open XML/);
+  assert.doesNotMatch(panel.webview.html, /Open XML/);
   assert.match(panel.webview.html, /Save/);
   formPanel.dispose();
 });

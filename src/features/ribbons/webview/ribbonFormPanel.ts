@@ -191,13 +191,13 @@ function renderActionButton(action: PanelAction): string {
 
 function actionsForNode(node: RibbonExplorerNode): PanelAction[] {
   if (node instanceof RibbonSourceNode) {
-    return [saveAction()];
+    return node.source.kind === "flat" ? [openFileAction(), saveAction()] : [saveAction()];
   }
 
   if (node instanceof RibbonDocumentNode) {
     return node.document.kind === "Application"
       ? [openFileAction(), saveAction(), ...ribbonAddActions()]
-      : [openFileAction(), saveAction()];
+      : [saveAction()];
   }
 
   if (node instanceof RibbonViewNode) {
