@@ -45,6 +45,7 @@ import {
   addRibbonLocLabel,
   addCustomRibbonButton,
   deleteRibbonNode,
+  editRibbonNode,
   hideOobRibbonButton,
   openRibbonFile,
   refreshRibbonExplorer,
@@ -194,6 +195,9 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.deleteNode", (node) => deleteRibbonNode(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.editNode", (node) => editRibbonNode(ctx, node), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),

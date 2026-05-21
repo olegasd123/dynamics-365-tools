@@ -13,20 +13,37 @@ import {
 import {
   createCommandDefinitionPatches,
   createCommandActionPatch,
+  createCommandActionReplacePatch,
   createCommandRuleRefPatch,
+  createCustomButtonReplacePatch,
   createCustomButtonPatches,
   createDeleteNodePatch,
   createDisplayRulePatches,
   createEnableRulePatches,
+  createHideActionReplacePatch,
   createHideActionPatches,
+  createLocLabelTitleReplacePatch,
   createLocLabelPatches,
+  createRuleStepReplacePatch,
   makeCustomButtonIds,
   makeHideActionId,
   nextHideActionId,
   NewCommandActionInput,
+  NewCustomButtonInput,
   NewRuleStepInput,
 } from "../ribbonEditPatches";
-import { CommandDefinition, EnableRule, DisplayRule, RibbonDocument, RibbonView } from "../models";
+import {
+  CommandAction,
+  CommandDefinition,
+  CustomAction,
+  DisplayRule,
+  EnableRule,
+  HideAction,
+  LocLabelTitle,
+  RibbonDocument,
+  RibbonView,
+  RuleStep,
+} from "../models";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
@@ -86,6 +103,37 @@ export function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): vo
   const { document, range } = node.editTarget;
   ctx.ribbonEditorState.queuePatches(document, [createDeleteNodePatch(document.sourceText, range)]);
   ctx.ribbonExplorer.refresh();
+}
+
+export async function editRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
+  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
+    vscode.window.showWarningMessage("Select a ribbon item that can be edited.");
+    return;
+  }
+
+  const target = resolveEditableTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("This ribbon item cannot be edited yet.");
+    return;
+  }
+
+  switch (target.kind) {
+    case "CustomAction":
+      await editCustomAction(ctx, target.document, target.action);
+      return;
+    case "HideAction":
+      await editHideAction(ctx, target.document, target.action);
+      return;
+    case "CommandAction":
+      await editCommandAction(ctx, target.document, target.action);
+      return;
+    case "RuleStep":
+      await editRuleStep(ctx, target.document, target.ruleKind, target.step);
+      return;
+    case "LocLabelTitle":
+      await editLocLabelTitle(ctx, target.document, target.title);
+      return;
+  }
 }
 
 export async function addCustomRibbonButton(
@@ -384,6 +432,247 @@ function resolveCommandTarget(
   return undefined;
 }
 
+type EditableTarget =
+  | { kind: "CustomAction"; document: RibbonDocument; action: CustomAction }
+  | { kind: "HideAction"; document: RibbonDocument; action: HideAction }
+  | { kind: "CommandAction"; document: RibbonDocument; action: CommandAction }
+  | {
+      kind: "RuleStep";
+      document: RibbonDocument;
+      ruleKind: "Enable" | "Display";
+      step: RuleStep;
+    }
+  | { kind: "LocLabelTitle"; document: RibbonDocument; title: LocLabelTitle };
+
+function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined {
+  const target = node.editTarget;
+  if (!target) {
+    return undefined;
+  }
+
+  for (const view of target.document.views) {
+    const customAction = view.customActions.find((item) => sameRange(item.range, target.range));
+    if (customAction && node.contextValue === "d365RibbonCustomAction") {
+      return { kind: "CustomAction", document: target.document, action: customAction };
+    }
+
+    const hideAction = view.hideActions.find((item) => sameRange(item.range, target.range));
+    if (hideAction) {
+      return { kind: "HideAction", document: target.document, action: hideAction };
+    }
+
+    for (const command of view.commandDefinitions) {
+      const action = command.actions.find((item) => sameRange(item.range, target.range));
+      if (action && action.kind !== "Unknown") {
+        return { kind: "CommandAction", document: target.document, action };
+      }
+    }
+
+    for (const rule of view.enableRules) {
+      const step = rule.steps.find((item) => sameRange(item.range, target.range));
+      if (step && step.kind !== "Unknown") {
+        return { kind: "RuleStep", document: target.document, ruleKind: "Enable", step };
+      }
+    }
+
+    for (const rule of view.displayRules) {
+      const step = rule.steps.find((item) => sameRange(item.range, target.range));
+      if (step && step.kind !== "Unknown") {
+        return { kind: "RuleStep", document: target.document, ruleKind: "Display", step };
+      }
+    }
+
+    for (const label of view.locLabels) {
+      const title = label.titles.find((item) => sameRange(item.range, target.range));
+      if (title) {
+        return { kind: "LocLabelTitle", document: target.document, title };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function sameRange(left: { start: number; end: number }, right: { start: number; end: number }) {
+  return left.start === right.start && left.end === right.end;
+}
+
+async function editCustomAction(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  action: CustomAction,
+): Promise<void> {
+  if (action.commandUI?.kind !== "Button") {
+    vscode.window.showWarningMessage("Only Button custom actions can be edited.");
+    return;
+  }
+
+  const customActionId = await promptRequired("Custom action id", action.id);
+  if (customActionId === undefined) {
+    return;
+  }
+
+  const location = await promptRequired("Location", action.location);
+  if (location === undefined) {
+    return;
+  }
+
+  const sequenceText = await vscode.window.showInputBox({
+    prompt: "Sequence",
+    value: action.sequence === undefined ? "" : String(action.sequence),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const buttonId = await promptRequired("Button id", action.commandUI.id);
+  if (buttonId === undefined) {
+    return;
+  }
+
+  const commandId = await promptRequired("Command id", action.commandUI.command);
+  if (commandId === undefined) {
+    return;
+  }
+
+  const labelLocId = await promptOptional("Label LocLabel id", action.commandUI.labelLocId);
+  if (labelLocId === undefined) {
+    return;
+  }
+
+  const labelText = await promptOptional("Inline label text", action.commandUI.labelText);
+  if (labelText === undefined) {
+    return;
+  }
+
+  const image16x16 = await promptOptional(
+    "Small icon web resource",
+    action.commandUI.image16x16?.webResourceUniqueName,
+  );
+  if (image16x16 === undefined) {
+    return;
+  }
+
+  const image32x32 = await promptOptional(
+    "Large icon web resource",
+    action.commandUI.image32x32?.webResourceUniqueName,
+  );
+  if (image32x32 === undefined) {
+    return;
+  }
+
+  const templateAlias = await promptOptional("Template alias", action.commandUI.templateAlias);
+  if (templateAlias === undefined) {
+    return;
+  }
+
+  const input: NewCustomButtonInput = {
+    customActionId: customActionId.trim(),
+    location: location.trim(),
+    sequence: sequenceText.trim() ? Number(sequenceText.trim()) : undefined,
+    buttonId: buttonId.trim(),
+    commandId: commandId.trim(),
+    action: { kind: "Url", address: "" },
+    labelLocId: labelLocId.trim() || undefined,
+    labelText: labelText.trim() || undefined,
+    image16x16: image16x16.trim() || undefined,
+    image32x32: image32x32.trim() || undefined,
+    templateAlias: templateAlias.trim() || undefined,
+  };
+
+  ctx.ribbonEditorState.queuePatches(document, [
+    createCustomButtonReplacePatch(document.sourceText, action.range, input),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+async function editHideAction(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  action: HideAction,
+): Promise<void> {
+  const hideActionId = await promptRequired("Hide action id", action.hideActionId);
+  if (hideActionId === undefined) {
+    return;
+  }
+
+  const location = await promptRequired("Location", action.location);
+  if (location === undefined) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(document, [
+    createHideActionReplacePatch(document.sourceText, action.range, {
+      hideActionId: hideActionId.trim(),
+      location: location.trim(),
+    }),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+async function editCommandAction(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  action: CommandAction,
+): Promise<void> {
+  const input = await promptCommandAction(ctx);
+  if (!input) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(document, [
+    createCommandActionReplacePatch(document.sourceText, action, input),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+async function editRuleStep(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  ruleKind: "Enable" | "Display",
+  step: RuleStep,
+): Promise<void> {
+  const input = await promptRuleStep(ctx, ruleKind);
+  if (!input) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(document, [
+    createRuleStepReplacePatch(document.sourceText, step, input),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+async function editLocLabelTitle(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  title: LocLabelTitle,
+): Promise<void> {
+  const languageCode = await vscode.window.showInputBox({
+    prompt: "Language code",
+    value: String(title.languageCode),
+    validateInput: (value) =>
+      /^\d+$/.test(value.trim()) ? undefined : "Language code must be a number.",
+  });
+  if (languageCode === undefined) {
+    return;
+  }
+
+  const description = await promptRequired("Text", title.description);
+  if (description === undefined) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(document, [
+    createLocLabelTitleReplacePatch(document.sourceText, title, {
+      languageCode: Number(languageCode.trim()),
+      description: description.trim(),
+    }),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
 async function pickOobCommand(
   document: RibbonDocument,
   view: RibbonView,
@@ -537,6 +826,25 @@ async function promptUrlAction() {
     kind: "Url" as const,
     address: address.trim(),
   };
+}
+
+function promptRequired(prompt: string, value: string | undefined): Thenable<string | undefined> {
+  return vscode.window.showInputBox({
+    prompt,
+    value: value ?? "",
+    validateInput: (input) => (input.trim() ? undefined : `${prompt} is required.`),
+  });
+}
+
+function promptOptional(prompt: string, value: string | undefined): Thenable<string | undefined> {
+  return vscode.window.showInputBox({
+    prompt,
+    value: value ?? "",
+  });
+}
+
+function validateOptionalNumber(value: string): string | undefined {
+  return value.trim() === "" || /^\d+$/.test(value.trim()) ? undefined : "Use a number.";
 }
 
 async function pickWebResourceLibrary(

@@ -83,6 +83,7 @@
     "onCommand:dynamics365Tools.ribbons.addEnableRule",
     "onCommand:dynamics365Tools.ribbons.addDisplayRule",
     "onCommand:dynamics365Tools.ribbons.addLocLabel",
+    "onCommand:dynamics365Tools.ribbons.editNode",
     "onCommand:dynamics365Tools.ribbons.deleteNode",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
@@ -435,6 +436,12 @@
         "title": "Delete Ribbon Item",
         "category": "Dynamics 365 Tools",
         "icon": "$(trash)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.editNode",
+        "title": "Edit Ribbon Item",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(edit)"
       }
     ],
     "submenus": [
@@ -859,6 +866,11 @@
           "command": "dynamics365Tools.ribbons.addLocLabel",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:locLabels)",
           "group": "navigation@7"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.editNode",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem =~ /d365RibbonRuleStep/ || viewItem == d365RibbonLocLabelTitle)",
+          "group": "inline@8"
         },
         {
           "command": "dynamics365Tools.ribbons.deleteNode",

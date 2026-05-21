@@ -1,8 +1,11 @@
 import {
+  CommandAction,
   CommandDefinition,
   HideAction,
+  LocLabelTitle,
   RibbonDocument,
   RibbonPatch,
+  RuleStep,
   TextRange,
   XmlElementRange,
 } from "./models";
@@ -129,6 +132,14 @@ export function createCustomButtonPatches(
   return createSectionChildPatches(document, sectionEdits);
 }
 
+export function createCustomButtonReplacePatch(
+  sourceText: string,
+  range: TextRange,
+  input: NewCustomButtonInput,
+): RibbonPatch {
+  return createReplaceNodePatch(sourceText, range, renderCustomButtonAction(input));
+}
+
 export function createCommandDefinitionPatches(
   document: RibbonDocument,
   input: NewCommandDefinitionInput,
@@ -147,6 +158,14 @@ export function createCommandActionPatch(
   action: NewCommandActionInput,
 ): RibbonPatch {
   return createCommandChildPatch(document, command, "Actions", renderCommandAction(action));
+}
+
+export function createCommandActionReplacePatch(
+  sourceText: string,
+  action: CommandAction,
+  input: NewCommandActionInput,
+): RibbonPatch {
+  return createReplaceNodePatch(sourceText, action.range, renderCommandAction(input));
 }
 
 export function createCommandRuleRefPatch(
@@ -169,6 +188,14 @@ export function createHideActionPatches(
       childText: renderHideAction(input),
     },
   ]);
+}
+
+export function createHideActionReplacePatch(
+  sourceText: string,
+  range: TextRange,
+  input: NewHideActionInput,
+): RibbonPatch {
+  return createReplaceNodePatch(sourceText, range, renderHideAction(input));
 }
 
 export function createEnableRulePatches(
@@ -195,6 +222,22 @@ export function createLocLabelPatches(
       childText: renderLocLabel(input),
     },
   ]);
+}
+
+export function createRuleStepReplacePatch(
+  sourceText: string,
+  step: RuleStep,
+  input: NewRuleStepInput,
+): RibbonPatch {
+  return createReplaceNodePatch(sourceText, step.range, renderRuleStep(input));
+}
+
+export function createLocLabelTitleReplacePatch(
+  sourceText: string,
+  title: LocLabelTitle,
+  input: Pick<NewLocLabelInput, "languageCode" | "description">,
+): RibbonPatch {
+  return createReplaceNodePatch(sourceText, title.range, renderLocLabelTitle(input));
 }
 
 export function nextHideActionId(
@@ -520,9 +563,15 @@ function renderCommandAction(action: NewCommandActionInput): string {
 function renderLocLabel(input: NewLocLabelInput): string {
   return `<LocLabel Id="${escapeXmlAttribute(input.id)}">
   <Titles>
-    <Title languagecode="${input.languageCode}" description="${escapeXmlAttribute(input.description)}" />
+    ${renderLocLabelTitle(input)}
   </Titles>
 </LocLabel>`;
+}
+
+function renderLocLabelTitle(
+  input: Pick<NewLocLabelInput, "languageCode" | "description">,
+): string {
+  return `<Title languagecode="${input.languageCode}" description="${escapeXmlAttribute(input.description)}" />`;
 }
 
 function createRulePatches(
@@ -619,6 +668,14 @@ function renderRuleStep(step: NewRuleStepInput): string {
   }
 }
 
+function createReplaceNodePatch(sourceText: string, range: TextRange, text: string): RibbonPatch {
+  return {
+    kind: "replace",
+    range,
+    text: indentContinuationLines(text, indentationBefore(sourceText, range.start)),
+  };
+}
+
 function findMissingRuleContainerOffset(
   ruleDefinitions: XmlElementRange,
   containerName: "EnableRules" | "DisplayRules",
@@ -692,6 +749,13 @@ function indentBlock(text: string, indent: string): string {
   return text
     .split("\n")
     .map((line) => `${indent}${line}`)
+    .join("\n");
+}
+
+function indentContinuationLines(text: string, indent: string): string {
+  return text
+    .split("\n")
+    .map((line, index) => (index === 0 ? line : `${indent}${line}`))
     .join("\n");
 }
 

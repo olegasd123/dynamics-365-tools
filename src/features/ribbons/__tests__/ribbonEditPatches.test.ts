@@ -1,17 +1,22 @@
 import assert from "node:assert";
 import test from "node:test";
-import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
+import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments } from "../ribbonXmlReader";
 import {
   createCommandDefinitionPatches,
   createCommandActionPatch,
+  createCommandActionReplacePatch,
   createCommandRuleRefPatch,
+  createCustomButtonReplacePatch,
   createCustomButtonPatches,
   createDeleteNodePatch,
   createDisplayRulePatches,
   createEnableRulePatches,
+  createHideActionReplacePatch,
   createHideActionPatches,
+  createLocLabelTitleReplacePatch,
   createLocLabelPatches,
+  createRuleStepReplacePatch,
 } from "../ribbonEditPatches";
 
 test("creates a custom button with command action and label", () => {
@@ -379,4 +384,89 @@ test("delete node patch removes the full XML line", () => {
 
   assert.doesNotMatch(updated, /HideCustomAction/);
   assert.match(updated, /<CustomActions>\n {2}<\/CustomActions>/);
+});
+
+test("replaces editable ribbon nodes without touching surrounding XML", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="old.action" Location="old.location" Sequence="10">
+      <CommandUIDefinition>
+        <Button Id="old.button" Command="old.command" LabelText="Old label" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <HideCustomAction HideActionId="old.hide" Location="old.location" />
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="old.command">
+      <Actions>
+        <Url Address="https://old.example" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="old.rule">
+        <ValueRule Field="statuscode" Value="1" />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+  <LocLabels>
+    <LocLabel Id="old.label">
+      <Titles>
+        <Title languagecode="1033" description="Old label" />
+      </Titles>
+    </LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const view = document.views[0];
+
+  const updated = applyRibbonPatches(source, [
+    createCustomButtonReplacePatch(document.sourceText, view.customActions[0].range, {
+      customActionId: "new.action",
+      location: "new.location",
+      sequence: 20,
+      buttonId: "new.button",
+      commandId: "new.command",
+      labelText: "New label",
+      action: { kind: "Url", address: "" },
+    }),
+    createHideActionReplacePatch(document.sourceText, view.hideActions[0].range, {
+      hideActionId: "new.hide",
+      location: "new.location",
+    }),
+    createCommandActionReplacePatch(document.sourceText, view.commandDefinitions[0].actions[0], {
+      kind: "JavaScriptFunction",
+      library: "new_/scripts/account.js",
+      functionName: "validateAndSave",
+    }),
+    createRuleStepReplacePatch(document.sourceText, view.displayRules[0].steps[0], {
+      kind: "ValueRule",
+      field: "statecode",
+      value: "0",
+      invertResult: true,
+    }),
+    createLocLabelTitleReplacePatch(document.sourceText, view.locLabels[0].titles[0], {
+      languageCode: 1033,
+      description: "New label",
+    }),
+  ]);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedView = updatedDocument.views[0];
+
+  assert.strictEqual(updatedView.customActions[0].id, "new.action");
+  assert.strictEqual(updatedView.hideActions[0].hideActionId, "new.hide");
+  assert.strictEqual(updatedView.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
+  assert.strictEqual(updatedView.displayRules[0].steps[0].kind, "ValueRule");
+  assert.strictEqual(updatedView.locLabels[0].titles[0].description, "New label");
+  assert.match(updated, /<CommandDefinitions>/);
+  assert.doesNotMatch(updated, /old\.hide/);
 });
