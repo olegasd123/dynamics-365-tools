@@ -23,6 +23,49 @@ export interface NewLocLabelInput {
   description: string;
 }
 
+export interface NewCommandDefinitionInput {
+  id: string;
+  action?: NewCommandActionInput;
+  enableRuleIds?: string[];
+  displayRuleIds?: string[];
+}
+
+export type NewRuleStepInput =
+  | {
+      kind: "CustomRule";
+      library: string;
+      functionName: string;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "EntityPrivilegeRule";
+      entityName?: string;
+      privilegeType: string;
+      privilegeDepth?: string;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "ValueRule";
+      field: string;
+      value: string;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "FormStateRule";
+      state: string;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "CommandClientTypeRule";
+      type: "Modern" | "Refresh";
+    };
+
+export interface NewRuleInput {
+  id: string;
+  step?: NewRuleStepInput;
+}
+
 export interface NewCustomButtonInput {
   customActionId: string;
   location: string;
@@ -77,6 +120,18 @@ export function createCustomButtonPatches(
   return createSectionChildPatches(document, sectionEdits);
 }
 
+export function createCommandDefinitionPatches(
+  document: RibbonDocument,
+  input: NewCommandDefinitionInput,
+): RibbonPatch[] {
+  return createSectionChildPatches(document, [
+    {
+      sectionName: "CommandDefinitions",
+      childText: renderStandaloneCommandDefinition(input),
+    },
+  ]);
+}
+
 export function createHideActionPatches(
   document: RibbonDocument,
   input: NewHideActionInput,
@@ -85,6 +140,32 @@ export function createHideActionPatches(
     {
       sectionName: "CustomActions",
       childText: renderHideAction(input),
+    },
+  ]);
+}
+
+export function createEnableRulePatches(
+  document: RibbonDocument,
+  input: NewRuleInput,
+): RibbonPatch[] {
+  return createRulePatches(document, "EnableRules", "EnableRule", input);
+}
+
+export function createDisplayRulePatches(
+  document: RibbonDocument,
+  input: NewRuleInput,
+): RibbonPatch[] {
+  return createRulePatches(document, "DisplayRules", "DisplayRule", input);
+}
+
+export function createLocLabelPatches(
+  document: RibbonDocument,
+  input: NewLocLabelInput,
+): RibbonPatch[] {
+  return createSectionChildPatches(document, [
+    {
+      sectionName: "LocLabels",
+      childText: renderLocLabel(input),
     },
   ]);
 }
@@ -307,6 +388,16 @@ function renderCommandDefinition(input: NewCustomButtonInput): string {
 </CommandDefinition>`;
 }
 
+function renderStandaloneCommandDefinition(input: NewCommandDefinitionInput): string {
+  const actions = input.action ? `\n    ${renderCommandAction(input.action)}\n  ` : "";
+
+  return `<CommandDefinition Id="${escapeXmlAttribute(input.id)}">
+  <EnableRules>${renderRuleRefs("EnableRule", input.enableRuleIds ?? [])}</EnableRules>
+  <DisplayRules>${renderRuleRefs("DisplayRule", input.displayRuleIds ?? [])}</DisplayRules>
+  <Actions>${actions}</Actions>
+</CommandDefinition>`;
+}
+
 function renderRuleRefs(name: "EnableRule" | "DisplayRule", ids: string[]): string {
   return ids.map((id) => `<${name} Id="${escapeXmlAttribute(id)}" />`).join("");
 }
@@ -327,11 +418,129 @@ function renderLocLabel(input: NewLocLabelInput): string {
 </LocLabel>`;
 }
 
+function createRulePatches(
+  document: RibbonDocument,
+  containerName: "EnableRules" | "DisplayRules",
+  ruleName: "EnableRule" | "DisplayRule",
+  input: NewRuleInput,
+): RibbonPatch[] {
+  const ribbon = findDocumentRibbon(document);
+  const ruleDefinitions = ribbon.children.find((child) => child.name === "RuleDefinitions");
+  const ruleText = renderRule(ruleName, input);
+
+  if (!ruleDefinitions) {
+    return createSectionChildPatches(document, [
+      {
+        sectionName: "RuleDefinitions",
+        childText: renderRuleContainer(containerName, ruleText),
+      },
+    ]);
+  }
+
+  if (ruleDefinitions.selfClosing) {
+    const sectionIndent = indentationBefore(document.sourceText, ruleDefinitions.range.start);
+    const childIndent = `${sectionIndent}  `;
+
+    return [
+      {
+        kind: "replace",
+        range: ruleDefinitions.range,
+        text: `<RuleDefinitions>\n${indentBlock(renderRuleContainer(containerName, ruleText), childIndent)}\n${sectionIndent}</RuleDefinitions>`,
+      },
+    ];
+  }
+
+  const container = ruleDefinitions.children.find((child) => child.name === containerName);
+  if (container) {
+    return [createExistingSectionChildPatch(document.sourceText, container, ruleText)];
+  }
+
+  const offset = findMissingRuleContainerOffset(ruleDefinitions, containerName);
+  const ruleDefinitionsIndent = indentationBefore(document.sourceText, ruleDefinitions.range.start);
+  const containerIndent =
+    findChildIndent(document.sourceText, ruleDefinitions) ?? `${ruleDefinitionsIndent}  `;
+  return [
+    {
+      kind: "insert",
+      offset,
+      text: `\n${indentBlock(renderRuleContainer(containerName, ruleText), containerIndent)}`,
+    },
+  ];
+}
+
+function renderRuleContainer(
+  containerName: "EnableRules" | "DisplayRules",
+  ruleText: string,
+): string {
+  return `<${containerName}>\n  ${indentBlock(ruleText, "  ")}\n</${containerName}>`;
+}
+
+function renderRule(ruleName: "EnableRule" | "DisplayRule", input: NewRuleInput): string {
+  const stepText = input.step ? `\n  ${indentBlock(renderRuleStep(input.step), "  ")}\n` : "";
+  return `<${ruleName} Id="${escapeXmlAttribute(input.id)}">${stepText}</${ruleName}>`;
+}
+
+function renderRuleStep(step: NewRuleStepInput): string {
+  switch (step.kind) {
+    case "CustomRule":
+      return `<CustomRule ${renderAttributes([
+        ["Library", webResourceValue(step.library)],
+        ["FunctionName", step.functionName],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "EntityPrivilegeRule":
+      return `<EntityPrivilegeRule ${renderAttributes([
+        ["EntityName", step.entityName],
+        ["PrivilegeType", step.privilegeType],
+        ["PrivilegeDepth", step.privilegeDepth],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "ValueRule":
+      return `<ValueRule ${renderAttributes([
+        ["Field", step.field],
+        ["Value", step.value],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "FormStateRule":
+      return `<FormStateRule ${renderAttributes([
+        ["State", step.state],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "CommandClientTypeRule":
+      return `<CommandClientTypeRule Type="${escapeXmlAttribute(step.type)}" />`;
+  }
+}
+
+function findMissingRuleContainerOffset(
+  ruleDefinitions: XmlElementRange,
+  containerName: "EnableRules" | "DisplayRules",
+): number {
+  const containerOrder = ["TabDisplayRules", "DisplayRules", "EnableRules"];
+  const targetIndex = containerOrder.indexOf(containerName);
+  const nextContainer = ruleDefinitions.children
+    .filter((child) => containerOrder.includes(child.name))
+    .filter((child) => containerOrder.indexOf(child.name) > targetIndex)
+    .sort((a, b) => containerOrder.indexOf(a.name) - containerOrder.indexOf(b.name))[0];
+
+  if (nextContainer) {
+    return nextContainer.range.start;
+  }
+
+  return ruleDefinitions.children.length
+    ? ruleDefinitions.innerRange.end
+    : ruleDefinitions.startTagRange.end;
+}
+
 function renderAttributes(attributes: Array<[string, string | number | undefined]>): string {
   return attributes
     .filter((attribute): attribute is [string, string | number] => attribute[1] !== undefined)
     .map(([name, value]) => `${name}="${escapeXmlAttribute(String(value))}"`)
     .join(" ");
+}
+
+function optionalBoolean(value: boolean | undefined): string | undefined {
+  return value === undefined ? undefined : String(value);
 }
 
 function expandToLineRange(sourceText: string, range: TextRange): TextRange {

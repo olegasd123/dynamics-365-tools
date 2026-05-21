@@ -36,6 +36,10 @@ import {
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
+  addRibbonCommandDefinition,
+  addRibbonDisplayRule,
+  addRibbonEnableRule,
+  addRibbonLocLabel,
   addCustomRibbonButton,
   deleteRibbonNode,
   hideOobRibbonButton,
@@ -147,6 +151,22 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       },
     ),
     register("dynamics365Tools.ribbons.hideOobButton", (node) => hideOobRibbonButton(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.ribbons.addCommandDefinition",
+      (node) => addRibbonCommandDefinition(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register("dynamics365Tools.ribbons.addEnableRule", (node) => addRibbonEnableRule(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.addDisplayRule", (node) => addRibbonDisplayRule(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.addLocLabel", (node) => addRibbonLocLabel(ctx, node), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.deleteNode", (node) => deleteRibbonNode(ctx, node), {

@@ -11,12 +11,18 @@ import {
   RibbonViewNode,
 } from "../ribbonExplorer";
 import {
+  createCommandDefinitionPatches,
   createCustomButtonPatches,
   createDeleteNodePatch,
+  createDisplayRulePatches,
+  createEnableRulePatches,
   createHideActionPatches,
+  createLocLabelPatches,
   makeCustomButtonIds,
   makeHideActionId,
   nextHideActionId,
+  NewCommandActionInput,
+  NewRuleStepInput,
 } from "../ribbonEditPatches";
 import { RibbonDocument, RibbonView } from "../models";
 import {
@@ -33,6 +39,7 @@ interface OobCommandPick extends vscode.QuickPickItem {
 
 interface WebResourceLibraryPick extends vscode.QuickPickItem {
   uniqueName: string;
+  localPath?: string;
 }
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
@@ -180,6 +187,103 @@ export async function hideOobRibbonButton(
   ctx.ribbonExplorer.refresh();
 }
 
+export async function addRibbonCommandDefinition(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    return;
+  }
+
+  const id = await vscode.window.showInputBox({
+    prompt: "Command definition id",
+    placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.Command`,
+    validateInput: (value) => validateUniqueId(target.document, value, "Command id is required."),
+  });
+  if (!id) {
+    return;
+  }
+
+  const action = await promptOptionalCommandAction(ctx);
+  if (action === undefined) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createCommandDefinitionPatches(target.document, {
+      id: id.trim(),
+      action: action ?? undefined,
+    }),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
+export async function addRibbonEnableRule(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await addRibbonRule(ctx, node, "Enable");
+}
+
+export async function addRibbonDisplayRule(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await addRibbonRule(ctx, node, "Display");
+}
+
+export async function addRibbonLocLabel(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    return;
+  }
+
+  const id = await vscode.window.showInputBox({
+    prompt: "Loc label id",
+    placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.Label`,
+    validateInput: (value) => validateUniqueId(target.document, value, "Label id is required."),
+  });
+  if (!id) {
+    return;
+  }
+
+  const description = await vscode.window.showInputBox({
+    prompt: "Text",
+    placeHolder: "Validate and save",
+    validateInput: (value) => (value.trim() ? undefined : "Text is required."),
+  });
+  if (!description) {
+    return;
+  }
+
+  const languageCode = await vscode.window.showInputBox({
+    prompt: "Language code",
+    value: "1033",
+    validateInput: (value) =>
+      /^\d+$/.test(value.trim()) ? undefined : "Language code must be a number.",
+  });
+  if (!languageCode) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createLocLabelPatches(target.document, {
+      id: id.trim(),
+      languageCode: Number(languageCode.trim()),
+      description: description.trim(),
+    }),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
 function resolveSourceId(node: unknown): string | undefined {
   if (node instanceof RibbonSourceNode) {
     return node.source.id;
@@ -306,11 +410,7 @@ async function promptJavaScriptAction(ctx: CommandContext) {
     return undefined;
   }
 
-  const functionName = await vscode.window.showInputBox({
-    prompt: "JavaScript function name",
-    placeHolder: "validateAndSave",
-    validateInput: (value) => (value.trim() ? undefined : "Function name is required."),
-  });
+  const functionName = await pickJavaScriptFunctionName(library);
   if (!functionName) {
     return undefined;
   }
@@ -320,6 +420,28 @@ async function promptJavaScriptAction(ctx: CommandContext) {
     library: library.uniqueName,
     functionName: functionName.trim(),
   };
+}
+
+async function promptOptionalCommandAction(
+  ctx: CommandContext,
+): Promise<NewCommandActionInput | undefined | null> {
+  const actionKind = await vscode.window.showQuickPick(
+    [
+      { label: "JavaScript function", description: "Call a workspace web resource" },
+      { label: "URL", description: "Open a URL" },
+      { label: "No action", description: "Create an empty Actions block" },
+    ],
+    { placeHolder: "Command action" },
+  );
+  if (!actionKind) {
+    return undefined;
+  }
+
+  if (actionKind.label === "No action") {
+    return null;
+  }
+
+  return actionKind.label === "URL" ? promptUrlAction() : promptJavaScriptAction(ctx);
 }
 
 async function promptUrlAction() {
@@ -368,6 +490,7 @@ async function listBoundJavaScriptLibraries(
             ctx.configuration.resolveLocalPath(binding.relativeLocalPath),
           ),
           uniqueName,
+          localPath: ctx.configuration.resolveLocalPath(binding.relativeLocalPath),
         });
       }
       continue;
@@ -396,8 +519,258 @@ async function listFolderJavaScriptLibraries(
       label: uniqueName,
       description: ctx.configuration.getRelativeToWorkspace(file.fsPath),
       uniqueName,
+      localPath: file.fsPath,
     };
   });
+}
+
+async function pickJavaScriptFunctionName(
+  library: WebResourceLibraryPick,
+): Promise<string | undefined> {
+  const suggestions = await listJavaScriptFunctionSuggestions(library.localPath);
+  if (!suggestions.length) {
+    return vscode.window.showInputBox({
+      prompt: "JavaScript function name",
+      placeHolder: "validateAndSave",
+      validateInput: (value) => (value.trim() ? undefined : "Function name is required."),
+    });
+  }
+
+  const manual = "Type function name";
+  const pick = await vscode.window.showQuickPick(
+    [...suggestions.map((name) => ({ label: name })), { label: manual }],
+    { placeHolder: "JavaScript function name" },
+  );
+  if (!pick) {
+    return undefined;
+  }
+
+  if (pick.label !== manual) {
+    return pick.label;
+  }
+
+  return vscode.window.showInputBox({
+    prompt: "JavaScript function name",
+    placeHolder: "validateAndSave",
+    validateInput: (value) => (value.trim() ? undefined : "Function name is required."),
+  });
+}
+
+async function listJavaScriptFunctionSuggestions(localPath: string | undefined): Promise<string[]> {
+  if (!localPath) {
+    return [];
+  }
+
+  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(localPath)).then(
+    (value) => value,
+    () => undefined,
+  );
+  if (!stat || stat.size > 256 * 1024) {
+    return [];
+  }
+
+  const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(localPath));
+  const source = Buffer.from(bytes).toString("utf8");
+  const names = new Set<string>();
+  const patterns = [
+    /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g,
+    /(?:^|[;\n]\s*)([A-Za-z_$][\w$]*)\s*=\s*function\s*\(/g,
+    /(?:^|[;\n]\s*)([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*=\s*function\s*\(/g,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      names.add(match[1]);
+    }
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+async function addRibbonRule(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+  kind: "Enable" | "Display",
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    return;
+  }
+
+  const id = await vscode.window.showInputBox({
+    prompt: `${kind} rule id`,
+    placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.${kind}Rule`,
+    validateInput: (value) => validateUniqueId(target.document, value, "Rule id is required."),
+  });
+  if (!id) {
+    return;
+  }
+
+  const step = await promptRuleStep(ctx, kind);
+  if (step === undefined) {
+    return;
+  }
+
+  const createPatches = kind === "Enable" ? createEnableRulePatches : createDisplayRulePatches;
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createPatches(target.document, {
+      id: id.trim(),
+      step: step ?? undefined,
+    }),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
+async function promptRuleStep(
+  ctx: CommandContext,
+  ruleKind: "Enable" | "Display",
+): Promise<NewRuleStepInput | null | undefined> {
+  const common = [
+    { label: "CustomRule", description: "Call a JavaScript function" },
+    { label: "FormStateRule", description: "Check form state" },
+    { label: "CommandClientTypeRule", description: "Modern or refresh client" },
+  ];
+  const displayOnly = [
+    { label: "ValueRule", description: "Check a field value" },
+    { label: "EntityPrivilegeRule", description: "Check entity privilege" },
+  ];
+  const pick = await vscode.window.showQuickPick(
+    [
+      ...(ruleKind === "Display" ? displayOnly : []),
+      ...common,
+      { label: "No step", description: "Create an empty rule" },
+    ],
+    { placeHolder: "First rule step" },
+  );
+  if (!pick) {
+    return undefined;
+  }
+
+  switch (pick.label) {
+    case "No step":
+      return null;
+    case "CustomRule":
+      return promptCustomRuleStep(ctx);
+    case "FormStateRule":
+      return promptFormStateRuleStep();
+    case "CommandClientTypeRule":
+      return promptCommandClientTypeRuleStep();
+    case "ValueRule":
+      return promptValueRuleStep();
+    case "EntityPrivilegeRule":
+      return promptEntityPrivilegeRuleStep();
+    default:
+      return undefined;
+  }
+}
+
+async function promptCustomRuleStep(ctx: CommandContext): Promise<NewRuleStepInput | undefined> {
+  const action = await promptJavaScriptAction(ctx);
+  if (!action || action.kind !== "JavaScriptFunction") {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "CustomRule",
+    library: action.library,
+    functionName: action.functionName,
+    invertResult,
+  };
+}
+
+async function promptFormStateRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const state = await vscode.window.showQuickPick(["Create", "Existing", "ReadOnly", "Disabled"], {
+    placeHolder: "Form state",
+  });
+  if (!state) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "FormStateRule", state, invertResult };
+}
+
+async function promptCommandClientTypeRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const type = await vscode.window.showQuickPick(["Modern", "Refresh"], {
+    placeHolder: "Client type",
+  });
+  return type ? { kind: "CommandClientTypeRule", type: type as "Modern" | "Refresh" } : undefined;
+}
+
+async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const field = await vscode.window.showInputBox({
+    prompt: "Field name",
+    placeHolder: "statuscode",
+    validateInput: (value) => (value.trim() ? undefined : "Field name is required."),
+  });
+  if (!field) {
+    return undefined;
+  }
+
+  const value = await vscode.window.showInputBox({
+    prompt: "Value",
+    validateInput: (input) => (input.trim() ? undefined : "Value is required."),
+  });
+  if (!value) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "ValueRule", field: field.trim(), value: value.trim(), invertResult };
+}
+
+async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const privilegeType = await vscode.window.showQuickPick(
+    ["Create", "Read", "Write", "Delete", "Append", "AppendTo", "Assign", "Share"],
+    { placeHolder: "Privilege type" },
+  );
+  if (!privilegeType) {
+    return undefined;
+  }
+
+  const entityName = await vscode.window.showInputBox({
+    prompt: "Entity logical name",
+    placeHolder: "account",
+  });
+  const privilegeDepth = await vscode.window.showQuickPick(["Basic", "Local", "Deep", "Global"], {
+    placeHolder: "Privilege depth",
+  });
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "EntityPrivilegeRule",
+    entityName: entityName?.trim() || undefined,
+    privilegeType,
+    privilegeDepth,
+    invertResult,
+  };
+}
+
+async function promptOptionalBoolean(prompt: string): Promise<boolean | undefined> {
+  const pick = await vscode.window.showQuickPick(["No", "Yes"], { placeHolder: prompt });
+  if (!pick) {
+    return undefined;
+  }
+
+  return pick === "Yes";
 }
 
 function joinRemotePath(root: string, relative: string): string {
@@ -409,4 +782,42 @@ function nextCustomActionSequence(view: RibbonView): number {
     .map((action) => action.sequence)
     .filter((sequence): sequence is number => typeof sequence === "number");
   return sequences.length ? Math.max(...sequences) + 10 : 10;
+}
+
+function validateUniqueId(
+  document: RibbonDocument,
+  value: string,
+  requiredMessage: string,
+): string | undefined {
+  const id = value.trim();
+  if (!id) {
+    return requiredMessage;
+  }
+
+  const used = new Set<string>();
+  for (const view of document.views) {
+    for (const action of view.customActions) {
+      used.add(action.id);
+      if (action.commandUI && action.commandUI.kind !== "Unknown") {
+        used.add(action.commandUI.id);
+      }
+    }
+    for (const action of view.hideActions) {
+      used.add(action.hideActionId);
+    }
+    for (const command of view.commandDefinitions) {
+      used.add(command.id);
+    }
+    for (const rule of view.enableRules) {
+      used.add(rule.id);
+    }
+    for (const rule of view.displayRules) {
+      used.add(rule.id);
+    }
+    for (const label of view.locLabels) {
+      used.add(label.id);
+    }
+  }
+
+  return used.has(id) ? "This id already exists in this ribbon." : undefined;
 }
