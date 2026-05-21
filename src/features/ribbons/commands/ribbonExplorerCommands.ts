@@ -88,7 +88,15 @@ export async function saveRibbonSource(
   );
 }
 
-export async function openRibbonFile(node?: RibbonDocumentNode): Promise<void> {
+export async function openRibbonFile(node?: RibbonDocumentNode | RibbonSourceNode): Promise<void> {
+  if (node instanceof RibbonSourceNode && node.source.kind === "flat") {
+    const fileUri = node.source.files[0]?.fileUri;
+    if (fileUri) {
+      await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(fileUri));
+    }
+    return;
+  }
+
   if (!(node instanceof RibbonDocumentNode)) {
     vscode.window.showWarningMessage("Select a ribbon document first.");
     return;

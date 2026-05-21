@@ -43,7 +43,9 @@ export class RibbonSourceNode extends vscode.TreeItem {
     dirty = false,
   ) {
     super(source.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.contextValue = dirty ? "d365RibbonSource:dirty" : "d365RibbonSource";
+    this.contextValue = dirty
+      ? `d365RibbonSource:${source.kind}:dirty`
+      : `d365RibbonSource:${source.kind}`;
     this.iconPath = new vscode.ThemeIcon(source.kind === "flat" ? "file-code" : "folder-library");
     this.description = `${source.kind === "flat" ? "flat" : `${source.files.length} files`}${dirty ? " *" : ""}`;
     this.tooltip = source.rootUri;
