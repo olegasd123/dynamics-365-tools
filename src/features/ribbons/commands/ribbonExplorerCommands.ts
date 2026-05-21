@@ -61,6 +61,7 @@ interface OobCommandPick extends vscode.QuickPickItem {
 interface WebResourceLibraryPick extends vscode.QuickPickItem {
   uniqueName: string;
   localPath?: string;
+  manual?: boolean;
 }
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
@@ -276,7 +277,7 @@ export async function addRibbonCommandDefinition(
     return;
   }
 
-  const action = await promptCommandAction(ctx);
+  const action = await promptOptionalCommandAction(ctx);
   if (action === undefined) {
     return;
   }
@@ -301,7 +302,7 @@ export async function addRibbonCommandAction(
     return;
   }
 
-  const action = await promptOptionalCommandAction(ctx);
+  const action = await promptCommandAction(ctx);
   if (!action) {
     return;
   }
@@ -917,14 +918,38 @@ async function pickWebResourceLibrary(
   ctx: CommandContext,
 ): Promise<WebResourceLibraryPick | undefined> {
   const picks = await listBoundJavaScriptLibraries(ctx);
-  if (!picks.length) {
-    vscode.window.showWarningMessage("No bound JavaScript web resources were found.");
+  const manualPick: WebResourceLibraryPick = {
+    label: "Type schema name manually",
+    description: "Use an external or unbound web resource",
+    uniqueName: "",
+    manual: true,
+  };
+
+  const pick = await vscode.window.showQuickPick([...picks, manualPick], {
+    placeHolder: "JavaScript web resource",
+  });
+  if (!pick) {
     return undefined;
   }
 
-  return vscode.window.showQuickPick(picks, {
-    placeHolder: "JavaScript web resource",
+  if (!pick.manual) {
+    return pick;
+  }
+
+  const uniqueName = await vscode.window.showInputBox({
+    prompt: "JavaScript web resource schema name",
+    placeHolder: "new_/scripts/account.js",
+    validateInput: (value) =>
+      normalizeWebResourceUniqueName(value) ? undefined : "Schema name is required.",
   });
+  const normalized = normalizeWebResourceUniqueName(uniqueName ?? "");
+
+  return normalized
+    ? {
+        label: normalized,
+        uniqueName: normalized,
+      }
+    : undefined;
 }
 
 async function listBoundJavaScriptLibraries(
@@ -1317,6 +1342,13 @@ async function promptOptionalBoolean(prompt: string): Promise<boolean | undefine
 
 function joinRemotePath(root: string, relative: string): string {
   return `${root.replace(/[\\/]+$/, "")}/${relative.replace(/^[\\/]+/, "")}`.replace(/\\/g, "/");
+}
+
+export function normalizeWebResourceUniqueName(value: string): string {
+  return value
+    .trim()
+    .replace(/^\$webresource:/i, "")
+    .replace(/\\/g, "/");
 }
 
 function nextCustomActionSequence(view: RibbonView): number {
