@@ -824,12 +824,12 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addCustomButton",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem =~ /d365RibbonSection/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
           "group": "inline@3"
         },
         {
           "command": "dynamics365Tools.ribbons.hideOobButton",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem =~ /d365RibbonSection/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
           "group": "inline@4"
         },
         {
