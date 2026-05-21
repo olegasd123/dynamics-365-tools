@@ -74,6 +74,7 @@
     "onCommand:dynamics365Tools.ribbons.refreshExplorer",
     "onCommand:dynamics365Tools.ribbons.save",
     "onCommand:dynamics365Tools.ribbons.openFile",
+    "onCommand:dynamics365Tools.ribbons.addCustomButton",
     "onCommand:dynamics365Tools.ribbons.hideOobButton",
     "onCommand:dynamics365Tools.ribbons.deleteNode",
     "onCommand:dynamics365Tools.publishLastResource",
@@ -367,6 +368,12 @@
         "title": "Open Ribbon XML",
         "category": "Dynamics 365 Tools",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.addCustomButton",
+        "title": "Add Custom Button",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.hideOobButton",
@@ -760,14 +767,19 @@
           "group": "inline@2"
         },
         {
-          "command": "dynamics365Tools.ribbons.hideOobButton",
+          "command": "dynamics365Tools.ribbons.addCustomButton",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem =~ /d365RibbonSection/)",
           "group": "inline@3"
         },
         {
+          "command": "dynamics365Tools.ribbons.hideOobButton",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem =~ /d365RibbonSection/)",
+          "group": "inline@4"
+        },
+        {
           "command": "dynamics365Tools.ribbons.deleteNode",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/ || viewItem =~ /d365RibbonJavaScriptAction/ || viewItem =~ /d365RibbonUrlAction/ || viewItem =~ /d365RibbonRuleStep/)",
-          "group": "inline@4"
+          "group": "inline@5"
         }
       ]
     },

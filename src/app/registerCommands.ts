@@ -36,6 +36,7 @@ import {
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
+  addCustomRibbonButton,
   deleteRibbonNode,
   hideOobRibbonButton,
   openRibbonFile,
@@ -138,6 +139,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.addCustomButton",
+      (node) => addCustomRibbonButton(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.ribbons.hideOobButton", (node) => hideOobRibbonButton(ctx, node), {
       validateConfiguration: false,
     }),

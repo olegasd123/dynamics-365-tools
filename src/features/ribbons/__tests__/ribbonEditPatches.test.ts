@@ -2,7 +2,95 @@ import assert from "node:assert";
 import test from "node:test";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments } from "../ribbonXmlReader";
-import { createDeleteNodePatch, createHideActionPatches } from "../ribbonEditPatches";
+import {
+  createCustomButtonPatches,
+  createDeleteNodePatch,
+  createHideActionPatches,
+} from "../ribbonEditPatches";
+
+test("creates a custom button with command action and label", () => {
+  const source = `<RibbonDiffXml>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomButtonPatches(document, {
+      customActionId: "d365tools.account.Form.Validate.CustomAction",
+      location: "Mscrm.Form.account.MainTab.Save.Controls._children",
+      sequence: 10,
+      buttonId: "d365tools.account.Form.Validate.Button",
+      commandId: "d365tools.account.Form.Validate.Command",
+      labelLocId: "d365tools.account.Form.Validate.Label",
+      image16x16: "new_/icons/save16.png",
+      image32x32: "new_/icons/save32.png",
+      action: {
+        kind: "JavaScriptFunction",
+        library: "new_/scripts/account.js",
+        functionName: "validateAndSave",
+      },
+      locLabel: {
+        id: "d365tools.account.Form.Validate.Label",
+        languageCode: 1033,
+        description: "Validate and save",
+      },
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const form = updatedDocument.views[0];
+
+  assert.match(updated, /<CustomActions>/);
+  assert.match(updated, /<CommandDefinitions>/);
+  assert.match(updated, /<LocLabels>/);
+  assert.strictEqual(form.customActions[0].commandUI?.kind, "Button");
+  assert.strictEqual(form.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
+  assert.strictEqual(form.locLabels[0].titles[0].description, "Validate and save");
+  assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
+});
+
+test("adds a custom button to existing self-closing sections", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomButtonPatches(document, {
+      customActionId: "d365tools.account.Form.Open.CustomAction",
+      location: "Mscrm.Form.account.MainTab.Record.Controls._children",
+      buttonId: "d365tools.account.Form.Open.Button",
+      commandId: "d365tools.account.Form.Open.Command",
+      labelText: "Open help",
+      action: {
+        kind: "Url",
+        address: "https://contoso.example/help",
+      },
+    }),
+  );
+
+  assert.doesNotMatch(updated, /<CustomActions \/>/);
+  assert.doesNotMatch(updated, /<CommandDefinitions \/>/);
+  assert.match(updated, /<Url Address="https:\/\/contoso\.example\/help" \/>/);
+});
 
 test("creates a hide action inside an existing CustomActions section", () => {
   const source = `<RibbonDiffXml>
