@@ -37,6 +37,9 @@ import {
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
   addRibbonCommandDefinition,
+  addRibbonCommandAction,
+  addRibbonCommandDisplayRuleRef,
+  addRibbonCommandEnableRuleRef,
   addRibbonDisplayRule,
   addRibbonEnableRule,
   addRibbonLocLabel,
@@ -156,6 +159,27 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register(
       "dynamics365Tools.ribbons.addCommandDefinition",
       (node) => addRibbonCommandDefinition(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.addCommandAction",
+      (node) => addRibbonCommandAction(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.addCommandEnableRuleRef",
+      (node) => addRibbonCommandEnableRuleRef(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.addCommandDisplayRuleRef",
+      (node) => addRibbonCommandDisplayRuleRef(ctx, node),
       {
         validateConfiguration: false,
       },

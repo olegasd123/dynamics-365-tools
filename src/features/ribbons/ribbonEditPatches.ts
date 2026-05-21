@@ -1,4 +1,11 @@
-import { HideAction, RibbonDocument, RibbonPatch, TextRange, XmlElementRange } from "./models";
+import {
+  CommandDefinition,
+  HideAction,
+  RibbonDocument,
+  RibbonPatch,
+  TextRange,
+  XmlElementRange,
+} from "./models";
 import { scanXmlElements } from "./ribbonXmlReader";
 
 export interface NewHideActionInput {
@@ -29,6 +36,8 @@ export interface NewCommandDefinitionInput {
   enableRuleIds?: string[];
   displayRuleIds?: string[];
 }
+
+export type CommandRuleRefKind = "EnableRule" | "DisplayRule";
 
 export type NewRuleStepInput =
   | {
@@ -130,6 +139,24 @@ export function createCommandDefinitionPatches(
       childText: renderStandaloneCommandDefinition(input),
     },
   ]);
+}
+
+export function createCommandActionPatch(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  action: NewCommandActionInput,
+): RibbonPatch {
+  return createCommandChildPatch(document, command, "Actions", renderCommandAction(action));
+}
+
+export function createCommandRuleRefPatch(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  kind: CommandRuleRefKind,
+  ruleId: string,
+): RibbonPatch {
+  const containerName = kind === "EnableRule" ? "EnableRules" : "DisplayRules";
+  return createCommandChildPatch(document, command, containerName, renderRuleRef(kind, ruleId));
 }
 
 export function createHideActionPatches(
@@ -283,6 +310,82 @@ function createExistingSectionChildPatch(
   };
 }
 
+function createCommandChildPatch(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  containerName: "EnableRules" | "DisplayRules" | "Actions",
+  childText: string,
+): RibbonPatch {
+  const commandElement = findCommandElement(document, command);
+  const container = commandElement.children.find((child) => child.name === containerName);
+
+  if (container) {
+    return createExistingSectionChildPatch(document.sourceText, container, childText);
+  }
+
+  const commandIndent = indentationBefore(document.sourceText, commandElement.range.start);
+  const containerIndent =
+    findChildIndent(document.sourceText, commandElement) ?? `${commandIndent}  `;
+  const containerText = `<${containerName}>\n${indentBlock(childText, "  ")}\n</${containerName}>`;
+
+  if (commandElement.selfClosing) {
+    return {
+      kind: "replace",
+      range: commandElement.range,
+      text: `${openSelfClosingElement(document.sourceText, commandElement)}\n${indentBlock(containerText, containerIndent)}\n${commandIndent}</${commandElement.name}>`,
+    };
+  }
+
+  const offset = findMissingCommandContainerOffset(commandElement, containerName);
+
+  return {
+    kind: "insert",
+    offset,
+    text: `\n${indentBlock(containerText, containerIndent)}${offset === commandElement.innerRange.end ? `\n${commandIndent}` : ""}`,
+  };
+}
+
+function findCommandElement(document: RibbonDocument, command: CommandDefinition): XmlElementRange {
+  const ribbon = findDocumentRibbon(document);
+  const commandDefinitions = ribbon.children.find((child) => child.name === "CommandDefinitions");
+  const commandElement = commandDefinitions?.children.find(
+    (child) =>
+      child.name === "CommandDefinition" &&
+      child.range.start === command.range.start &&
+      child.range.end === command.range.end,
+  );
+
+  if (!commandElement) {
+    throw new Error(
+      `CommandDefinition '${command.id}' was not found in the current document text.`,
+    );
+  }
+
+  return commandElement;
+}
+
+function findMissingCommandContainerOffset(
+  command: XmlElementRange,
+  containerName: "EnableRules" | "DisplayRules" | "Actions",
+): number {
+  const containerOrder = ["EnableRules", "DisplayRules", "Actions"];
+  const targetIndex = containerOrder.indexOf(containerName);
+  const nextContainer = command.children
+    .filter((child) => containerOrder.includes(child.name))
+    .filter((child) => containerOrder.indexOf(child.name) > targetIndex)
+    .sort((a, b) => containerOrder.indexOf(a.name) - containerOrder.indexOf(b.name))[0];
+
+  if (nextContainer) {
+    return nextContainer.range.start;
+  }
+
+  return command.children.length ? command.innerRange.end : command.startTagRange.end;
+}
+
+function openSelfClosingElement(sourceText: string, element: XmlElementRange): string {
+  return sourceText.slice(element.range.start, element.range.end).replace(/\s*\/\s*>$/, ">");
+}
+
 function findMissingSectionOffset(
   ribbon: XmlElementRange,
   sectionName: RibbonSectionChildEdit["sectionName"],
@@ -399,7 +502,11 @@ function renderStandaloneCommandDefinition(input: NewCommandDefinitionInput): st
 }
 
 function renderRuleRefs(name: "EnableRule" | "DisplayRule", ids: string[]): string {
-  return ids.map((id) => `<${name} Id="${escapeXmlAttribute(id)}" />`).join("");
+  return ids.map((id) => renderRuleRef(name, id)).join("");
+}
+
+function renderRuleRef(name: "EnableRule" | "DisplayRule", id: string): string {
+  return `<${name} Id="${escapeXmlAttribute(id)}" />`;
 }
 
 function renderCommandAction(action: NewCommandActionInput): string {

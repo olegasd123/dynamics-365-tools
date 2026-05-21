@@ -12,6 +12,8 @@ import {
 } from "../ribbonExplorer";
 import {
   createCommandDefinitionPatches,
+  createCommandActionPatch,
+  createCommandRuleRefPatch,
   createCustomButtonPatches,
   createDeleteNodePatch,
   createDisplayRulePatches,
@@ -24,7 +26,7 @@ import {
   NewCommandActionInput,
   NewRuleStepInput,
 } from "../ribbonEditPatches";
-import { RibbonDocument, RibbonView } from "../models";
+import { CommandDefinition, EnableRule, DisplayRule, RibbonDocument, RibbonView } from "../models";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
@@ -206,7 +208,7 @@ export async function addRibbonCommandDefinition(
     return;
   }
 
-  const action = await promptOptionalCommandAction(ctx);
+  const action = await promptCommandAction(ctx);
   if (action === undefined) {
     return;
   }
@@ -219,6 +221,41 @@ export async function addRibbonCommandDefinition(
     }),
   );
   ctx.ribbonExplorer.refresh();
+}
+
+export async function addRibbonCommandAction(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveCommandTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a command definition first.");
+    return;
+  }
+
+  const action = await promptOptionalCommandAction(ctx);
+  if (!action) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(target.document, [
+    createCommandActionPatch(target.document, target.command, action),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+export async function addRibbonCommandEnableRuleRef(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await addRibbonCommandRuleRef(ctx, node, "EnableRule");
+}
+
+export async function addRibbonCommandDisplayRuleRef(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await addRibbonCommandRuleRef(ctx, node, "DisplayRule");
 }
 
 export async function addRibbonEnableRule(
@@ -322,6 +359,31 @@ function resolveRibbonTarget(
   return undefined;
 }
 
+function resolveCommandTarget(
+  node: RibbonExplorerNode | undefined,
+): { document: RibbonDocument; command: CommandDefinition } | undefined {
+  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
+    return undefined;
+  }
+
+  if (!node.contextValue.includes("d365RibbonCommandDefinition")) {
+    return undefined;
+  }
+
+  for (const view of node.editTarget.document.views) {
+    const command = view.commandDefinitions.find(
+      (item) =>
+        item.range.start === node.editTarget?.range.start &&
+        item.range.end === node.editTarget.range.end,
+    );
+    if (command) {
+      return { document: node.editTarget.document, command };
+    }
+  }
+
+  return undefined;
+}
+
 async function pickOobCommand(
   document: RibbonDocument,
   view: RibbonView,
@@ -420,6 +482,23 @@ async function promptJavaScriptAction(ctx: CommandContext) {
     library: library.uniqueName,
     functionName: functionName.trim(),
   };
+}
+
+async function promptCommandAction(
+  ctx: CommandContext,
+): Promise<NewCommandActionInput | undefined> {
+  const actionKind = await vscode.window.showQuickPick(
+    [
+      { label: "JavaScript function", description: "Call a workspace web resource" },
+      { label: "URL", description: "Open a URL" },
+    ],
+    { placeHolder: "Command action" },
+  );
+  if (!actionKind) {
+    return undefined;
+  }
+
+  return actionKind.label === "URL" ? promptUrlAction() : promptJavaScriptAction(ctx);
 }
 
 async function promptOptionalCommandAction(
@@ -621,6 +700,95 @@ async function addRibbonRule(
     }),
   );
   ctx.ribbonExplorer.refresh();
+}
+
+async function addRibbonCommandRuleRef(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+  kind: "EnableRule" | "DisplayRule",
+): Promise<void> {
+  const target = resolveCommandTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a command definition first.");
+    return;
+  }
+
+  const ruleId =
+    kind === "EnableRule"
+      ? await pickRuleId(
+          "Enable rule",
+          target.document,
+          target.command.enableRuleRefs,
+          (view) => view.enableRules,
+        )
+      : await pickRuleId(
+          "Display rule",
+          target.document,
+          target.command.displayRuleRefs,
+          (view) => view.displayRules,
+        );
+  if (!ruleId) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(target.document, [
+    createCommandRuleRefPatch(target.document, target.command, kind, ruleId.trim()),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+async function pickRuleId<T extends EnableRule | DisplayRule>(
+  label: string,
+  document: RibbonDocument,
+  currentRefs: string[],
+  selectRules: (view: RibbonView) => T[],
+): Promise<string | undefined> {
+  const used = new Set(currentRefs);
+  const rules = uniqueById(document.views.flatMap(selectRules)).filter(
+    (rule) => !used.has(rule.id),
+  );
+  const manual = `Type ${label.toLowerCase()} id`;
+  const pick = await vscode.window.showQuickPick(
+    [
+      ...rules.map((rule) => ({ label: rule.id })),
+      { label: manual, description: "Use an id that is not in this view yet" },
+    ],
+    { placeHolder: label },
+  );
+  if (!pick) {
+    return undefined;
+  }
+
+  if (pick.label !== manual) {
+    return pick.label;
+  }
+
+  const id = await vscode.window.showInputBox({
+    prompt: `${label} id`,
+    validateInput: (value) => {
+      const id = value.trim();
+      if (!id) {
+        return `${label} id is required.`;
+      }
+      return currentRefs.includes(id) ? "This command already references this rule." : undefined;
+    },
+  });
+  return id?.trim();
+}
+
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of items) {
+    if (seen.has(item.id)) {
+      continue;
+    }
+    seen.add(item.id);
+    result.push(item);
+  }
+
+  return result;
 }
 
 async function promptRuleStep(

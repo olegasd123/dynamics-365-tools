@@ -4,6 +4,8 @@ import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments } from "../ribbonXmlReader";
 import {
   createCommandDefinitionPatches,
+  createCommandActionPatch,
+  createCommandRuleRefPatch,
   createCustomButtonPatches,
   createDeleteNodePatch,
   createDisplayRulePatches,
@@ -182,6 +184,91 @@ test("creates a standalone command definition", () => {
     "d365tools.account.Form.Validate.Command",
   );
   assert.match(updated, /<JavaScriptFunction Library="\$webresource:new_\/scripts\/account\.js"/);
+});
+
+test("adds an action to an existing command definition", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="d365tools.account.Form.Validate.Command">
+      <EnableRules />
+      <DisplayRules />
+      <Actions />
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(source, [
+    createCommandActionPatch(document, document.views[0].commandDefinitions[0], {
+      kind: "JavaScriptFunction",
+      library: "new_/scripts/account.js",
+      functionName: "validateAndSave",
+    }),
+  ]);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  assert.strictEqual(updatedDocument.views[0].commandDefinitions[0].actions.length, 1);
+  assert.match(updated, /<EnableRules \/>/);
+  assert.match(updated, /<DisplayRules \/>/);
+  assert.match(updated, /FunctionName="validateAndSave"/);
+});
+
+test("adds rule references to command definitions", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="d365tools.account.Form.Validate.Command" />
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const withEnableRef = applyRibbonPatchSequence(source, [
+    createCommandRuleRefPatch(
+      document,
+      document.views[0].commandDefinitions[0],
+      "EnableRule",
+      "d365tools.account.Form.EnableRule",
+    ),
+  ]);
+  const [documentWithEnableRef] = readRibbonDocuments(withEnableRef, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const withDisplayRef = applyRibbonPatchSequence(withEnableRef, [
+    createCommandRuleRefPatch(
+      documentWithEnableRef,
+      documentWithEnableRef.views[0].commandDefinitions[0],
+      "DisplayRule",
+      "d365tools.account.Form.DisplayRule",
+    ),
+  ]);
+  const [updatedDocument] = readRibbonDocuments(withDisplayRef, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const command = updatedDocument.views[0].commandDefinitions[0];
+
+  assert.deepStrictEqual(command.enableRuleRefs, ["d365tools.account.Form.EnableRule"]);
+  assert.deepStrictEqual(command.displayRuleRefs, ["d365tools.account.Form.DisplayRule"]);
+  assert.match(withDisplayRef, /<EnableRules>\n {8}<EnableRule/);
+  assert.match(withDisplayRef, /<DisplayRules>\n {8}<DisplayRule/);
 });
 
 test("creates rule definitions and appends simple rules", () => {
