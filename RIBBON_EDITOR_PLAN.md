@@ -429,7 +429,11 @@ the form panel (§8). Inline actions on each node level (the
 | LocLabel              | Edit, Delete, Add language                                     |
 
 A toolbar-level command **"Open Ribbons from Solution…"** is added in phase 3.
-It prompts for a `.zip` and adds it as a source.
+It first uses the selected environment from `EnvironmentConnectionService`.
+Then it lists solutions from that environment, preferably unmanaged solutions
+only (`IsManaged eq false`), lets the user pick one, downloads the solution
+zip, and adds it as a source. A local `.zip` picker can stay as a secondary
+"open from disk" path.
 
 ---
 
@@ -724,12 +728,18 @@ OOB Save, re-add a custom button with the same icon, and call workspace JS.
 ### Phase 3 — Solution `.zip` source + reorder + multi-language (≈ 3–4 days)
 
 - `SolutionZipService` (JSZip) + zip source type.
-- "Open Ribbons from Solution…" command, "Save Solution Zip…" action.
+- "Open Ribbons from Solution…" command:
+  - Reuse the selected environment from `EnvironmentConnectionService`.
+  - List solutions from that environment before download, filtered to
+    unmanaged solutions when possible (`IsManaged eq false`).
+  - Download the selected solution zip and open it as an editable ribbon source.
+- "Save Solution Zip…" action.
 - Reorder for custom buttons & rule steps (move up/down via Sequence).
 - Multi-language UI for LocLabels.
 
-Exit criteria: open a downloaded `solution.zip`, edit ribbons, save back to
-zip, import zip into an env — ribbon behaves as edited.
+Exit criteria: pick an unmanaged solution from the selected environment,
+download its `solution.zip`, edit ribbons, save back to zip, import zip into
+an env — ribbon behaves as edited.
 
 ### Phase 4 — Publish to environment (≈ 4–5 days)
 
