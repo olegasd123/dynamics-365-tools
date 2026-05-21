@@ -24,6 +24,7 @@ import {
   createHideActionPatches,
   createLocLabelTitleReplacePatch,
   createLocLabelPatches,
+  createNodeAttributeValuePatch,
   createRuleStepReplacePatch,
   makeCustomButtonIds,
   makeHideActionId,
@@ -39,6 +40,7 @@ import {
   DisplayRule,
   EnableRule,
   HideAction,
+  LocLabel,
   LocLabelTitle,
   RibbonDocument,
   RibbonView,
@@ -123,6 +125,24 @@ export async function editRibbonNode(ctx: CommandContext, node?: RibbonItemNode)
       return;
     case "HideAction":
       await editHideAction(ctx, target.document, target.action);
+      return;
+    case "CommandDefinition":
+      await editNodeId(
+        ctx,
+        target.document,
+        target.command.range,
+        "CommandDefinition id",
+        target.command.id,
+      );
+      return;
+    case "EnableRule":
+      await editNodeId(ctx, target.document, target.rule.range, "Enable rule id", target.rule.id);
+      return;
+    case "DisplayRule":
+      await editNodeId(ctx, target.document, target.rule.range, "Display rule id", target.rule.id);
+      return;
+    case "LocLabel":
+      await editNodeId(ctx, target.document, target.label.range, "Loc label id", target.label.id);
       return;
     case "CommandAction":
       await editCommandAction(ctx, target.document, target.action);
@@ -435,6 +455,10 @@ function resolveCommandTarget(
 type EditableTarget =
   | { kind: "CustomAction"; document: RibbonDocument; action: CustomAction }
   | { kind: "HideAction"; document: RibbonDocument; action: HideAction }
+  | { kind: "CommandDefinition"; document: RibbonDocument; command: CommandDefinition }
+  | { kind: "EnableRule"; document: RibbonDocument; rule: EnableRule }
+  | { kind: "DisplayRule"; document: RibbonDocument; rule: DisplayRule }
+  | { kind: "LocLabel"; document: RibbonDocument; label: LocLabel }
   | { kind: "CommandAction"; document: RibbonDocument; action: CommandAction }
   | {
       kind: "RuleStep";
@@ -462,6 +486,13 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
     }
 
     for (const command of view.commandDefinitions) {
+      if (
+        sameRange(command.range, target.range) &&
+        node.contextValue === "d365RibbonCommandDefinition"
+      ) {
+        return { kind: "CommandDefinition", document: target.document, command };
+      }
+
       const action = command.actions.find((item) => sameRange(item.range, target.range));
       if (action && action.kind !== "Unknown") {
         return { kind: "CommandAction", document: target.document, action };
@@ -469,6 +500,10 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
     }
 
     for (const rule of view.enableRules) {
+      if (sameRange(rule.range, target.range) && node.contextValue === "d365RibbonEnableRule") {
+        return { kind: "EnableRule", document: target.document, rule };
+      }
+
       const step = rule.steps.find((item) => sameRange(item.range, target.range));
       if (step && step.kind !== "Unknown") {
         return { kind: "RuleStep", document: target.document, ruleKind: "Enable", step };
@@ -476,6 +511,10 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
     }
 
     for (const rule of view.displayRules) {
+      if (sameRange(rule.range, target.range) && node.contextValue === "d365RibbonDisplayRule") {
+        return { kind: "DisplayRule", document: target.document, rule };
+      }
+
       const step = rule.steps.find((item) => sameRange(item.range, target.range));
       if (step && step.kind !== "Unknown") {
         return { kind: "RuleStep", document: target.document, ruleKind: "Display", step };
@@ -483,6 +522,10 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
     }
 
     for (const label of view.locLabels) {
+      if (sameRange(label.range, target.range) && node.contextValue === "d365RibbonLocLabel") {
+        return { kind: "LocLabel", document: target.document, label };
+      }
+
       const title = label.titles.find((item) => sameRange(item.range, target.range));
       if (title) {
         return { kind: "LocLabelTitle", document: target.document, title };
@@ -607,6 +650,29 @@ async function editHideAction(
       hideActionId: hideActionId.trim(),
       location: location.trim(),
     }),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+async function editNodeId(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  range: { start: number; end: number },
+  prompt: string,
+  currentId: string,
+): Promise<void> {
+  const id = await vscode.window.showInputBox({
+    prompt,
+    value: currentId,
+    validateInput: (value) =>
+      validateUniqueId(document, value, `${prompt} is required.`, currentId),
+  });
+  if (id === undefined) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(document, [
+    createNodeAttributeValuePatch(document.sourceText, range, "Id", id.trim()),
   ]);
   ctx.ribbonExplorer.refresh();
 }
@@ -1264,10 +1330,15 @@ function validateUniqueId(
   document: RibbonDocument,
   value: string,
   requiredMessage: string,
+  allowedId?: string,
 ): string | undefined {
   const id = value.trim();
   if (!id) {
     return requiredMessage;
+  }
+
+  if (allowedId && id === allowedId) {
+    return undefined;
   }
 
   const used = new Set<string>();

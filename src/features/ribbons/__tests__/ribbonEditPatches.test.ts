@@ -16,6 +16,7 @@ import {
   createHideActionPatches,
   createLocLabelTitleReplacePatch,
   createLocLabelPatches,
+  createNodeAttributeValuePatch,
   createRuleStepReplacePatch,
 } from "../ribbonEditPatches";
 
@@ -469,4 +470,52 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
   assert.strictEqual(updatedView.locLabels[0].titles[0].description, "New label");
   assert.match(updated, /<CommandDefinitions>/);
   assert.doesNotMatch(updated, /old\.hide/);
+});
+
+test("replaces node ids without rebuilding child XML", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="old.command" CustomAttr="keep">
+      <!-- keep comment -->
+      <Actions>
+        <Url Address="https://contoso.example" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="old.enable"><CustomRule Library="$webresource:new_/scripts/account.js" FunctionName="isEnabled" /></EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+  <LocLabels>
+    <LocLabel Id="old.label"><Titles /></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const view = document.views[0];
+
+  const updated = applyRibbonPatches(source, [
+    createNodeAttributeValuePatch(
+      document.sourceText,
+      view.commandDefinitions[0].range,
+      "Id",
+      "new.command",
+    ),
+    createNodeAttributeValuePatch(
+      document.sourceText,
+      view.enableRules[0].range,
+      "Id",
+      "new.enable",
+    ),
+    createNodeAttributeValuePatch(document.sourceText, view.locLabels[0].range, "Id", "new.label"),
+  ]);
+
+  assert.match(updated, /<CommandDefinition Id="new\.command" CustomAttr="keep">/);
+  assert.match(updated, /<!-- keep comment -->/);
+  assert.match(updated, /<EnableRule Id="new\.enable">/);
+  assert.match(updated, /<LocLabel Id="new\.label">/);
 });

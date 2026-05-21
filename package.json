@@ -869,7 +869,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.editNode",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem =~ /d365RibbonRuleStep/ || viewItem == d365RibbonLocLabelTitle)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonLocLabel || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem =~ /d365RibbonRuleStep/ || viewItem == d365RibbonLocLabelTitle)",
           "group": "inline@8"
         },
         {

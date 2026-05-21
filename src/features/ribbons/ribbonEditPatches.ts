@@ -240,6 +240,32 @@ export function createLocLabelTitleReplacePatch(
   return createReplaceNodePatch(sourceText, title.range, renderLocLabelTitle(input));
 }
 
+export function createNodeAttributeValuePatch(
+  sourceText: string,
+  range: TextRange,
+  attributeName: string,
+  value: string,
+): RibbonPatch {
+  const node = findElementByRange(sourceText, range);
+  const attribute = node.attributes.find(
+    (item) => item.name.toLowerCase() === attributeName.toLowerCase(),
+  );
+
+  if (attribute) {
+    return {
+      kind: "replace",
+      range: attribute.valueRange,
+      text: escapeXmlAttribute(value),
+    };
+  }
+
+  return {
+    kind: "insert",
+    offset: node.startTagRange.start + 1 + node.name.length,
+    text: ` ${attributeName}="${escapeXmlAttribute(value)}"`,
+  };
+}
+
 export function nextHideActionId(
   document: RibbonDocument,
   hideAction: Pick<HideAction, "hideActionId">,
@@ -389,16 +415,9 @@ function createCommandChildPatch(
 }
 
 function findCommandElement(document: RibbonDocument, command: CommandDefinition): XmlElementRange {
-  const ribbon = findDocumentRibbon(document);
-  const commandDefinitions = ribbon.children.find((child) => child.name === "CommandDefinitions");
-  const commandElement = commandDefinitions?.children.find(
-    (child) =>
-      child.name === "CommandDefinition" &&
-      child.range.start === command.range.start &&
-      child.range.end === command.range.end,
-  );
+  const commandElement = findElementByRange(document.sourceText, command.range);
 
-  if (!commandElement) {
+  if (commandElement.name !== "CommandDefinition") {
     throw new Error(
       `CommandDefinition '${command.id}' was not found in the current document text.`,
     );
@@ -469,26 +488,33 @@ function renderMissingSections(
 }
 
 function findDocumentRibbon(document: RibbonDocument): XmlElementRange {
-  const roots = scanXmlElements(document.sourceText);
-  const ribbons = collectElements(roots, "RibbonDiffXml");
-  const ribbon = ribbons.find(
-    (node) =>
-      node.range.start === document.ribbonRange.start &&
-      node.range.end === document.ribbonRange.end,
-  );
+  const ribbon = findElementByRange(document.sourceText, document.ribbonRange);
 
-  if (!ribbon) {
+  if (ribbon.name !== "RibbonDiffXml") {
     throw new Error("RibbonDiffXml range was not found in the current document text.");
   }
 
   return ribbon;
 }
 
-function collectElements(nodes: XmlElementRange[], name: string): XmlElementRange[] {
+function findElementByRange(sourceText: string, range: TextRange): XmlElementRange {
+  const roots = scanXmlElements(sourceText);
+  const element = collectElements(roots).find(
+    (node) => node.range.start === range.start && node.range.end === range.end,
+  );
+
+  if (!element) {
+    throw new Error("XML node range was not found in the current document text.");
+  }
+
+  return element;
+}
+
+function collectElements(nodes: XmlElementRange[], name?: string): XmlElementRange[] {
   const matches: XmlElementRange[] = [];
 
   for (const node of nodes) {
-    if (node.name === name) {
+    if (!name || node.name === name) {
       matches.push(node);
     }
     matches.push(...collectElements(node.children, name));
