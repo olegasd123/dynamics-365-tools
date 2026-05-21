@@ -5,7 +5,7 @@ import { RibbonDocument } from "../models";
 import { RibbonDocumentNode, RibbonItemNode } from "../ribbonExplorer";
 import { RibbonFormPanel } from "../webview/ribbonFormPanel";
 
-test("renders selected ribbon document details in a read-only webview", () => {
+test("renders selected ribbon document details with edit actions", () => {
   const formPanel = new RibbonFormPanel();
   const document: RibbonDocument = {
     id: "doc",
@@ -36,6 +36,8 @@ test("renders selected ribbon document details in a read-only webview", () => {
   assert.strictEqual(panel.title, "Ribbon Document");
   assert.match(panel.webview.html, /account/);
   assert.match(panel.webview.html, /RibbonDiffXml\.xml/);
+  assert.match(panel.webview.html, /Open XML/);
+  assert.match(panel.webview.html, /Save/);
   formPanel.dispose();
 });
 
@@ -55,4 +57,38 @@ test("escapes item detail values before rendering", () => {
   assert.match(panel.webview.html, /Unsafe &lt;Label&gt;/);
   assert.match(panel.webview.html, /new\.account\.&quot;bad&quot;/);
   formPanel.dispose();
+});
+
+test("runs selected node commands from the webview", async () => {
+  const formPanel = new RibbonFormPanel();
+  const node = new RibbonItemNode(
+    "Custom action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-method",
+    [["Id", "new.account.CustomAction"]],
+  );
+  const previousExecuteCommand = vscode.commands.executeCommand;
+  const calls: Array<{ command: string; argument: unknown }> = [];
+
+  (vscode.commands as any).executeCommand = async (command: string, argument: unknown) => {
+    calls.push({ command, argument });
+  };
+
+  try {
+    formPanel.show(node);
+
+    const panel = (vscode.window as any).__lastWebviewPanel;
+    panel.webview.__postMessage({
+      type: "runCommand",
+      command: "dynamics365Tools.ribbons.editNode",
+    });
+
+    assert.deepStrictEqual(calls, [
+      { command: "dynamics365Tools.ribbons.editNode", argument: node },
+    ]);
+  } finally {
+    (vscode.commands as any).executeCommand = previousExecuteCommand;
+    formPanel.dispose();
+  }
 });

@@ -711,7 +711,7 @@ Exit criteria: open an unpacked solution in the workspace, see every ribbon
 and its full structure in the tree, drill into any node and see all its
 properties.
 
-### Phase 2 — First useful editing release (≈ 5–7 days)
+### Phase 2 — First useful editing release (≈ 5–7 days) [Done]
 
 - Add/edit/delete for: CustomAction (Button only), HideAction,
   CommandDefinition, Action (JsFn + Url), simple EnableRule, simple

@@ -112,10 +112,13 @@ const window = {
   registerTreeDataProvider: () => ({ dispose: () => {} }),
   createWebviewPanel: (_viewType, title) => {
     const disposeEmitter = new EventEmitter();
+    const messageEmitter = new EventEmitter();
     const panel = {
       title,
       webview: {
         html: "",
+        onDidReceiveMessage: messageEmitter.event,
+        __postMessage: (message) => messageEmitter.fire(message),
       },
       onDidDispose: disposeEmitter.event,
       dispose: () => disposeEmitter.fire(undefined),
