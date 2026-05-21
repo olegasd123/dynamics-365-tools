@@ -36,8 +36,11 @@ import {
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
+  deleteRibbonNode,
+  hideOobRibbonButton,
   openRibbonFile,
   refreshRibbonExplorer,
+  saveRibbonSource,
 } from "../features/ribbons/commands/ribbonExplorerCommands";
 import {
   buildPcfControl,
@@ -129,7 +132,16 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.refreshExplorer", () => refreshRibbonExplorer(ctx), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.ribbons.save", (node) => saveRibbonSource(ctx, node), {
+      validateConfiguration: false,
+    }),
     register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.hideOobButton", (node) => hideOobRibbonButton(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.deleteNode", (node) => deleteRibbonNode(ctx, node), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),

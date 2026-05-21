@@ -13,9 +13,10 @@ import {
   RibbonSource,
   RibbonView,
   RuleStep,
+  TextRange,
 } from "./models";
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
-import { RibbonRepository } from "./ribbonRepository";
+import { RibbonEditorState } from "./ribbonEditorState";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
 
 export type RibbonExplorerNode =
@@ -35,23 +36,31 @@ type RibbonSectionKind =
   | "locLabels";
 
 export class RibbonSourceNode extends vscode.TreeItem {
-  readonly contextValue = "d365RibbonSource";
+  readonly contextValue: string;
 
-  constructor(readonly source: RibbonSource) {
+  constructor(
+    readonly source: RibbonSource,
+    dirty = false,
+  ) {
     super(source.name, vscode.TreeItemCollapsibleState.Collapsed);
+    this.contextValue = dirty ? "d365RibbonSource:dirty" : "d365RibbonSource";
     this.iconPath = new vscode.ThemeIcon(source.kind === "flat" ? "file-code" : "folder-library");
-    this.description = source.kind === "flat" ? "flat" : `${source.files.length} files`;
+    this.description = `${source.kind === "flat" ? "flat" : `${source.files.length} files`}${dirty ? " *" : ""}`;
     this.tooltip = source.rootUri;
   }
 }
 
 export class RibbonDocumentNode extends vscode.TreeItem {
-  readonly contextValue = "d365RibbonDocument";
+  readonly contextValue: string;
 
-  constructor(readonly document: RibbonDocument) {
+  constructor(
+    readonly document: RibbonDocument,
+    dirty = false,
+  ) {
     super(documentLabel(document), vscode.TreeItemCollapsibleState.Collapsed);
+    this.contextValue = dirty ? "d365RibbonDocument:dirty" : "d365RibbonDocument";
     this.iconPath = new vscode.ThemeIcon(document.kind === "Application" ? "globe" : "file-code");
-    this.description = document.kind === "Application" ? "Application" : "Entity";
+    this.description = `${document.kind === "Application" ? "Application" : "Entity"}${dirty ? " *" : ""}`;
     this.tooltip = document.fileUri;
     this.resourceUri = vscode.Uri.file(document.fileUri);
   }
@@ -95,6 +104,7 @@ export class RibbonItemNode extends vscode.TreeItem {
     icon: string,
     readonly details: Array<[string, string | number | undefined]>,
     readonly children: RibbonExplorerNode[] = [],
+    readonly editTarget?: RibbonItemEditTarget,
   ) {
     super(
       label,
@@ -106,6 +116,11 @@ export class RibbonItemNode extends vscode.TreeItem {
     this.contextValue = contextValue;
     this.iconPath = new vscode.ThemeIcon(icon);
   }
+}
+
+export interface RibbonItemEditTarget {
+  document: RibbonDocument;
+  range: TextRange;
 }
 
 export class RibbonEmptyNode extends vscode.TreeItem {
@@ -129,7 +144,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
   constructor(
     private readonly configuration: ConfigurationService,
     private readonly locator: RibbonSourceLocator,
-    private readonly repository: RibbonRepository,
+    private readonly editorState: RibbonEditorState,
     private readonly diagnostics?: RibbonDiagnosticsService,
   ) {}
 
@@ -137,6 +152,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     if (!node) {
       this.sources = undefined;
       this.documentsBySourceId.clear();
+      this.editorState.clearCachedDocuments();
       this.diagnostics?.clear();
     }
 
@@ -151,7 +167,9 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     if (!element) {
       const sources = await this.loadSources();
       return sources.length
-        ? sources.map((source) => new RibbonSourceNode(source))
+        ? sources.map(
+            (source) => new RibbonSourceNode(source, this.editorState.isSourceDirty(source.id)),
+          )
         : [new RibbonEmptyNode()];
     }
 
@@ -192,7 +210,10 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     try {
       const documents = await this.loadDocuments(source);
       return documents.length
-        ? documents.map((document) => new RibbonDocumentNode(document))
+        ? documents.map(
+            (document) =>
+              new RibbonDocumentNode(document, this.editorState.isFileDirty(document.fileUri)),
+          )
         : [new RibbonEmptyNode("No RibbonDiffXml blocks found", "Check the source files")];
     } catch (error) {
       void vscode.window.showErrorMessage(`Failed to load ribbons: ${String(error)}`);
@@ -206,7 +227,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
       return cached;
     }
 
-    const documents = (await this.repository.loadSource(source)).sort(compareDocuments);
+    const documents = await this.editorState.loadSource(source);
     this.documentsBySourceId.set(source.id, documents);
     this.diagnostics?.validateDocuments([...this.documentsBySourceId.values()].flat());
     return documents;
@@ -227,21 +248,23 @@ function buildSectionNodes(document: RibbonDocument, view: RibbonView): RibbonSe
 function buildItemNodes(section: RibbonSectionNode): RibbonExplorerNode[] {
   switch (section.kind) {
     case "customActions":
-      return section.view.customActions.map(customActionNode);
+      return section.view.customActions.map((action) => customActionNode(section.document, action));
     case "hideActions":
-      return section.view.hideActions.map(hideActionNode);
+      return section.view.hideActions.map((action) => hideActionNode(section.document, action));
     case "commandDefinitions":
-      return section.view.commandDefinitions.map(commandDefinitionNode);
+      return section.view.commandDefinitions.map((command) =>
+        commandDefinitionNode(section.document, command),
+      );
     case "enableRules":
-      return section.view.enableRules.map(enableRuleNode);
+      return section.view.enableRules.map((rule) => enableRuleNode(section.document, rule));
     case "displayRules":
-      return section.view.displayRules.map(displayRuleNode);
+      return section.view.displayRules.map((rule) => displayRuleNode(section.document, rule));
     case "locLabels":
-      return section.view.locLabels.map(locLabelNode);
+      return section.view.locLabels.map((label) => locLabelNode(section.document, label));
   }
 }
 
-function customActionNode(action: CustomAction): RibbonItemNode {
+function customActionNode(document: RibbonDocument, action: CustomAction): RibbonItemNode {
   return new RibbonItemNode(
     action.id,
     action.location ? `@ ${action.location}` : undefined,
@@ -276,9 +299,12 @@ function customActionNode(action: CustomAction): RibbonItemNode {
               ],
               ["Sequence", commandUiSequence(action.commandUI)],
             ],
+            [],
+            { document, range: action.commandUI.range },
           ),
         ]
       : [],
+    { document, range: action.range },
   );
 }
 
@@ -290,7 +316,7 @@ function commandUiSequence(commandUI: NonNullable<CustomAction["commandUI"]>): n
   return commandUI.kind === "Unknown" ? undefined : commandUI.sequence;
 }
 
-function hideActionNode(action: HideAction): RibbonItemNode {
+function hideActionNode(document: RibbonDocument, action: HideAction): RibbonItemNode {
   return new RibbonItemNode(
     action.hideActionId,
     action.location ? `@ ${action.location}` : undefined,
@@ -300,10 +326,15 @@ function hideActionNode(action: HideAction): RibbonItemNode {
       ["Hide action id", action.hideActionId],
       ["Location", action.location],
     ],
+    [],
+    { document, range: action.range },
   );
 }
 
-function commandDefinitionNode(command: CommandDefinition): RibbonItemNode {
+function commandDefinitionNode(
+  document: RibbonDocument,
+  command: CommandDefinition,
+): RibbonItemNode {
   return new RibbonItemNode(
     command.id,
     `${command.actions.length} actions`,
@@ -318,12 +349,13 @@ function commandDefinitionNode(command: CommandDefinition): RibbonItemNode {
     [
       ruleRefGroupNode("EnableRules", command.enableRuleRefs, "d365RibbonEnableRuleRefs"),
       ruleRefGroupNode("DisplayRules", command.displayRuleRefs, "d365RibbonDisplayRuleRefs"),
-      actionGroupNode(command.actions),
+      actionGroupNode(document, command.actions),
     ],
+    { document, range: command.range },
   );
 }
 
-function enableRuleNode(rule: EnableRule): RibbonItemNode {
+function enableRuleNode(document: RibbonDocument, rule: EnableRule): RibbonItemNode {
   return new RibbonItemNode(
     rule.id,
     `${rule.steps.length} steps`,
@@ -333,11 +365,12 @@ function enableRuleNode(rule: EnableRule): RibbonItemNode {
       ["Id", rule.id],
       ["Steps", rule.steps.map((step) => step.kind).join(", ")],
     ],
-    rule.steps.map((step, index) => ruleStepNode(step, index)),
+    rule.steps.map((step, index) => ruleStepNode(document, step, index)),
+    { document, range: rule.range },
   );
 }
 
-function displayRuleNode(rule: DisplayRule): RibbonItemNode {
+function displayRuleNode(document: RibbonDocument, rule: DisplayRule): RibbonItemNode {
   return new RibbonItemNode(
     rule.id,
     `${rule.steps.length} steps`,
@@ -347,11 +380,12 @@ function displayRuleNode(rule: DisplayRule): RibbonItemNode {
       ["Id", rule.id],
       ["Steps", rule.steps.map((step) => step.kind).join(", ")],
     ],
-    rule.steps.map((step, index) => ruleStepNode(step, index)),
+    rule.steps.map((step, index) => ruleStepNode(document, step, index)),
+    { document, range: rule.range },
   );
 }
 
-function locLabelNode(label: LocLabel): RibbonItemNode {
+function locLabelNode(document: RibbonDocument, label: LocLabel): RibbonItemNode {
   return new RibbonItemNode(
     label.id,
     `${label.titles.length} languages`,
@@ -362,7 +396,8 @@ function locLabelNode(label: LocLabel): RibbonItemNode {
       ["Languages", label.titles.map((title) => title.languageCode).join(", ")],
       ["Default text", label.titles[0]?.description],
     ],
-    label.titles.map(locLabelTitleNode),
+    label.titles.map((title) => locLabelTitleNode(document, title)),
+    { document, range: label.range },
   );
 }
 
@@ -381,18 +416,22 @@ function ruleRefNode(id: string): RibbonItemNode {
   return new RibbonItemNode(id, undefined, "d365RibbonRuleRef", "symbol-key", [["Id", id]]);
 }
 
-function actionGroupNode(actions: CommandAction[]): RibbonItemNode {
+function actionGroupNode(document: RibbonDocument, actions: CommandAction[]): RibbonItemNode {
   return new RibbonItemNode(
     "Actions",
     String(actions.length),
     "d365RibbonActions",
     "run",
     [],
-    actions.map((action, index) => commandActionNode(action, index)),
+    actions.map((action, index) => commandActionNode(document, action, index)),
   );
 }
 
-function commandActionNode(action: CommandAction, index: number): RibbonItemNode {
+function commandActionNode(
+  document: RibbonDocument,
+  action: CommandAction,
+  index: number,
+): RibbonItemNode {
   if (action.kind === "JavaScriptFunction") {
     return new RibbonItemNode(
       `JavaScript: ${action.functionName}`,
@@ -405,29 +444,49 @@ function commandActionNode(action: CommandAction, index: number): RibbonItemNode
         ["Function", action.functionName],
         ["Parameters", action.parameters.map((parameter) => parameter.value).join(", ")],
       ],
+      [],
+      { document, range: action.range },
     );
   }
 
   if (action.kind === "Url") {
-    return new RibbonItemNode(`Url: ${action.address}`, undefined, "d365RibbonUrlAction", "link", [
-      ["Index", index + 1],
-      ["Address", action.address],
-    ]);
+    return new RibbonItemNode(
+      `Url: ${action.address}`,
+      undefined,
+      "d365RibbonUrlAction",
+      "link",
+      [
+        ["Index", index + 1],
+        ["Address", action.address],
+      ],
+      [],
+      { document, range: action.range },
+    );
   }
 
-  return new RibbonItemNode("Unknown action", undefined, "d365RibbonUnknownAction", "warning", [
-    ["Index", index + 1],
-    ["Raw XML", action.raw],
-  ]);
+  return new RibbonItemNode(
+    "Unknown action",
+    undefined,
+    "d365RibbonUnknownAction",
+    "warning",
+    [
+      ["Index", index + 1],
+      ["Raw XML", action.raw],
+    ],
+    [],
+    { document, range: action.range },
+  );
 }
 
-function ruleStepNode(step: RuleStep, index: number): RibbonItemNode {
+function ruleStepNode(document: RibbonDocument, step: RuleStep, index: number): RibbonItemNode {
   return new RibbonItemNode(
     `${index + 1}. ${step.kind}`,
     ruleStepDescription(step),
     `d365RibbonRuleStep:${step.kind}`,
     step.kind === "Unknown" ? "warning" : "symbol-property",
     ruleStepDetails(step, index),
+    [],
+    { document, range: step.range },
   );
 }
 
@@ -491,7 +550,7 @@ function ruleStepDetails(
   }
 }
 
-function locLabelTitleNode(title: LocLabelTitle): RibbonItemNode {
+function locLabelTitleNode(document: RibbonDocument, title: LocLabelTitle): RibbonItemNode {
   return new RibbonItemNode(
     String(title.languageCode),
     title.description,
@@ -501,6 +560,8 @@ function locLabelTitleNode(title: LocLabelTitle): RibbonItemNode {
       ["Language", title.languageCode],
       ["Description", title.description],
     ],
+    [],
+    { document, range: title.range },
   );
 }
 
@@ -546,12 +607,4 @@ function sectionIcon(kind: RibbonSectionKind): string {
     case "locLabels":
       return "symbol-string";
   }
-}
-
-function compareDocuments(a: RibbonDocument, b: RibbonDocument): number {
-  if (a.kind !== b.kind) {
-    return a.kind === "Application" ? -1 : 1;
-  }
-
-  return documentLabel(a).localeCompare(documentLabel(b), undefined, { sensitivity: "base" });
 }

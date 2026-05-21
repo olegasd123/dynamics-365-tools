@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import { RibbonDocument, RibbonPatch, RibbonSource, RibbonSourceFile } from "./models";
-import { applyRibbonPatches } from "./ribbonPatchWriter";
+import { applyRibbonPatches, applyRibbonPatchSequence } from "./ribbonPatchWriter";
 import { readRibbonDocuments } from "./ribbonXmlReader";
 
 export type RibbonPatchMap = Map<string, RibbonPatch[]> | Record<string, RibbonPatch[]>;
@@ -10,18 +10,25 @@ export interface RibbonSaveResult {
 }
 
 export class RibbonRepository {
-  async loadSource(source: RibbonSource): Promise<RibbonDocument[]> {
+  async loadSource(
+    source: RibbonSource,
+    sourceTextByFileUri: Map<string, string> = new Map(),
+  ): Promise<RibbonDocument[]> {
     const documents: RibbonDocument[] = [];
 
     for (const file of source.files) {
-      documents.push(...(await this.loadFile(source, file)));
+      documents.push(...(await this.loadFile(source, file, sourceTextByFileUri.get(file.fileUri))));
     }
 
     return documents;
   }
 
-  async loadFile(source: RibbonSource, file: RibbonSourceFile): Promise<RibbonDocument[]> {
-    const sourceText = await fs.readFile(file.fileUri, "utf8");
+  async loadFile(
+    source: RibbonSource,
+    file: RibbonSourceFile,
+    sourceText?: string,
+  ): Promise<RibbonDocument[]> {
+    const text = sourceText ?? (await fs.readFile(file.fileUri, "utf8"));
     const options =
       file.kind === "Flat"
         ? { sourceId: source.id, fileUri: file.fileUri }
@@ -32,7 +39,7 @@ export class RibbonRepository {
             entityLogicalName: file.entityLogicalName,
           };
 
-    return readRibbonDocuments(sourceText, options);
+    return readRibbonDocuments(text, options);
   }
 
   async savePatches(patchesByFileUri: RibbonPatchMap): Promise<RibbonSaveResult> {
@@ -45,6 +52,27 @@ export class RibbonRepository {
 
       const sourceText = await fs.readFile(fileUri, "utf8");
       const updatedText = applyRibbonPatches(sourceText, patches);
+      if (updatedText === sourceText) {
+        continue;
+      }
+
+      await fs.writeFile(fileUri, updatedText, "utf8");
+      changedFileUris.push(fileUri);
+    }
+
+    return { changedFileUris };
+  }
+
+  async savePatchSequence(patchesByFileUri: RibbonPatchMap): Promise<RibbonSaveResult> {
+    const changedFileUris: string[] = [];
+
+    for (const [fileUri, patches] of patchEntries(patchesByFileUri)) {
+      if (!patches.length) {
+        continue;
+      }
+
+      const sourceText = await fs.readFile(fileUri, "utf8");
+      const updatedText = applyRibbonPatchSequence(sourceText, patches);
       if (updatedText === sourceText) {
         continue;
       }

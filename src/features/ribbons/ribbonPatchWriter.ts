@@ -30,6 +30,18 @@ export function hasRibbonChanges(sourceText: string, patches: RibbonPatch[]): bo
   return applyRibbonPatches(sourceText, patches) !== sourceText;
 }
 
+export function applyRibbonPatchSequence(sourceText: string, patches: RibbonPatch[]): string {
+  let result = sourceText;
+
+  for (const patch of patches) {
+    const range = patchRange(patch);
+    validateRange(range, result.length);
+    result = result.slice(0, range.start) + patchText(patch) + result.slice(range.end);
+  }
+
+  return result;
+}
+
 function patchStart(patch: RibbonPatch): number {
   return patch.kind === "insert" ? patch.offset : patch.range.start;
 }

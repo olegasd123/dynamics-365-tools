@@ -12,6 +12,7 @@ import {
   RibbonSectionNode,
   RibbonSourceNode,
 } from "../ribbonExplorer";
+import { RibbonEditorState } from "../ribbonEditorState";
 import { RibbonRepository } from "../ribbonRepository";
 import { RibbonSourceLocator } from "../ribbonSourceLocator";
 
@@ -49,7 +50,7 @@ test("renders located ribbon documents as a read-only tree", async () => {
   const explorer = new RibbonExplorerProvider(
     new ConfigurationService(),
     new RibbonSourceLocator(),
-    new RibbonRepository(),
+    new RibbonEditorState(new RibbonRepository()),
   );
 
   const roots = await explorer.getChildren();

@@ -72,7 +72,10 @@
     "onCommand:dynamics365Tools.pcf.syncManifestVersionFromEnvironment",
     "onCommand:dynamics365Tools.pcf.copyDeployedControlId",
     "onCommand:dynamics365Tools.ribbons.refreshExplorer",
+    "onCommand:dynamics365Tools.ribbons.save",
     "onCommand:dynamics365Tools.ribbons.openFile",
+    "onCommand:dynamics365Tools.ribbons.hideOobButton",
+    "onCommand:dynamics365Tools.ribbons.deleteNode",
     "onCommand:dynamics365Tools.publishLastResource",
     "onStartupFinished"
   ],
@@ -354,10 +357,28 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "dynamics365Tools.ribbons.save",
+        "title": "Save Ribbon Changes",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(save)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.openFile",
         "title": "Open Ribbon XML",
         "category": "Dynamics 365 Tools",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.hideOobButton",
+        "title": "Hide OOB Button",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.deleteNode",
+        "title": "Delete Ribbon Item",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(trash)"
       }
     ],
     "submenus": [
@@ -610,6 +631,11 @@
           "command": "dynamics365Tools.ribbons.refreshExplorer",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@1"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.save",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -725,8 +751,23 @@
         },
         {
           "command": "dynamics365Tools.ribbons.openFile",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonDocument",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /d365RibbonDocument/",
           "group": "inline@1"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.save",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /d365RibbonSource/",
+          "group": "inline@2"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.hideOobButton",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem =~ /d365RibbonSection/)",
+          "group": "inline@3"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.deleteNode",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/ || viewItem =~ /d365RibbonJavaScriptAction/ || viewItem =~ /d365RibbonUrlAction/ || viewItem =~ /d365RibbonRuleStep/)",
+          "group": "inline@4"
         }
       ]
     },

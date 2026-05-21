@@ -20,6 +20,7 @@ import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import type { RibbonDiagnosticsService } from "../features/ribbons/ribbonDiagnostics";
+import type { RibbonEditorState } from "../features/ribbons/ribbonEditorState";
 import type { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
 import type { RibbonRepository } from "../features/ribbons/ribbonRepository";
 import type { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
@@ -55,6 +56,7 @@ export interface CommandContext {
 
   ribbonSourceLocator: RibbonSourceLocator;
   ribbonRepository: RibbonRepository;
+  ribbonEditorState: RibbonEditorState;
   ribbonDiagnostics: RibbonDiagnosticsService;
   ribbonExplorer: RibbonExplorerProvider;
   ribbonFormPanel: RibbonFormPanel;
