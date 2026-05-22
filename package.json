@@ -951,7 +951,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.publishToEnvironment",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/ || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/ || viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/)",
           "group": "inline@4"
         },
         {
