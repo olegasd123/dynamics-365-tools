@@ -725,7 +725,7 @@ Exit criteria: build the "validate before save with custom JS, then save" use
 case end-to-end against a real entity ribbon in an unpacked solution. Hide
 OOB Save, re-add a custom button with the same icon, and call workspace JS.
 
-### Phase 3 — Solution `.zip` source + reorder + multi-language (≈ 3–4 days)
+### Phase 3 — Solution `.zip` source + reorder + multi-language (≈ 3–4 days) [Done]
 
 - `SolutionZipService` (JSZip) + zip source type.
 - "Open Ribbons from Solution…" command:
