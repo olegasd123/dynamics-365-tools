@@ -27,6 +27,14 @@ test("lists parameterized OOB commands by ribbon scope", () => {
 
   assert.ok(formCommands.some((command) => command.id === "Mscrm.SavePrimary"));
   assert.ok(
+    gridCommands.some(
+      (command) =>
+        command.id === "Mscrm.HomepageGrid.account.NewRecord" &&
+        command.commandId === "Mscrm.NewRecordFromGrid" &&
+        command.controlId === "Mscrm.HomepageGrid.account.NewRecord",
+    ),
+  );
+  assert.ok(
     gridCommands.some((command) => command.id === "Mscrm.HomepageGrid.account.AddNewRecord"),
   );
   assert.ok(gridCommands.every((command) => command.scopes.includes("HomepageGrid")));
@@ -40,5 +48,9 @@ test("finds OOB catalog entries after entity substitution", () => {
   assert.strictEqual(
     findOobRibbonCommand("Mscrm.SubGrid.contact.Refresh", "contact")?.label,
     "Refresh",
+  );
+  assert.strictEqual(
+    findOobRibbonCommand("Mscrm.AddExistingRecordFromSubGridStandard", "contact")?.controlId,
+    "Mscrm.SubGrid.contact.AddExistingStandard",
   );
 });

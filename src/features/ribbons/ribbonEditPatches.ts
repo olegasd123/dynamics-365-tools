@@ -97,6 +97,7 @@ export interface NewCustomButtonInput {
 
 export interface NewOobStubReplacementInput extends NewCustomButtonInput {
   hideActionId: string;
+  hideLocation?: string;
 }
 
 const RIBBON_SECTION_ORDER = [
@@ -149,7 +150,10 @@ export function createOobStubReplacementPatches(
       sectionName: "CustomActions",
       childText: inputs
         .flatMap((input) => [
-          renderHideAction({ hideActionId: input.hideActionId, location: input.location }),
+          renderHideAction({
+            hideActionId: input.hideActionId,
+            location: input.hideLocation ?? input.location,
+          }),
           renderCustomButtonAction(input),
         ])
         .join("\n"),

@@ -245,6 +245,7 @@ test("creates OOB hide actions and replacement button stubs as one patch batch",
     createOobStubReplacementPatches(document, [
       {
         hideActionId: "d365tools.account.Form.Hide.Mscrm.SavePrimary",
+        hideLocation: "Mscrm.Form.account.Save",
         customActionId: "d365tools.account.Form.SavePrimary.CustomAction",
         location: "Mscrm.Form.account.MainTab.Save.Controls._children",
         sequence: 10,
@@ -285,6 +286,10 @@ test("creates OOB hide actions and replacement button stubs as one patch batch",
   assert.strictEqual(form.customActions.length, 2);
   assert.strictEqual(form.commandDefinitions.length, 2);
   assert.strictEqual(form.locLabels.length, 2);
+  assert.match(
+    updated,
+    /<HideCustomAction HideActionId="d365tools\.account\.Form\.Hide\.Mscrm\.SavePrimary" Location="Mscrm\.Form\.account\.Save" \/>/,
+  );
   assert.match(updated, /<Actions><\/Actions>/);
   assert.match(updated, /<Title languagecode="1033" description="Save and close" \/>/);
 });

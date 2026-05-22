@@ -761,12 +761,12 @@ export async function hideOobRibbonButton(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view, command);
+  const location = await pickHideLocation(target.document, target.view, command);
   if (!location) {
     return;
   }
 
-  const baseId = makeHideActionId(target.document, target.view.scope, command.id);
+  const baseId = makeHideActionId(target.document, target.view.scope, getOobControlId(command));
   const hideActionId = nextHideActionId(target.document, { hideActionId: baseId });
   ctx.ribbonEditorState.queuePatches(
     target.document,
@@ -819,12 +819,17 @@ export async function hideAndStubOobRibbonButtons(
     const hideActionId = nextBatchId(
       usedIds,
       nextHideActionId(target.document, {
-        hideActionId: makeHideActionId(target.document, target.view.scope, command.id),
+        hideActionId: makeHideActionId(
+          target.document,
+          target.view.scope,
+          getOobControlId(command),
+        ),
       }),
     );
 
     return {
       hideActionId,
+      hideLocation: getOobControlId(command),
       customActionId,
       location,
       sequence: baseSequence + index * 10,
@@ -898,14 +903,15 @@ export async function overrideOobRibbonCommand(
     return;
   }
 
-  const duplicate = validateUniqueId(target.document, command.id, "Command id is required.");
+  const commandId = getOobCommandId(command);
+  const duplicate = validateUniqueId(target.document, commandId, "Command id is required.");
   if (duplicate) {
-    vscode.window.showWarningMessage(`Cannot override '${command.id}': ${duplicate}`);
+    vscode.window.showWarningMessage(`Cannot override '${commandId}': ${duplicate}`);
     return;
   }
 
   const choice = await vscode.window.showWarningMessage(
-    `Override OOB command '${command.id}'? This can replace default Dynamics behavior.`,
+    `Override OOB command '${commandId}'? This can replace default Dynamics behavior.`,
     { modal: true },
     "Override",
   );
@@ -916,7 +922,7 @@ export async function overrideOobRibbonCommand(
   ctx.ribbonEditorState.queuePatches(
     target.document,
     createCommandDefinitionPatches(target.document, {
-      id: command.id,
+      id: commandId,
     }),
   );
   ctx.ribbonExplorer.refresh();
@@ -1660,6 +1666,7 @@ async function pickOobCommand(
         label: id.trim(),
         scopes: [view.scope],
         locationIds: [],
+        commandId: id.trim(),
       }
     : undefined;
 }
@@ -1729,6 +1736,26 @@ async function pickLocation(
     placeHolder: "Mscrm.Form.account.MainTab.Save.Controls._children",
     validateInput: (value) => (value.trim() ? undefined : "Location is required."),
   });
+}
+
+async function pickHideLocation(
+  document: RibbonDocument,
+  view: RibbonView,
+  command: OobRibbonCommand,
+): Promise<string | undefined> {
+  if (command.controlId) {
+    return command.controlId;
+  }
+
+  return pickLocation(document, view, command);
+}
+
+function getOobCommandId(command: OobRibbonCommand): string {
+  return command.commandId || command.id;
+}
+
+function getOobControlId(command: OobRibbonCommand): string {
+  return command.controlId || command.id;
 }
 
 async function promptJavaScriptAction(ctx: CommandContext) {
