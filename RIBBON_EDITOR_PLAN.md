@@ -763,7 +763,7 @@ opening Power Apps.
 - Expanded `oobCatalog.ts` with common command/control ids. [Partial: per-version variants deferred]
 - Reorder of OOB buttons (synthesized hide+re-add). [Done]
 - Undo/redo across the working set. [Done]
-- Pull-from-env flow (the inverse of publish).
+- Pull-from-env flow (the inverse of publish). [Done]
 
 ---
 

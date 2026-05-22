@@ -79,6 +79,7 @@
     "onCommand:dynamics365Tools.ribbons.openSolutionZip",
     "onCommand:dynamics365Tools.ribbons.saveSolutionZip",
     "onCommand:dynamics365Tools.ribbons.publishToEnvironment",
+    "onCommand:dynamics365Tools.ribbons.pullFromEnvironment",
     "onCommand:dynamics365Tools.ribbons.cleanupGeneratedSolutions",
     "onCommand:dynamics365Tools.ribbons.addCustomButton",
     "onCommand:dynamics365Tools.ribbons.hideOobButton",
@@ -420,6 +421,12 @@
         "icon": "$(cloud-upload)"
       },
       {
+        "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+        "title": "Pull Ribbons from Environment...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
         "title": "Clean Up Generated Ribbon Solutions...",
         "category": "Dynamics 365 Tools",
@@ -720,6 +727,9 @@
         },
         {
           "command": "dynamics365Tools.ribbons.openFile"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.pullFromEnvironment"
         }
       ],
       "view/title": [
@@ -806,6 +816,11 @@
           "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@6"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@7"
         }
       ],
       "view/item/context": [
@@ -938,6 +953,11 @@
           "command": "dynamics365Tools.ribbons.publishToEnvironment",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/ || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/ || viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/)",
           "group": "inline@4"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/ || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/ || viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/)",
+          "group": "navigation@0"
         },
         {
           "command": "dynamics365Tools.ribbons.addCustomButton",

@@ -55,6 +55,7 @@ import {
   openRibbonFile,
   overrideOobRibbonCommand,
   publishRibbonToEnvironment,
+  pullRibbonsFromEnvironment,
   refreshRibbonExplorer,
   reorderOobRibbonButtons,
   saveRibbonSolutionZip,
@@ -178,6 +179,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register(
       "dynamics365Tools.ribbons.publishToEnvironment",
       (node) => publishRibbonToEnvironment(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.pullFromEnvironment",
+      (node) => pullRibbonsFromEnvironment(ctx, node),
       {
         validateConfiguration: false,
       },

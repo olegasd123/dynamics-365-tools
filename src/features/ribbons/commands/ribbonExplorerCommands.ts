@@ -6,6 +6,7 @@ import { DEFAULT_SOLUTION_NAME } from "../../../shared/solutions";
 import { BindingEntry } from "../../config/domain/models";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionImportError } from "../../dataverse/solutionImportService";
+import { createRibbonPullPlan } from "../ribbonPullService";
 import {
   RibbonDocumentNode,
   RibbonExplorerNode,
@@ -79,6 +80,10 @@ interface SolutionOpenPick extends vscode.QuickPickItem {
 
 interface DataverseSolutionPick extends vscode.QuickPickItem {
   uniqueName: string;
+}
+
+interface RibbonSourcePick extends vscode.QuickPickItem {
+  source: RibbonSource;
 }
 
 interface RibbonPublishSolutionPick extends vscode.QuickPickItem {
@@ -303,6 +308,110 @@ export async function publishRibbonToEnvironment(
 
     void vscode.window.showErrorMessage(`Ribbon publish failed: ${message}`);
   }
+}
+
+export async function pullRibbonsFromEnvironment(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const source = await resolvePullSource(ctx, node);
+  if (!source) {
+    return;
+  }
+
+  if (ctx.ribbonEditorState.isSourceDirty(source.id)) {
+    vscode.window.showWarningMessage(
+      "Save or undo pending ribbon edits before pulling from the environment.",
+    );
+    return;
+  }
+
+  const targetDocuments = await resolvePullDocuments(ctx, source, node);
+  if (!targetDocuments.length) {
+    vscode.window.showWarningMessage("No local ribbon documents were found to update.");
+    return;
+  }
+
+  const config = await ctx.configuration.loadConfiguration();
+  const target = await pickEnvironmentAndAuth(
+    ctx.configuration,
+    ctx.ui,
+    ctx.secrets,
+    ctx.auth,
+    ctx.lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment to pull ribbons from" },
+  );
+  if (!target) {
+    return;
+  }
+
+  const connection = await ctx.connections.createConnection(target.env, target.auth);
+  if (!connection) {
+    return;
+  }
+
+  const client = new DataverseClient(connection);
+  const solutions = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Loading unmanaged solutions",
+      cancellable: false,
+    },
+    () => ctx.solutionZipService.listUnmanagedSolutions(client),
+  );
+  const solutionPick = await pickDataverseSolution(solutions, "Select solution to pull ribbons");
+  if (!solutionPick) {
+    return;
+  }
+
+  const pulledSource = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Exporting ${solutionPick.uniqueName}`,
+      cancellable: false,
+    },
+    async () => {
+      const buffer = await ctx.solutionZipService.downloadSolutionZip(
+        client,
+        solutionPick.uniqueName,
+      );
+      return ctx.solutionZipService.openZipBuffer(buffer, {
+        storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
+        sourceName: `${solutionPick.uniqueName}-pull.zip`,
+      });
+    },
+  );
+  const incomingDocuments = await ctx.ribbonRepository.loadSource(pulledSource);
+  const plan = createRibbonPullPlan(targetDocuments, incomingDocuments);
+
+  if (!plan.matchedDocuments.length) {
+    const missing = plan.missingDocuments.length;
+    const unchanged = plan.unchangedDocuments.length;
+    vscode.window.showInformationMessage(
+      missing
+        ? `No matching ribbon changes were found (${missing} missing, ${unchanged} unchanged).`
+        : "Local ribbons already match the environment.",
+    );
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Replace ${plan.matchedDocuments.length} local ribbon block${plan.matchedDocuments.length === 1 ? "" : "s"} from ${solutionPick.uniqueName}?`,
+    { modal: true },
+    "Pull",
+  );
+  if (choice !== "Pull") {
+    return;
+  }
+
+  const result = await ctx.ribbonRepository.savePatchSequence(plan.patchesByFileUri);
+  ctx.ribbonExplorer.refresh();
+
+  void vscode.window.showInformationMessage(
+    `Pulled ${plan.matchedDocuments.length} ribbon block${plan.matchedDocuments.length === 1 ? "" : "s"} into ${result.changedFileUris.length} file${result.changedFileUris.length === 1 ? "" : "s"}.`,
+  );
 }
 
 export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Promise<void> {
@@ -579,15 +688,7 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
     },
     () => ctx.solutionZipService.listUnmanagedSolutions(client),
   );
-  const solutionPick = await vscode.window.showQuickPick<DataverseSolutionPick>(
-    solutions.map((solution) => ({
-      label: solution.uniqueName,
-      description: solution.version,
-      detail: solution.friendlyName,
-      uniqueName: solution.uniqueName,
-    })),
-    { placeHolder: "Select unmanaged solution" },
-  );
+  const solutionPick = await pickDataverseSolution(solutions, "Select unmanaged solution");
   if (!solutionPick) {
     return;
   }
@@ -605,6 +706,72 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
     sourceName: `${solutionPick.uniqueName}.zip`,
   });
   addImportedRibbonSource(ctx, source);
+}
+
+async function resolvePullSource(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+): Promise<RibbonSource | undefined> {
+  const selected = await resolveSource(ctx, node);
+  if (selected) {
+    return selected;
+  }
+
+  const sources = await ctx.ribbonSourceLocator.locate(ctx.configuration.workspaceRoot);
+  if (!sources.length) {
+    vscode.window.showWarningMessage("No local ribbon source was found.");
+    return undefined;
+  }
+
+  if (sources.length === 1) {
+    return sources[0];
+  }
+
+  const pick = await vscode.window.showQuickPick<RibbonSourcePick>(
+    sources.map((source) => ({
+      label: source.name,
+      description: source.kind,
+      detail: source.rootUri,
+      source,
+    })),
+    { placeHolder: "Select local ribbon source to update" },
+  );
+  return pick?.source;
+}
+
+async function resolvePullDocuments(
+  ctx: CommandContext,
+  source: RibbonSource,
+  node: RibbonExplorerNode | undefined,
+): Promise<RibbonDocument[]> {
+  if (node instanceof RibbonDocumentNode) {
+    return [node.document];
+  }
+
+  if (node instanceof RibbonViewNode || node instanceof RibbonSectionNode) {
+    return [node.document];
+  }
+
+  if (node instanceof RibbonItemNode && node.editTarget) {
+    return [node.editTarget.document];
+  }
+
+  return ctx.ribbonEditorState.loadSource(source);
+}
+
+function pickDataverseSolution(
+  solutions: Awaited<ReturnType<CommandContext["solutionZipService"]["listUnmanagedSolutions"]>>,
+  placeHolder: string,
+): Thenable<DataverseSolutionPick | undefined> {
+  return vscode.window.showQuickPick<DataverseSolutionPick>(
+    solutions.map((solution) => ({
+      label: solution.uniqueName,
+      description: solution.version,
+      detail: solution.friendlyName,
+      uniqueName: solution.uniqueName,
+    })),
+    { placeHolder },
+  );
 }
 
 function addImportedRibbonSource(ctx: CommandContext, source: RibbonSource): void {
