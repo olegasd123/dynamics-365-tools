@@ -255,6 +255,12 @@ function itemActions(node: RibbonItemNode): PanelAction[] {
   if (canDelete(node)) {
     actions.push({ command: "dynamics365Tools.ribbons.deleteNode", label: "Delete" });
   }
+  if (canMove(node)) {
+    actions.push(
+      { command: "dynamics365Tools.ribbons.moveUp", label: "Move Up" },
+      { command: "dynamics365Tools.ribbons.moveDown", label: "Move Down" },
+    );
+  }
   if (node.contextValue === "d365RibbonCommandDefinition") {
     actions.push(
       { command: "dynamics365Tools.ribbons.addCommandAction", label: "Add Action" },
@@ -262,11 +268,29 @@ function itemActions(node: RibbonItemNode): PanelAction[] {
       { command: "dynamics365Tools.ribbons.addCommandDisplayRuleRef", label: "Add Display Ref" },
     );
   }
+  if (node.contextValue === "d365RibbonLocLabel") {
+    actions.push({ command: "dynamics365Tools.ribbons.addLocLabelTitle", label: "Add Language" });
+  }
 
   return actions;
 }
 
 function canEdit(node: RibbonItemNode): boolean {
+  return (
+    node.contextValue === "d365RibbonCustomAction" ||
+    node.contextValue === "d365RibbonHideAction" ||
+    node.contextValue === "d365RibbonCommandDefinition" ||
+    node.contextValue === "d365RibbonEnableRule" ||
+    node.contextValue === "d365RibbonDisplayRule" ||
+    node.contextValue === "d365RibbonLocLabel" ||
+    node.contextValue === "d365RibbonJavaScriptAction" ||
+    node.contextValue === "d365RibbonUrlAction" ||
+    node.contextValue === "d365RibbonLocLabelTitle" ||
+    node.contextValue.startsWith("d365RibbonRuleStep")
+  );
+}
+
+function canMove(node: RibbonItemNode): boolean {
   return (
     node.contextValue === "d365RibbonCustomAction" ||
     node.contextValue === "d365RibbonHideAction" ||

@@ -14,10 +14,12 @@ import {
   createEnableRulePatches,
   createHideActionReplacePatch,
   createHideActionPatches,
+  createLocLabelTitlePatch,
   createLocLabelTitleReplacePatch,
   createLocLabelPatches,
   createNodeAttributeValuePatch,
   createRuleStepReplacePatch,
+  createSwapNodePatches,
 } from "../ribbonEditPatches";
 
 test("creates a custom button with command action and label", () => {
@@ -518,4 +520,76 @@ test("replaces node ids without rebuilding child XML", () => {
   assert.match(updated, /<!-- keep comment -->/);
   assert.match(updated, /<EnableRule Id="new\.enable">/);
   assert.match(updated, /<LocLabel Id="new\.label">/);
+});
+
+test("adds a language title to an existing loc label", () => {
+  const source = `<RibbonDiffXml>
+  <LocLabels>
+    <LocLabel Id="old.label">
+      <Titles>
+        <Title languagecode="1033" description="Name" />
+      </Titles>
+    </LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const updated = applyRibbonPatchSequence(source, [
+    createLocLabelTitlePatch(document, document.views[0].locLabels[0].range, {
+      languageCode: 1058,
+      description: "Name UA",
+    }),
+  ]);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(
+    updatedDocument.views[0].locLabels[0].titles.map((title) => title.languageCode),
+    [1033, 1058],
+  );
+  assert.match(updated, /<Title languagecode="1058" description="Name UA" \/>/);
+});
+
+test("swaps sibling XML nodes without changing their content", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="first" CustomAttr="keep">
+      <Actions><Url Address="https://first.example" /></Actions>
+    </CommandDefinition>
+    <CommandDefinition Id="second">
+      <!-- keep comment -->
+      <Actions><Url Address="https://second.example" /></Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const [first, second] = document.views[0].commandDefinitions;
+
+  const updated = applyRibbonPatches(
+    source,
+    createSwapNodePatches(document.sourceText, first.range, second.range),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(
+    updatedDocument.views[0].commandDefinitions.map((command) => command.id),
+    ["second", "first"],
+  );
+  assert.match(updated, /<!-- keep comment -->/);
+  assert.match(updated, /CustomAttr="keep"/);
 });

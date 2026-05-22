@@ -43,10 +43,13 @@ import {
   addRibbonDisplayRule,
   addRibbonEnableRule,
   addRibbonLocLabel,
+  addRibbonLocLabelTitle,
   addCustomRibbonButton,
   deleteRibbonNode,
   editRibbonNode,
   hideOobRibbonButton,
+  moveRibbonNodeDown,
+  moveRibbonNodeUp,
   openRibbonsFromSolution,
   openRibbonFile,
   refreshRibbonExplorer,
@@ -204,6 +207,19 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.addLocLabel", (node) => addRibbonLocLabel(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.ribbons.addLocLabelTitle",
+      (node) => addRibbonLocLabelTitle(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register("dynamics365Tools.ribbons.moveUp", (node) => moveRibbonNodeUp(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.moveDown", (node) => moveRibbonNodeDown(ctx, node), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.deleteNode", (node) => deleteRibbonNode(ctx, node), {

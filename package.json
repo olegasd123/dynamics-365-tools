@@ -85,6 +85,9 @@
     "onCommand:dynamics365Tools.ribbons.addEnableRule",
     "onCommand:dynamics365Tools.ribbons.addDisplayRule",
     "onCommand:dynamics365Tools.ribbons.addLocLabel",
+    "onCommand:dynamics365Tools.ribbons.addLocLabelTitle",
+    "onCommand:dynamics365Tools.ribbons.moveUp",
+    "onCommand:dynamics365Tools.ribbons.moveDown",
     "onCommand:dynamics365Tools.ribbons.editNode",
     "onCommand:dynamics365Tools.ribbons.deleteNode",
     "onCommand:dynamics365Tools.publishLastResource",
@@ -444,6 +447,24 @@
         "title": "Add Loc Label",
         "category": "Dynamics 365 Tools",
         "icon": "$(symbol-string)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.addLocLabelTitle",
+        "title": "Add Loc Label Language",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.moveUp",
+        "title": "Move Ribbon Item Up",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.moveDown",
+        "title": "Move Ribbon Item Down",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(arrow-down)"
       },
       {
         "command": "dynamics365Tools.ribbons.deleteNode",
@@ -893,6 +914,21 @@
           "command": "dynamics365Tools.ribbons.addLocLabel",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:locLabels)",
           "group": "navigation@7"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addLocLabelTitle",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonLocLabel",
+          "group": "navigation@8"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.moveUp",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonLocLabel || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem =~ /d365RibbonRuleStep/ || viewItem == d365RibbonLocLabelTitle)",
+          "group": "inline@6"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.moveDown",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonLocLabel || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem =~ /d365RibbonRuleStep/ || viewItem == d365RibbonLocLabelTitle)",
+          "group": "inline@7"
         },
         {
           "command": "dynamics365Tools.ribbons.editNode",

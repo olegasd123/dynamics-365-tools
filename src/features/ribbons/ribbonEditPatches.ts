@@ -224,6 +224,40 @@ export function createLocLabelPatches(
   ]);
 }
 
+export function createLocLabelTitlePatch(
+  document: RibbonDocument,
+  locLabelRange: TextRange,
+  input: Pick<NewLocLabelInput, "languageCode" | "description">,
+): RibbonPatch {
+  const locLabel = findElementByRange(document.sourceText, locLabelRange);
+  if (locLabel.name !== "LocLabel") {
+    throw new Error("LocLabel range was not found in the current document text.");
+  }
+
+  const titles = locLabel.children.find((child) => child.name === "Titles");
+  if (titles) {
+    return createExistingSectionChildPatch(document.sourceText, titles, renderLocLabelTitle(input));
+  }
+
+  const locLabelIndent = indentationBefore(document.sourceText, locLabel.range.start);
+  const titlesIndent = findChildIndent(document.sourceText, locLabel) ?? `${locLabelIndent}  `;
+  const titlesText = `<Titles>\n${indentBlock(renderLocLabelTitle(input), "  ")}\n</Titles>`;
+
+  if (locLabel.selfClosing) {
+    return {
+      kind: "replace",
+      range: locLabel.range,
+      text: `${openSelfClosingElement(document.sourceText, locLabel)}\n${indentBlock(titlesText, titlesIndent)}\n${locLabelIndent}</${locLabel.name}>`,
+    };
+  }
+
+  return {
+    kind: "insert",
+    offset: locLabel.children.length ? locLabel.innerRange.end : locLabel.startTagRange.end,
+    text: `\n${indentBlock(titlesText, titlesIndent)}\n${locLabelIndent}`,
+  };
+}
+
 export function createRuleStepReplacePatch(
   sourceText: string,
   step: RuleStep,
@@ -238,6 +272,29 @@ export function createLocLabelTitleReplacePatch(
   input: Pick<NewLocLabelInput, "languageCode" | "description">,
 ): RibbonPatch {
   return createReplaceNodePatch(sourceText, title.range, renderLocLabelTitle(input));
+}
+
+export function createSwapNodePatches(
+  sourceText: string,
+  firstRange: TextRange,
+  secondRange: TextRange,
+): RibbonPatch[] {
+  const first = expandToLineRange(sourceText, firstRange);
+  const second = expandToLineRange(sourceText, secondRange);
+  if (first.start === second.start && first.end === second.end) {
+    return [];
+  }
+
+  const earlier = first.start < second.start ? first : second;
+  const later = first.start < second.start ? second : first;
+  if (earlier.end > later.start) {
+    throw new Error("Ribbon nodes cannot be reordered because their XML ranges overlap.");
+  }
+
+  return [
+    { kind: "replace", range: earlier, text: sourceText.slice(later.start, later.end) },
+    { kind: "replace", range: later, text: sourceText.slice(earlier.start, earlier.end) },
+  ];
 }
 
 export function createNodeAttributeValuePatch(

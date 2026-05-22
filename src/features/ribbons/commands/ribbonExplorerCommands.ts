@@ -25,9 +25,11 @@ import {
   createHideActionReplacePatch,
   createHideActionPatches,
   createLocLabelTitleReplacePatch,
+  createLocLabelTitlePatch,
   createLocLabelPatches,
   createNodeAttributeValuePatch,
   createRuleStepReplacePatch,
+  createSwapNodePatches,
   makeCustomButtonIds,
   makeHideActionId,
   nextHideActionId,
@@ -554,6 +556,66 @@ export async function addRibbonLocLabel(
   ctx.ribbonExplorer.refresh();
 }
 
+export async function addRibbonLocLabelTitle(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveLocLabelTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a LocLabel first.");
+    return;
+  }
+
+  const languageCode = await vscode.window.showInputBox({
+    prompt: "Language code",
+    value: "1033",
+    validateInput: (value) => {
+      const code = value.trim();
+      if (!/^\d+$/.test(code)) {
+        return "Language code must be a number.";
+      }
+
+      return target.label.titles.some((title) => title.languageCode === Number(code))
+        ? "This LocLabel already has this language."
+        : undefined;
+    },
+  });
+  if (languageCode === undefined) {
+    return;
+  }
+
+  const description = await vscode.window.showInputBox({
+    prompt: "Text",
+    placeHolder: "Validate and save",
+    validateInput: (value) => (value.trim() ? undefined : "Text is required."),
+  });
+  if (description === undefined) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(target.document, [
+    createLocLabelTitlePatch(target.document, target.label.range, {
+      languageCode: Number(languageCode.trim()),
+      description: description.trim(),
+    }),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
+export async function moveRibbonNodeUp(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await moveRibbonNode(ctx, node, -1);
+}
+
+export async function moveRibbonNodeDown(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await moveRibbonNode(ctx, node, 1);
+}
+
 function resolveSourceId(node: unknown): string | undefined {
   if (node instanceof RibbonSourceNode) {
     return node.source.id;
@@ -634,6 +696,28 @@ function resolveCommandTarget(
   return undefined;
 }
 
+function resolveLocLabelTarget(
+  node: RibbonExplorerNode | undefined,
+): { document: RibbonDocument; label: LocLabel } | undefined {
+  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
+    return undefined;
+  }
+
+  if (node.contextValue !== "d365RibbonLocLabel") {
+    return undefined;
+  }
+
+  const target = node.editTarget;
+  for (const view of target.document.views) {
+    const label = view.locLabels.find((item) => sameRange(item.range, target.range));
+    if (label) {
+      return { document: target.document, label };
+    }
+  }
+
+  return undefined;
+}
+
 type EditableTarget =
   | { kind: "CustomAction"; document: RibbonDocument; action: CustomAction }
   | { kind: "HideAction"; document: RibbonDocument; action: HideAction }
@@ -649,6 +733,151 @@ type EditableTarget =
       step: RuleStep;
     }
   | { kind: "LocLabelTitle"; document: RibbonDocument; title: LocLabelTitle };
+
+type ReorderTarget = {
+  document: RibbonDocument;
+  ranges: Array<{ start: number; end: number }>;
+  index: number;
+};
+
+async function moveRibbonNode(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+  direction: -1 | 1,
+): Promise<void> {
+  const target = resolveReorderTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon item that can be moved.");
+    return;
+  }
+
+  const nextIndex = target.index + direction;
+  if (nextIndex < 0 || nextIndex >= target.ranges.length) {
+    vscode.window.showWarningMessage(
+      direction < 0 ? "Item is already first." : "Item is already last.",
+    );
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createSwapNodePatches(
+      target.document.sourceText,
+      target.ranges[target.index],
+      target.ranges[nextIndex],
+    ),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
+function resolveReorderTarget(node: RibbonExplorerNode | undefined): ReorderTarget | undefined {
+  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
+    return undefined;
+  }
+
+  const target = node.editTarget;
+  for (const view of target.document.views) {
+    const customAction = findRangeIndex(view.customActions, target.range);
+    if (node.contextValue === "d365RibbonCustomAction" && customAction >= 0) {
+      return {
+        document: target.document,
+        ranges: view.customActions.map((item) => item.range),
+        index: customAction,
+      };
+    }
+
+    const hideAction = findRangeIndex(view.hideActions, target.range);
+    if (node.contextValue === "d365RibbonHideAction" && hideAction >= 0) {
+      return {
+        document: target.document,
+        ranges: view.hideActions.map((item) => item.range),
+        index: hideAction,
+      };
+    }
+
+    const commandDefinition = findRangeIndex(view.commandDefinitions, target.range);
+    if (node.contextValue === "d365RibbonCommandDefinition" && commandDefinition >= 0) {
+      return {
+        document: target.document,
+        ranges: view.commandDefinitions.map((item) => item.range),
+        index: commandDefinition,
+      };
+    }
+
+    const enableRule = findRangeIndex(view.enableRules, target.range);
+    if (node.contextValue === "d365RibbonEnableRule" && enableRule >= 0) {
+      return {
+        document: target.document,
+        ranges: view.enableRules.map((item) => item.range),
+        index: enableRule,
+      };
+    }
+
+    const displayRule = findRangeIndex(view.displayRules, target.range);
+    if (node.contextValue === "d365RibbonDisplayRule" && displayRule >= 0) {
+      return {
+        document: target.document,
+        ranges: view.displayRules.map((item) => item.range),
+        index: displayRule,
+      };
+    }
+
+    const locLabel = findRangeIndex(view.locLabels, target.range);
+    if (node.contextValue === "d365RibbonLocLabel" && locLabel >= 0) {
+      return {
+        document: target.document,
+        ranges: view.locLabels.map((item) => item.range),
+        index: locLabel,
+      };
+    }
+
+    for (const command of view.commandDefinitions) {
+      const action = findRangeIndex(command.actions, target.range);
+      if (
+        (node.contextValue === "d365RibbonJavaScriptAction" ||
+          node.contextValue === "d365RibbonUrlAction") &&
+        action >= 0
+      ) {
+        return {
+          document: target.document,
+          ranges: command.actions.map((item) => item.range),
+          index: action,
+        };
+      }
+    }
+
+    for (const rule of [...view.enableRules, ...view.displayRules]) {
+      const step = findRangeIndex(rule.steps, target.range);
+      if (node.contextValue.startsWith("d365RibbonRuleStep:") && step >= 0) {
+        return {
+          document: target.document,
+          ranges: rule.steps.map((item) => item.range),
+          index: step,
+        };
+      }
+    }
+
+    for (const label of view.locLabels) {
+      const title = findRangeIndex(label.titles, target.range);
+      if (node.contextValue === "d365RibbonLocLabelTitle" && title >= 0) {
+        return {
+          document: target.document,
+          ranges: label.titles.map((item) => item.range),
+          index: title,
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function findRangeIndex<T extends { range: { start: number; end: number } }>(
+  items: T[],
+  range: { start: number; end: number },
+): number {
+  return items.findIndex((item) => sameRange(item.range, range));
+}
 
 function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined {
   const target = node.editTarget;
