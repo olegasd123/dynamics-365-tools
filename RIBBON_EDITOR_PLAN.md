@@ -741,7 +741,7 @@ Exit criteria: pick an unmanaged solution from the selected environment,
 download its `solution.zip`, edit ribbons, save back to zip, import zip into
 an env — ribbon behaves as edited.
 
-### Phase 4 — Publish to environment (≈ 4–5 days)
+### Phase 4 — Publish to environment (≈ 4–5 days) [Done]
 
 - `RibbonPublishService` + minimal-zip builder (fixture-tested shape).
 - Env + solution picker reusing `EnvironmentConnectionService` UX.

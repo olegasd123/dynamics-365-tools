@@ -52,9 +52,11 @@ import {
   moveRibbonNodeUp,
   openRibbonsFromSolution,
   openRibbonFile,
+  publishRibbonToEnvironment,
   refreshRibbonExplorer,
   saveRibbonSolutionZip,
   saveRibbonSource,
+  cleanupGeneratedRibbonSolutions,
 } from "../features/ribbons/commands/ribbonExplorerCommands";
 import {
   buildPcfControl,
@@ -161,6 +163,16 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       {
         validateConfiguration: false,
       },
+    ),
+    register(
+      "dynamics365Tools.ribbons.publishToEnvironment",
+      (node) => publishRibbonToEnvironment(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register("dynamics365Tools.ribbons.cleanupGeneratedSolutions", () =>
+      cleanupGeneratedRibbonSolutions(ctx),
     ),
     register(
       "dynamics365Tools.ribbons.addCustomButton",

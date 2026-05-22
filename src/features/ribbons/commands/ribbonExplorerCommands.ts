@@ -2,8 +2,10 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { CommandContext } from "../../../app/commandContext";
 import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
+import { DEFAULT_SOLUTION_NAME } from "../../../shared/solutions";
 import { BindingEntry } from "../../config/domain/models";
 import { DataverseClient } from "../../dataverse/dataverseClient";
+import { SolutionImportError } from "../../dataverse/solutionImportService";
 import {
   RibbonDocumentNode,
   RibbonExplorerNode,
@@ -75,6 +77,20 @@ interface SolutionOpenPick extends vscode.QuickPickItem {
 
 interface DataverseSolutionPick extends vscode.QuickPickItem {
   uniqueName: string;
+}
+
+interface RibbonPublishSolutionPick extends vscode.QuickPickItem {
+  publishKind: "existing" | "generated";
+  uniqueName?: string;
+  publisherPrefix?: string;
+}
+
+interface PublisherPrefixPick extends vscode.QuickPickItem {
+  publisherPrefix: string;
+}
+
+interface GeneratedSolutionPick extends vscode.QuickPickItem {
+  solutionId: string;
 }
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
@@ -160,6 +176,184 @@ export async function saveRibbonSource(
   );
 }
 
+export async function publishRibbonToEnvironment(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const sourceId = resolveSourceId(node);
+  const documents = await resolvePublishDocuments(ctx, node);
+  if (!documents.length) {
+    vscode.window.showWarningMessage("Select a ribbon source or ribbon document first.");
+    return;
+  }
+
+  if (sourceId && ctx.ribbonEditorState.isSourceDirty(sourceId)) {
+    const choice = await vscode.window.showWarningMessage(
+      "Save ribbon changes before publishing?",
+      { modal: true },
+      "Save and Publish",
+    );
+    if (choice !== "Save and Publish") {
+      return;
+    }
+    await ctx.ribbonEditorState.saveSource(sourceId);
+    ctx.ribbonExplorer.refresh();
+  }
+
+  const config = await ctx.configuration.loadConfiguration();
+  const target = await pickEnvironmentAndAuth(
+    ctx.configuration,
+    ctx.ui,
+    ctx.secrets,
+    ctx.auth,
+    ctx.lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment for ribbon publish" },
+  );
+  if (!target) {
+    return;
+  }
+
+  const connection = await ctx.connections.createConnection(target.env, target.auth);
+  if (!connection) {
+    return;
+  }
+
+  const client = new DataverseClient(connection);
+  const solutions = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Loading unmanaged solutions",
+      cancellable: false,
+    },
+    () => ctx.ribbonPublishService.listUnmanagedSolutions(client),
+  );
+  const solution = await pickPublishSolution(ctx, client, solutions, documents);
+  if (!solution) {
+    return;
+  }
+
+  if (solution.uniqueName.toLowerCase() === DEFAULT_SOLUTION_NAME.toLowerCase()) {
+    const choice = await vscode.window.showWarningMessage(
+      "Publishing to the Default solution is allowed but not recommended.",
+      { modal: true },
+      "Publish Anyway",
+    );
+    if (choice !== "Publish Anyway") {
+      return;
+    }
+  }
+
+  try {
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Publishing ribbons to ${target.env.name}`,
+        cancellable: true,
+      },
+      (progress, token) =>
+        ctx.ribbonPublishService.publishDocuments(client, documents, solution, {
+          token,
+          onStatus: (message) => progress.report({ message }),
+        }),
+    );
+
+    const summary = [
+      `${result.entities.length} entit${result.entities.length === 1 ? "y" : "ies"}`,
+      result.includesApplicationRibbon ? "application ribbon" : undefined,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    void vscode.window.showInformationMessage(
+      `Published ribbons to ${target.env.name} (${summary}).`,
+    );
+  } catch (error) {
+    const message = describeRibbonPublishError(error);
+    if (error instanceof SolutionImportError && error.log) {
+      const action = await vscode.window.showErrorMessage(
+        `Ribbon publish failed: ${message}`,
+        "Copy Error XML",
+      );
+      if (action === "Copy Error XML") {
+        await vscode.env.clipboard.writeText(error.log);
+      }
+      return;
+    }
+
+    void vscode.window.showErrorMessage(`Ribbon publish failed: ${message}`);
+  }
+}
+
+export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Promise<void> {
+  const config = await ctx.configuration.loadConfiguration();
+  const target = await pickEnvironmentAndAuth(
+    ctx.configuration,
+    ctx.ui,
+    ctx.secrets,
+    ctx.auth,
+    ctx.lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment for generated solution cleanup" },
+  );
+  if (!target) {
+    return;
+  }
+
+  const connection = await ctx.connections.createConnection(target.env, target.auth);
+  if (!connection) {
+    return;
+  }
+
+  const client = new DataverseClient(connection);
+  const generated = await ctx.ribbonPublishService.listGeneratedSolutions(client);
+  if (!generated.length) {
+    void vscode.window.showInformationMessage("No generated ribbon solutions were found.");
+    return;
+  }
+
+  const picks = await vscode.window.showQuickPick<GeneratedSolutionPick>(
+    generated.map((solution) => ({
+      label: solution.uniqueName,
+      description: solution.friendlyName,
+      solutionId: solution.solutionId,
+    })),
+    {
+      canPickMany: true,
+      placeHolder: "Select generated ribbon solutions to delete",
+    },
+  );
+  if (!picks?.length) {
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Delete ${picks.length} generated ribbon solution${picks.length === 1 ? "" : "s"}?`,
+    { modal: true },
+    "Delete",
+  );
+  if (choice !== "Delete") {
+    return;
+  }
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Deleting generated ribbon solutions",
+      cancellable: false,
+    },
+    async () => {
+      for (const pick of picks) {
+        await ctx.ribbonPublishService.deleteGeneratedSolution(client, pick.solutionId);
+      }
+    },
+  );
+  void vscode.window.showInformationMessage(
+    `Deleted ${picks.length} generated ribbon solution${picks.length === 1 ? "" : "s"}.`,
+  );
+}
+
 export async function openRibbonFile(node?: RibbonDocumentNode | RibbonSourceNode): Promise<void> {
   if (node instanceof RibbonSourceNode && node.source.kind === "flat") {
     const fileUri = node.source.files[0]?.fileUri;
@@ -195,6 +389,128 @@ async function openRibbonsFromDisk(ctx: CommandContext): Promise<void> {
     ctx.extensionContext.globalStorageUri.fsPath,
   );
   addImportedRibbonSource(ctx, source);
+}
+
+async function resolvePublishDocuments(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+): Promise<RibbonDocument[]> {
+  if (node instanceof RibbonDocumentNode) {
+    return [node.document];
+  }
+
+  if (node instanceof RibbonViewNode || node instanceof RibbonSectionNode) {
+    return [node.document];
+  }
+
+  if (node instanceof RibbonItemNode && node.editTarget) {
+    return [node.editTarget.document];
+  }
+
+  const source = await resolveSource(ctx, node);
+  if (!source) {
+    return [];
+  }
+
+  return ctx.ribbonEditorState.loadSource(source);
+}
+
+async function pickPublishSolution(
+  ctx: CommandContext,
+  client: DataverseClient,
+  solutions: Awaited<ReturnType<CommandContext["ribbonPublishService"]["listUnmanagedSolutions"]>>,
+  documents: RibbonDocument[],
+): Promise<
+  Awaited<ReturnType<CommandContext["ribbonPublishService"]["createGeneratedSolution"]>> | undefined
+> {
+  const picks: RibbonPublishSolutionPick[] = [
+    ...solutions.map((solution) => ({
+      label: solution.friendlyName || solution.uniqueName,
+      description:
+        solution.friendlyName && solution.friendlyName !== solution.uniqueName
+          ? solution.uniqueName
+          : undefined,
+      detail: `Unmanaged solution • Publisher prefix: ${solution.publisherPrefix}`,
+      publishKind: "existing" as const,
+      uniqueName: solution.uniqueName,
+    })),
+    {
+      label: "Create generated solution",
+      description: "Use a temporary d365tools_ribbon_* solution",
+      detail: "The solution is left in the environment until cleanup is run.",
+      publishKind: "generated",
+    },
+  ];
+
+  const pick = await vscode.window.showQuickPick<RibbonPublishSolutionPick>(picks, {
+    placeHolder: "Select target solution for ribbon publish",
+  });
+  if (!pick) {
+    return undefined;
+  }
+
+  if (pick.publishKind === "existing") {
+    return solutions.find((solution) => solution.uniqueName === pick.uniqueName);
+  }
+
+  const prefix = await pickPublisherPrefix(solutions);
+  if (!prefix) {
+    return undefined;
+  }
+
+  return ctx.ribbonPublishService.createGeneratedSolution(
+    client,
+    prefix.publisherPrefix,
+    describePublishScope(documents),
+  );
+}
+
+async function pickPublisherPrefix(
+  solutions: Awaited<ReturnType<CommandContext["ribbonPublishService"]["listUnmanagedSolutions"]>>,
+): Promise<PublisherPrefixPick | undefined> {
+  const prefixes = [
+    ...new Set(solutions.map((solution) => solution.publisherPrefix).filter(Boolean)),
+  ]
+    .sort((a, b) => a.localeCompare(b))
+    .map((publisherPrefix) => ({
+      label: publisherPrefix,
+      description: "Publisher prefix",
+      publisherPrefix,
+    }));
+
+  if (!prefixes.length) {
+    vscode.window.showErrorMessage("No publisher prefix was found in unmanaged solutions.");
+    return undefined;
+  }
+
+  return vscode.window.showQuickPick<PublisherPrefixPick>(prefixes, {
+    placeHolder: "Select publisher prefix for generated solution",
+  });
+}
+
+function describePublishScope(documents: RibbonDocument[]): string {
+  const entities = documents
+    .filter((document) => document.kind === "Entity")
+    .map((document) => document.entityLogicalName)
+    .filter((name): name is string => Boolean(name?.trim()));
+  const hasApplication = documents.some((document) => document.kind === "Application");
+  if (entities.length === 1 && !hasApplication) {
+    return entities[0];
+  }
+  if (!entities.length && hasApplication) {
+    return "application";
+  }
+  return "source";
+}
+
+function describeRibbonPublishError(error: unknown): string {
+  if (error instanceof SolutionImportError && error.errors.length) {
+    return error.errors.join("; ");
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
 
 async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {

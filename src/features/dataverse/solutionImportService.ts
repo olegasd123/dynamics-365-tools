@@ -5,6 +5,7 @@ import type * as vscode from "vscode";
 export interface SolutionImportClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  delete?(path: string): Promise<void>;
 }
 
 export interface SolutionImportOptions {
@@ -54,6 +55,7 @@ export class SolutionImportError extends Error {
     message: string,
     readonly importJobId: string,
     readonly errors: string[] = [],
+    readonly log?: string,
   ) {
     super(errors.length ? `${message}: ${errors.join("; ")}` : message);
     this.name = "SolutionImportError";
@@ -84,7 +86,7 @@ export class SolutionImportService {
       const job = await this.getImportJob(importJobId);
       const errors = parseImportErrors(job?.data);
       if (errors.length) {
-        throw new SolutionImportError("Solution import failed", importJobId, errors);
+        throw new SolutionImportError("Solution import failed", importJobId, errors, job?.data);
       }
       return {
         importJobId,
@@ -117,6 +119,17 @@ export class SolutionImportService {
     });
   }
 
+  async publishRibbons(entities: string[], includeApplicationRibbon = false): Promise<void> {
+    const normalizedEntities = entities.map((entity) => entity.trim()).filter(Boolean);
+    if (!normalizedEntities.length && !includeApplicationRibbon) {
+      return;
+    }
+
+    await this.client.post("PublishXml", {
+      ParameterXml: buildPublishRibbonsXml(normalizedEntities, includeApplicationRibbon),
+    });
+  }
+
   private async pollImport(
     importJobId: string,
     asyncOperationId: string | undefined,
@@ -146,7 +159,12 @@ export class SolutionImportService {
             operation.message,
             ...parseImportErrors(job?.data),
           ].filter((item): item is string => Boolean(item?.trim()));
-          throw new SolutionImportError("Solution import failed", importJobId, unique(errors));
+          throw new SolutionImportError(
+            "Solution import failed",
+            importJobId,
+            unique(errors),
+            job?.data,
+          );
         }
 
         if (isAsyncOperationSuccess(operation)) {
@@ -197,6 +215,20 @@ export function buildPublishCustomControlsXml(customControlIds: string[]): strin
     .map((id) => `<customcontrol>${escapeXml(id)}</customcontrol>`)
     .join("");
   return `<importexportxml><customcontrols>${controls}</customcontrols></importexportxml>`;
+}
+
+export function buildPublishRibbonsXml(
+  entities: string[],
+  includeApplicationRibbon = false,
+): string {
+  const entityXml = entities
+    .map((entity) => entity.trim())
+    .filter(Boolean)
+    .map((entity) => `<entity>${escapeXml(entity)}</entity>`)
+    .join("");
+  const entitiesXml = entityXml ? `<entities>${entityXml}</entities>` : "";
+  const ribbonXml = includeApplicationRibbon ? "<ribbon />" : "";
+  return `<importexportxml>${entitiesXml}${ribbonXml}</importexportxml>`;
 }
 
 export function parseImportErrors(log?: string): string[] {
