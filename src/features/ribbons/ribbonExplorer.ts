@@ -18,6 +18,7 @@ import {
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonEditorState } from "./ribbonEditorState";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
+import { findOobRibbonCommand } from "./oobCatalog";
 
 export type RibbonExplorerNode =
   | RibbonSourceNode
@@ -360,13 +361,19 @@ function commandDefinitionNode(
   document: RibbonDocument,
   command: CommandDefinition,
 ): RibbonItemNode {
+  const oobCommand = findOobRibbonCommand(command.id, document.entityLogicalName);
+  const isOverride = Boolean(oobCommand);
+
   return new RibbonItemNode(
-    command.id,
-    `${command.actions.length} actions`,
+    isOverride ? `OVERRIDE: ${command.id}` : command.id,
+    isOverride
+      ? `${command.actions.length} actions • OOB command`
+      : `${command.actions.length} actions`,
     "d365RibbonCommandDefinition",
-    "gear",
+    isOverride ? "debug-rerun" : "gear",
     [
       ["Id", command.id],
+      ["Type", isOverride ? "OOB command override" : "Command definition"],
       ["Enable rules", command.enableRuleRefs.join(", ")],
       ["Display rules", command.displayRuleRefs.join(", ")],
       ["Actions", command.actions.length],

@@ -219,6 +219,7 @@ function ribbonAddActions(): PanelAction[] {
   return [
     { command: "dynamics365Tools.ribbons.addCustomButton", label: "Add Button" },
     { command: "dynamics365Tools.ribbons.hideOobButton", label: "Hide OOB" },
+    { command: "dynamics365Tools.ribbons.overrideOobCommand", label: "Override OOB" },
     { command: "dynamics365Tools.ribbons.addCommandDefinition", label: "Add Command" },
     { command: "dynamics365Tools.ribbons.addEnableRule", label: "Add Enable Rule" },
     { command: "dynamics365Tools.ribbons.addDisplayRule", label: "Add Display Rule" },
@@ -236,7 +237,10 @@ function sectionActions(node: RibbonSectionNode): PanelAction[] {
     case "hideActions":
       return [{ command: "dynamics365Tools.ribbons.hideOobButton", label: "Hide OOB" }];
     case "commandDefinitions":
-      return [{ command: "dynamics365Tools.ribbons.addCommandDefinition", label: "Add Command" }];
+      return [
+        { command: "dynamics365Tools.ribbons.addCommandDefinition", label: "Add Command" },
+        { command: "dynamics365Tools.ribbons.overrideOobCommand", label: "Override OOB" },
+      ];
     case "enableRules":
       return [{ command: "dynamics365Tools.ribbons.addEnableRule", label: "Add Enable Rule" }];
     case "displayRules":

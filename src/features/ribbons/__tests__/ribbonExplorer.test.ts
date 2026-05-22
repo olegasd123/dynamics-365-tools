@@ -92,6 +92,72 @@ test("renders located ribbon documents as a read-only tree", async () => {
   assert.strictEqual(actionNodes[0].label, "JavaScript: run");
 });
 
+test("labels OOB command overrides in the tree", async () => {
+  const workspaceRoot = await makeWorkspace();
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  await writeFile(
+    workspaceRoot,
+    "Entities/account/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="Mscrm.SavePrimary">
+      <EnableRules />
+      <DisplayRules />
+      <Actions />
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    new ConfigurationService(),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  const roots = await explorer.getChildren();
+  const documents = await explorer.getChildren(roots[0]);
+  const views = await explorer.getChildren(documents[0]);
+  const sections = await explorer.getChildren(views[0]);
+  const commandSection = sections.find((section) => section.label === "Command Definitions");
+  assert.ok(commandSection);
+
+  const commands = await explorer.getChildren(commandSection);
+
+  assert.strictEqual(commands[0].label, "OVERRIDE: Mscrm.SavePrimary");
+  assert.strictEqual(commands[0].description, "0 actions • OOB command");
+});
+
+test("scopes known OOB command overrides to matching entity views", async () => {
+  const workspaceRoot = await makeWorkspace();
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  await writeFile(
+    workspaceRoot,
+    "Entities/account/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="Mscrm.SavePrimary" />
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    new ConfigurationService(),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  const roots = await explorer.getChildren();
+  const documents = await explorer.getChildren(roots[0]);
+  const views = await explorer.getChildren(documents[0]);
+  const sectionCounts = await Promise.all(
+    views.map(async (view) => {
+      const sections = await explorer.getChildren(view);
+      return sections.find((section) => section.label === "Command Definitions")?.description;
+    }),
+  );
+
+  assert.deepStrictEqual(sectionCounts, ["1", "0", "0"]);
+});
+
 async function makeWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-explorer-"));
 }

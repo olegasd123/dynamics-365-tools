@@ -24,6 +24,7 @@ import {
   XmlAttributeRange,
   XmlElementRange,
 } from "./models";
+import { findOobRibbonCommand } from "./oobCatalog";
 
 export interface RibbonReadOptions {
   sourceId?: string;
@@ -78,7 +79,9 @@ export function readRibbonDocuments(
       views:
         kind === "Application"
           ? [allView]
-          : ENTITY_SCOPES.map((scope) => filterEntityView(allView, scope)),
+          : ENTITY_SCOPES.map((scope) =>
+              filterEntityView(allView, scope, options.entityLogicalName ?? parentEntityName),
+            ),
     };
   });
 }
@@ -416,7 +419,11 @@ function buildRibbonView(
   };
 }
 
-function filterEntityView(view: RibbonView, scope: RibbonScope): RibbonView {
+function filterEntityView(
+  view: RibbonView,
+  scope: RibbonScope,
+  entityLogicalName: string | undefined,
+): RibbonView {
   const customActions = view.customActions.filter((action) => customActionInScope(action, scope));
   const hideActions = view.hideActions.filter((action) =>
     belongsToScope([action.hideActionId, action.location], scope),
@@ -427,7 +434,8 @@ function filterEntityView(view: RibbonView, scope: RibbonScope): RibbonView {
       .filter(isDefined),
   );
   const commandDefinitions = view.commandDefinitions.filter(
-    (command) => commandIds.has(command.id) || belongsToScope([command.id], scope),
+    (command) =>
+      commandIds.has(command.id) || commandDefinitionInScope(command.id, scope, entityLogicalName),
   );
   const enableRuleIds = new Set(commandDefinitions.flatMap((command) => command.enableRuleRefs));
   const displayRuleIds = new Set(commandDefinitions.flatMap((command) => command.displayRuleRefs));
@@ -462,6 +470,15 @@ function filterEntityView(view: RibbonView, scope: RibbonScope): RibbonView {
     displayRules,
     locLabels,
   };
+}
+
+function commandDefinitionInScope(
+  commandId: string,
+  scope: RibbonScope,
+  entityLogicalName: string | undefined,
+): boolean {
+  const oobCommand = findOobRibbonCommand(commandId, entityLogicalName);
+  return oobCommand ? oobCommand.scopes.includes(scope) : belongsToScope([commandId], scope);
 }
 
 function customActionInScope(action: CustomAction, scope: RibbonScope): boolean {

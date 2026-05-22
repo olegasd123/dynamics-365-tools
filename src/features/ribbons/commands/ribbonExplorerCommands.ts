@@ -774,6 +774,48 @@ export async function addRibbonCommandDefinition(
   ctx.ribbonExplorer.refresh();
 }
 
+export async function overrideOobRibbonCommand(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    return;
+  }
+
+  const command = await pickOobCommand(target.document, target.view, {
+    placeHolder: "OOB command to override",
+    manualDescription: "Use a custom OOB command id",
+  });
+  if (!command) {
+    return;
+  }
+
+  const duplicate = validateUniqueId(target.document, command.id, "Command id is required.");
+  if (duplicate) {
+    vscode.window.showWarningMessage(`Cannot override '${command.id}': ${duplicate}`);
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Override OOB command '${command.id}'? This can replace default Dynamics behavior.`,
+    { modal: true },
+    "Override",
+  );
+  if (choice !== "Override") {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createCommandDefinitionPatches(target.document, {
+      id: command.id,
+    }),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
 export async function addRibbonCommandAction(
   ctx: CommandContext,
   node?: RibbonExplorerNode,
@@ -1469,11 +1511,15 @@ async function editLocLabelTitle(
 async function pickOobCommand(
   document: RibbonDocument,
   view: RibbonView,
+  options: {
+    placeHolder?: string;
+    manualDescription?: string;
+  } = {},
 ): Promise<OobRibbonCommand | undefined> {
   const commands = listOobRibbonCommands(view.scope, document.entityLogicalName);
   const manual: OobCommandPick = {
     label: "Type command id",
-    description: "Use a custom OOB command id",
+    description: options.manualDescription ?? "Use a custom OOB command id",
     manual: true,
   };
   const items: OobCommandPick[] = [
@@ -1485,7 +1531,7 @@ async function pickOobCommand(
     manual,
   ];
   const pick = await vscode.window.showQuickPick<OobCommandPick>(items, {
-    placeHolder: "OOB button command to hide",
+    placeHolder: options.placeHolder ?? "OOB button command to hide",
   });
 
   if (!pick) {

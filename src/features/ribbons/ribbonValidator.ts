@@ -11,6 +11,7 @@ import {
   RuleStep,
   TextRange,
 } from "./models";
+import { findOobRibbonCommand } from "./oobCatalog";
 
 export type RibbonValidationSeverity = "error" | "warning";
 
@@ -21,17 +22,19 @@ export interface RibbonValidationIssue {
 }
 
 export function validateRibbonDocument(document: RibbonDocument): RibbonValidationIssue[] {
-  return document.views.flatMap((view) => validateRibbonView(view));
+  return document.views.flatMap((view) => validateRibbonView(document, view));
 }
 
-function validateRibbonView(view: RibbonView): RibbonValidationIssue[] {
+function validateRibbonView(document: RibbonDocument, view: RibbonView): RibbonValidationIssue[] {
   const issues: RibbonValidationIssue[] = [];
   const commandIds = new Set(view.commandDefinitions.map((command) => command.id).filter(Boolean));
   const enableRuleIds = new Set(view.enableRules.map((rule) => rule.id).filter(Boolean));
   const displayRuleIds = new Set(view.displayRules.map((rule) => rule.id).filter(Boolean));
   const locLabelIds = new Set(view.locLabels.map((label) => label.id).filter(Boolean));
 
-  issues.push(...validateCustomActions(view.customActions, commandIds, locLabelIds));
+  issues.push(
+    ...validateCustomActions(view.customActions, commandIds, locLabelIds, document, view),
+  );
   issues.push(
     ...validateUnique(
       "CustomAction",
@@ -85,6 +88,8 @@ function validateCustomActions(
   actions: CustomAction[],
   commandIds: Set<string>,
   locLabelIds: Set<string>,
+  document: RibbonDocument,
+  view: RibbonView,
 ): RibbonValidationIssue[] {
   const issues: RibbonValidationIssue[] = [];
 
@@ -93,7 +98,7 @@ function validateCustomActions(
     issues.push(...required(action.location, "Location", action.range));
 
     if (action.commandUI?.kind === "Button") {
-      issues.push(...validateButton(action.commandUI, commandIds, locLabelIds));
+      issues.push(...validateButton(action.commandUI, commandIds, locLabelIds, document, view));
     }
   }
 
@@ -104,12 +109,18 @@ function validateButton(
   button: ButtonNode,
   commandIds: Set<string>,
   locLabelIds: Set<string>,
+  document: RibbonDocument,
+  view: RibbonView,
 ): RibbonValidationIssue[] {
   const issues: RibbonValidationIssue[] = [];
   issues.push(...required(button.id, "Button Id", button.range));
   issues.push(...required(button.command, "Button Command", button.range));
 
-  if (button.command && !commandIds.has(button.command)) {
+  if (
+    button.command &&
+    !commandIds.has(button.command) &&
+    !isKnownOobCommand(document, view, button.command)
+  ) {
     issues.push({
       severity: "error",
       message: `Button references missing CommandDefinition '${button.command}'.`,
@@ -132,6 +143,12 @@ function validateButton(
   }
 
   return issues;
+}
+
+function isKnownOobCommand(document: RibbonDocument, view: RibbonView, commandId: string): boolean {
+  return Boolean(
+    findOobRibbonCommand(commandId, document.entityLogicalName)?.scopes.includes(view.scope),
+  );
 }
 
 function validateCommandDefinitions(

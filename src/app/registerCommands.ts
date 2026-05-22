@@ -52,6 +52,7 @@ import {
   moveRibbonNodeUp,
   openRibbonsFromSolution,
   openRibbonFile,
+  overrideOobRibbonCommand,
   publishRibbonToEnvironment,
   refreshRibbonExplorer,
   saveRibbonSolutionZip,
@@ -187,6 +188,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register(
       "dynamics365Tools.ribbons.addCommandDefinition",
       (node) => addRibbonCommandDefinition(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.overrideOobCommand",
+      (node) => overrideOobRibbonCommand(ctx, node),
       {
         validateConfiguration: false,
       },

@@ -194,6 +194,40 @@ test("creates a standalone command definition", () => {
   assert.match(updated, /<JavaScriptFunction Library="\$webresource:new_\/scripts\/account\.js"/);
 });
 
+test("creates an OOB command override with empty action chain", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCommandDefinitionPatches(document, {
+      id: "Mscrm.SavePrimary",
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  assert.deepStrictEqual(
+    updatedDocument.views.map((view) => view.commandDefinitions.map((command) => command.id)),
+    [["Mscrm.SavePrimary"], [], []],
+  );
+  assert.match(updated, /<CommandDefinition Id="Mscrm\.SavePrimary">/);
+  assert.match(updated, /<EnableRules><\/EnableRules>/);
+  assert.match(updated, /<DisplayRules><\/DisplayRules>/);
+  assert.match(updated, /<Actions><\/Actions>/);
+});
+
 test("adds an action to an existing command definition", () => {
   const source = `<RibbonDiffXml>
   <CommandDefinitions>

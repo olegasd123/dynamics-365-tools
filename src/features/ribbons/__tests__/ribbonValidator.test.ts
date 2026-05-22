@@ -58,3 +58,22 @@ test("reports duplicate ribbon ids", () => {
   assert.ok(messages.includes("Duplicate CustomAction Id 'new.account.Action'."));
   assert.ok(messages.includes("Duplicate CommandDefinition Id 'new.account.Command'."));
 });
+
+test("allows known OOB button commands without local command definitions", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.Button" Command="Mscrm.SavePrimary" LabelText="Save" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(!messages.includes("Button references missing CommandDefinition 'Mscrm.SavePrimary'."));
+});
