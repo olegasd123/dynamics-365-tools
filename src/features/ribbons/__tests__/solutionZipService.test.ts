@@ -5,7 +5,7 @@ import * as path from "node:path";
 import test from "node:test";
 import JSZip from "jszip";
 import { RibbonRepository } from "../ribbonRepository";
-import { SolutionZipService } from "../solutionZipService";
+import { cleanRibbonZipsFolder, SolutionZipService } from "../solutionZipService";
 
 test("opens solution zip as a ribbon source", async () => {
   const storageRoot = await makeWorkspace();
@@ -96,6 +96,58 @@ test("fails zip save when an extracted entry is missing", async () => {
     /Extracted zip entry is missing: customizations\.xml/,
   );
 });
+
+test("cleanRibbonZipsFolder does nothing when folder does not exist", async () => {
+  const missing = path.join(os.tmpdir(), `d365-missing-${Date.now()}`);
+  await assert.doesNotReject(() => cleanRibbonZipsFolder(missing, 5));
+});
+
+test("cleanRibbonZipsFolder keeps all directories when count is within limit", async () => {
+  const root = await makeWorkspace();
+  const dirs = await makeDirs(root, ["a", "b", "c"]);
+
+  await cleanRibbonZipsFolder(root, 5);
+
+  const remaining = await readDirNames(root);
+  assert.deepStrictEqual(remaining.sort(), dirs.sort());
+});
+
+test("cleanRibbonZipsFolder removes oldest directories beyond keepCount", async () => {
+  const root = await makeWorkspace();
+  // dirs[0] = oldest, dirs[4] = newest
+  const dirs = await makeDirs(root, ["d0", "d1", "d2", "d3", "d4"]);
+
+  await cleanRibbonZipsFolder(root, 3);
+
+  const remaining = await readDirNames(root);
+  assert.deepStrictEqual(remaining.sort(), [dirs[2], dirs[3], dirs[4]].sort());
+});
+
+test("cleanRibbonZipsFolder deletes all directories when keepCount is 0", async () => {
+  const root = await makeWorkspace();
+  await makeDirs(root, ["x", "y"]);
+
+  await cleanRibbonZipsFolder(root, 0);
+
+  const remaining = await readDirNames(root);
+  assert.deepStrictEqual(remaining, []);
+});
+
+async function makeDirs(root: string, names: string[]): Promise<string[]> {
+  const now = Date.now();
+  for (let i = 0; i < names.length; i++) {
+    const dir = path.join(root, names[i]);
+    await fs.mkdir(dir);
+    const mtime = new Date(now - (names.length - 1 - i) * 10_000);
+    await fs.utimes(dir, mtime, mtime);
+  }
+  return names;
+}
+
+async function readDirNames(root: string): Promise<string[]> {
+  const entries = await fs.readdir(root, { withFileTypes: true });
+  return entries.filter((e) => e.isDirectory()).map((e) => e.name);
+}
 
 async function makeWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-zip-"));

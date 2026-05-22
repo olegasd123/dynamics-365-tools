@@ -211,6 +211,30 @@ function normalizeZipEntryName(entryName: string): string | undefined {
   return parts.join("/");
 }
 
+export async function cleanRibbonZipsFolder(folderPath: string, keepCount: number): Promise<void> {
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await fs.readdir(folderPath, { withFileTypes: true });
+  } catch {
+    return; // folder doesn't exist yet — nothing to clean
+  }
+
+  const dirs = await Promise.all(
+    entries
+      .filter((e) => e.isDirectory())
+      .map(async (e) => {
+        const fullPath = path.join(folderPath, e.name);
+        const stat = await fs.stat(fullPath);
+        return { fullPath, mtime: stat.mtimeMs };
+      }),
+  );
+
+  dirs.sort((a, b) => b.mtime - a.mtime);
+  const toDelete = dirs.slice(keepCount);
+
+  await Promise.all(toDelete.map((d) => fs.rm(d.fullPath, { recursive: true, force: true })));
+}
+
 async function isFile(filePath: string): Promise<boolean> {
   try {
     const stat = await fs.stat(filePath);
