@@ -30,6 +30,7 @@ import {
   createLocLabelTitlePatch,
   createLocLabelPatches,
   createNodeAttributeValuePatch,
+  createOobButtonReorderPatches,
   createOobStubReplacementPatches,
   createRuleStepReplacePatch,
   createSwapNodePatches,
@@ -847,6 +848,91 @@ export async function hideAndStubOobRibbonButtons(
   ctx.ribbonEditorState.queuePatches(
     target.document,
     createOobStubReplacementPatches(target.document, inputs),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
+export async function reorderOobRibbonButtons(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    return;
+  }
+
+  const location = await pickLocation(target.document, target.view);
+  if (!location) {
+    return;
+  }
+
+  const commands = await pickOobCommandsForLocation(target.document, target.view, location, {
+    placeHolder: "OOB buttons to reorder",
+  });
+  if (!commands?.length) {
+    return;
+  }
+
+  const orderedCommands = await pickOobCommandOrder(commands);
+  if (!orderedCommands) {
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Hide ${orderedCommands.length} OOB button${orderedCommands.length === 1 ? "" : "s"} and re-add them in the selected order?`,
+    { modal: true },
+    "Reorder",
+  );
+  if (choice !== "Reorder") {
+    return;
+  }
+
+  const usedIds = collectRibbonIds(target.document);
+  const baseSequence = nextCustomActionSequence(target.view);
+  const inputs = orderedCommands.map((command, index) => {
+    const ids = makeCustomButtonIds(
+      target.document,
+      target.view.scope,
+      `${command.label} ${command.id}`,
+    );
+    const customActionId = nextBatchId(usedIds, ids.customActionId);
+    const buttonId = nextBatchId(usedIds, ids.buttonId);
+    const labelLocId = nextBatchId(usedIds, ids.labelLocId ?? `${buttonId}.Label`);
+    const hideActionId = nextBatchId(
+      usedIds,
+      nextHideActionId(target.document, {
+        hideActionId: makeHideActionId(
+          target.document,
+          target.view.scope,
+          getOobControlId(command),
+        ),
+      }),
+    );
+
+    return {
+      hideActionId,
+      hideLocation: getOobControlId(command),
+      customActionId,
+      location,
+      sequence: baseSequence + index * 10,
+      buttonId,
+      commandId: getOobCommandId(command),
+      labelLocId,
+      image16x16: command.image16x16,
+      image32x32: command.image32x32,
+      templateAlias: command.templateAlias,
+      locLabel: {
+        id: labelLocId,
+        languageCode: 1033,
+        description: command.label,
+      },
+    };
+  });
+
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createOobButtonReorderPatches(target.document, inputs),
   );
   ctx.ribbonExplorer.refresh();
 }
@@ -1675,6 +1761,7 @@ async function pickOobCommandsForLocation(
   document: RibbonDocument,
   view: RibbonView,
   location: string,
+  options: { placeHolder?: string } = {},
 ): Promise<OobRibbonCommand[] | undefined> {
   const catalogLocation = listOobRibbonLocations(view.scope, document.entityLogicalName).find(
     (item) => item.location === location,
@@ -1693,13 +1780,48 @@ async function pickOobCommandsForLocation(
       canPickMany: true,
       placeHolder: catalogLocation
         ? `OOB buttons in ${catalogLocation.label}`
-        : "OOB buttons to hide and stub",
+        : (options.placeHolder ?? "OOB buttons to hide and stub"),
     },
   );
 
   return picks
     ?.map((pick) => pick.command)
     .filter((command): command is OobRibbonCommand => Boolean(command));
+}
+
+async function pickOobCommandOrder(
+  commands: OobRibbonCommand[],
+): Promise<OobRibbonCommand[] | undefined> {
+  if (commands.length <= 1) {
+    return commands;
+  }
+
+  const remaining = commands.slice();
+  const ordered: OobRibbonCommand[] = [];
+
+  while (remaining.length) {
+    const pick = await vscode.window.showQuickPick<OobCommandPick>(
+      remaining.map((command) => ({
+        label: command.id,
+        description: command.label,
+        command,
+      })),
+      {
+        placeHolder: `Pick button ${ordered.length + 1} of ${commands.length}`,
+      },
+    );
+    if (!pick?.command) {
+      return undefined;
+    }
+
+    ordered.push(pick.command);
+    remaining.splice(
+      remaining.findIndex((command) => command.id === pick.command?.id),
+      1,
+    );
+  }
+
+  return ordered;
 }
 
 async function pickLocation(

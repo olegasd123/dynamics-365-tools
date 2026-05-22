@@ -100,6 +100,11 @@ export interface NewOobStubReplacementInput extends NewCustomButtonInput {
   hideLocation?: string;
 }
 
+export interface NewOobButtonReorderInput extends NewCustomButtonInput {
+  hideActionId: string;
+  hideLocation?: string;
+}
+
 const RIBBON_SECTION_ORDER = [
   "CustomActions",
   "Templates",
@@ -161,6 +166,42 @@ export function createOobStubReplacementPatches(
     {
       sectionName: "CommandDefinitions",
       childText: inputs.map((input) => renderCommandDefinition(input)).join("\n"),
+    },
+  ];
+
+  const locLabels = inputs
+    .map((input) => input.locLabel)
+    .filter((input): input is NewLocLabelInput => Boolean(input));
+  if (locLabels.length) {
+    sectionEdits.push({
+      sectionName: "LocLabels",
+      childText: locLabels.map((input) => renderLocLabel(input)).join("\n"),
+    });
+  }
+
+  return createSectionChildPatches(document, sectionEdits);
+}
+
+export function createOobButtonReorderPatches(
+  document: RibbonDocument,
+  inputs: NewOobButtonReorderInput[],
+): RibbonPatch[] {
+  if (!inputs.length) {
+    return [];
+  }
+
+  const sectionEdits: RibbonSectionChildEdit[] = [
+    {
+      sectionName: "CustomActions",
+      childText: inputs
+        .flatMap((input) => [
+          renderHideAction({
+            hideActionId: input.hideActionId,
+            location: input.hideLocation ?? input.location,
+          }),
+          renderCustomButtonAction(input),
+        ])
+        .join("\n"),
     },
   ];
 

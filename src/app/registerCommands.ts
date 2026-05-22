@@ -56,6 +56,7 @@ import {
   overrideOobRibbonCommand,
   publishRibbonToEnvironment,
   refreshRibbonExplorer,
+  reorderOobRibbonButtons,
   saveRibbonSolutionZip,
   saveRibbonSource,
   cleanupGeneratedRibbonSolutions,
@@ -197,6 +198,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register(
       "dynamics365Tools.ribbons.hideAndStubOobButtons",
       (node) => hideAndStubOobRibbonButtons(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.reorderOobButtons",
+      (node) => reorderOobRibbonButtons(ctx, node),
       {
         validateConfiguration: false,
       },
