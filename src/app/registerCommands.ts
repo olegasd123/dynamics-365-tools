@@ -58,6 +58,8 @@ import {
   saveRibbonSolutionZip,
   saveRibbonSource,
   cleanupGeneratedRibbonSolutions,
+  redoRibbonEdit,
+  undoRibbonEdit,
 } from "../features/ribbons/commands/ribbonExplorerCommands";
 import {
   buildPcfControl,
@@ -150,6 +152,12 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.save", (node) => saveRibbonSource(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.undo", () => undoRibbonEdit(ctx), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.redo", () => redoRibbonEdit(ctx), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {

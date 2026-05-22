@@ -176,6 +176,24 @@ export async function saveRibbonSource(
   );
 }
 
+export function undoRibbonEdit(ctx: CommandContext): void {
+  if (!ctx.ribbonEditorState.undo()) {
+    vscode.window.showWarningMessage("No ribbon edit to undo.");
+    return;
+  }
+
+  ctx.ribbonExplorer.refresh();
+}
+
+export function redoRibbonEdit(ctx: CommandContext): void {
+  if (!ctx.ribbonEditorState.redo()) {
+    vscode.window.showWarningMessage("No ribbon edit to redo.");
+    return;
+  }
+
+  ctx.ribbonExplorer.refresh();
+}
+
 export async function publishRibbonToEnvironment(
   ctx: CommandContext,
   node?: RibbonExplorerNode,

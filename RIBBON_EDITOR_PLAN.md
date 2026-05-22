@@ -762,7 +762,7 @@ opening Power Apps.
 - Templates editor (or at minimum a "raw XML" escape hatch for unknown nodes).
 - Expanded `oobCatalog.ts` (community-sourced lists, per-version variants).
 - Reorder of OOB buttons (synthesized hide+re-add).
-- Undo/redo across the working set.
+- Undo/redo across the working set. [Done]
 - Pull-from-env flow (the inverse of publish).
 
 ---

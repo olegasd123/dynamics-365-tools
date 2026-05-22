@@ -7,6 +7,8 @@ export class RibbonEditorState {
   private readonly sourcesById = new Map<string, RibbonSource>();
   private readonly documentsBySourceId = new Map<string, RibbonDocument[]>();
   private readonly patchesByFileUri = new Map<string, RibbonPatch[]>();
+  private readonly undoStack: RibbonEdit[] = [];
+  private readonly redoStack: RibbonEdit[] = [];
 
   constructor(private readonly repository: RibbonRepository) {}
 
@@ -39,14 +41,52 @@ export class RibbonEditorState {
       return;
     }
 
+    this.undoStack.push({ fileUri: document.fileUri, patches });
+    this.redoStack.length = 0;
+
     const current = this.patchesByFileUri.get(document.fileUri) ?? [];
     this.patchesByFileUri.set(document.fileUri, [...current, ...patches]);
     this.documentsBySourceId.delete(document.sourceId);
   }
 
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  undo(): boolean {
+    const edit = this.undoStack.pop();
+    if (!edit) {
+      return false;
+    }
+
+    this.redoStack.push(edit);
+    this.rebuildFilePatches(edit.fileUri);
+    this.documentsBySourceId.clear();
+    return true;
+  }
+
+  redo(): boolean {
+    const edit = this.redoStack.pop();
+    if (!edit) {
+      return false;
+    }
+
+    this.undoStack.push(edit);
+    this.rebuildFilePatches(edit.fileUri);
+    this.documentsBySourceId.clear();
+    return true;
+  }
+
   clear(): void {
     this.documentsBySourceId.clear();
     this.sourcesById.clear();
+    this.patchesByFileUri.clear();
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
   }
 
   clearCachedDocuments(): void {
@@ -72,6 +112,7 @@ export class RibbonEditorState {
     for (const file of source.files) {
       this.patchesByFileUri.delete(file.fileUri);
     }
+    this.removeHistoryForFiles(source.files.map((file) => file.fileUri));
     this.documentsBySourceId.delete(source.id);
     await this.reloadSource(source);
     return result;
@@ -113,6 +154,38 @@ export class RibbonEditorState {
 
   private hasFilePatches(fileUri: string): boolean {
     return (this.patchesByFileUri.get(fileUri) ?? []).length > 0;
+  }
+
+  private rebuildFilePatches(fileUri: string): void {
+    const patches = this.undoStack
+      .filter((edit) => edit.fileUri === fileUri)
+      .flatMap((edit) => edit.patches);
+
+    if (patches.length) {
+      this.patchesByFileUri.set(fileUri, patches);
+      return;
+    }
+
+    this.patchesByFileUri.delete(fileUri);
+  }
+
+  private removeHistoryForFiles(fileUris: string[]): void {
+    const savedFiles = new Set(fileUris);
+    removeMatchingEdits(this.undoStack, savedFiles);
+    removeMatchingEdits(this.redoStack, savedFiles);
+  }
+}
+
+interface RibbonEdit {
+  fileUri: string;
+  patches: RibbonPatch[];
+}
+
+function removeMatchingEdits(edits: RibbonEdit[], fileUris: Set<string>): void {
+  for (let index = edits.length - 1; index >= 0; index -= 1) {
+    if (fileUris.has(edits[index].fileUri)) {
+      edits.splice(index, 1);
+    }
   }
 }
 

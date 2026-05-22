@@ -73,6 +73,8 @@
     "onCommand:dynamics365Tools.pcf.copyDeployedControlId",
     "onCommand:dynamics365Tools.ribbons.refreshExplorer",
     "onCommand:dynamics365Tools.ribbons.save",
+    "onCommand:dynamics365Tools.ribbons.undo",
+    "onCommand:dynamics365Tools.ribbons.redo",
     "onCommand:dynamics365Tools.ribbons.openFile",
     "onCommand:dynamics365Tools.ribbons.openSolutionZip",
     "onCommand:dynamics365Tools.ribbons.saveSolutionZip",
@@ -378,6 +380,18 @@
         "title": "Save Ribbon Changes",
         "category": "Dynamics 365 Tools",
         "icon": "$(save)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.undo",
+        "title": "Undo Ribbon Edit",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.redo",
+        "title": "Redo Ribbon Edit",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(redo)"
       },
       {
         "command": "dynamics365Tools.ribbons.openFile",
@@ -765,9 +779,19 @@
           "group": "navigation@3"
         },
         {
-          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "command": "dynamics365Tools.ribbons.undo",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@4"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.redo",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@5"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@6"
         }
       ],
       "view/item/context": [
