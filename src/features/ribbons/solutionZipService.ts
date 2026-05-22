@@ -49,7 +49,7 @@ export class SolutionZipService {
         continue;
       }
 
-      const safeName = normalizeZipEntryName(entry.name);
+      const safeName = normalizeLoadedZipEntryName(entry.name, entry.unsafeOriginalName);
       if (!safeName) {
         continue;
       }
@@ -87,9 +87,11 @@ export class SolutionZipService {
     const zip = new JSZip();
     for (const entryName of source.zip.entries) {
       const filePath = path.join(source.zip.extractedRootUri, ...entryName.split("/"));
-      if (await isFile(filePath)) {
-        zip.file(entryName, await fs.readFile(filePath));
+      if (!(await isFile(filePath))) {
+        throw new Error(`Extracted zip entry is missing: ${entryName}`);
       }
+
+      zip.file(entryName, await fs.readFile(filePath));
     }
 
     const buffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
@@ -177,6 +179,22 @@ function isFlatCustomizationsEntry(entryName: string): boolean {
 function entityRibbonName(entryName: string): string | undefined {
   const match = /^Entities\/([^/]+)\/RibbonDiffXml\.xml$/i.exec(entryName);
   return match?.[1];
+}
+
+function normalizeLoadedZipEntryName(
+  entryName: string,
+  unsafeOriginalName: string | undefined,
+): string | undefined {
+  const safeName = normalizeZipEntryName(entryName);
+  if (!safeName) {
+    return undefined;
+  }
+
+  if (!unsafeOriginalName) {
+    return safeName;
+  }
+
+  return normalizeZipEntryName(unsafeOriginalName) === safeName ? safeName : undefined;
 }
 
 function normalizeZipEntryName(entryName: string): string | undefined {

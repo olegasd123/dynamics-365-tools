@@ -35,6 +35,11 @@ test("opens solution zip as a ribbon source", async () => {
   assert.strictEqual(source.files.length, 1);
   assert.strictEqual(source.files[0].kind, "Flat");
   assert.ok(!source.zip?.entries.includes("../unsafe.xml"));
+  assert.ok(!source.zip?.entries.includes("unsafe.xml"));
+  assert.strictEqual(
+    await fileExists(path.join(source.zip?.extractedRootUri ?? "", "unsafe.xml")),
+    false,
+  );
 
   const documents = await new RibbonRepository().loadSource(source);
   assert.strictEqual(documents.length, 2);
@@ -73,10 +78,38 @@ test("saves extracted solution source back to a zip", async () => {
   assert.strictEqual(await saved.file("solution.xml")?.async("string"), "<ImportExportXml />");
 });
 
+test("fails zip save when an extracted entry is missing", async () => {
+  const storageRoot = await makeWorkspace();
+  const zip = new JSZip();
+  zip.file("customizations.xml", "<ImportExportXml><RibbonDiffXml /></ImportExportXml>");
+
+  const service = new SolutionZipService();
+  const source = await service.openZipBuffer(await zipBuffer(zip), {
+    storageRoot,
+    sourceName: "core.zip",
+  });
+
+  await fs.unlink(path.join(source.zip?.extractedRootUri ?? "", "customizations.xml"));
+
+  await assert.rejects(
+    () => service.saveSourceToZip(source, path.join(storageRoot, "saved.zip")),
+    /Extracted zip entry is missing: customizations\.xml/,
+  );
+});
+
 async function makeWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-zip-"));
 }
 
 async function zipBuffer(zip: JSZip): Promise<Buffer> {
   return zip.generateAsync({ type: "nodebuffer" });
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(filePath);
+    return stat.isFile();
+  } catch {
+    return false;
+  }
 }
