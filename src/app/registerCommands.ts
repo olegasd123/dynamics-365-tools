@@ -47,6 +47,7 @@ import {
   addCustomRibbonButton,
   deleteRibbonNode,
   editRibbonNode,
+  hideAndStubOobRibbonButtons,
   hideOobRibbonButton,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
@@ -193,6 +194,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.hideOobButton", (node) => hideOobRibbonButton(ctx, node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.hideAndStubOobButtons",
+      (node) => hideAndStubOobRibbonButtons(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register(
       "dynamics365Tools.ribbons.addCommandDefinition",
       (node) => addRibbonCommandDefinition(ctx, node),

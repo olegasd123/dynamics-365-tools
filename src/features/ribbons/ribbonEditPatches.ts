@@ -83,7 +83,7 @@ export interface NewCustomButtonInput {
   location: string;
   buttonId: string;
   commandId: string;
-  action: NewCommandActionInput;
+  action?: NewCommandActionInput;
   sequence?: number;
   labelLocId?: string;
   labelText?: string;
@@ -93,6 +93,10 @@ export interface NewCustomButtonInput {
   enableRuleIds?: string[];
   displayRuleIds?: string[];
   locLabel?: NewLocLabelInput;
+}
+
+export interface NewOobStubReplacementInput extends NewCustomButtonInput {
+  hideActionId: string;
 }
 
 const RIBBON_SECTION_ORDER = [
@@ -126,6 +130,43 @@ export function createCustomButtonPatches(
     sectionEdits.push({
       sectionName: "LocLabels",
       childText: renderLocLabel(input.locLabel),
+    });
+  }
+
+  return createSectionChildPatches(document, sectionEdits);
+}
+
+export function createOobStubReplacementPatches(
+  document: RibbonDocument,
+  inputs: NewOobStubReplacementInput[],
+): RibbonPatch[] {
+  if (!inputs.length) {
+    return [];
+  }
+
+  const sectionEdits: RibbonSectionChildEdit[] = [
+    {
+      sectionName: "CustomActions",
+      childText: inputs
+        .flatMap((input) => [
+          renderHideAction({ hideActionId: input.hideActionId, location: input.location }),
+          renderCustomButtonAction(input),
+        ])
+        .join("\n"),
+    },
+    {
+      sectionName: "CommandDefinitions",
+      childText: inputs.map((input) => renderCommandDefinition(input)).join("\n"),
+    },
+  ];
+
+  const locLabels = inputs
+    .map((input) => input.locLabel)
+    .filter((input): input is NewLocLabelInput => Boolean(input));
+  if (locLabels.length) {
+    sectionEdits.push({
+      sectionName: "LocLabels",
+      childText: locLabels.map((input) => renderLocLabel(input)).join("\n"),
     });
   }
 
@@ -608,12 +649,12 @@ function renderCustomButtonAction(input: NewCustomButtonInput): string {
 }
 
 function renderCommandDefinition(input: NewCustomButtonInput): string {
+  const actions = input.action ? `\n    ${renderCommandAction(input.action)}\n  ` : "";
+
   return `<CommandDefinition Id="${escapeXmlAttribute(input.commandId)}">
   <EnableRules>${renderRuleRefs("EnableRule", input.enableRuleIds ?? [])}</EnableRules>
   <DisplayRules>${renderRuleRefs("DisplayRule", input.displayRuleIds ?? [])}</DisplayRules>
-  <Actions>
-    ${renderCommandAction(input.action)}
-  </Actions>
+  <Actions>${actions}</Actions>
 </CommandDefinition>`;
 }
 

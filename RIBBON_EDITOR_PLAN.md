@@ -757,8 +757,8 @@ opening Power Apps.
 
 ### Phase 5 — Polish / stretch
 
-- OOB command override.
-- "Hide all and stub replacements" wizard.
+- OOB command override. [Done]
+- "Hide all and stub replacements" wizard. [Done]
 - Templates editor (or at minimum a "raw XML" escape hatch for unknown nodes).
 - Expanded `oobCatalog.ts` (community-sourced lists, per-version variants).
 - Reorder of OOB buttons (synthesized hide+re-add).

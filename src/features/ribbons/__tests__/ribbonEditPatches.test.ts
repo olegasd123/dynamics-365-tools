@@ -18,6 +18,7 @@ import {
   createLocLabelTitleReplacePatch,
   createLocLabelPatches,
   createNodeAttributeValuePatch,
+  createOobStubReplacementPatches,
   createRuleStepReplacePatch,
   createSwapNodePatches,
 } from "../ribbonEditPatches";
@@ -226,6 +227,66 @@ test("creates an OOB command override with empty action chain", () => {
   assert.match(updated, /<EnableRules><\/EnableRules>/);
   assert.match(updated, /<DisplayRules><\/DisplayRules>/);
   assert.match(updated, /<Actions><\/Actions>/);
+});
+
+test("creates OOB hide actions and replacement button stubs as one patch batch", () => {
+  const source = `<RibbonDiffXml>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createOobStubReplacementPatches(document, [
+      {
+        hideActionId: "d365tools.account.Form.Hide.Mscrm.SavePrimary",
+        customActionId: "d365tools.account.Form.SavePrimary.CustomAction",
+        location: "Mscrm.Form.account.MainTab.Save.Controls._children",
+        sequence: 10,
+        buttonId: "d365tools.account.Form.SavePrimary.Button",
+        commandId: "d365tools.account.Form.SavePrimary.Command",
+        labelLocId: "d365tools.account.Form.SavePrimary.Label",
+        locLabel: {
+          id: "d365tools.account.Form.SavePrimary.Label",
+          languageCode: 1033,
+          description: "Save",
+        },
+      },
+      {
+        hideActionId: "d365tools.account.Form.Hide.Mscrm.SaveAndClosePrimary",
+        customActionId: "d365tools.account.Form.SaveAndClosePrimary.CustomAction",
+        location: "Mscrm.Form.account.MainTab.Save.Controls._children",
+        sequence: 20,
+        buttonId: "d365tools.account.Form.SaveAndClosePrimary.Button",
+        commandId: "d365tools.account.Form.SaveAndClosePrimary.Command",
+        labelLocId: "d365tools.account.Form.SaveAndClosePrimary.Label",
+        locLabel: {
+          id: "d365tools.account.Form.SaveAndClosePrimary.Label",
+          languageCode: 1033,
+          description: "Save and close",
+        },
+      },
+    ]),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const form = updatedDocument.views[0];
+
+  assert.strictEqual(form.hideActions.length, 2);
+  assert.strictEqual(form.customActions.length, 2);
+  assert.strictEqual(form.commandDefinitions.length, 2);
+  assert.strictEqual(form.locLabels.length, 2);
+  assert.match(updated, /<Actions><\/Actions>/);
+  assert.match(updated, /<Title languagecode="1033" description="Save and close" \/>/);
 });
 
 test("adds an action to an existing command definition", () => {

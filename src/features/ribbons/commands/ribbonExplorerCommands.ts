@@ -30,6 +30,7 @@ import {
   createLocLabelTitlePatch,
   createLocLabelPatches,
   createNodeAttributeValuePatch,
+  createOobStubReplacementPatches,
   createRuleStepReplacePatch,
   createSwapNodePatches,
   makeCustomButtonIds,
@@ -754,6 +755,77 @@ export async function hideOobRibbonButton(
   ctx.ribbonEditorState.queuePatches(
     target.document,
     createHideActionPatches(target.document, { hideActionId, location }),
+  );
+  ctx.ribbonExplorer.refresh();
+}
+
+export async function hideAndStubOobRibbonButtons(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    return;
+  }
+
+  const location = await pickLocation(target.document, target.view);
+  if (!location) {
+    return;
+  }
+
+  const commands = await pickOobCommandsForLocation(target.document, target.view, location);
+  if (!commands?.length) {
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Hide ${commands.length} OOB button${commands.length === 1 ? "" : "s"} and create replacement stubs?`,
+    { modal: true },
+    "Create Stubs",
+  );
+  if (choice !== "Create Stubs") {
+    return;
+  }
+
+  const usedIds = collectRibbonIds(target.document);
+  const baseSequence = nextCustomActionSequence(target.view);
+  const inputs = commands.map((command, index) => {
+    const ids = makeCustomButtonIds(
+      target.document,
+      target.view.scope,
+      `${command.label} ${command.id}`,
+    );
+    const customActionId = nextBatchId(usedIds, ids.customActionId);
+    const buttonId = nextBatchId(usedIds, ids.buttonId);
+    const commandId = nextBatchId(usedIds, ids.commandId);
+    const labelLocId = nextBatchId(usedIds, ids.labelLocId ?? `${buttonId}.Label`);
+    const hideActionId = nextBatchId(
+      usedIds,
+      nextHideActionId(target.document, {
+        hideActionId: makeHideActionId(target.document, target.view.scope, command.id),
+      }),
+    );
+
+    return {
+      hideActionId,
+      customActionId,
+      location,
+      sequence: baseSequence + index * 10,
+      buttonId,
+      commandId,
+      labelLocId,
+      locLabel: {
+        id: labelLocId,
+        languageCode: 1033,
+        description: command.label,
+      },
+    };
+  });
+
+  ctx.ribbonEditorState.queuePatches(
+    target.document,
+    createOobStubReplacementPatches(target.document, inputs),
   );
   ctx.ribbonExplorer.refresh();
 }
@@ -1576,6 +1648,37 @@ async function pickOobCommand(
     : undefined;
 }
 
+async function pickOobCommandsForLocation(
+  document: RibbonDocument,
+  view: RibbonView,
+  location: string,
+): Promise<OobRibbonCommand[] | undefined> {
+  const catalogLocation = listOobRibbonLocations(view.scope, document.entityLogicalName).find(
+    (item) => item.location === location,
+  );
+  const commands = listOobRibbonCommands(view.scope, document.entityLogicalName);
+  const suggested = catalogLocation
+    ? commands.filter((command) => command.locationIds.includes(catalogLocation.id))
+    : commands;
+  const picks = await vscode.window.showQuickPick<OobCommandPick>(
+    suggested.map((command) => ({
+      label: command.id,
+      description: command.label,
+      command,
+    })),
+    {
+      canPickMany: true,
+      placeHolder: catalogLocation
+        ? `OOB buttons in ${catalogLocation.label}`
+        : "OOB buttons to hide and stub",
+    },
+  );
+
+  return picks
+    ?.map((pick) => pick.command)
+    .filter((command): command is OobRibbonCommand => Boolean(command));
+}
+
 async function pickLocation(
   document: RibbonDocument,
   view: RibbonView,
@@ -2189,4 +2292,48 @@ function validateUniqueId(
   }
 
   return used.has(id) ? "This id already exists in this ribbon." : undefined;
+}
+
+function collectRibbonIds(document: RibbonDocument): Set<string> {
+  const used = new Set<string>();
+  for (const view of document.views) {
+    for (const action of view.customActions) {
+      used.add(action.id);
+      if (action.commandUI && action.commandUI.kind !== "Unknown") {
+        used.add(action.commandUI.id);
+      }
+    }
+    for (const action of view.hideActions) {
+      used.add(action.hideActionId);
+    }
+    for (const command of view.commandDefinitions) {
+      used.add(command.id);
+    }
+    for (const rule of view.enableRules) {
+      used.add(rule.id);
+    }
+    for (const rule of view.displayRules) {
+      used.add(rule.id);
+    }
+    for (const label of view.locLabels) {
+      used.add(label.id);
+    }
+  }
+
+  return used;
+}
+
+function nextBatchId(used: Set<string>, id: string): string {
+  if (!used.has(id)) {
+    used.add(id);
+    return id;
+  }
+
+  for (let index = 2; ; index += 1) {
+    const candidate = `${id}.${index}`;
+    if (!used.has(candidate)) {
+      used.add(candidate);
+      return candidate;
+    }
+  }
 }
