@@ -762,3 +762,42 @@ test("swaps sibling XML nodes without changing their content", () => {
   assert.match(updated, /<!-- keep comment -->/);
   assert.match(updated, /CustomAttr="keep"/);
 });
+
+test("swaps sibling XML nodes in queued patch order when node sizes differ", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="short"><Actions><Url Address="https://short.example" /></Actions></CommandDefinition>
+    <CommandDefinition Id="longer">
+      <EnableRules>
+        <EnableRule Id="new.Enabled" />
+      </EnableRules>
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/scripts/account.js" FunctionName="run" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const [short, longer] = document.views[0].commandDefinitions;
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createSwapNodePatches(document.sourceText, short.range, longer.range),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(
+    updatedDocument.views[0].commandDefinitions.map((command) => command.id),
+    ["longer", "short"],
+  );
+  assert.match(updated, /<JavaScriptFunction Library="\$webresource:new_\/scripts\/account\.js"/);
+  assert.match(updated, /https:\/\/short\.example/);
+});

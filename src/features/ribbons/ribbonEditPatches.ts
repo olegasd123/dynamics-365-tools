@@ -378,8 +378,8 @@ export function createSwapNodePatches(
   }
 
   return [
-    { kind: "replace", range: earlier, text: sourceText.slice(later.start, later.end) },
     { kind: "replace", range: later, text: sourceText.slice(earlier.start, earlier.end) },
+    { kind: "replace", range: earlier, text: sourceText.slice(later.start, later.end) },
   ];
 }
 

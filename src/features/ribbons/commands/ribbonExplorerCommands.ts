@@ -55,6 +55,7 @@ import {
   RibbonSource,
   RibbonView,
   RuleStep,
+  TextRange,
 } from "../models";
 import {
   findOobRibbonLocation,
@@ -1463,12 +1464,21 @@ type ReorderTarget = {
   index: number;
 };
 
+type ReorderIdentity =
+  | { kind: "CustomAction"; id: string }
+  | { kind: "HideAction"; id: string }
+  | { kind: "CommandDefinition"; id: string }
+  | { kind: "EnableRule"; id: string }
+  | { kind: "DisplayRule"; id: string }
+  | { kind: "LocLabel"; id: string }
+  | { kind: "LocLabelTitle"; labelId: string; languageCode: number };
+
 async function moveRibbonNode(
   ctx: CommandContext,
   node: RibbonExplorerNode | undefined,
   direction: -1 | 1,
 ): Promise<void> {
-  const target = resolveReorderTarget(node);
+  const target = await resolveReorderTarget(ctx, node);
   if (!target) {
     vscode.window.showWarningMessage("Select a ribbon item that can be moved.");
     return;
@@ -1493,76 +1503,134 @@ async function moveRibbonNode(
   ctx.ribbonExplorer.refresh();
 }
 
-function resolveReorderTarget(node: RibbonExplorerNode | undefined): ReorderTarget | undefined {
+async function resolveReorderTarget(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+): Promise<ReorderTarget | undefined> {
   if (!(node instanceof RibbonItemNode) || !node.editTarget) {
     return undefined;
   }
 
   const target = node.editTarget;
-  for (const view of target.document.views) {
-    const customAction = findRangeIndex(view.customActions, target.range);
-    if (node.contextValue === "d365RibbonCustomAction" && customAction >= 0) {
+  const identity = resolveReorderIdentity(node, target.document, target.range);
+  const currentDocument = await resolveCurrentRibbonDocument(ctx, node, target.document);
+  return resolveReorderTargetInDocument(
+    node.contextValue,
+    currentDocument ?? target.document,
+    target.range,
+    identity,
+  );
+}
+
+async function resolveCurrentRibbonDocument(
+  ctx: CommandContext,
+  node: RibbonExplorerNode,
+  document: RibbonDocument,
+): Promise<RibbonDocument | undefined> {
+  const source = await resolveSource(ctx, node);
+  if (!source) {
+    return undefined;
+  }
+
+  const documents = await ctx.ribbonEditorState.loadSource(source);
+  return (
+    documents.find((item) => item.id === document.id) ??
+    documents.find(
+      (item) =>
+        item.fileUri === document.fileUri &&
+        item.kind === document.kind &&
+        item.entityLogicalName === document.entityLogicalName,
+    )
+  );
+}
+
+function resolveReorderTargetInDocument(
+  contextValue: string,
+  document: RibbonDocument,
+  range: TextRange,
+  identity: ReorderIdentity | undefined,
+): ReorderTarget | undefined {
+  for (const view of document.views) {
+    const customAction =
+      identity?.kind === "CustomAction"
+        ? view.customActions.findIndex((item) => item.id === identity.id)
+        : findRangeIndex(view.customActions, range);
+    if (contextValue === "d365RibbonCustomAction" && customAction >= 0) {
       return {
-        document: target.document,
+        document,
         ranges: view.customActions.map((item) => item.range),
         index: customAction,
       };
     }
 
-    const hideAction = findRangeIndex(view.hideActions, target.range);
-    if (node.contextValue === "d365RibbonHideAction" && hideAction >= 0) {
+    const hideAction =
+      identity?.kind === "HideAction"
+        ? view.hideActions.findIndex((item) => item.hideActionId === identity.id)
+        : findRangeIndex(view.hideActions, range);
+    if (contextValue === "d365RibbonHideAction" && hideAction >= 0) {
       return {
-        document: target.document,
+        document,
         ranges: view.hideActions.map((item) => item.range),
         index: hideAction,
       };
     }
 
-    const commandDefinition = findRangeIndex(view.commandDefinitions, target.range);
-    if (node.contextValue === "d365RibbonCommandDefinition" && commandDefinition >= 0) {
+    const commandDefinition =
+      identity?.kind === "CommandDefinition"
+        ? view.commandDefinitions.findIndex((item) => item.id === identity.id)
+        : findRangeIndex(view.commandDefinitions, range);
+    if (contextValue === "d365RibbonCommandDefinition" && commandDefinition >= 0) {
       return {
-        document: target.document,
+        document,
         ranges: view.commandDefinitions.map((item) => item.range),
         index: commandDefinition,
       };
     }
 
-    const enableRule = findRangeIndex(view.enableRules, target.range);
-    if (node.contextValue === "d365RibbonEnableRule" && enableRule >= 0) {
+    const enableRule =
+      identity?.kind === "EnableRule"
+        ? view.enableRules.findIndex((item) => item.id === identity.id)
+        : findRangeIndex(view.enableRules, range);
+    if (contextValue === "d365RibbonEnableRule" && enableRule >= 0) {
       return {
-        document: target.document,
+        document,
         ranges: view.enableRules.map((item) => item.range),
         index: enableRule,
       };
     }
 
-    const displayRule = findRangeIndex(view.displayRules, target.range);
-    if (node.contextValue === "d365RibbonDisplayRule" && displayRule >= 0) {
+    const displayRule =
+      identity?.kind === "DisplayRule"
+        ? view.displayRules.findIndex((item) => item.id === identity.id)
+        : findRangeIndex(view.displayRules, range);
+    if (contextValue === "d365RibbonDisplayRule" && displayRule >= 0) {
       return {
-        document: target.document,
+        document,
         ranges: view.displayRules.map((item) => item.range),
         index: displayRule,
       };
     }
 
-    const locLabel = findRangeIndex(view.locLabels, target.range);
-    if (node.contextValue === "d365RibbonLocLabel" && locLabel >= 0) {
+    const locLabel =
+      identity?.kind === "LocLabel"
+        ? view.locLabels.findIndex((item) => item.id === identity.id)
+        : findRangeIndex(view.locLabels, range);
+    if (contextValue === "d365RibbonLocLabel" && locLabel >= 0) {
       return {
-        document: target.document,
+        document,
         ranges: view.locLabels.map((item) => item.range),
         index: locLabel,
       };
     }
 
     for (const command of view.commandDefinitions) {
-      const action = findRangeIndex(command.actions, target.range);
+      const action = findRangeIndex(command.actions, range);
       if (
-        (node.contextValue === "d365RibbonJavaScriptAction" ||
-          node.contextValue === "d365RibbonUrlAction") &&
+        (contextValue === "d365RibbonJavaScriptAction" || contextValue === "d365RibbonUrlAction") &&
         action >= 0
       ) {
         return {
-          document: target.document,
+          document,
           ranges: command.actions.map((item) => item.range),
           index: action,
         };
@@ -1570,10 +1638,10 @@ function resolveReorderTarget(node: RibbonExplorerNode | undefined): ReorderTarg
     }
 
     for (const rule of [...view.enableRules, ...view.displayRules]) {
-      const step = findRangeIndex(rule.steps, target.range);
-      if (node.contextValue.startsWith("d365RibbonRuleStep:") && step >= 0) {
+      const step = findRangeIndex(rule.steps, range);
+      if (contextValue.startsWith("d365RibbonRuleStep:") && step >= 0) {
         return {
-          document: target.document,
+          document,
           ranges: rule.steps.map((item) => item.range),
           index: step,
         };
@@ -1581,13 +1649,64 @@ function resolveReorderTarget(node: RibbonExplorerNode | undefined): ReorderTarg
     }
 
     for (const label of view.locLabels) {
-      const title = findRangeIndex(label.titles, target.range);
-      if (node.contextValue === "d365RibbonLocLabelTitle" && title >= 0) {
+      const title =
+        identity?.kind === "LocLabelTitle"
+          ? label.id === identity.labelId
+            ? label.titles.findIndex((item) => item.languageCode === identity.languageCode)
+            : -1
+          : findRangeIndex(label.titles, range);
+      if (contextValue === "d365RibbonLocLabelTitle" && title >= 0) {
         return {
-          document: target.document,
+          document,
           ranges: label.titles.map((item) => item.range),
           index: title,
         };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function resolveReorderIdentity(
+  node: RibbonItemNode,
+  document: RibbonDocument,
+  range: TextRange,
+): ReorderIdentity | undefined {
+  for (const view of document.views) {
+    const customAction = view.customActions.find((item) => sameRange(item.range, range));
+    if (node.contextValue === "d365RibbonCustomAction" && customAction) {
+      return { kind: "CustomAction", id: customAction.id };
+    }
+
+    const hideAction = view.hideActions.find((item) => sameRange(item.range, range));
+    if (node.contextValue === "d365RibbonHideAction" && hideAction) {
+      return { kind: "HideAction", id: hideAction.hideActionId };
+    }
+
+    const commandDefinition = view.commandDefinitions.find((item) => sameRange(item.range, range));
+    if (node.contextValue === "d365RibbonCommandDefinition" && commandDefinition) {
+      return { kind: "CommandDefinition", id: commandDefinition.id };
+    }
+
+    const enableRule = view.enableRules.find((item) => sameRange(item.range, range));
+    if (node.contextValue === "d365RibbonEnableRule" && enableRule) {
+      return { kind: "EnableRule", id: enableRule.id };
+    }
+
+    const displayRule = view.displayRules.find((item) => sameRange(item.range, range));
+    if (node.contextValue === "d365RibbonDisplayRule" && displayRule) {
+      return { kind: "DisplayRule", id: displayRule.id };
+    }
+
+    for (const label of view.locLabels) {
+      if (node.contextValue === "d365RibbonLocLabel" && sameRange(label.range, range)) {
+        return { kind: "LocLabel", id: label.id };
+      }
+
+      const title = label.titles.find((item) => sameRange(item.range, range));
+      if (node.contextValue === "d365RibbonLocLabelTitle" && title) {
+        return { kind: "LocLabelTitle", labelId: label.id, languageCode: title.languageCode };
       }
     }
   }
