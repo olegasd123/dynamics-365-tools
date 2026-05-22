@@ -914,7 +914,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.openFile",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource:flat/ || viewItem =~ /d365RibbonDocument:application/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource:flat/ || viewItem =~ /d365RibbonDocument:application/ || viewItem == d365RibbonTemplates || viewItem == d365RibbonUnknownXml)",
           "group": "inline@1"
         },
         {

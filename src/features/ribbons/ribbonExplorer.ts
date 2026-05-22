@@ -14,11 +14,13 @@ import {
   RibbonView,
   RuleStep,
   TextRange,
+  XmlElementRange,
 } from "./models";
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonEditorState } from "./ribbonEditorState";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
 import { findOobRibbonCommand } from "./oobCatalog";
+import { scanXmlElements } from "./ribbonXmlReader";
 
 export type RibbonExplorerNode =
   | RibbonSourceNode
@@ -34,7 +36,9 @@ type RibbonSectionKind =
   | "commandDefinitions"
   | "enableRules"
   | "displayRules"
-  | "locLabels";
+  | "locLabels"
+  | "templates"
+  | "unknownXml";
 
 export class RibbonSourceNode extends vscode.TreeItem {
   readonly contextValue: string;
@@ -239,7 +243,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
 }
 
 function buildSectionNodes(document: RibbonDocument, view: RibbonView): RibbonSectionNode[] {
-  return [
+  const sections = [
     new RibbonSectionNode(document, view, "customActions", view.customActions.length),
     new RibbonSectionNode(document, view, "hideActions", view.hideActions.length),
     new RibbonSectionNode(document, view, "commandDefinitions", view.commandDefinitions.length),
@@ -247,6 +251,18 @@ function buildSectionNodes(document: RibbonDocument, view: RibbonView): RibbonSe
     new RibbonSectionNode(document, view, "displayRules", view.displayRules.length),
     new RibbonSectionNode(document, view, "locLabels", view.locLabels.length),
   ];
+
+  if (view.templatesRange) {
+    sections.push(new RibbonSectionNode(document, view, "templates", 1));
+  }
+
+  if (view.unknownNodeRanges.length) {
+    sections.push(
+      new RibbonSectionNode(document, view, "unknownXml", view.unknownNodeRanges.length),
+    );
+  }
+
+  return sections;
 }
 
 function sourceIcon(source: RibbonSource): string {
@@ -287,7 +303,38 @@ function buildItemNodes(section: RibbonSectionNode): RibbonExplorerNode[] {
       return section.view.displayRules.map((rule) => displayRuleNode(section.document, rule));
     case "locLabels":
       return section.view.locLabels.map((label) => locLabelNode(section.document, label));
+    case "templates":
+      return section.view.templatesRange
+        ? [rawXmlNode(section.document, section.view.templatesRange)]
+        : [];
+    case "unknownXml":
+      return section.view.unknownNodeRanges.map((range) => rawXmlNode(section.document, range));
   }
+}
+
+function rawXmlNode(document: RibbonDocument, range: TextRange): RibbonItemNode {
+  const name = rawXmlNodeName(document, range);
+  return new RibbonItemNode(
+    name === "Templates" ? "Templates" : `Unknown XML: ${name}`,
+    "Open source XML to edit",
+    name === "Templates" ? "d365RibbonTemplates" : "d365RibbonUnknownXml",
+    name === "Templates" ? "symbol-namespace" : "warning",
+    [
+      ["Element", name],
+      ["Start", range.start],
+      ["End", range.end],
+    ],
+    [],
+    { document, range },
+  );
+}
+
+function rawXmlNodeName(document: RibbonDocument, range: TextRange): string {
+  const element = collectElements(scanXmlElements(document.sourceText)).find((node) =>
+    sameRange(node.range, range),
+  );
+
+  return element?.name ?? "XML";
 }
 
 function customActionNode(document: RibbonDocument, action: CustomAction): RibbonItemNode {
@@ -621,6 +668,10 @@ function sectionLabel(kind: RibbonSectionKind): string {
       return "Display Rules";
     case "locLabels":
       return "Loc Labels";
+    case "templates":
+      return "Templates";
+    case "unknownXml":
+      return "Unknown XML";
   }
 }
 
@@ -638,5 +689,24 @@ function sectionIcon(kind: RibbonSectionKind): string {
       return "eye";
     case "locLabels":
       return "symbol-string";
+    case "templates":
+      return "symbol-namespace";
+    case "unknownXml":
+      return "warning";
   }
+}
+
+function collectElements(nodes: XmlElementRange[]): XmlElementRange[] {
+  const matches: XmlElementRange[] = [];
+
+  for (const node of nodes) {
+    matches.push(node);
+    matches.push(...collectElements(node.children));
+  }
+
+  return matches;
+}
+
+function sameRange(left: TextRange, right: TextRange): boolean {
+  return left.start === right.start && left.end === right.end;
 }

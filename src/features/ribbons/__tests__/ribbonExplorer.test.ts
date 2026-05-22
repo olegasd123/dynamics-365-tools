@@ -30,6 +30,9 @@ test("renders located ribbon documents as a read-only tree", async () => {
       </CommandUIDefinition>
     </CustomAction>
   </CustomActions>
+  <Templates>
+    <RibbonTemplates Id="Mscrm.Templates" />
+  </Templates>
   <CommandDefinitions>
     <CommandDefinition Id="new.account.Command">
       <EnableRules><EnableRule Id="new.account.Enable" /></EnableRules>
@@ -45,6 +48,9 @@ test("renders located ribbon documents as a read-only tree", async () => {
       </EnableRule>
     </EnableRules>
   </RuleDefinitions>
+  <CustomXml>
+    <Value />
+  </CustomXml>
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
@@ -71,6 +77,8 @@ test("renders located ribbon documents as a read-only tree", async () => {
   assert.ok(sections[0] instanceof RibbonSectionNode);
   assert.strictEqual(sections[0].label, "Custom Actions");
   assert.strictEqual(sections[0].description, "1");
+  assert.ok(sections.some((section) => section.label === "Templates"));
+  assert.ok(sections.some((section) => section.label === "Unknown XML"));
 
   const items = await explorer.getChildren(sections[0]);
   assert.strictEqual(items[0].label, "new.account.Form.Button.CustomAction");
@@ -90,6 +98,16 @@ test("renders located ribbon documents as a read-only tree", async () => {
 
   const actionNodes = await explorer.getChildren(commandChildren[2]);
   assert.strictEqual(actionNodes[0].label, "JavaScript: run");
+
+  const templatesSection = sections.find((section) => section.label === "Templates");
+  assert.ok(templatesSection);
+  const templateNodes = await explorer.getChildren(templatesSection);
+  assert.strictEqual(templateNodes[0].label, "Templates");
+
+  const unknownSection = sections.find((section) => section.label === "Unknown XML");
+  assert.ok(unknownSection);
+  const unknownNodes = await explorer.getChildren(unknownSection);
+  assert.strictEqual(unknownNodes[0].label, "Unknown XML: CustomXml");
 });
 
 test("labels OOB command overrides in the tree", async () => {

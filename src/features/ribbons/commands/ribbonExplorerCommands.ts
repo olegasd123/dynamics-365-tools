@@ -373,7 +373,9 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
   );
 }
 
-export async function openRibbonFile(node?: RibbonDocumentNode | RibbonSourceNode): Promise<void> {
+export async function openRibbonFile(
+  node?: RibbonDocumentNode | RibbonSourceNode | RibbonItemNode,
+): Promise<void> {
   if (node instanceof RibbonSourceNode && node.source.kind === "flat") {
     const fileUri = node.source.files[0]?.fileUri;
     if (fileUri) {
@@ -382,12 +384,26 @@ export async function openRibbonFile(node?: RibbonDocumentNode | RibbonSourceNod
     return;
   }
 
+  if (node instanceof RibbonItemNode && node.editTarget) {
+    await openDocumentAtRange(node.editTarget.document, node.editTarget.range.start);
+    return;
+  }
+
   if (!(node instanceof RibbonDocumentNode)) {
     vscode.window.showWarningMessage("Select a ribbon document first.");
     return;
   }
 
-  await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(node.document.fileUri));
+  await openDocumentAtRange(node.document, node.document.ribbonRange.start);
+}
+
+async function openDocumentAtRange(document: RibbonDocument, offset: number): Promise<void> {
+  const textDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(document.fileUri));
+  const editor = await vscode.window.showTextDocument(textDocument);
+  const position = textDocument.positionAt(offset);
+  const range = new vscode.Range(position, position);
+  editor.selection = new vscode.Selection(position, position);
+  editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
 async function openRibbonsFromDisk(ctx: CommandContext): Promise<void> {

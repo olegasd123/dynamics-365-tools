@@ -252,11 +252,19 @@ function sectionActions(node: RibbonSectionNode): PanelAction[] {
       return [{ command: "dynamics365Tools.ribbons.addDisplayRule", label: "Add Display Rule" }];
     case "locLabels":
       return [{ command: "dynamics365Tools.ribbons.addLocLabel", label: "Add Label" }];
+    case "templates":
+    case "unknownXml":
+      return [];
   }
 }
 
 function itemActions(node: RibbonItemNode): PanelAction[] {
   const actions: PanelAction[] = [];
+
+  if (isRawXmlNode(node)) {
+    actions.push(openFileAction());
+    return actions;
+  }
 
   if (canEdit(node)) {
     actions.push({ command: "dynamics365Tools.ribbons.editNode", label: "Edit" });
@@ -282,6 +290,12 @@ function itemActions(node: RibbonItemNode): PanelAction[] {
   }
 
   return actions;
+}
+
+function isRawXmlNode(node: RibbonItemNode): boolean {
+  return (
+    node.contextValue === "d365RibbonTemplates" || node.contextValue === "d365RibbonUnknownXml"
+  );
 }
 
 function canEdit(node: RibbonItemNode): boolean {
