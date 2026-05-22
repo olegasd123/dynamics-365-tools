@@ -1,11 +1,18 @@
 import { RibbonScope } from "./models";
 
+export type OobRibbonCatalogVersion = "legacy" | "modern";
+
+export interface OobRibbonCatalogOptions {
+  version?: OobRibbonCatalogVersion;
+}
+
 export interface OobRibbonLocation {
   id: string;
   scope: RibbonScope;
   label: string;
   location: string;
   group: string;
+  versions?: OobRibbonCatalogVersion[];
 }
 
 export interface OobRibbonCommand {
@@ -19,6 +26,7 @@ export interface OobRibbonCommand {
   image16x16?: string;
   image32x32?: string;
   templateAlias?: string;
+  versions?: OobRibbonCatalogVersion[];
 }
 
 interface OobRibbonLocationTemplate {
@@ -27,6 +35,7 @@ interface OobRibbonLocationTemplate {
   label: string;
   locationTemplate: string;
   group: string;
+  versions?: OobRibbonCatalogVersion[];
 }
 
 interface OobRibbonCommandTemplate {
@@ -40,6 +49,7 @@ interface OobRibbonCommandTemplate {
   image16x16?: string;
   image32x32?: string;
   templateAlias?: string;
+  versions?: OobRibbonCatalogVersion[];
 }
 
 const LOCATION_TEMPLATES: OobRibbonLocationTemplate[] = [
@@ -327,6 +337,7 @@ const COMMAND_TEMPLATES: OobRibbonCommandTemplate[] = [
     image16x16: "/_imgs/ribbon/New_16.png",
     image32x32: "/_imgs/ribbon/newrecord32.png",
     templateAlias: "o1",
+    versions: ["modern"],
   },
   {
     commandIdTemplate: "Mscrm.HomepageGrid.{entity}.AddNewRecord",
@@ -334,6 +345,7 @@ const COMMAND_TEMPLATES: OobRibbonCommandTemplate[] = [
     label: "New (legacy)",
     scopes: ["HomepageGrid"],
     locationIds: ["homepagegrid-management"],
+    versions: ["legacy"],
   },
   {
     commandIdTemplate: "Mscrm.EditSelectedRecord",
@@ -557,45 +569,51 @@ const COMMAND_TEMPLATES: OobRibbonCommandTemplate[] = [
 export function listOobRibbonLocations(
   scope?: RibbonScope,
   entityLogicalName = "{entity}",
+  options: OobRibbonCatalogOptions = {},
 ): OobRibbonLocation[] {
-  return LOCATION_TEMPLATES.filter((location) => !scope || location.scope === scope).map(
-    (location) => ({
-      id: location.id,
-      scope: location.scope,
-      label: location.label,
-      group: location.group,
-      location: applyEntity(location.locationTemplate, entityLogicalName),
-    }),
-  );
+  return LOCATION_TEMPLATES.filter(
+    (location) => (!scope || location.scope === scope) && matchesCatalogVersion(location, options),
+  ).map((location) => ({
+    id: location.id,
+    scope: location.scope,
+    label: location.label,
+    group: location.group,
+    location: applyEntity(location.locationTemplate, entityLogicalName),
+    versions: location.versions,
+  }));
 }
 
 export function listOobRibbonCommands(
   scope?: RibbonScope,
   entityLogicalName = "{entity}",
+  options: OobRibbonCatalogOptions = {},
 ): OobRibbonCommand[] {
-  return COMMAND_TEMPLATES.filter((command) => !scope || command.scopes.includes(scope)).map(
-    (command) => ({
-      id: applyEntity(command.idTemplate ?? command.commandIdTemplate, entityLogicalName),
-      label: command.label,
-      scopes: command.scopes,
-      locationIds: command.locationIds,
-      commandId: applyEntity(command.commandIdTemplate, entityLogicalName),
-      controlId: command.controlIdTemplate
-        ? applyEntity(command.controlIdTemplate, entityLogicalName)
-        : undefined,
-      sequence: command.sequence,
-      image16x16: command.image16x16,
-      image32x32: command.image32x32,
-      templateAlias: command.templateAlias,
-    }),
-  );
+  return COMMAND_TEMPLATES.filter(
+    (command) =>
+      (!scope || command.scopes.includes(scope)) && matchesCatalogVersion(command, options),
+  ).map((command) => ({
+    id: applyEntity(command.idTemplate ?? command.commandIdTemplate, entityLogicalName),
+    label: command.label,
+    scopes: command.scopes,
+    locationIds: command.locationIds,
+    commandId: applyEntity(command.commandIdTemplate, entityLogicalName),
+    controlId: command.controlIdTemplate
+      ? applyEntity(command.controlIdTemplate, entityLogicalName)
+      : undefined,
+    sequence: command.sequence,
+    image16x16: command.image16x16,
+    image32x32: command.image32x32,
+    templateAlias: command.templateAlias,
+    versions: command.versions,
+  }));
 }
 
 export function findOobRibbonLocation(
   id: string,
   entityLogicalName = "{entity}",
+  options: OobRibbonCatalogOptions = {},
 ): OobRibbonLocation | undefined {
-  return listOobRibbonLocations(undefined, entityLogicalName).find(
+  return listOobRibbonLocations(undefined, entityLogicalName, options).find(
     (location) => location.id === id,
   );
 }
@@ -603,8 +621,9 @@ export function findOobRibbonLocation(
 export function findOobRibbonCommand(
   id: string,
   entityLogicalName = "{entity}",
+  options: OobRibbonCatalogOptions = {},
 ): OobRibbonCommand | undefined {
-  const commands = listOobRibbonCommands(undefined, entityLogicalName);
+  const commands = listOobRibbonCommands(undefined, entityLogicalName, options);
   const controlMatches = commands.filter(
     (command) => command.id === id || command.controlId === id,
   );
@@ -626,6 +645,7 @@ function mergeOobRibbonCommands(commands: OobRibbonCommand[]): OobRibbonCommand 
     return first;
   }
 
+  const versions = unique(commands.flatMap((command) => command.versions ?? []));
   return {
     ...first,
     scopes: unique(commands.flatMap((command) => command.scopes)),
@@ -635,7 +655,15 @@ function mergeOobRibbonCommands(commands: OobRibbonCommand[]): OobRibbonCommand 
     image16x16: sameValue(commands.map((command) => command.image16x16)),
     image32x32: sameValue(commands.map((command) => command.image32x32)),
     templateAlias: sameValue(commands.map((command) => command.templateAlias)),
+    versions: versions.length ? versions : undefined,
   };
+}
+
+function matchesCatalogVersion(
+  item: { versions?: OobRibbonCatalogVersion[] },
+  options: OobRibbonCatalogOptions,
+): boolean {
+  return !options.version || !item.versions || item.versions.includes(options.version);
 }
 
 function unique<T>(values: T[]): T[] {

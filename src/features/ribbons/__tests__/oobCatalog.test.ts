@@ -79,3 +79,33 @@ test("merges OOB command ids that are shared by multiple controls", () => {
     "Mscrm.SubGrid.account.Edit",
   );
 });
+
+test("filters OOB command variants by catalog version", () => {
+  const modernCommands = listOobRibbonCommands("HomepageGrid", "account", {
+    version: "modern",
+  });
+  const legacyCommands = listOobRibbonCommands("HomepageGrid", "account", {
+    version: "legacy",
+  });
+
+  assert.ok(
+    modernCommands.some((command) => command.id === "Mscrm.HomepageGrid.account.NewRecord"),
+  );
+  assert.ok(
+    !modernCommands.some((command) => command.id === "Mscrm.HomepageGrid.account.AddNewRecord"),
+  );
+  assert.ok(
+    legacyCommands.some((command) => command.id === "Mscrm.HomepageGrid.account.AddNewRecord"),
+  );
+  assert.ok(
+    !legacyCommands.some((command) => command.id === "Mscrm.HomepageGrid.account.NewRecord"),
+  );
+  assert.strictEqual(
+    findOobRibbonCommand("Mscrm.NewRecordFromGrid", "account", { version: "modern" })?.controlId,
+    "Mscrm.HomepageGrid.account.NewRecord",
+  );
+  assert.strictEqual(
+    findOobRibbonCommand("Mscrm.NewRecordFromGrid", "account", { version: "legacy" }),
+    undefined,
+  );
+});
