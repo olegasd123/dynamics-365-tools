@@ -44,6 +44,13 @@ interface OobRibbonCommandTemplate {
 
 const LOCATION_TEMPLATES: OobRibbonLocationTemplate[] = [
   {
+    id: "application-global-new",
+    scope: "Application",
+    label: "Global command bar New",
+    group: "New",
+    locationTemplate: "Mscrm.GlobalTab.New.Controls._children",
+  },
+  {
     id: "form-save",
     scope: "Form",
     label: "Form Save",
@@ -597,11 +604,45 @@ export function findOobRibbonCommand(
   id: string,
   entityLogicalName = "{entity}",
 ): OobRibbonCommand | undefined {
-  return listOobRibbonCommands(undefined, entityLogicalName).find(
-    (command) => command.id === id || command.commandId === id || command.controlId === id,
+  const commands = listOobRibbonCommands(undefined, entityLogicalName);
+  const controlMatches = commands.filter(
+    (command) => command.id === id || command.controlId === id,
   );
+  if (controlMatches.length) {
+    return mergeOobRibbonCommands(controlMatches);
+  }
+
+  const commandMatches = commands.filter((command) => command.commandId === id);
+  return commandMatches.length ? mergeOobRibbonCommands(commandMatches) : undefined;
 }
 
 function applyEntity(value: string, entityLogicalName: string): string {
   return value.replace(/\{entity\}/g, entityLogicalName);
+}
+
+function mergeOobRibbonCommands(commands: OobRibbonCommand[]): OobRibbonCommand {
+  const [first] = commands;
+  if (commands.length === 1) {
+    return first;
+  }
+
+  return {
+    ...first,
+    scopes: unique(commands.flatMap((command) => command.scopes)),
+    locationIds: unique(commands.flatMap((command) => command.locationIds)),
+    controlId: sameValue(commands.map((command) => command.controlId)),
+    sequence: sameValue(commands.map((command) => command.sequence)),
+    image16x16: sameValue(commands.map((command) => command.image16x16)),
+    image32x32: sameValue(commands.map((command) => command.image32x32)),
+    templateAlias: sameValue(commands.map((command) => command.templateAlias)),
+  };
+}
+
+function unique<T>(values: T[]): T[] {
+  return [...new Set(values)];
+}
+
+function sameValue<T>(values: Array<T | undefined>): T | undefined {
+  const [first] = values;
+  return values.every((value) => value === first) ? first : undefined;
 }

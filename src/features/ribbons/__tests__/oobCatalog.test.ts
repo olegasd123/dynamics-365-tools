@@ -21,6 +21,18 @@ test("lists parameterized OOB locations by ribbon scope", () => {
   );
 });
 
+test("lists application ribbon locations", () => {
+  const locations = listOobRibbonLocations("Application");
+
+  assert.ok(
+    locations.some(
+      (location) =>
+        location.id === "application-global-new" &&
+        location.location === "Mscrm.GlobalTab.New.Controls._children",
+    ),
+  );
+});
+
 test("lists parameterized OOB commands by ribbon scope", () => {
   const formCommands = listOobRibbonCommands("Form", "account");
   const gridCommands = listOobRibbonCommands("HomepageGrid", "account");
@@ -52,5 +64,18 @@ test("finds OOB catalog entries after entity substitution", () => {
   assert.strictEqual(
     findOobRibbonCommand("Mscrm.AddExistingRecordFromSubGridStandard", "contact")?.controlId,
     "Mscrm.SubGrid.contact.AddExistingStandard",
+  );
+});
+
+test("merges OOB command ids that are shared by multiple controls", () => {
+  const command = findOobRibbonCommand("Mscrm.EditSelectedRecord", "account");
+
+  assert.ok(command);
+  assert.deepStrictEqual(command.scopes, ["HomepageGrid", "SubGrid"]);
+  assert.deepStrictEqual(command.locationIds, ["homepagegrid-records", "subgrid-actions"]);
+  assert.strictEqual(command.controlId, undefined);
+  assert.strictEqual(
+    findOobRibbonCommand("Mscrm.SubGrid.account.Edit", "account")?.controlId,
+    "Mscrm.SubGrid.account.Edit",
   );
 });

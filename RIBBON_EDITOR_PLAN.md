@@ -760,7 +760,7 @@ opening Power Apps.
 - OOB command override. [Done]
 - "Hide all and stub replacements" wizard. [Done]
 - Templates editor (or at minimum a "raw XML" escape hatch for unknown nodes). [Done: raw XML escape hatch]
-- Expanded `oobCatalog.ts` with common command/control ids. [Partial: per-version variants deferred]
+- Expanded `oobCatalog.ts` with common command/control ids. [Partial: app global location + shared command-id resolution done; per-version variants deferred]
 - Reorder of OOB buttons (synthesized hide+re-add). [Done]
 - Undo/redo across the working set. [Done]
 - Pull-from-env flow (the inverse of publish). [Done]
