@@ -78,6 +78,7 @@ const window = {
   },
   showInputBox: async () => undefined,
   showQuickPick: async () => undefined,
+  showSaveDialog: async () => undefined,
   showTextDocument: async () => undefined,
   withProgress: async (_options, task) => {
     const token = {

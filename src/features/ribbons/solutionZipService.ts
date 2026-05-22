@@ -99,6 +99,12 @@ export class SolutionZipService {
     return targetUri;
   }
 
+  async saveBufferToZip(buffer: Buffer, outputZipUri: string): Promise<string> {
+    await fs.mkdir(path.dirname(outputZipUri), { recursive: true });
+    await fs.writeFile(outputZipUri, buffer);
+    return outputZipUri;
+  }
+
   async listUnmanagedSolutions(client: DataverseClient): Promise<DataverseSolutionSummary[]> {
     const response = await client.get<DataverseSolutionsResponse>(
       "/solutions?$select=uniquename,friendlyname,version&$filter=ismanaged eq false&$orderby=uniquename",

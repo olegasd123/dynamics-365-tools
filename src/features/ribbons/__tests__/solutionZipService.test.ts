@@ -78,6 +78,17 @@ test("saves extracted solution source back to a zip", async () => {
   assert.strictEqual(await saved.file("solution.xml")?.async("string"), "<ImportExportXml />");
 });
 
+test("saves exported solution buffer to a zip", async () => {
+  const storageRoot = await makeWorkspace();
+  const outputPath = path.join(storageRoot, "backup", "core.zip");
+  const buffer = Buffer.from("zip-content");
+
+  const savedPath = await new SolutionZipService().saveBufferToZip(buffer, outputPath);
+
+  assert.strictEqual(savedPath, outputPath);
+  assert.deepStrictEqual(await fs.readFile(outputPath), buffer);
+});
+
 test("fails zip save when an extracted entry is missing", async () => {
   const storageRoot = await makeWorkspace();
   const zip = new JSZip();

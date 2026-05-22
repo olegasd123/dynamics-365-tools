@@ -3,16 +3,20 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
+import * as vscode from "vscode";
+import JSZip from "jszip";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import {
   moveRibbonNodeDown,
   moveRibbonNodeUp,
   normalizeWebResourceUniqueName,
+  openRibbonsFromSolution,
 } from "../commands/ribbonExplorerCommands";
 import { RibbonPatch, RibbonSource } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";
 import { RibbonItemNode } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
+import { SolutionZipService } from "../solutionZipService";
 import { readRibbonDocuments } from "../ribbonXmlReader";
 
 test("normalizes manually typed web resource names", () => {
@@ -24,6 +28,98 @@ test("normalizes manually typed web resource names", () => {
     normalizeWebResourceUniqueName("new_/scripts/account.js"),
     "new_/scripts/account.js",
   );
+});
+
+test("offers to save a backup when opening an exported solution", async () => {
+  const storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-export-"));
+  const backupPath = path.join(storageRoot, "backup.zip");
+  const zip = new JSZip();
+  zip.file("customizations.xml", "<ImportExportXml><RibbonDiffXml /></ImportExportXml>");
+  const buffer = await zip.generateAsync({ type: "nodebuffer" });
+  const service = new SolutionZipService();
+  let backupPromptShown = false;
+  let saveDialogDefaultUri: vscode.Uri | undefined;
+  let importedSource: RibbonSource | undefined;
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInformationMessage = vscode.window.showInformationMessage;
+  const originalShowSaveDialog = vscode.window.showSaveDialog;
+
+  (vscode.window as any).showQuickPick = async (items: any[]) => {
+    if (items[0]?.sourceKind === "environment") {
+      return items[0];
+    }
+    return items[0];
+  };
+  (vscode.window as any).showInformationMessage = async (message: string) => {
+    if (message.startsWith("Save a backup copy")) {
+      backupPromptShown = true;
+      return "Save Backup";
+    }
+    return undefined;
+  };
+  (vscode.window as any).showSaveDialog = async (options: { defaultUri?: vscode.Uri }) => {
+    saveDialogDefaultUri = options.defaultUri;
+    return vscode.Uri.file(backupPath);
+  };
+
+  try {
+    await openRibbonsFromSolution({
+      extensionContext: { globalStorageUri: vscode.Uri.file(storageRoot) },
+      configuration: {
+        workspaceRoot: storageRoot,
+        loadConfiguration: async () => ({
+          environments: [{ name: "Dev", url: "https://org.crm.dynamics.com" }],
+          solutions: [],
+        }),
+      },
+      ui: {
+        pickEnvironment: async (environments: unknown[]) => environments[0],
+      },
+      auth: {
+        getAccessToken: async () => "token",
+      },
+      secrets: {
+        getCredentials: async () => undefined,
+      },
+      lastSelection: {
+        getLastEnvironment: () => undefined,
+        setLastEnvironment: async () => undefined,
+      },
+      connections: {
+        createConnection: async (env: unknown) => ({
+          env,
+          apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+          token: "token",
+        }),
+      },
+      solutionZipService: {
+        listUnmanagedSolutions: async () => [
+          { uniqueName: "core", friendlyName: "Core", version: "1.0.0" },
+        ],
+        downloadSolutionZip: async () => buffer,
+        saveBufferToZip: service.saveBufferToZip.bind(service),
+        openZipBuffer: service.openZipBuffer.bind(service),
+      },
+      ribbonSourceLocator: {
+        addImportedSource: (source: RibbonSource) => {
+          importedSource = source;
+        },
+      },
+      ribbonExplorer: {
+        refresh: () => undefined,
+      },
+    } as any);
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
+    (vscode.window as any).showSaveDialog = originalShowSaveDialog;
+  }
+
+  assert.strictEqual(backupPromptShown, true);
+  assert.ok(saveDialogDefaultUri?.fsPath.startsWith(storageRoot));
+  assert.deepStrictEqual(await fs.readFile(backupPath), buffer);
+  assert.strictEqual(importedSource?.name, "core.zip");
 });
 
 test("moves ribbon nodes down without losing unequal sibling XML", async () => {

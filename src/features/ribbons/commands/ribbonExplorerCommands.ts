@@ -101,6 +101,8 @@ interface GeneratedSolutionPick extends vscode.QuickPickItem {
   solutionId: string;
 }
 
+const SAVE_EXPORT_BACKUP = "Save Backup";
+
 export function refreshRibbonExplorer(ctx: CommandContext): void {
   ctx.ribbonExplorer.refresh();
 }
@@ -367,24 +369,20 @@ export async function pullRibbonsFromEnvironment(
     return;
   }
 
-  const pulledSource = await vscode.window.withProgress(
+  const buffer = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
       title: `Exporting ${solutionPick.uniqueName}`,
       cancellable: false,
     },
-    async () => {
-      const buffer = await ctx.solutionZipService.downloadSolutionZip(
-        client,
-        solutionPick.uniqueName,
-      );
-      return ctx.solutionZipService.openZipBuffer(buffer, {
-        storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
-        sourceName: `${solutionPick.uniqueName}-pull.zip`,
-      });
-    },
+    () => ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName),
   );
-  const incomingDocuments = await ctx.ribbonRepository.loadSource(pulledSource);
+  await offerExportedSolutionBackup(ctx, buffer, solutionPick.uniqueName);
+  const incomingSource = await ctx.solutionZipService.openZipBuffer(buffer, {
+    storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
+    sourceName: `${solutionPick.uniqueName}-pull.zip`,
+  });
+  const incomingDocuments = await ctx.ribbonRepository.loadSource(incomingSource);
   const plan = createRibbonPullPlan(targetDocuments, incomingDocuments);
 
   if (!plan.matchedDocuments.length) {
@@ -702,6 +700,7 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
     },
     () => ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName),
   );
+  await offerExportedSolutionBackup(ctx, buffer, solutionPick.uniqueName);
   const source = await ctx.solutionZipService.openZipBuffer(buffer, {
     storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
     sourceName: `${solutionPick.uniqueName}.zip`,
@@ -781,6 +780,48 @@ function addImportedRibbonSource(ctx: CommandContext, source: RibbonSource): voi
   void vscode.window.showInformationMessage(
     `Opened ${source.name} with ${source.files.length} ribbon file${source.files.length === 1 ? "" : "s"}.`,
   );
+}
+
+async function offerExportedSolutionBackup(
+  ctx: CommandContext,
+  buffer: Buffer,
+  solutionUniqueName: string,
+): Promise<void> {
+  const choice = await vscode.window.showInformationMessage(
+    `Save a backup copy of exported solution ${solutionUniqueName}?`,
+    { modal: true },
+    SAVE_EXPORT_BACKUP,
+    "Skip",
+  );
+  if (choice !== SAVE_EXPORT_BACKUP) {
+    return;
+  }
+
+  const target = await vscode.window.showSaveDialog({
+    defaultUri: defaultSolutionBackupUri(ctx, solutionUniqueName),
+    filters: { "Solution zip": ["zip"] },
+    saveLabel: "Save Backup",
+  });
+  if (!target) {
+    return;
+  }
+
+  const savedPath = await ctx.solutionZipService.saveBufferToZip(buffer, target.fsPath);
+  void vscode.window.showInformationMessage(`Saved solution backup to ${savedPath}.`);
+}
+
+function defaultSolutionBackupUri(ctx: CommandContext, solutionUniqueName: string): vscode.Uri {
+  const root = ctx.configuration.workspaceRoot ?? ctx.extensionContext.globalStorageUri.fsPath;
+  return vscode.Uri.file(path.join(root, solutionBackupFileName(solutionUniqueName)));
+}
+
+function solutionBackupFileName(solutionUniqueName: string, now = new Date()): string {
+  const timestamp = now
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z")
+    .replace(/[:.]/g, "-");
+  const safeName = solutionUniqueName.trim().replace(/[<>:"/\\|?*]/g, "_") || "solution";
+  return `${safeName}-backup-${timestamp}.zip`;
 }
 
 export function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): void {
