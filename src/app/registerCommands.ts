@@ -47,8 +47,10 @@ import {
   deleteRibbonNode,
   editRibbonNode,
   hideOobRibbonButton,
+  openRibbonsFromSolution,
   openRibbonFile,
   refreshRibbonExplorer,
+  saveRibbonSolutionZip,
   saveRibbonSource,
 } from "../features/ribbons/commands/ribbonExplorerCommands";
 import {
@@ -147,6 +149,16 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.ribbons.openSolutionZip", () => openRibbonsFromSolution(ctx), {
+      validateConfiguration: false,
+    }),
+    register(
+      "dynamics365Tools.ribbons.saveSolutionZip",
+      (node) => saveRibbonSolutionZip(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register(
       "dynamics365Tools.ribbons.addCustomButton",
       (node) => addCustomRibbonButton(ctx, node),

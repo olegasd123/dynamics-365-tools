@@ -63,6 +63,28 @@ test("locates flat customizations XML files at supported paths", async () => {
   );
 });
 
+test("keeps imported zip sources with workspace sources", async () => {
+  const workspaceRoot = await makeWorkspace();
+  const locator = new RibbonSourceLocator();
+  locator.addImportedSource({
+    id: "zip:/tmp/core",
+    kind: "zip",
+    name: "core.zip",
+    rootUri: "/tmp/core",
+    files: [],
+    zip: {
+      extractedRootUri: "/tmp/core",
+      entries: [],
+    },
+  });
+
+  const sources = await locator.locate(workspaceRoot);
+
+  assert.strictEqual(sources.length, 1);
+  assert.strictEqual(sources[0].kind, "zip");
+  assert.strictEqual(sources[0].name, "core.zip");
+});
+
 async function makeWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-locator-"));
 }

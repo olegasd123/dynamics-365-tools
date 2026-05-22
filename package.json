@@ -74,6 +74,8 @@
     "onCommand:dynamics365Tools.ribbons.refreshExplorer",
     "onCommand:dynamics365Tools.ribbons.save",
     "onCommand:dynamics365Tools.ribbons.openFile",
+    "onCommand:dynamics365Tools.ribbons.openSolutionZip",
+    "onCommand:dynamics365Tools.ribbons.saveSolutionZip",
     "onCommand:dynamics365Tools.ribbons.addCustomButton",
     "onCommand:dynamics365Tools.ribbons.hideOobButton",
     "onCommand:dynamics365Tools.ribbons.addCommandDefinition",
@@ -378,6 +380,18 @@
         "icon": "$(go-to-file)"
       },
       {
+        "command": "dynamics365Tools.ribbons.openSolutionZip",
+        "title": "Open Ribbons from Solution...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(file-zip)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.saveSolutionZip",
+        "title": "Save Solution Zip...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(archive)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.addCustomButton",
         "title": "Add Custom Button",
         "category": "Dynamics 365 Tools",
@@ -632,6 +646,9 @@
           "command": "dynamics365Tools.ribbons.refreshExplorer"
         },
         {
+          "command": "dynamics365Tools.ribbons.openSolutionZip"
+        },
+        {
           "command": "dynamics365Tools.ribbons.openFile"
         }
       ],
@@ -696,9 +713,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "dynamics365Tools.ribbons.save",
+          "command": "dynamics365Tools.ribbons.openSolutionZip",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@2"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.save",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -823,14 +845,19 @@
           "group": "inline@2"
         },
         {
+          "command": "dynamics365Tools.ribbons.saveSolutionZip",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /d365RibbonSource:zip/",
+          "group": "inline@3"
+        },
+        {
           "command": "dynamics365Tools.ribbons.addCustomButton",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
-          "group": "inline@3"
+          "group": "inline@4"
         },
         {
           "command": "dynamics365Tools.ribbons.hideOobButton",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
-          "group": "inline@4"
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandDefinition",
@@ -930,6 +957,7 @@
   },
   "dependencies": {
     "fast-xml-parser": "^5.8.0",
+    "jszip": "^3.10.1",
     "zod": "^4.1.13"
   }
 }

@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { CommandContext } from "../../../app/commandContext";
+import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
 import { BindingEntry } from "../../config/domain/models";
+import { DataverseClient } from "../../dataverse/dataverseClient";
 import {
   RibbonDocumentNode,
   RibbonExplorerNode,
@@ -43,6 +45,7 @@ import {
   LocLabel,
   LocLabelTitle,
   RibbonDocument,
+  RibbonSource,
   RibbonView,
   RuleStep,
 } from "../models";
@@ -64,8 +67,75 @@ interface WebResourceLibraryPick extends vscode.QuickPickItem {
   manual?: boolean;
 }
 
+interface SolutionOpenPick extends vscode.QuickPickItem {
+  sourceKind: "environment" | "disk";
+}
+
+interface DataverseSolutionPick extends vscode.QuickPickItem {
+  uniqueName: string;
+}
+
 export function refreshRibbonExplorer(ctx: CommandContext): void {
   ctx.ribbonExplorer.refresh();
+}
+
+export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void> {
+  const pick = await vscode.window.showQuickPick<SolutionOpenPick>(
+    [
+      {
+        label: "Download from environment",
+        description: "Export an unmanaged solution zip",
+        sourceKind: "environment",
+      },
+      {
+        label: "Open zip from disk",
+        description: "Use a local solution zip file",
+        sourceKind: "disk",
+      },
+    ],
+    { placeHolder: "Open ribbons from solution" },
+  );
+  if (!pick) {
+    return;
+  }
+
+  if (pick.sourceKind === "disk") {
+    await openRibbonsFromDisk(ctx);
+    return;
+  }
+
+  await openRibbonsFromEnvironment(ctx);
+}
+
+export async function saveRibbonSolutionZip(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const source = await resolveSource(ctx, node);
+  if (!source || source.kind !== "zip") {
+    vscode.window.showWarningMessage("Select an imported solution zip source first.");
+    return;
+  }
+
+  if (ctx.ribbonEditorState.isSourceDirty(source.id)) {
+    await ctx.ribbonEditorState.saveSource(source.id);
+  }
+
+  const defaultUri = source.zip?.originalZipUri
+    ? vscode.Uri.file(source.zip.originalZipUri)
+    : vscode.Uri.file(path.join(ctx.extensionContext.globalStorageUri.fsPath, source.name));
+  const target = await vscode.window.showSaveDialog({
+    defaultUri,
+    filters: { "Solution zip": ["zip"] },
+    saveLabel: "Save Solution Zip",
+  });
+  if (!target) {
+    return;
+  }
+
+  const savedPath = await ctx.solutionZipService.saveSourceToZip(source, target.fsPath);
+  ctx.ribbonExplorer.refresh();
+  void vscode.window.showInformationMessage(`Saved solution zip to ${savedPath}.`);
 }
 
 export async function saveRibbonSource(
@@ -103,6 +173,92 @@ export async function openRibbonFile(node?: RibbonDocumentNode | RibbonSourceNod
   }
 
   await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(node.document.fileUri));
+}
+
+async function openRibbonsFromDisk(ctx: CommandContext): Promise<void> {
+  const picks = await vscode.window.showOpenDialog({
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    filters: { "Solution zip": ["zip"] },
+    openLabel: "Open Solution Zip",
+  });
+  const zipUri = picks?.[0];
+  if (!zipUri) {
+    return;
+  }
+
+  const source = await ctx.solutionZipService.openZipFile(
+    zipUri.fsPath,
+    ctx.extensionContext.globalStorageUri.fsPath,
+  );
+  addImportedRibbonSource(ctx, source);
+}
+
+async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
+  const config = await ctx.configuration.loadConfiguration();
+  const target = await pickEnvironmentAndAuth(
+    ctx.configuration,
+    ctx.ui,
+    ctx.secrets,
+    ctx.auth,
+    ctx.lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment for solution export" },
+  );
+  if (!target) {
+    return;
+  }
+
+  const connection = await ctx.connections.createConnection(target.env, target.auth);
+  if (!connection) {
+    return;
+  }
+
+  const client = new DataverseClient(connection);
+  const solutions = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Loading unmanaged solutions",
+      cancellable: false,
+    },
+    () => ctx.solutionZipService.listUnmanagedSolutions(client),
+  );
+  const solutionPick = await vscode.window.showQuickPick<DataverseSolutionPick>(
+    solutions.map((solution) => ({
+      label: solution.uniqueName,
+      description: solution.version,
+      detail: solution.friendlyName,
+      uniqueName: solution.uniqueName,
+    })),
+    { placeHolder: "Select unmanaged solution" },
+  );
+  if (!solutionPick) {
+    return;
+  }
+
+  const buffer = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Exporting ${solutionPick.uniqueName}`,
+      cancellable: false,
+    },
+    () => ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName),
+  );
+  const source = await ctx.solutionZipService.openZipBuffer(buffer, {
+    storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
+    sourceName: `${solutionPick.uniqueName}.zip`,
+  });
+  addImportedRibbonSource(ctx, source);
+}
+
+function addImportedRibbonSource(ctx: CommandContext, source: RibbonSource): void {
+  ctx.ribbonSourceLocator.addImportedSource(source);
+  ctx.ribbonExplorer.refresh();
+  void vscode.window.showInformationMessage(
+    `Opened ${source.name} with ${source.files.length} ribbon file${source.files.length === 1 ? "" : "s"}.`,
+  );
 }
 
 export function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): void {
@@ -416,6 +572,23 @@ function resolveSourceId(node: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+async function resolveSource(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+): Promise<RibbonSource | undefined> {
+  if (node instanceof RibbonSourceNode) {
+    return node.source;
+  }
+
+  const sourceId = resolveSourceId(node);
+  if (!sourceId) {
+    return undefined;
+  }
+
+  const sources = await ctx.ribbonSourceLocator.locate(ctx.configuration.workspaceRoot);
+  return sources.find((source) => source.id === sourceId);
 }
 
 function resolveRibbonTarget(

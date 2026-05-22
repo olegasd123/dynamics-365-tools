@@ -3,9 +3,19 @@ import * as path from "node:path";
 import { RibbonSource, RibbonSourceFile } from "./models";
 
 export class RibbonSourceLocator {
+  private readonly importedSources = new Map<string, RibbonSource>();
+
+  addImportedSource(source: RibbonSource): void {
+    this.importedSources.set(source.id, source);
+  }
+
   async locate(workspaceRoot: string | undefined): Promise<RibbonSource[]> {
+    const imported = [...this.importedSources.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+
     if (!workspaceRoot) {
-      return [];
+      return imported;
     }
 
     const root = path.resolve(workspaceRoot);
@@ -32,7 +42,7 @@ export class RibbonSourceLocator {
       });
     }
 
-    return sources;
+    return [...sources, ...imported];
   }
 
   private async findUnpackedFiles(root: string): Promise<RibbonSourceFile[]> {

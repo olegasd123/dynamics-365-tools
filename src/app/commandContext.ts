@@ -24,6 +24,7 @@ import type { RibbonEditorState } from "../features/ribbons/ribbonEditorState";
 import type { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
 import type { RibbonRepository } from "../features/ribbons/ribbonRepository";
 import type { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
+import type { SolutionZipService } from "../features/ribbons/solutionZipService";
 import type { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
@@ -56,6 +57,7 @@ export interface CommandContext {
 
   ribbonSourceLocator: RibbonSourceLocator;
   ribbonRepository: RibbonRepository;
+  solutionZipService: SolutionZipService;
   ribbonEditorState: RibbonEditorState;
   ribbonDiagnostics: RibbonDiagnosticsService;
   ribbonExplorer: RibbonExplorerProvider;

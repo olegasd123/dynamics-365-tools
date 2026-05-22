@@ -46,8 +46,8 @@ export class RibbonSourceNode extends vscode.TreeItem {
     this.contextValue = dirty
       ? `d365RibbonSource:${source.kind}:dirty`
       : `d365RibbonSource:${source.kind}`;
-    this.iconPath = new vscode.ThemeIcon(source.kind === "flat" ? "file-code" : "folder-library");
-    this.description = `${source.kind === "flat" ? "flat" : `${source.files.length} files`}${dirty ? " *" : ""}`;
+    this.iconPath = new vscode.ThemeIcon(sourceIcon(source));
+    this.description = `${sourceDescription(source)}${dirty ? " *" : ""}`;
     this.tooltip = source.rootUri;
   }
 }
@@ -246,6 +246,28 @@ function buildSectionNodes(document: RibbonDocument, view: RibbonView): RibbonSe
     new RibbonSectionNode(document, view, "displayRules", view.displayRules.length),
     new RibbonSectionNode(document, view, "locLabels", view.locLabels.length),
   ];
+}
+
+function sourceIcon(source: RibbonSource): string {
+  switch (source.kind) {
+    case "flat":
+      return "file-code";
+    case "zip":
+      return "file-zip";
+    case "unpacked":
+      return "folder-library";
+  }
+}
+
+function sourceDescription(source: RibbonSource): string {
+  switch (source.kind) {
+    case "flat":
+      return "flat";
+    case "zip":
+      return `${source.files.length} files from zip`;
+    case "unpacked":
+      return `${source.files.length} files`;
+  }
 }
 
 function buildItemNodes(section: RibbonSectionNode): RibbonExplorerNode[] {

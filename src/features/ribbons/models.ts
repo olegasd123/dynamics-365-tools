@@ -1,6 +1,6 @@
 export type RibbonScope = "Application" | "Form" | "HomepageGrid" | "SubGrid";
 
-export type RibbonSourceKind = "unpacked" | "flat";
+export type RibbonSourceKind = "unpacked" | "flat" | "zip";
 
 export interface RibbonSource {
   id: string;
@@ -8,6 +8,13 @@ export interface RibbonSource {
   name: string;
   rootUri: string;
   files: RibbonSourceFile[];
+  zip?: RibbonZipSource;
+}
+
+export interface RibbonZipSource {
+  originalZipUri?: string;
+  extractedRootUri: string;
+  entries: string[];
 }
 
 export interface RibbonSourceFile {

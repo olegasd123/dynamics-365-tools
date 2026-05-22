@@ -25,6 +25,7 @@ import { RibbonEditorState } from "../features/ribbons/ribbonEditorState";
 import { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
 import { RibbonRepository } from "../features/ribbons/ribbonRepository";
 import { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
+import { SolutionZipService } from "../features/ribbons/solutionZipService";
 import { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import { BindingService } from "../features/webResources/bindingService";
 import { PublishCacheService } from "../features/webResources/publishCacheService";
@@ -57,6 +58,7 @@ export async function createServices(
   const pluginRegistration = new PluginRegistrationManager(pluginAssemblyIntrospector);
   const ribbonSourceLocator = new RibbonSourceLocator();
   const ribbonRepository = new RibbonRepository();
+  const solutionZipService = new SolutionZipService();
   const ribbonEditorState = new RibbonEditorState(ribbonRepository);
   const ribbonDiagnostics = new RibbonDiagnosticsService();
   const ribbonExplorer = new RibbonExplorerProvider(
@@ -133,6 +135,7 @@ export async function createServices(
     pluginRegistration,
     ribbonSourceLocator,
     ribbonRepository,
+    solutionZipService,
     ribbonEditorState,
     ribbonDiagnostics,
     ribbonExplorer,
