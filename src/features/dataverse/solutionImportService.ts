@@ -187,7 +187,7 @@ export class SolutionImportService {
 
   private getAsyncOperation(asyncOperationId: string): Promise<AsyncOperationRecord> {
     return this.client.get<AsyncOperationRecord>(
-      `/asyncoperations(${asyncOperationId})?$select=asyncoperationid,statecode,statuscode,message,friendlymessage,errortext`,
+      `/asyncoperations(${asyncOperationId})?$select=asyncoperationid,statecode,statuscode,message,friendlymessage`,
     );
   }
 

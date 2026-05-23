@@ -46,7 +46,7 @@ test("SolutionImportService starts async import and polls until success", async 
     },
   ]);
   assert.deepStrictEqual(gets, [
-    "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage,errortext",
+    "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage",
     "/importjobs(11111111-2222-3333-4444-555555555555)?$select=importjobid,data,progress,solutionname",
   ]);
 });

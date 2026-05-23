@@ -30,6 +30,22 @@ test("buildRibbonPublishTarget extracts entity and application ribbon XML", () =
   assert.strictEqual(target.applicationRibbonXml, "<RibbonDiffXml><LocLabels /></RibbonDiffXml>");
 });
 
+test("buildRibbonPublishTarget normalizes entity logical names", () => {
+  const document = makeDocument(
+    "Entity",
+    " Account ",
+    `<RibbonDiffXml><CustomActions /></RibbonDiffXml>`,
+  );
+
+  const target = buildRibbonPublishTarget([document]);
+
+  assert.deepStrictEqual(target.entities, ["account"]);
+  assert.strictEqual(
+    target.entityRibbonXmlByName.get("account"),
+    "<RibbonDiffXml><CustomActions /></RibbonDiffXml>",
+  );
+});
+
 test("buildMinimalRibbonSolutionZip creates the expected solution entries", async () => {
   const document = makeDocument(
     "Entity",
@@ -86,7 +102,7 @@ test("publishDocuments preflights entities, imports, then publishes ribbons", as
   assert.deepStrictEqual(result.entities, ["account"]);
   assert.deepStrictEqual(client.gets, [
     "/EntityDefinitions(LogicalName='account')?$select=LogicalName",
-    "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage,errortext",
+    "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage",
     `/importjobs(${importJobId})?$select=importjobid,data,progress,solutionname`,
   ]);
   assert.strictEqual(client.posts[0].path, "ImportSolutionAsync");

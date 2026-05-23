@@ -287,7 +287,7 @@ export function buildRibbonPublishTarget(documents: RibbonDocument[]): RibbonPub
       continue;
     }
 
-    const entityName = document.entityLogicalName?.trim();
+    const entityName = normalizeEntityLogicalName(document.entityLogicalName);
     if (entityName && !entityRibbonXmlByName.has(entityName)) {
       entityRibbonXmlByName.set(entityName, ribbonXml);
     }
@@ -372,6 +372,10 @@ function makeGeneratedSolutionName(scopeName: string): string {
 
 function normalizeGuid(value: string): string {
   return value.replace(/[{}]/g, "").trim().toLowerCase();
+}
+
+function normalizeEntityLogicalName(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
 }
 
 function escapeODataString(value: string): string {
