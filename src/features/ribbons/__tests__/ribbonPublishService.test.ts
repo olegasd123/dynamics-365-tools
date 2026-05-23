@@ -73,8 +73,16 @@ test("buildMinimalRibbonSolutionZip creates the expected solution entries", asyn
     /<RootComponent type="1" schemaName="account" behavior="0" \/>/,
   );
   assert.match(
+    (await zip.file("solution.xml")?.async("string")) ?? "",
+    /<ImportExportXml version="9\.2\.0\.0" SolutionPackageVersion="9\.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http:\/\/www\.w3\.org\/2001\/XMLSchema-instance">/,
+  );
+  assert.match(
     (await zip.file("customizations.xml")?.async("string")) ?? "",
     /<Name>account<\/Name>\s+<RibbonDiffXml>/,
+  );
+  assert.match(
+    (await zip.file("customizations.xml")?.async("string")) ?? "",
+    /<ImportExportXml version="9\.2\.0\.0" SolutionPackageVersion="9\.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http:\/\/www\.w3\.org\/2001\/XMLSchema-instance">/,
   );
 });
 
@@ -99,15 +107,23 @@ test("publishDocuments preflights entities, imports, then publishes ribbons", as
   );
 
   const importJobId = client.posts[0].body.ImportJobId;
+  const publishedZip = await JSZip.loadAsync(
+    Buffer.from(client.posts[0].body.CustomizationFile, "base64"),
+  );
   assert.deepStrictEqual(result.entities, ["account"]);
   assert.deepStrictEqual(client.gets, [
     "/EntityDefinitions(LogicalName='account')?$select=LogicalName",
+    "RetrieveVersion()",
     "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage",
     `/importjobs(${importJobId})?$select=importjobid,data,progress,solutionname`,
   ]);
   assert.strictEqual(client.posts[0].path, "ImportSolutionAsync");
   assert.strictEqual(client.posts[0].body.OverwriteUnmanagedCustomizations, true);
   assert.strictEqual(client.posts[0].body.PublishWorkflows, false);
+  assert.match(
+    (await publishedZip.file("solution.xml")?.async("string")) ?? "",
+    /<ImportExportXml version="9\.2\.26043\.165" SolutionPackageVersion="9\.2"/,
+  );
   assert.strictEqual(client.posts[1].path, "PublishXml");
   assert.deepStrictEqual(client.posts[1].body, {
     ParameterXml:
@@ -174,6 +190,9 @@ class FakeClient {
     this.gets.push(path);
     if (path.startsWith("/EntityDefinitions")) {
       return { LogicalName: "account" } as T;
+    }
+    if (path === "RetrieveVersion()") {
+      return { Version: "9.2.26043.165" } as T;
     }
     if (path.startsWith("/publishers")) {
       return {

@@ -59,6 +59,11 @@ interface PublisherListResponse {
   }>;
 }
 
+interface RetrieveVersionResponse {
+  Version?: string;
+  version?: string;
+}
+
 export class RibbonPublishService {
   async listUnmanagedSolutions(client: SolutionImportClient): Promise<RibbonPublishSolution[]> {
     const response = await client.get<SolutionListResponse>(
@@ -159,11 +164,13 @@ export class RibbonPublishService {
     }
 
     await this.preflightEntities(client, target.entities);
+    const packageMetadata = await this.getSolutionPackageMetadata(client);
     const zipBytes = await buildMinimalRibbonSolutionZip({
       solution,
       entities: target.entities,
       entityRibbonXmlByName: target.entityRibbonXmlByName,
       applicationRibbonXml: target.applicationRibbonXml,
+      packageMetadata,
     });
 
     const importer = new SolutionImportService(client);
@@ -253,6 +260,22 @@ export class RibbonPublishService {
       generated: true,
     };
   }
+
+  private async getSolutionPackageMetadata(
+    client: SolutionImportClient,
+  ): Promise<SolutionPackageMetadata> {
+    try {
+      const response = await client.get<RetrieveVersionResponse>("RetrieveVersion()");
+      const version = normalizePackageVersion(response.Version ?? response.version);
+      if (version) {
+        return makeSolutionPackageMetadata(version);
+      }
+    } catch {
+      // Use a current Dataverse package marker when the version function is unavailable.
+    }
+
+    return makeSolutionPackageMetadata(DEFAULT_DATAVERSE_VERSION);
+  }
 }
 
 interface RibbonPublishTarget {
@@ -263,7 +286,17 @@ interface RibbonPublishTarget {
 
 interface MinimalRibbonZipInput extends RibbonPublishTarget {
   solution: RibbonPublishSolution;
+  packageMetadata?: SolutionPackageMetadata;
 }
+
+interface SolutionPackageMetadata {
+  version: string;
+  solutionPackageVersion: string;
+  generatedBy: string;
+  languageCode: string;
+}
+
+const DEFAULT_DATAVERSE_VERSION = "9.2.0.0";
 
 export async function buildMinimalRibbonSolutionZip(input: MinimalRibbonZipInput): Promise<Buffer> {
   const zip = new JSZip();
@@ -313,7 +346,7 @@ function buildCustomizationsXml(input: MinimalRibbonZipInput): string {
   const appRibbon = input.applicationRibbonXml ? `\n  ${input.applicationRibbonXml}` : "";
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<ImportExportXml>
+<ImportExportXml ${buildImportExportXmlAttributes(input.packageMetadata)}>
   <Entities>
 ${entities}
   </Entities>${appRibbon}
@@ -333,7 +366,7 @@ function buildSolutionXml(input: MinimalRibbonZipInput): string {
     input.solution.publisherUniqueName || `${input.solution.publisherPrefix}publisher`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<ImportExportXml>
+<ImportExportXml ${buildImportExportXmlAttributes(input.packageMetadata)}>
   <SolutionManifest>
     <UniqueName>${escapeXml(input.solution.uniqueName)}</UniqueName>
     <LocalizedNames>
@@ -351,6 +384,16 @@ ${roots}
     <MissingDependencies />
   </SolutionManifest>
 </ImportExportXml>`;
+}
+
+function buildImportExportXmlAttributes(metadata = makeSolutionPackageMetadata()): string {
+  return [
+    `version="${escapeXml(metadata.version)}"`,
+    `SolutionPackageVersion="${escapeXml(metadata.solutionPackageVersion)}"`,
+    `languagecode="${escapeXml(metadata.languageCode)}"`,
+    `generatedBy="${escapeXml(metadata.generatedBy)}"`,
+    `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"`,
+  ].join(" ");
 }
 
 function buildContentTypesXml(): string {
@@ -376,6 +419,32 @@ function normalizeGuid(value: string): string {
 
 function normalizeEntityLogicalName(value: string | undefined): string {
   return value?.trim().toLowerCase() ?? "";
+}
+
+function normalizePackageVersion(value: string | undefined): string | undefined {
+  const version = value?.trim().match(/\d+(?:\.\d+){1,3}/)?.[0];
+  if (!version) {
+    return undefined;
+  }
+
+  const parts = version.split(".");
+  while (parts.length < 4) {
+    parts.push("0");
+  }
+
+  return parts.slice(0, 4).join(".");
+}
+
+function makeSolutionPackageMetadata(version = DEFAULT_DATAVERSE_VERSION): SolutionPackageMetadata {
+  const normalizedVersion = normalizePackageVersion(version) ?? DEFAULT_DATAVERSE_VERSION;
+  const [major, minor] = normalizedVersion.split(".");
+
+  return {
+    version: normalizedVersion,
+    solutionPackageVersion: `${major}.${minor}`,
+    languageCode: "1033",
+    generatedBy: "CrmLive",
+  };
 }
 
 function escapeODataString(value: string): string {
