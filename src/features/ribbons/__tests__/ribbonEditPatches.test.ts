@@ -86,6 +86,8 @@ test("creates a custom button with command action and label", () => {
   );
   assert.strictEqual(form.locLabels[0].titles[0].description, "Validate and save");
   assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
+  assert.match(updated, /LabelText="\$LocLabels:d365tools\.account\.Form\.Validate\.Label"/);
+  assert.match(updated, /<Button[^>]+Sequence="10"/);
   assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 

@@ -107,7 +107,7 @@ test("projects entity ribbon nodes into scoped views", () => {
   <CustomActions>
     <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
       <CommandUIDefinition>
-        <Button Id="new.account.Form.Button" Command="new.account.Form.Command" LabelLocId="new.account.Form.Label" />
+        <Button Id="new.account.Form.Button" Command="new.account.Form.Command" LabelText="$LocLabels:new.account.Form.Label" />
       </CommandUIDefinition>
     </CustomAction>
     <CustomAction Id="new.account.HomepageGrid.Button.CustomAction" Location="Mscrm.HomepageGrid.account.MainTab.Management.Controls._children">
@@ -187,6 +187,30 @@ test("locates embedded RibbonDiffXml blocks in flat customizations XML", () => {
   assert.strictEqual(documents[1].entityLogicalName, "contact");
   assert.ok(documents[0].ribbonRange.start > 0);
   assert.strictEqual(documents[1].views[0].customActions.length, 0);
+});
+
+test("infers entity logical name from existing ribbon locations", () => {
+  const flatXml = `<ImportExportXml>
+  <Entities>
+    <Entity>
+      <Name LocalizedName="Account" OriginalName="">Account</Name>
+      <RibbonDiffXml>
+        <CustomActions>
+          <CustomAction Id="new.account.Form.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children" />
+          <CustomAction Id="new.account.Grid.Action" Location="Mscrm.HomepageGrid.account.MainTab.Management.Controls._children" />
+          <CustomAction Id="new.account.Wrong.Action" Location="Mscrm.Form.Account.MainTab.Save.Controls._children" />
+        </CustomActions>
+      </RibbonDiffXml>
+    </Entity>
+  </Entities>
+</ImportExportXml>`;
+
+  const [document] = readRibbonDocuments(flatXml, {
+    sourceId: "flat",
+    fileUri: "/tmp/customizations.xml",
+  });
+
+  assert.strictEqual(document.entityLogicalName, "account");
 });
 
 test("ranges can drive surgical patches while unknown XML stays byte-identical", () => {

@@ -63,6 +63,10 @@ export function readRibbonDocuments(
   return ribbons.map(({ node: ribbon, ancestors }, index) => {
     const sections = getRibbonSections(ribbon);
     const parentEntityName = findParentEntityName(sourceText, ancestors);
+    const entityLogicalName =
+      options.entityLogicalName ??
+      findRibbonEntityLogicalName(sourceText, ribbon) ??
+      normalizeEntityLogicalName(parentEntityName);
     const kind =
       options.kind ?? (parentEntityName ? "Entity" : ("Application" as "Application" | "Entity"));
     const allView = buildRibbonView(sourceText, ribbon, sections, "Application");
@@ -71,7 +75,7 @@ export function readRibbonDocuments(
       id: `${sourceId}:ribbon:${index}`,
       sourceId,
       kind,
-      entityLogicalName: options.entityLogicalName ?? parentEntityName,
+      entityLogicalName,
       fileUri: options.fileUri ?? "",
       sourceText,
       ribbonRange: ribbon.range,
@@ -79,9 +83,7 @@ export function readRibbonDocuments(
       views:
         kind === "Application"
           ? [allView]
-          : ENTITY_SCOPES.map((scope) =>
-              filterEntityView(allView, scope, options.entityLogicalName ?? parentEntityName),
-            ),
+          : ENTITY_SCOPES.map((scope) => filterEntityView(allView, scope, entityLogicalName)),
     };
   });
 }
@@ -361,6 +363,44 @@ function findParentEntityName(
   return undefined;
 }
 
+function findRibbonEntityLogicalName(
+  sourceText: string,
+  ribbon: XmlElementRange,
+): string | undefined {
+  const ribbonText = sourceText.slice(ribbon.range.start, ribbon.range.end);
+  const counts = new Map<string, number>();
+
+  for (const match of ribbonText.matchAll(
+    /\bMscrm\.(?:Form|HomepageGrid|SubGrid)\.([A-Za-z0-9_]+)\./g,
+  )) {
+    const name = match[1];
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+
+  const rankedNames = [...counts.entries()].sort(
+    ([leftName, leftCount], [rightName, rightCount]) => {
+      if (leftCount !== rightCount) {
+        return rightCount - leftCount;
+      }
+
+      const leftIsLowerCase = leftName === leftName.toLowerCase();
+      const rightIsLowerCase = rightName === rightName.toLowerCase();
+
+      if (leftIsLowerCase !== rightIsLowerCase) {
+        return leftIsLowerCase ? -1 : 1;
+      }
+
+      return leftName.localeCompare(rightName);
+    },
+  );
+
+  return rankedNames[0]?.[0];
+}
+
+function normalizeEntityLogicalName(name: string | undefined): string | undefined {
+  return name?.toLowerCase();
+}
+
 function getRibbonSections(ribbon: XmlElementRange): RibbonSectionRanges {
   const sections: RibbonSectionRanges = {};
 
@@ -556,21 +596,29 @@ function readCommandUINode(
   }
 
   switch (node.name) {
-    case "Button":
+    case "Button": {
+      const labelText = optionalAttr(node, "LabelText");
+      const toolTipTitle = optionalAttr(node, "ToolTipTitle");
+      const toolTipDescription = optionalAttr(node, "ToolTipDescription");
+
       return {
         kind: "Button",
         id: attr(node, "Id"),
         command: attr(node, "Command"),
-        labelLocId: optionalAttr(node, "LabelLocId"),
-        labelText: optionalAttr(node, "LabelText"),
-        toolTipTitleLocId: optionalAttr(node, "ToolTipTitleLocId"),
-        toolTipDescriptionLocId: optionalAttr(node, "ToolTipDescriptionLocId"),
+        labelLocId: optionalAttr(node, "LabelLocId") ?? locLabelIdFromReference(labelText),
+        labelText: isLocLabelReference(labelText) ? undefined : labelText,
+        toolTipTitleLocId:
+          optionalAttr(node, "ToolTipTitleLocId") ?? locLabelIdFromReference(toolTipTitle),
+        toolTipDescriptionLocId:
+          optionalAttr(node, "ToolTipDescriptionLocId") ??
+          locLabelIdFromReference(toolTipDescription),
         image16x16: readImageRef(node, "Image16by16"),
         image32x32: readImageRef(node, "Image32by32"),
         templateAlias: optionalAttr(node, "TemplateAlias"),
         sequence: numberAttr(node, "Sequence"),
         range: node.range,
       };
+    }
     case "Group":
       return {
         kind: "Group",
@@ -604,6 +652,14 @@ function readCommandUINode(
         range: node.range,
       };
   }
+}
+
+function isLocLabelReference(value: string | undefined): boolean {
+  return value?.toLowerCase().startsWith("$loclabels:") ?? false;
+}
+
+function locLabelIdFromReference(value: string | undefined): string | undefined {
+  return isLocLabelReference(value) ? value?.slice("$LocLabels:".length) : undefined;
 }
 
 function readCommandDefinitions(sourceText: string, section: XmlElementRange): CommandDefinition[] {

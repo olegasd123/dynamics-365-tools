@@ -679,11 +679,12 @@ function renderCustomButtonAction(input: NewCustomButtonInput): string {
     ["Location", input.location],
     ["Sequence", input.sequence],
   ];
+  const labelText = input.labelText ?? locLabelReference(input.labelLocId);
   const buttonAttributes: Array<[string, string | number | undefined]> = [
     ["Id", input.buttonId],
     ["Command", input.commandId],
-    ["LabelLocId", input.labelLocId],
-    ["LabelText", input.labelText],
+    ["LabelText", labelText],
+    ["Sequence", input.sequence],
     ["Image16by16", webResourceValue(input.image16x16)],
     ["Image32by32", webResourceValue(input.image32x32)],
     ["TemplateAlias", input.templateAlias],
@@ -1024,4 +1025,8 @@ function webResourceValue(value: string | undefined): string | undefined {
   }
 
   return value.toLowerCase().startsWith("$webresource:") ? value : `$webresource:${value}`;
+}
+
+function locLabelReference(value: string | undefined): string | undefined {
+  return value ? `$LocLabels:${value}` : undefined;
 }

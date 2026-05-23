@@ -956,6 +956,7 @@ export async function addCustomRibbonButton(
       labelLocId,
       image16x16: image16x16?.trim() || undefined,
       image32x32: image32x32?.trim() || undefined,
+      templateAlias: "o1",
       locLabel: {
         id: labelLocId,
         languageCode: 1033,
