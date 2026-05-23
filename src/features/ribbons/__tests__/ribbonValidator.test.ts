@@ -77,3 +77,24 @@ test("allows known OOB button commands without local command definitions", () =>
 
   assert.ok(!messages.includes("Button references missing CommandDefinition 'Mscrm.SavePrimary'."));
 });
+
+test("warns about unknown CRM parameters", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/account/ribbon.js" FunctionName="New.Account.run">
+          <CrmParameter Value="ASD" />
+        </JavaScriptFunction>
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("Unknown CRM parameter 'ASD'."));
+});

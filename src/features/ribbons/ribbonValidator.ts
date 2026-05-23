@@ -5,6 +5,7 @@ import {
   CustomAction,
   DisplayRule,
   EnableRule,
+  ActionParameter,
   LocLabel,
   RibbonDocument,
   RibbonView,
@@ -20,6 +21,18 @@ export interface RibbonValidationIssue {
   message: string;
   range: TextRange;
 }
+
+const KNOWN_CRM_PARAMETERS = new Set([
+  "PrimaryControl",
+  "SelectedControl",
+  "SelectedControlSelectedItemIds",
+  "SelectedControlSelectedItemReferences",
+  "SelectedEntityTypeName",
+  "FirstPrimaryItemId",
+  "PrimaryEntityTypeName",
+  "PrimaryItemIds",
+  "CommandProperties",
+]);
 
 export function validateRibbonDocument(document: RibbonDocument): RibbonValidationIssue[] {
   return document.views.flatMap((view) => validateRibbonView(document, view));
@@ -187,7 +200,18 @@ function validateCommandAction(action: CommandAction): RibbonValidationIssue[] {
   return [
     ...required(action.library.uniqueName, "JavaScript library", action.range),
     ...required(action.functionName, "JavaScript function name", action.range),
+    ...validateActionParameters(action.parameters),
   ];
+}
+
+function validateActionParameters(parameters: ActionParameter[]): RibbonValidationIssue[] {
+  return parameters
+    .filter((parameter) => parameter.kind === "Crm" && !KNOWN_CRM_PARAMETERS.has(parameter.value))
+    .map((parameter) => ({
+      severity: "warning" as const,
+      message: `Unknown CRM parameter '${parameter.value}'.`,
+      range: parameter.range ?? { start: 0, end: 0 },
+    }));
 }
 
 function validateRules(
