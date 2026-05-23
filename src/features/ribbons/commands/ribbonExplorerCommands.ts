@@ -2337,7 +2337,7 @@ async function pickWebResourceLibrary(
     : undefined;
 }
 
-async function listBoundJavaScriptLibraries(
+export async function listBoundJavaScriptLibraries(
   ctx: CommandContext,
 ): Promise<WebResourceLibraryPick[]> {
   const snapshot = await ctx.bindings.listBindings();
@@ -2362,7 +2362,9 @@ async function listBoundJavaScriptLibraries(
     picks.push(...(await listFolderJavaScriptLibraries(ctx, binding)));
   }
 
-  return picks.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  return uniqueByWebResourceUniqueName(picks).sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+  );
 }
 
 async function listFolderJavaScriptLibraries(
@@ -2569,6 +2571,22 @@ function uniqueById<T extends { id: string }>(items: T[]): T[] {
       continue;
     }
     seen.add(item.id);
+    result.push(item);
+  }
+
+  return result;
+}
+
+function uniqueByWebResourceUniqueName(items: WebResourceLibraryPick[]): WebResourceLibraryPick[] {
+  const seen = new Set<string>();
+  const result: WebResourceLibraryPick[] = [];
+
+  for (const item of items) {
+    const key = normalizeWebResourceUniqueName(item.uniqueName).toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
     result.push(item);
   }
 

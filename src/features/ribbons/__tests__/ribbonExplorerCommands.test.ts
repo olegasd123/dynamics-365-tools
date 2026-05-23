@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import JSZip from "jszip";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import {
+  listBoundJavaScriptLibraries,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
   normalizeWebResourceUniqueName,
@@ -27,6 +28,46 @@ test("normalizes manually typed web resource names", () => {
   assert.strictEqual(
     normalizeWebResourceUniqueName("new_/scripts/account.js"),
     "new_/scripts/account.js",
+  );
+});
+
+test("lists each bound JavaScript web resource once", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-js-pick-"));
+
+  const picks = await listBoundJavaScriptLibraries({
+    bindings: {
+      listBindings: async () => ({
+        bindings: [
+          {
+            kind: "file",
+            relativeLocalPath: "src/account/form.js",
+            remotePath: "new_/account/form.js",
+            solutionName: "core",
+          },
+          {
+            kind: "file",
+            relativeLocalPath: "src/account/form-copy.js",
+            remotePath: "new_\\account\\form.js",
+            solutionName: "core",
+          },
+          {
+            kind: "file",
+            relativeLocalPath: "src/account/form-copy.js",
+            remotePath: "new_/account/form-copy.js",
+            solutionName: "core",
+          },
+        ],
+      }),
+    },
+    configuration: {
+      resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
+      getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
+    },
+  } as any);
+
+  assert.deepStrictEqual(
+    picks.map((pick) => pick.uniqueName),
+    ["new_/account/form-copy.js", "new_/account/form.js"],
   );
 });
 
