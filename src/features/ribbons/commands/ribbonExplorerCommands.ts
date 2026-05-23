@@ -2030,7 +2030,7 @@ async function editCommandAction(
   document: RibbonDocument,
   action: CommandAction,
 ): Promise<void> {
-  const input = await promptCommandAction(ctx);
+  const input = await promptCommandAction(ctx, action);
   if (!input) {
     return;
   }
@@ -2263,18 +2263,19 @@ function getOobControlId(command: OobRibbonCommand): string {
 
 async function promptJavaScriptAction(
   ctx: CommandContext,
+  current?: Extract<CommandAction, { kind: "JavaScriptFunction" }>,
 ): Promise<NewCommandActionInput | undefined> {
-  const library = await pickWebResourceLibrary(ctx);
+  const library = await pickWebResourceLibrary(ctx, current?.library.uniqueName);
   if (!library) {
     return undefined;
   }
 
-  const functionName = await pickJavaScriptFunctionName(library);
+  const functionName = await pickJavaScriptFunctionName(library, current?.functionName);
   if (!functionName) {
     return undefined;
   }
 
-  const parameters = await promptCrmParameters();
+  const parameters = await promptCrmParameters(current?.parameters);
   if (parameters === undefined) {
     return undefined;
   }
@@ -2287,15 +2288,28 @@ async function promptJavaScriptAction(
   };
 }
 
-async function promptCrmParameters(): Promise<ActionParameter[] | undefined> {
+async function promptCrmParameters(
+  currentParameters: ActionParameter[] = [],
+): Promise<ActionParameter[] | undefined> {
+  const currentCrmValues = currentParameters
+    .filter((parameter) => parameter.kind === "Crm")
+    .map((parameter) => parameter.value);
+  const knownCrmValues = new Set(CRM_PARAMETER_PICKS.map((pick) => pick.value?.toLowerCase()));
+  const customCrmValues = currentCrmValues.filter(
+    (value) => !knownCrmValues.has(value.toLowerCase()),
+  );
   const picks = await vscode.window.showQuickPick<CrmParameterPick>(
     [
       {
         label: CUSTOM_CRM_PARAMETERS,
         description: "Add values that are not in the list",
         custom: true,
+        picked: customCrmValues.length > 0,
       },
-      ...CRM_PARAMETER_PICKS,
+      ...CRM_PARAMETER_PICKS.map((pick) => ({
+        ...pick,
+        picked: currentCrmValues.some((value) => value.toLowerCase() === pick.value?.toLowerCase()),
+      })),
     ],
     {
       canPickMany: true,
@@ -2314,6 +2328,7 @@ async function promptCrmParameters(): Promise<ActionParameter[] | undefined> {
   const input = await vscode.window.showInputBox({
     prompt: "Custom CRM parameters",
     placeHolder: "CustomValue, OtherValue",
+    value: customCrmValues.join(", "),
     validateInput: validateCrmParameters,
   });
   if (input === undefined) {
@@ -2351,19 +2366,33 @@ function validateCrmParameters(input: string): string | undefined {
 
 async function promptCommandAction(
   ctx: CommandContext,
+  current?: CommandAction,
 ): Promise<NewCommandActionInput | undefined> {
+  const currentKind =
+    current?.kind === "JavaScriptFunction"
+      ? "JavaScript function"
+      : current?.kind === "Url"
+        ? "URL"
+        : undefined;
+  const actionKinds = [
+    { label: "JavaScript function", description: "Call a workspace web resource" },
+    { label: "URL", description: "Open a URL" },
+  ];
   const actionKind = await vscode.window.showQuickPick(
-    [
-      { label: "JavaScript function", description: "Call a workspace web resource" },
-      { label: "URL", description: "Open a URL" },
-    ],
+    currentKind
+      ? actionKinds.map((item) =>
+          item.label === currentKind ? { ...item, description: "Current action type" } : item,
+        )
+      : actionKinds,
     { placeHolder: "Command action" },
   );
   if (!actionKind) {
     return undefined;
   }
 
-  return actionKind.label === "URL" ? promptUrlAction() : promptJavaScriptAction(ctx);
+  return actionKind.label === "URL"
+    ? promptUrlAction(current?.kind === "Url" ? current.address : undefined)
+    : promptJavaScriptAction(ctx, current?.kind === "JavaScriptFunction" ? current : undefined);
 }
 
 async function promptOptionalCommandAction(
@@ -2388,10 +2417,11 @@ async function promptOptionalCommandAction(
   return actionKind.label === "URL" ? promptUrlAction() : promptJavaScriptAction(ctx);
 }
 
-async function promptUrlAction() {
+async function promptUrlAction(currentAddress?: string) {
   const address = await vscode.window.showInputBox({
     prompt: "URL",
     placeHolder: "https://contoso.example",
+    value: currentAddress ?? "",
     validateInput: (value) => (value.trim() ? undefined : "URL is required."),
   });
   if (!address) {
@@ -2425,8 +2455,9 @@ function validateOptionalNumber(value: string): string | undefined {
 
 async function pickWebResourceLibrary(
   ctx: CommandContext,
+  currentUniqueName?: string,
 ): Promise<WebResourceLibraryPick | undefined> {
-  const picks = await listBoundJavaScriptLibraries(ctx);
+  const picks = currentWebResourceFirst(await listBoundJavaScriptLibraries(ctx), currentUniqueName);
   const manualPick: WebResourceLibraryPick = {
     label: "Type schema name manually",
     description: "Use an external or unbound web resource",
@@ -2448,6 +2479,7 @@ async function pickWebResourceLibrary(
   const uniqueName = await vscode.window.showInputBox({
     prompt: "JavaScript web resource schema name",
     placeHolder: "new_/scripts/account.js",
+    value: currentUniqueName ?? "",
     validateInput: (value) =>
       normalizeWebResourceUniqueName(value) ? undefined : "Schema name is required.",
   });
@@ -2515,21 +2547,27 @@ async function listFolderJavaScriptLibraries(
 
 async function pickJavaScriptFunctionName(
   library: WebResourceLibraryPick,
+  currentFunctionName?: string,
 ): Promise<string | undefined> {
   const suggestions = await listJavaScriptFunctionSuggestions(library.localPath);
   if (!suggestions.length) {
     return vscode.window.showInputBox({
       prompt: "JavaScript function name",
       placeHolder: "validateAndSave",
+      value: currentFunctionName ?? "",
       validateInput: (value) => (value.trim() ? undefined : "Function name is required."),
     });
   }
 
   const manual = "Type function name";
-  const pick = await vscode.window.showQuickPick(
-    [...suggestions.map((name) => ({ label: name })), { label: manual }],
-    { placeHolder: "JavaScript function name" },
-  );
+  const suggestionItems = currentFunctionFirst(suggestions, currentFunctionName).map((name) => ({
+    label: name,
+    description:
+      currentFunctionName && name === currentFunctionName ? "Current function" : undefined,
+  }));
+  const pick = await vscode.window.showQuickPick([...suggestionItems, { label: manual }], {
+    placeHolder: "JavaScript function name",
+  });
   if (!pick) {
     return undefined;
   }
@@ -2541,6 +2579,7 @@ async function pickJavaScriptFunctionName(
   return vscode.window.showInputBox({
     prompt: "JavaScript function name",
     placeHolder: "validateAndSave",
+    value: currentFunctionName ?? "",
     validateInput: (value) => (value.trim() ? undefined : "Function name is required."),
   });
 }
@@ -2715,6 +2754,62 @@ function uniqueByWebResourceUniqueName(items: WebResourceLibraryPick[]): WebReso
   }
 
   return result;
+}
+
+function currentWebResourceFirst(
+  picks: WebResourceLibraryPick[],
+  currentUniqueName: string | undefined,
+): WebResourceLibraryPick[] {
+  const normalized = normalizeWebResourceUniqueName(currentUniqueName ?? "");
+  if (!normalized) {
+    return picks;
+  }
+
+  const currentIndex = picks.findIndex(
+    (pick) =>
+      normalizeWebResourceUniqueName(pick.uniqueName).toLowerCase() === normalized.toLowerCase(),
+  );
+  if (currentIndex < 0) {
+    return [
+      {
+        label: normalized,
+        description: "Current web resource",
+        uniqueName: normalized,
+      },
+      ...picks,
+    ];
+  }
+
+  const currentPick = {
+    ...picks[currentIndex],
+    description: picks[currentIndex].description
+      ? `${picks[currentIndex].description} - Current web resource`
+      : "Current web resource",
+  };
+  return [currentPick, ...picks.slice(0, currentIndex), ...picks.slice(currentIndex + 1)];
+}
+
+function currentFunctionFirst(
+  suggestions: string[],
+  currentFunctionName: string | undefined,
+): string[] {
+  const current = currentFunctionName?.trim();
+  if (!current) {
+    return suggestions;
+  }
+
+  const currentIndex = suggestions.findIndex(
+    (name) => name.toLowerCase() === current.toLowerCase(),
+  );
+  if (currentIndex < 0) {
+    return [current, ...suggestions];
+  }
+
+  return [
+    suggestions[currentIndex],
+    ...suggestions.slice(0, currentIndex),
+    ...suggestions.slice(currentIndex + 1),
+  ];
 }
 
 async function promptRuleStep(

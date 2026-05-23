@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import JSZip from "jszip";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import {
+  editRibbonNode,
   listBoundJavaScriptLibraries,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
@@ -68,6 +69,135 @@ test("lists each bound JavaScript web resource once", async () => {
   assert.deepStrictEqual(
     picks.map((pick) => pick.uniqueName),
     ["new_/account/form-copy.js", "new_/account/form.js"],
+  );
+});
+
+test("prefills saved JavaScript action values while editing", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/account/form.js" FunctionName="onButtonClick">
+          <CrmParameter Value="PrimaryControl" />
+          <CrmParameter Value="CommandProperties" />
+        </JavaScriptFunction>
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].commandDefinitions[0].actions[0];
+  const node = new RibbonItemNode(
+    "JavaScript: onButtonClick",
+    undefined,
+    "d365RibbonJavaScriptAction",
+    "symbol-method",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+  let actionKindItems: vscode.QuickPickItem[] = [];
+  let libraryItems: vscode.QuickPickItem[] = [];
+  let parameterItems: vscode.QuickPickItem[] = [];
+  let functionInputValue: string | undefined;
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Command action") {
+      actionKindItems = items;
+      return items.find((item) => item.label === "JavaScript function");
+    }
+
+    if (options.placeHolder === "JavaScript web resource") {
+      libraryItems = items;
+      return items[0];
+    }
+
+    if (options.placeHolder === "CRM parameters") {
+      parameterItems = items;
+      return items.filter((item) => item.picked);
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt === "JavaScript function name") {
+      functionInputValue = options.value;
+      return options.value;
+    }
+
+    return undefined;
+  };
+
+  try {
+    await editRibbonNode(
+      {
+        bindings: {
+          listBindings: async () => ({
+            bindings: [
+              {
+                kind: "file",
+                relativeLocalPath: "src/account/form.js",
+                remotePath: "new_/account/form.js",
+                solutionName: "core",
+              },
+            ],
+          }),
+        },
+        configuration: {
+          resolveLocalPath: (value: string) => path.join("/tmp", value),
+          getRelativeToWorkspace: (value: string) => value,
+        },
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.strictEqual(
+    actionKindItems.find((item) => item.label === "JavaScript function")?.description,
+    "Current action type",
+  );
+  assert.strictEqual(libraryItems[0]?.label, "new_/account/form.js");
+  assert.strictEqual(functionInputValue, "onButtonClick");
+  assert.deepStrictEqual(
+    parameterItems.filter((item) => item.picked).map((item) => item.label),
+    ["PrimaryControl", "CommandProperties"],
+  );
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedAction = updatedDocument.views[0].commandDefinitions[0].actions[0];
+  assert.strictEqual(updatedAction.kind, "JavaScriptFunction");
+  assert.deepStrictEqual(
+    updatedAction.kind === "JavaScriptFunction"
+      ? updatedAction.parameters.map((parameter) => parameter.value)
+      : [],
+    ["PrimaryControl", "CommandProperties"],
   );
 });
 
