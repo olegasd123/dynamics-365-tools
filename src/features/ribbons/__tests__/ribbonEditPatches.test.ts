@@ -50,6 +50,10 @@ test("creates a custom button with command action and label", () => {
         kind: "JavaScriptFunction",
         library: "new_/scripts/account.js",
         functionName: "validateAndSave",
+        parameters: [
+          { kind: "Crm", value: "PrimaryControl" },
+          { kind: "Crm", value: "SelectedControl" },
+        ],
       },
       locLabel: {
         id: "d365tools.account.Form.Validate.Label",
@@ -71,8 +75,18 @@ test("creates a custom button with command action and label", () => {
   assert.match(updated, /<LocLabels>/);
   assert.strictEqual(form.customActions[0].commandUI?.kind, "Button");
   assert.strictEqual(form.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
+  assert.deepStrictEqual(
+    form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
+      ? form.commandDefinitions[0].actions[0].parameters
+      : [],
+    [
+      { kind: "Crm", value: "PrimaryControl" },
+      { kind: "Crm", value: "SelectedControl" },
+    ],
+  );
   assert.strictEqual(form.locLabels[0].titles[0].description, "Validate and save");
   assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
+  assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
 test("adds a custom button to existing self-closing sections", () => {
@@ -501,6 +515,44 @@ test("creates rule definitions and appends simple rules", () => {
   assert.match(withDisplayRule, /<RuleDefinitions>/);
   assert.match(withDisplayRule, /<EnableRules>/);
   assert.match(withDisplayRule, /<DisplayRules>/);
+});
+
+test("creates custom rules with CRM parameters", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createEnableRulePatches(document, {
+      id: "d365tools.account.Form.EnableRule",
+      step: {
+        kind: "CustomRule",
+        library: "new_/scripts/account.js",
+        functionName: "canRun",
+        parameters: [{ kind: "Crm", value: "PrimaryControl" }],
+      },
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const step = updatedDocument.views[0].enableRules[0].steps[0];
+
+  assert.strictEqual(step.kind, "CustomRule");
+  assert.deepStrictEqual(step.kind === "CustomRule" ? step.parameters : [], [
+    { kind: "Crm", value: "PrimaryControl" },
+  ]);
+  assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
 test("creates a loc label section when needed", () => {

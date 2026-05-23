@@ -37,7 +37,10 @@ test("renders located ribbon documents as a read-only tree", async () => {
     <CommandDefinition Id="new.account.Command">
       <EnableRules><EnableRule Id="new.account.Enable" /></EnableRules>
       <Actions>
-        <JavaScriptFunction Library="$webresource:new_/account.js" FunctionName="run" />
+        <JavaScriptFunction Library="$webresource:new_/account.js" FunctionName="run">
+          <CrmParameter Value="PrimaryControl" />
+          <CrmParameter Value="SelectedControl" />
+        </JavaScriptFunction>
       </Actions>
     </CommandDefinition>
   </CommandDefinitions>
@@ -98,6 +101,15 @@ test("renders located ribbon documents as a read-only tree", async () => {
 
   const actionNodes = await explorer.getChildren(commandChildren[2]);
   assert.strictEqual(actionNodes[0].label, "JavaScript: run");
+  const parameterNodes = await explorer.getChildren(actionNodes[0]);
+  assert.deepStrictEqual(
+    parameterNodes.map((node) => node.label),
+    ["1. PrimaryControl", "2. SelectedControl"],
+  );
+  assert.deepStrictEqual((actionNodes[0] as RibbonItemNode).details[3], [
+    "Parameters",
+    ["PrimaryControl", "SelectedControl"],
+  ]);
 
   const templatesSection = sections.find((section) => section.label === "Templates");
   assert.ok(templatesSection);

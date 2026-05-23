@@ -4,6 +4,7 @@ import {
   RibbonEmptyNode,
   RibbonExplorerNode,
   RibbonItemNode,
+  RibbonDetailValue,
   RibbonSectionNode,
   RibbonSourceNode,
   RibbonViewNode,
@@ -159,6 +160,10 @@ function renderHtml(node: RibbonExplorerNode, actions: PanelAction[]): string {
     dd {
       margin: 0;
       overflow-wrap: anywhere;
+    }
+    ul {
+      margin: 0;
+      padding-left: 18px;
     }
     code {
       font-family: var(--vscode-editor-font-family);
@@ -350,7 +355,7 @@ function saveAction(): PanelAction {
   return { command: "dynamics365Tools.ribbons.save", label: "Save" };
 }
 
-function detailRows(node: RibbonExplorerNode): Array<[string, string | number | undefined]> {
+function detailRows(node: RibbonExplorerNode): Array<[string, RibbonDetailValue]> {
   if (node instanceof RibbonSourceNode) {
     return [
       ["Type", node.source.kind],
@@ -399,7 +404,15 @@ function detailRows(node: RibbonExplorerNode): Array<[string, string | number | 
   return [];
 }
 
-function formatValue(value: string | number | undefined): string {
+function formatValue(value: RibbonDetailValue): string {
+  if (Array.isArray(value)) {
+    if (!value.length) {
+      return "";
+    }
+
+    return `<ul>${value.map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul>`;
+  }
+
   if (value === undefined || value === "") {
     return "";
   }

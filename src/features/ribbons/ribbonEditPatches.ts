@@ -1,4 +1,5 @@
 import {
+  ActionParameter,
   CommandAction,
   CommandDefinition,
   HideAction,
@@ -21,6 +22,7 @@ export type NewCommandActionInput =
       kind: "JavaScriptFunction";
       library: string;
       functionName: string;
+      parameters?: ActionParameter[];
     }
   | {
       kind: "Url";
@@ -49,6 +51,7 @@ export type NewRuleStepInput =
       functionName: string;
       default?: boolean;
       invertResult?: boolean;
+      parameters?: ActionParameter[];
     }
   | {
       kind: "EntityPrivilegeRule";
@@ -723,7 +726,14 @@ function renderRuleRef(name: "EnableRule" | "DisplayRule", id: string): string {
 
 function renderCommandAction(action: NewCommandActionInput): string {
   if (action.kind === "JavaScriptFunction") {
-    return `<JavaScriptFunction Library="${escapeXmlAttribute(webResourceValue(action.library) ?? "")}" FunctionName="${escapeXmlAttribute(action.functionName)}" />`;
+    return renderJavaScriptNode(
+      "JavaScriptFunction",
+      [
+        ["Library", webResourceValue(action.library)],
+        ["FunctionName", action.functionName],
+      ],
+      action.parameters,
+    );
   }
 
   return `<Url Address="${escapeXmlAttribute(action.address)}" />`;
@@ -808,12 +818,16 @@ function renderRule(ruleName: "EnableRule" | "DisplayRule", input: NewRuleInput)
 function renderRuleStep(step: NewRuleStepInput): string {
   switch (step.kind) {
     case "CustomRule":
-      return `<CustomRule ${renderAttributes([
-        ["Library", webResourceValue(step.library)],
-        ["FunctionName", step.functionName],
-        ["Default", optionalBoolean(step.default)],
-        ["InvertResult", optionalBoolean(step.invertResult)],
-      ])} />`;
+      return renderJavaScriptNode(
+        "CustomRule",
+        [
+          ["Library", webResourceValue(step.library)],
+          ["FunctionName", step.functionName],
+          ["Default", optionalBoolean(step.default)],
+          ["InvertResult", optionalBoolean(step.invertResult)],
+        ],
+        step.parameters,
+      );
     case "EntityPrivilegeRule":
       return `<EntityPrivilegeRule ${renderAttributes([
         ["EntityName", step.entityName],
@@ -835,6 +849,25 @@ function renderRuleStep(step: NewRuleStepInput): string {
     case "CommandClientTypeRule":
       return `<CommandClientTypeRule Type="${escapeXmlAttribute(step.type)}" />`;
   }
+}
+
+function renderJavaScriptNode(
+  name: "JavaScriptFunction" | "CustomRule",
+  attributes: Array<[string, string | number | undefined]>,
+  parameters: ActionParameter[] | undefined,
+): string {
+  const renderedAttributes = renderAttributes(attributes);
+  if (!parameters?.length) {
+    return `<${name} ${renderedAttributes} />`;
+  }
+
+  return `<${name} ${renderedAttributes}>
+${indentBlock(parameters.map(renderActionParameter).join("\n"), "  ")}
+</${name}>`;
+}
+
+function renderActionParameter(parameter: ActionParameter): string {
+  return `<${parameter.kind}Parameter Value="${escapeXmlAttribute(parameter.value)}" />`;
 }
 
 function createReplaceNodePatch(sourceText: string, range: TextRange, text: string): RibbonPatch {

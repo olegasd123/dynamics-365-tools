@@ -43,6 +43,7 @@ import {
   NewRuleStepInput,
 } from "../ribbonEditPatches";
 import {
+  ActionParameter,
   CommandAction,
   CommandDefinition,
   CustomAction,
@@ -75,6 +76,11 @@ interface WebResourceLibraryPick extends vscode.QuickPickItem {
   manual?: boolean;
 }
 
+interface CrmParameterPick extends vscode.QuickPickItem {
+  value?: string;
+  custom?: boolean;
+}
+
 interface SolutionOpenPick extends vscode.QuickPickItem {
   sourceKind: "environment" | "disk";
 }
@@ -102,6 +108,54 @@ interface GeneratedSolutionPick extends vscode.QuickPickItem {
 }
 
 const SAVE_EXPORT_BACKUP = "Save Backup";
+const CUSTOM_CRM_PARAMETERS = "Type custom parameters";
+const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
+  {
+    label: "PrimaryControl",
+    description: "Current form context",
+    value: "PrimaryControl",
+  },
+  {
+    label: "SelectedControl",
+    description: "Current grid context",
+    value: "SelectedControl",
+  },
+  {
+    label: "SelectedControlSelectedItemIds",
+    description: "Selected grid row ids",
+    value: "SelectedControlSelectedItemIds",
+  },
+  {
+    label: "SelectedControlSelectedItemReferences",
+    description: "Selected grid row references",
+    value: "SelectedControlSelectedItemReferences",
+  },
+  {
+    label: "SelectedEntityTypeName",
+    description: "Selected row table name",
+    value: "SelectedEntityTypeName",
+  },
+  {
+    label: "FirstPrimaryItemId",
+    description: "First primary record id",
+    value: "FirstPrimaryItemId",
+  },
+  {
+    label: "PrimaryEntityTypeName",
+    description: "Primary table name",
+    value: "PrimaryEntityTypeName",
+  },
+  {
+    label: "PrimaryItemIds",
+    description: "Primary record ids",
+    value: "PrimaryItemIds",
+  },
+  {
+    label: "CommandProperties",
+    description: "Command metadata",
+    value: "CommandProperties",
+  },
+];
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
   ctx.ribbonExplorer.refresh();
@@ -2207,7 +2261,9 @@ function getOobControlId(command: OobRibbonCommand): string {
   return command.controlId || command.id;
 }
 
-async function promptJavaScriptAction(ctx: CommandContext) {
+async function promptJavaScriptAction(
+  ctx: CommandContext,
+): Promise<NewCommandActionInput | undefined> {
   const library = await pickWebResourceLibrary(ctx);
   if (!library) {
     return undefined;
@@ -2218,11 +2274,79 @@ async function promptJavaScriptAction(ctx: CommandContext) {
     return undefined;
   }
 
+  const parameters = await promptCrmParameters();
+  if (parameters === undefined) {
+    return undefined;
+  }
+
   return {
     kind: "JavaScriptFunction" as const,
     library: library.uniqueName,
     functionName: functionName.trim(),
+    parameters,
   };
+}
+
+async function promptCrmParameters(): Promise<ActionParameter[] | undefined> {
+  const picks = await vscode.window.showQuickPick<CrmParameterPick>(
+    [
+      {
+        label: CUSTOM_CRM_PARAMETERS,
+        description: "Add values that are not in the list",
+        custom: true,
+      },
+      ...CRM_PARAMETER_PICKS,
+    ],
+    {
+      canPickMany: true,
+      placeHolder: "CRM parameters",
+    },
+  );
+  if (!picks) {
+    return undefined;
+  }
+
+  const values = picks.map((pick) => pick.value).filter((value): value is string => Boolean(value));
+  if (!picks.some((pick) => pick.custom)) {
+    return toCrmParameters(values);
+  }
+
+  const input = await vscode.window.showInputBox({
+    prompt: "Custom CRM parameters",
+    placeHolder: "CustomValue, OtherValue",
+    validateInput: validateCrmParameters,
+  });
+  if (input === undefined) {
+    return undefined;
+  }
+
+  return toCrmParameters([...values, ...parseCrmParameterValues(input)]);
+}
+
+function parseCrmParameterValues(input: string): string[] {
+  return input
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function toCrmParameters(values: string[]): ActionParameter[] {
+  const seen = new Set<string>();
+  return values
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .map((value) => ({ kind: "Crm", value }));
+}
+
+function validateCrmParameters(input: string): string | undefined {
+  const hasEmptyItem = Boolean(input.trim()) && input.split(",").some((value) => !value.trim());
+  return hasEmptyItem ? "Remove empty CRM parameter values." : undefined;
 }
 
 async function promptCommandAction(
@@ -2651,6 +2775,7 @@ async function promptCustomRuleStep(ctx: CommandContext): Promise<NewRuleStepInp
     kind: "CustomRule",
     library: action.library,
     functionName: action.functionName,
+    parameters: action.parameters,
     invertResult,
   };
 }

@@ -59,6 +59,25 @@ test("escapes item detail values before rendering", () => {
   formPanel.dispose();
 });
 
+test("renders list detail values as lists", () => {
+  const formPanel = new RibbonFormPanel();
+  const node = new RibbonItemNode(
+    "JavaScript: run",
+    undefined,
+    "d365RibbonJavaScriptAction",
+    "symbol-function",
+    [["Parameters", ["PrimaryControl", "SelectedControl"]]],
+  );
+
+  formPanel.show(node);
+
+  const panel = (vscode.window as any).__lastWebviewPanel;
+  assert.match(panel.webview.html, /<ul>/);
+  assert.match(panel.webview.html, /<li><code>PrimaryControl<\/code><\/li>/);
+  assert.match(panel.webview.html, /<li><code>SelectedControl<\/code><\/li>/);
+  formPanel.dispose();
+});
+
 test("runs selected node commands from the webview", async () => {
   const formPanel = new RibbonFormPanel();
   const node = new RibbonItemNode(

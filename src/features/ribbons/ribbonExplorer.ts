@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../config/configurationService";
 import {
+  ActionParameter,
   CommandAction,
   CommandDefinition,
   CustomAction,
@@ -29,6 +30,8 @@ export type RibbonExplorerNode =
   | RibbonSectionNode
   | RibbonItemNode
   | RibbonEmptyNode;
+
+export type RibbonDetailValue = string | number | string[] | undefined;
 
 type RibbonSectionKind =
   | "customActions"
@@ -110,7 +113,7 @@ export class RibbonItemNode extends vscode.TreeItem {
     description: string | undefined,
     contextValue: string,
     icon: string,
-    readonly details: Array<[string, string | number | undefined]>,
+    readonly details: Array<[string, RibbonDetailValue]>,
     readonly children: RibbonExplorerNode[] = [],
     readonly editTarget?: RibbonItemEditTarget,
   ) {
@@ -521,9 +524,9 @@ function commandActionNode(
         ["Index", index + 1],
         ["Library", action.library.uniqueName],
         ["Function", action.functionName],
-        ["Parameters", action.parameters.map((parameter) => parameter.value).join(", ")],
+        ["Parameters", parameterValues(action.parameters)],
       ],
-      [],
+      parameterNodes(action.parameters),
       { document, range: action.range },
     );
   }
@@ -564,7 +567,7 @@ function ruleStepNode(document: RibbonDocument, step: RuleStep, index: number): 
     `d365RibbonRuleStep:${step.kind}`,
     step.kind === "Unknown" ? "warning" : "symbol-property",
     ruleStepDetails(step, index),
-    [],
+    step.kind === "CustomRule" ? parameterNodes(step.parameters) : [],
     { document, range: step.range },
   );
 }
@@ -586,11 +589,8 @@ function ruleStepDescription(step: RuleStep): string | undefined {
   }
 }
 
-function ruleStepDetails(
-  step: RuleStep,
-  index: number,
-): Array<[string, string | number | undefined]> {
-  const base: Array<[string, string | number | undefined]> = [
+function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDetailValue]> {
+  const base: Array<[string, RibbonDetailValue]> = [
     ["Index", index + 1],
     ["Kind", step.kind],
   ];
@@ -603,7 +603,7 @@ function ruleStepDetails(
         ["Function", step.functionName],
         ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
-        ["Parameters", step.parameters.map((parameter) => parameter.value).join(", ")],
+        ["Parameters", parameterValues(step.parameters)],
       ];
     case "EntityPrivilegeRule":
       return [
@@ -627,6 +627,26 @@ function ruleStepDetails(
     case "Unknown":
       return [...base, ["Raw XML", step.raw]];
   }
+}
+
+function parameterNodes(parameters: ActionParameter[]): RibbonItemNode[] {
+  return parameters.map(
+    (parameter, index) =>
+      new RibbonItemNode(
+        `${index + 1}. ${parameter.value}`,
+        parameter.kind,
+        "d365RibbonParameter",
+        "symbol-parameter",
+        [
+          ["Kind", parameter.kind],
+          ["Value", parameter.value],
+        ],
+      ),
+  );
+}
+
+function parameterValues(parameters: ActionParameter[]): string[] | undefined {
+  return parameters.length ? parameters.map((parameter) => parameter.value) : undefined;
 }
 
 function locLabelTitleNode(document: RibbonDocument, title: LocLabelTitle): RibbonItemNode {
