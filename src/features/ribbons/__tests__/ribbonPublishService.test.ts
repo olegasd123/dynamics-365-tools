@@ -108,10 +108,45 @@ test("createGeneratedSolution uses the publisher that owns the selected prefix",
   );
 
   assert.match(solution.uniqueName, /^d365tools_ribbon_account_/);
+  assert.strictEqual(solution.solutionId, "solution-id");
   assert.strictEqual(solution.publisherPrefix, "new");
   assert.strictEqual(solution.publisherUniqueName, "newpublisher");
   assert.strictEqual(client.posts[0].path, "/solutions");
   assert.strictEqual(client.posts[0].body["publisherid@odata.bind"], "/publishers(pub-id)");
+});
+
+test("createGeneratedSolutionFromDefaultPublisher uses the Default solution publisher", async () => {
+  const client = new FakeClient();
+  const solution = await new RibbonPublishService().createGeneratedSolutionFromDefaultPublisher(
+    client,
+    "account",
+  );
+
+  assert.match(solution.uniqueName, /^d365tools_ribbon_account_/);
+  assert.strictEqual(solution.solutionId, "solution-id");
+  assert.strictEqual(solution.publisherPrefix, "new");
+  assert.strictEqual(solution.publisherUniqueName, "newpublisher");
+  assert.strictEqual(
+    client.gets[0],
+    "/solutions?$select=solutionid,uniquename&$expand=publisherid($select=publisherid,uniquename,customizationprefix)&$filter=uniquename eq 'Default'&$top=1",
+  );
+  assert.strictEqual(client.posts[0].path, "/solutions");
+  assert.strictEqual(client.posts[0].body["publisherid@odata.bind"], "/publishers(pub-id)");
+});
+
+test("deleteGeneratedSolutionByUniqueName resolves and deletes the generated solution", async () => {
+  const client = new FakeClient();
+
+  await new RibbonPublishService().deleteGeneratedSolutionByUniqueName(
+    client,
+    "d365tools_ribbon_account_20260101010101",
+  );
+
+  assert.strictEqual(
+    client.gets[0],
+    "/solutions?$select=solutionid,uniquename&$filter=uniquename eq 'd365tools_ribbon_account_20260101010101'&$top=1",
+  );
+  assert.deepStrictEqual(client.deletes, ["/solutions(solution-id)"]);
 });
 
 class FakeClient {
@@ -135,6 +170,31 @@ class FakeClient {
         ],
       } as T;
     }
+    if (path.includes("uniquename eq 'Default'")) {
+      return {
+        value: [
+          {
+            solutionid: "default-solution-id",
+            uniquename: "Default",
+            publisherid: {
+              publisherid: "pub-id",
+              uniquename: "newpublisher",
+              customizationprefix: "new",
+            },
+          },
+        ],
+      } as T;
+    }
+    if (path.includes("d365tools_ribbon_account_20260101010101")) {
+      return {
+        value: [
+          {
+            solutionid: "solution-id",
+            uniquename: "d365tools_ribbon_account_20260101010101",
+          },
+        ],
+      } as T;
+    }
     if (path.startsWith("/asyncoperations")) {
       return { statecode: 3, statuscode: 30 } as T;
     }
@@ -151,6 +211,9 @@ class FakeClient {
         AsyncOperationId: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
         ImportJobKey: "11111111-2222-3333-4444-555555555555",
       } as T;
+    }
+    if (path === "/solutions") {
+      return { solutionid: "solution-id" } as T;
     }
     return {} as T;
   }

@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { CommandContext } from "../../../app/commandContext";
 import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
-import { DEFAULT_SOLUTION_NAME } from "../../../shared/solutions";
 import { BindingEntry } from "../../config/domain/models";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionImportError } from "../../dataverse/solutionImportService";
@@ -91,16 +90,6 @@ interface DataverseSolutionPick extends vscode.QuickPickItem {
 
 interface RibbonSourcePick extends vscode.QuickPickItem {
   source: RibbonSource;
-}
-
-interface RibbonPublishSolutionPick extends vscode.QuickPickItem {
-  publishKind: "existing" | "generated";
-  uniqueName?: string;
-  publisherPrefix?: string;
-}
-
-interface PublisherPrefixPick extends vscode.QuickPickItem {
-  publisherPrefix: string;
 }
 
 interface GeneratedSolutionPick extends vscode.QuickPickItem {
@@ -303,32 +292,30 @@ export async function publishRibbonToEnvironment(
   }
 
   const client = new DataverseClient(connection);
-  const solutions = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: "Loading unmanaged solutions",
-      cancellable: false,
-    },
-    () => ctx.ribbonPublishService.listUnmanagedSolutions(client),
-  );
-  const solution = await pickPublishSolution(ctx, client, solutions, documents);
-  if (!solution) {
-    return;
-  }
-
-  if (solution.uniqueName.toLowerCase() === DEFAULT_SOLUTION_NAME.toLowerCase()) {
-    const choice = await vscode.window.showWarningMessage(
-      "Publishing to the Default solution is allowed but not recommended.",
-      { modal: true },
-      "Publish Anyway",
-    );
-    if (choice !== "Publish Anyway") {
-      return;
-    }
-  }
+  let generatedSolution:
+    | Awaited<ReturnType<CommandContext["ribbonPublishService"]["createGeneratedSolution"]>>
+    | undefined;
+  let result:
+    | Awaited<ReturnType<CommandContext["ribbonPublishService"]["publishDocuments"]>>
+    | undefined;
+  let publishError: unknown;
 
   try {
-    const result = await vscode.window.withProgress(
+    generatedSolution = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Creating ribbon publish solution in ${target.env.name}`,
+        cancellable: false,
+      },
+      () =>
+        ctx.ribbonPublishService.createGeneratedSolutionFromDefaultPublisher(
+          client,
+          describePublishScope(documents),
+        ),
+    );
+    const solution = generatedSolution;
+
+    result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: `Publishing ribbons to ${target.env.name}`,
@@ -340,17 +327,16 @@ export async function publishRibbonToEnvironment(
           onStatus: (message) => progress.report({ message }),
         }),
     );
-
-    const summary = [
-      `${result.entities.length} entit${result.entities.length === 1 ? "y" : "ies"}`,
-      result.includesApplicationRibbon ? "application ribbon" : undefined,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    void vscode.window.showInformationMessage(
-      `Published ribbons to ${target.env.name} (${summary}).`,
-    );
   } catch (error) {
+    publishError = error;
+  } finally {
+    if (generatedSolution) {
+      await cleanupGeneratedPublishSolution(ctx, client, generatedSolution);
+    }
+  }
+
+  if (publishError) {
+    const error = publishError;
     const message = describeRibbonPublishError(error);
     if (error instanceof SolutionImportError && error.log) {
       const action = await vscode.window.showErrorMessage(
@@ -364,7 +350,22 @@ export async function publishRibbonToEnvironment(
     }
 
     void vscode.window.showErrorMessage(`Ribbon publish failed: ${message}`);
+    return;
   }
+
+  if (!result) {
+    return;
+  }
+
+  const summary = [
+    `${result.entities.length} entit${result.entities.length === 1 ? "y" : "ies"}`,
+    result.includesApplicationRibbon ? "application ribbon" : undefined,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  void vscode.window.showInformationMessage(
+    `Published ribbons to ${target.env.name} (${summary}).`,
+  );
 }
 
 export async function pullRibbonsFromEnvironment(
@@ -613,77 +614,32 @@ async function resolvePublishDocuments(
   return ctx.ribbonEditorState.loadSource(source);
 }
 
-async function pickPublishSolution(
+async function cleanupGeneratedPublishSolution(
   ctx: CommandContext,
   client: DataverseClient,
-  solutions: Awaited<ReturnType<CommandContext["ribbonPublishService"]["listUnmanagedSolutions"]>>,
-  documents: RibbonDocument[],
-): Promise<
-  Awaited<ReturnType<CommandContext["ribbonPublishService"]["createGeneratedSolution"]>> | undefined
-> {
-  const picks: RibbonPublishSolutionPick[] = [
-    ...solutions.map((solution) => ({
-      label: solution.friendlyName || solution.uniqueName,
-      description:
-        solution.friendlyName && solution.friendlyName !== solution.uniqueName
-          ? solution.uniqueName
-          : undefined,
-      detail: `Unmanaged solution • Publisher prefix: ${solution.publisherPrefix}`,
-      publishKind: "existing" as const,
-      uniqueName: solution.uniqueName,
-    })),
-    {
-      label: "Create generated solution",
-      description: "Use a temporary d365tools_ribbon_* solution",
-      detail: "The solution is left in the environment until cleanup is run.",
-      publishKind: "generated",
-    },
-  ];
-
-  const pick = await vscode.window.showQuickPick<RibbonPublishSolutionPick>(picks, {
-    placeHolder: "Select target solution for ribbon publish",
-  });
-  if (!pick) {
-    return undefined;
+  solution: Awaited<ReturnType<CommandContext["ribbonPublishService"]["createGeneratedSolution"]>>,
+): Promise<void> {
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Removing generated ribbon solution",
+        cancellable: false,
+      },
+      () =>
+        solution.solutionId
+          ? ctx.ribbonPublishService.deleteGeneratedSolution(client, solution.solutionId)
+          : ctx.ribbonPublishService.deleteGeneratedSolutionByUniqueName(
+              client,
+              solution.uniqueName,
+            ),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    void vscode.window.showWarningMessage(
+      `Could not remove generated ribbon solution ${solution.uniqueName}: ${message}`,
+    );
   }
-
-  if (pick.publishKind === "existing") {
-    return solutions.find((solution) => solution.uniqueName === pick.uniqueName);
-  }
-
-  const prefix = await pickPublisherPrefix(solutions);
-  if (!prefix) {
-    return undefined;
-  }
-
-  return ctx.ribbonPublishService.createGeneratedSolution(
-    client,
-    prefix.publisherPrefix,
-    describePublishScope(documents),
-  );
-}
-
-async function pickPublisherPrefix(
-  solutions: Awaited<ReturnType<CommandContext["ribbonPublishService"]["listUnmanagedSolutions"]>>,
-): Promise<PublisherPrefixPick | undefined> {
-  const prefixes = [
-    ...new Set(solutions.map((solution) => solution.publisherPrefix).filter(Boolean)),
-  ]
-    .sort((a, b) => a.localeCompare(b))
-    .map((publisherPrefix) => ({
-      label: publisherPrefix,
-      description: "Publisher prefix",
-      publisherPrefix,
-    }));
-
-  if (!prefixes.length) {
-    vscode.window.showErrorMessage("No publisher prefix was found in unmanaged solutions.");
-    return undefined;
-  }
-
-  return vscode.window.showQuickPick<PublisherPrefixPick>(prefixes, {
-    placeHolder: "Select publisher prefix for generated solution",
-  });
 }
 
 function describePublishScope(documents: RibbonDocument[]): string {

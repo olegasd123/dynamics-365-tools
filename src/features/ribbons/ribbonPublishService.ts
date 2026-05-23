@@ -1,9 +1,11 @@
 import JSZip from "jszip";
 import type * as vscode from "vscode";
+import { DEFAULT_SOLUTION_NAME } from "../../shared/solutions";
 import { SolutionImportClient, SolutionImportService } from "../dataverse/solutionImportService";
 import { RibbonDocument } from "./models";
 
 export interface RibbonPublishSolution {
+  solutionId?: string;
   uniqueName: string;
   friendlyName?: string;
   publisherPrefix: string;
@@ -38,10 +40,15 @@ interface SolutionListResponse {
     uniquename?: string;
     friendlyname?: string;
     publisherid?: {
+      publisherid?: string;
       uniquename?: string;
       customizationprefix?: string;
     };
   }>;
+}
+
+interface SolutionCreateResponse {
+  solutionid?: string;
 }
 
 interface PublisherListResponse {
@@ -78,22 +85,19 @@ export class RibbonPublishService {
       throw new Error(`No publisher was found for prefix ${publisherPrefix}.`);
     }
 
-    const uniqueName = makeGeneratedSolutionName(scopeName);
-    const friendlyName = `D365 Tools Ribbon ${scopeName}`;
-    await client.post("/solutions", {
-      uniquename: uniqueName,
-      friendlyname: friendlyName,
-      version: "1.0.0.0",
-      "publisherid@odata.bind": `/publishers(${normalizeGuid(publisher.publisherid)})`,
-    });
+    return this.createGeneratedSolutionForPublisher(client, publisher, scopeName);
+  }
 
-    return {
-      uniqueName,
-      friendlyName,
-      publisherPrefix: publisher.customizationprefix,
-      publisherUniqueName: publisher.uniquename,
-      generated: true,
-    };
+  async createGeneratedSolutionFromDefaultPublisher(
+    client: SolutionImportClient,
+    scopeName: string,
+  ): Promise<RibbonPublishSolution> {
+    const publisher = await this.findDefaultPublisher(client);
+    if (!publisher.publisherid || !publisher.uniquename || !publisher.customizationprefix) {
+      throw new Error("The Default solution publisher is missing required data.");
+    }
+
+    return this.createGeneratedSolutionForPublisher(client, publisher, scopeName);
   }
 
   async listGeneratedSolutions(client: SolutionImportClient): Promise<GeneratedRibbonSolution[]> {
@@ -120,6 +124,24 @@ export class RibbonPublishService {
     }
 
     await client.delete(`/solutions(${id})`);
+  }
+
+  async deleteGeneratedSolutionByUniqueName(
+    client: SolutionImportClient,
+    uniqueName: string,
+  ): Promise<void> {
+    const safeUniqueName = uniqueName.trim();
+    if (!safeUniqueName.startsWith("d365tools_ribbon_")) {
+      throw new Error("Only generated ribbon solutions can be deleted by this command.");
+    }
+
+    const response = await client.get<SolutionListResponse>(
+      `/solutions?$select=solutionid,uniquename&$filter=uniquename eq '${escapeODataString(safeUniqueName)}'&$top=1`,
+    );
+    const solutionId = normalizeGuid(response.value?.[0]?.solutionid ?? "");
+    if (solutionId) {
+      await this.deleteGeneratedSolution(client, solutionId);
+    }
   }
 
   async publishDocuments(
@@ -192,6 +214,44 @@ export class RibbonPublishService {
     }
 
     return publisher;
+  }
+
+  private async findDefaultPublisher(
+    client: SolutionImportClient,
+  ): Promise<NonNullable<PublisherListResponse["value"]>[number]> {
+    const response = await client.get<SolutionListResponse>(
+      `/solutions?$select=solutionid,uniquename&$expand=publisherid($select=publisherid,uniquename,customizationprefix)&$filter=uniquename eq '${DEFAULT_SOLUTION_NAME}'&$top=1`,
+    );
+    const publisher = response.value?.[0]?.publisherid;
+    if (!publisher) {
+      throw new Error("Default solution publisher was not found.");
+    }
+
+    return publisher;
+  }
+
+  private async createGeneratedSolutionForPublisher(
+    client: SolutionImportClient,
+    publisher: NonNullable<PublisherListResponse["value"]>[number],
+    scopeName: string,
+  ): Promise<RibbonPublishSolution> {
+    const uniqueName = makeGeneratedSolutionName(scopeName);
+    const friendlyName = `D365 Tools Ribbon ${scopeName}`;
+    const created = await client.post<SolutionCreateResponse>("/solutions", {
+      uniquename: uniqueName,
+      friendlyname: friendlyName,
+      version: "1.0.0.0",
+      "publisherid@odata.bind": `/publishers(${normalizeGuid(publisher.publisherid ?? "")})`,
+    });
+
+    return {
+      solutionId: normalizeGuid(created.solutionid ?? ""),
+      uniqueName,
+      friendlyName,
+      publisherPrefix: publisher.customizationprefix ?? "",
+      publisherUniqueName: publisher.uniquename,
+      generated: true,
+    };
   }
 }
 
