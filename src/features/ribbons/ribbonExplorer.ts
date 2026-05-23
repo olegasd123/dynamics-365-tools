@@ -526,7 +526,7 @@ function commandActionNode(
         ["Function", action.functionName],
         ["Parameters", parameterValues(action.parameters)],
       ],
-      parameterNodes(action.parameters),
+      parameterNodes(document, action.parameters),
       { document, range: action.range },
     );
   }
@@ -567,7 +567,7 @@ function ruleStepNode(document: RibbonDocument, step: RuleStep, index: number): 
     `d365RibbonRuleStep:${step.kind}`,
     step.kind === "Unknown" ? "warning" : "symbol-property",
     ruleStepDetails(step, index),
-    step.kind === "CustomRule" ? parameterNodes(step.parameters) : [],
+    step.kind === "CustomRule" ? parameterNodes(document, step.parameters) : [],
     { document, range: step.range },
   );
 }
@@ -629,7 +629,7 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
   }
 }
 
-function parameterNodes(parameters: ActionParameter[]): RibbonItemNode[] {
+function parameterNodes(document: RibbonDocument, parameters: ActionParameter[]): RibbonItemNode[] {
   return parameters.map(
     (parameter, index) =>
       new RibbonItemNode(
@@ -641,6 +641,8 @@ function parameterNodes(parameters: ActionParameter[]): RibbonItemNode[] {
           ["Kind", parameter.kind],
           ["Value", parameter.value],
         ],
+        [],
+        parameter.range ? { document, range: parameter.range } : undefined,
       ),
   );
 }

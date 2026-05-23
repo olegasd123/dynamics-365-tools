@@ -372,6 +372,84 @@ test("moves ribbon nodes down without losing unequal sibling XML", async () => {
   assert.match(updated, /https:\/\/short\.example/);
 });
 
+test("moves JavaScript parameters with ribbon move commands", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/scripts/account.js" FunctionName="run">
+          <CrmParameter Value="PrimaryControl" />
+          <CrmParameter Value="FirstPrimaryItemId" />
+          <CrmParameter Value="PrimaryEntityTypeName" />
+        </JavaScriptFunction>
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].commandDefinitions[0].actions[0];
+  assert.strictEqual(action.kind, "JavaScriptFunction");
+  const parameter = action.parameters[1];
+  assert.ok(parameter.range);
+  const node = new RibbonItemNode(
+    `2. ${parameter.value}`,
+    parameter.kind,
+    "d365RibbonParameter",
+    "symbol-parameter",
+    [],
+    [],
+    { document, range: parameter.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  await moveRibbonNodeUp(
+    {
+      configuration: {
+        workspaceRoot: "/tmp",
+      },
+      ribbonSourceLocator: {
+        locate: async () => [
+          {
+            id: "source",
+            kind: "flat",
+            name: "Source",
+            rootUri: "/tmp",
+            files: [{ fileUri: "/tmp/RibbonDiffXml.xml", kind: "Application" }],
+          },
+        ],
+      },
+      ribbonEditorState: {
+        loadSource: async () => [document],
+        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+          patches = queuedPatches;
+        },
+      },
+      ribbonExplorer: {
+        refresh: () => undefined,
+      },
+    } as any,
+    node,
+  );
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedAction = updatedDocument.views[0].commandDefinitions[0].actions[0];
+
+  assert.deepStrictEqual(
+    updatedAction.kind === "JavaScriptFunction"
+      ? updatedAction.parameters.map((item) => item.value)
+      : [],
+    ["FirstPrimaryItemId", "PrimaryControl", "PrimaryEntityTypeName"],
+  );
+});
+
 test("moves the same stale details-panel node down after moving it up", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-move-"));
   const filePath = path.join(workspaceRoot, "RibbonDiffXml.xml");
@@ -430,5 +508,75 @@ test("moves the same stale details-panel node down after moving it up", async ()
   assert.deepStrictEqual(
     (await state.loadSource(source))[0].views[0].commandDefinitions.map((command) => command.id),
     ["short", "middle", "last"],
+  );
+});
+
+test("moves the same stale JavaScript parameter node down after moving it up", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-param-move-"));
+  const filePath = path.join(workspaceRoot, "RibbonDiffXml.xml");
+  await fs.writeFile(
+    filePath,
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/scripts/account.js" FunctionName="run">
+          <CrmParameter Value="PrimaryControl" />
+          <CrmParameter Value="FirstPrimaryItemId" />
+          <CrmParameter Value="PrimaryEntityTypeName" />
+        </JavaScriptFunction>
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+    "utf8",
+  );
+  const source: RibbonSource = {
+    id: "source",
+    kind: "flat",
+    name: "Source",
+    rootUri: workspaceRoot,
+    files: [{ fileUri: filePath, kind: "Application" }],
+  };
+  const state = new RibbonEditorState(new RibbonRepository());
+  const [document] = await state.loadSource(source);
+  const action = document.views[0].commandDefinitions[0].actions[0];
+  assert.strictEqual(action.kind, "JavaScriptFunction");
+  const parameter = action.parameters[1];
+  assert.ok(parameter.range);
+  const staleNode = new RibbonItemNode(
+    `2. ${parameter.value}`,
+    parameter.kind,
+    "d365RibbonParameter",
+    "symbol-parameter",
+    [],
+    [],
+    { document, range: parameter.range },
+  );
+  const ctx = {
+    configuration: { workspaceRoot },
+    ribbonSourceLocator: { locate: async () => [source] },
+    ribbonEditorState: state,
+    ribbonExplorer: { refresh: () => undefined },
+  } as any;
+
+  await moveRibbonNodeUp(ctx, staleNode);
+  const movedUpAction = (await state.loadSource(source))[0].views[0].commandDefinitions[0]
+    .actions[0];
+  assert.deepStrictEqual(
+    movedUpAction.kind === "JavaScriptFunction"
+      ? movedUpAction.parameters.map((item) => item.value)
+      : [],
+    ["FirstPrimaryItemId", "PrimaryControl", "PrimaryEntityTypeName"],
+  );
+
+  await moveRibbonNodeDown(ctx, staleNode);
+  const movedDownAction = (await state.loadSource(source))[0].views[0].commandDefinitions[0]
+    .actions[0];
+  assert.deepStrictEqual(
+    movedDownAction.kind === "JavaScriptFunction"
+      ? movedDownAction.parameters.map((item) => item.value)
+      : [],
+    ["PrimaryControl", "FirstPrimaryItemId", "PrimaryEntityTypeName"],
   );
 });

@@ -1566,7 +1566,23 @@ type ReorderIdentity =
   | { kind: "EnableRule"; id: string }
   | { kind: "DisplayRule"; id: string }
   | { kind: "LocLabel"; id: string }
-  | { kind: "LocLabelTitle"; labelId: string; languageCode: number };
+  | { kind: "LocLabelTitle"; labelId: string; languageCode: number }
+  | {
+      kind: "ActionParameter";
+      parent: ParameterParentIdentity;
+      parameterKind: ActionParameter["kind"];
+      value: string;
+      occurrence: number;
+    };
+
+type ParameterParentIdentity =
+  | { kind: "CommandAction"; commandId: string; actionIndex: number }
+  | {
+      kind: "RuleStep";
+      ruleKind: "EnableRule" | "DisplayRule";
+      ruleId: string;
+      stepIndex: number;
+    };
 
 async function moveRibbonNode(
   ctx: CommandContext,
@@ -1719,7 +1735,7 @@ function resolveReorderTargetInDocument(
     }
 
     for (const command of view.commandDefinitions) {
-      const action = findRangeIndex(command.actions, range);
+      const action = findCommandActionIndex(command, range, identity);
       if (
         (contextValue === "d365RibbonJavaScriptAction" || contextValue === "d365RibbonUrlAction") &&
         action >= 0
@@ -1730,15 +1746,59 @@ function resolveReorderTargetInDocument(
           index: action,
         };
       }
+
+      const commandParameter = findCommandActionParameterTarget(command, range, identity);
+      if (contextValue === "d365RibbonParameter" && commandParameter) {
+        return {
+          document,
+          ranges: commandParameter.parameters
+            .map((parameter) => parameter.range)
+            .filter((parameterRange): parameterRange is TextRange => Boolean(parameterRange)),
+          index: commandParameter.index,
+        };
+      }
     }
 
-    for (const rule of [...view.enableRules, ...view.displayRules]) {
+    for (const rule of view.enableRules) {
       const step = findRangeIndex(rule.steps, range);
       if (contextValue.startsWith("d365RibbonRuleStep:") && step >= 0) {
         return {
           document,
           ranges: rule.steps.map((item) => item.range),
           index: step,
+        };
+      }
+
+      const ruleParameter = findRuleStepParameterTarget(rule, "EnableRule", range, identity);
+      if (contextValue === "d365RibbonParameter" && ruleParameter) {
+        return {
+          document,
+          ranges: ruleParameter.parameters
+            .map((parameter) => parameter.range)
+            .filter((parameterRange): parameterRange is TextRange => Boolean(parameterRange)),
+          index: ruleParameter.index,
+        };
+      }
+    }
+
+    for (const rule of view.displayRules) {
+      const step = findRangeIndex(rule.steps, range);
+      if (contextValue.startsWith("d365RibbonRuleStep:") && step >= 0) {
+        return {
+          document,
+          ranges: rule.steps.map((item) => item.range),
+          index: step,
+        };
+      }
+
+      const ruleParameter = findRuleStepParameterTarget(rule, "DisplayRule", range, identity);
+      if (contextValue === "d365RibbonParameter" && ruleParameter) {
+        return {
+          document,
+          ranges: ruleParameter.parameters
+            .map((parameter) => parameter.range)
+            .filter((parameterRange): parameterRange is TextRange => Boolean(parameterRange)),
+          index: ruleParameter.index,
         };
       }
     }
@@ -1784,14 +1844,54 @@ function resolveReorderIdentity(
       return { kind: "CommandDefinition", id: commandDefinition.id };
     }
 
+    for (const command of view.commandDefinitions) {
+      const actionIndex = command.actions.findIndex((action) =>
+        action.kind === "JavaScriptFunction"
+          ? action.parameters.some(
+              (parameter) => parameter.range && sameRange(parameter.range, range),
+            )
+          : false,
+      );
+      const action = command.actions[actionIndex];
+      if (node.contextValue === "d365RibbonParameter" && action?.kind === "JavaScriptFunction") {
+        const parameterIndex = action.parameters.findIndex(
+          (parameter) => parameter.range && sameRange(parameter.range, range),
+        );
+        const parameter = action.parameters[parameterIndex];
+        if (parameter) {
+          return {
+            kind: "ActionParameter",
+            parent: { kind: "CommandAction", commandId: command.id, actionIndex },
+            parameterKind: parameter.kind,
+            value: parameter.value,
+            occurrence: parameterOccurrence(action.parameters, parameterIndex),
+          };
+        }
+      }
+    }
+
     const enableRule = view.enableRules.find((item) => sameRange(item.range, range));
     if (node.contextValue === "d365RibbonEnableRule" && enableRule) {
       return { kind: "EnableRule", id: enableRule.id };
     }
 
+    for (const rule of view.enableRules) {
+      const identity = ruleStepParameterIdentity(rule, "EnableRule", range);
+      if (node.contextValue === "d365RibbonParameter" && identity) {
+        return identity;
+      }
+    }
+
     const displayRule = view.displayRules.find((item) => sameRange(item.range, range));
     if (node.contextValue === "d365RibbonDisplayRule" && displayRule) {
       return { kind: "DisplayRule", id: displayRule.id };
+    }
+
+    for (const rule of view.displayRules) {
+      const identity = ruleStepParameterIdentity(rule, "DisplayRule", range);
+      if (node.contextValue === "d365RibbonParameter" && identity) {
+        return identity;
+      }
     }
 
     for (const label of view.locLabels) {
@@ -1807,6 +1907,143 @@ function resolveReorderIdentity(
   }
 
   return undefined;
+}
+
+function findCommandActionIndex(
+  command: CommandDefinition,
+  range: TextRange,
+  identity: ReorderIdentity | undefined,
+): number {
+  if (
+    identity?.kind === "ActionParameter" &&
+    identity.parent.kind === "CommandAction" &&
+    identity.parent.commandId === command.id
+  ) {
+    return identity.parent.actionIndex;
+  }
+
+  return findRangeIndex(command.actions, range);
+}
+
+function findCommandActionParameterTarget(
+  command: CommandDefinition,
+  range: TextRange,
+  identity: ReorderIdentity | undefined,
+): { parameters: ActionParameter[]; index: number } | undefined {
+  for (const [actionIndex, action] of command.actions.entries()) {
+    if (action.kind !== "JavaScriptFunction") {
+      continue;
+    }
+
+    if (
+      identity?.kind === "ActionParameter" &&
+      identity.parent.kind === "CommandAction" &&
+      identity.parent.commandId === command.id &&
+      identity.parent.actionIndex === actionIndex
+    ) {
+      const index = findParameterByIdentity(action.parameters, identity);
+      return index >= 0 ? { parameters: action.parameters, index } : undefined;
+    }
+
+    const index = findParameterRangeIndex(action.parameters, range);
+    if (index >= 0) {
+      return { parameters: action.parameters, index };
+    }
+  }
+
+  return undefined;
+}
+
+function findRuleStepParameterTarget(
+  rule: EnableRule | DisplayRule,
+  ruleKind: "EnableRule" | "DisplayRule",
+  range: TextRange,
+  identity: ReorderIdentity | undefined,
+): { parameters: ActionParameter[]; index: number } | undefined {
+  for (const [stepIndex, step] of rule.steps.entries()) {
+    if (step.kind !== "CustomRule") {
+      continue;
+    }
+
+    if (
+      identity?.kind === "ActionParameter" &&
+      identity.parent.kind === "RuleStep" &&
+      identity.parent.ruleKind === ruleKind &&
+      identity.parent.ruleId === rule.id &&
+      identity.parent.stepIndex === stepIndex
+    ) {
+      const index = findParameterByIdentity(step.parameters, identity);
+      return index >= 0 ? { parameters: step.parameters, index } : undefined;
+    }
+
+    const index = findParameterRangeIndex(step.parameters, range);
+    if (index >= 0) {
+      return { parameters: step.parameters, index };
+    }
+  }
+
+  return undefined;
+}
+
+function ruleStepParameterIdentity(
+  rule: EnableRule | DisplayRule,
+  ruleKind: "EnableRule" | "DisplayRule",
+  range: TextRange,
+): ReorderIdentity | undefined {
+  for (const [stepIndex, step] of rule.steps.entries()) {
+    if (step.kind !== "CustomRule") {
+      continue;
+    }
+
+    const parameterIndex = findParameterRangeIndex(step.parameters, range);
+    const parameter = step.parameters[parameterIndex];
+    if (!parameter) {
+      continue;
+    }
+
+    return {
+      kind: "ActionParameter",
+      parent: { kind: "RuleStep", ruleKind, ruleId: rule.id, stepIndex },
+      parameterKind: parameter.kind,
+      value: parameter.value,
+      occurrence: parameterOccurrence(step.parameters, parameterIndex),
+    };
+  }
+
+  return undefined;
+}
+
+function findParameterByIdentity(
+  parameters: ActionParameter[],
+  identity: Extract<ReorderIdentity, { kind: "ActionParameter" }>,
+): number {
+  let occurrence = 0;
+
+  return parameters.findIndex((parameter) => {
+    if (parameter.kind !== identity.parameterKind || parameter.value !== identity.value) {
+      return false;
+    }
+
+    const matches = occurrence === identity.occurrence;
+    occurrence += 1;
+    return matches;
+  });
+}
+
+function parameterOccurrence(parameters: ActionParameter[], index: number): number {
+  const target = parameters[index];
+  if (!target) {
+    return -1;
+  }
+
+  return parameters
+    .slice(0, index)
+    .filter((parameter) => parameter.kind === target.kind && parameter.value === target.value)
+    .length;
+}
+
+function findParameterRangeIndex(parameters: ActionParameter[], range: TextRange): number {
+  return parameters.findIndex((parameter) => parameter.range && sameRange(parameter.range, range));
 }
 
 function findRangeIndex<T extends { range: { start: number; end: number } }>(

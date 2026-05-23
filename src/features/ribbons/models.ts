@@ -170,6 +170,7 @@ export interface WebResourceRef {
 export interface ActionParameter {
   kind: "Crm" | "Bool" | "Int" | "Float" | "String" | "Decimal";
   value: string;
+  range?: TextRange;
 }
 
 export interface EnableRule {

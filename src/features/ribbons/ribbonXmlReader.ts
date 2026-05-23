@@ -666,10 +666,21 @@ function readActions(sourceText: string, commandDefinition: XmlElementRange): Co
 function readActionParameters(node: XmlElementRange): ActionParameter[] {
   return node.children
     .filter((child) => child.name.endsWith("Parameter"))
-    .map((child) => ({
-      kind: parameterKind(child.name),
-      value: attr(child, "Value"),
-    }));
+    .map((child) => actionParameter(child));
+}
+
+function actionParameter(node: XmlElementRange): ActionParameter {
+  const parameter: ActionParameter = {
+    kind: parameterKind(node.name),
+    value: attr(node, "Value"),
+  };
+
+  Object.defineProperty(parameter, "range", {
+    value: node.range,
+    enumerable: false,
+  });
+
+  return parameter;
 }
 
 function readRules(
