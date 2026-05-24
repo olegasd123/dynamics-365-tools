@@ -9,6 +9,7 @@ import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   editRibbonNode,
+  extractJavaScriptFunctionSuggestions,
   listBoundJavaScriptLibraries,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
@@ -72,6 +73,33 @@ test("lists each bound JavaScript web resource once", async () => {
     picks.map((pick) => pick.uniqueName),
     ["new_/account/form-copy.js", "new_/account/form.js"],
   );
+});
+
+test("extracts full names from compiled TypeScript namespace JavaScript", () => {
+  const source = `"use strict";
+var Hjk;
+(function (Hjk) {
+    var Account;
+    (function (Account) {
+        var Ribbon = /** @class */ (function () {
+            function Ribbon() {
+            }
+            Ribbon.buttonVisible = function (primaryControl, recordId, entityName) {
+                return true;
+            };
+            Ribbon.onButtonClick = function (primaryControl, recordId, entityName) {
+                Xrm.Navigation.openAlertDialog({ text: entityName });
+            };
+            return Ribbon;
+        }());
+        Account.Ribbon = Ribbon;
+    })(Account = Hjk.Account || (Hjk.Account = {}));
+})(Hjk || (Hjk = {}));`;
+
+  assert.deepStrictEqual(extractJavaScriptFunctionSuggestions(source), [
+    "Hjk.Account.Ribbon.buttonVisible",
+    "Hjk.Account.Ribbon.onButtonClick",
+  ]);
 });
 
 test("prefills saved JavaScript action values while editing", async () => {
@@ -201,6 +229,131 @@ test("prefills saved JavaScript action values while editing", async () => {
       : [],
     ["PrimaryControl", "CommandProperties"],
   );
+});
+
+test("suggests full namespace while editing JavaScript action function", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-js-namespace-"));
+  const localPath = path.join(workspaceRoot, "src/account/ribbon.js");
+  await fs.mkdir(path.dirname(localPath), { recursive: true });
+  await fs.writeFile(
+    localPath,
+    `"use strict";
+var Hjk;
+(function (Hjk) {
+    var Account;
+    (function (Account) {
+        var Ribbon = /** @class */ (function () {
+            function Ribbon() {
+            }
+            Ribbon.buttonVisible = function (primaryControl, recordId, entityName) {
+                return true;
+            };
+            Ribbon.onButtonClick = function (primaryControl, recordId, entityName) {
+                Xrm.Navigation.openAlertDialog({ text: entityName });
+            };
+            return Ribbon;
+        }());
+        Account.Ribbon = Ribbon;
+    })(Account = Hjk.Account || (Hjk.Account = {}));
+})(Hjk || (Hjk = {}));`,
+    "utf8",
+  );
+
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:hjk_/account/ribbon.js" FunctionName="Ribbon.onButtonClick" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].commandDefinitions[0].actions[0];
+  const node = new RibbonItemNode(
+    "JavaScript: Ribbon.onButtonClick",
+    undefined,
+    "d365RibbonJavaScriptAction",
+    "symbol-method",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+  let functionItems: vscode.QuickPickItem[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Command action") {
+      return items.find((item) => item.label === "JavaScript function");
+    }
+
+    if (options.placeHolder === "JavaScript web resource") {
+      return items[0];
+    }
+
+    if (options.placeHolder === "JavaScript function name") {
+      functionItems = items;
+      return items[0];
+    }
+
+    if (options.placeHolder === "CRM parameters") {
+      return [];
+    }
+
+    return undefined;
+  };
+
+  try {
+    await editRibbonNode(
+      {
+        bindings: {
+          listBindings: async () => ({
+            bindings: [
+              {
+                kind: "file",
+                relativeLocalPath: "src/account/ribbon.js",
+                remotePath: "hjk_/account/ribbon.js",
+                solutionName: "core",
+              },
+            ],
+          }),
+        },
+        configuration: {
+          resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
+          getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
+        },
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  assert.deepStrictEqual(
+    functionItems.map((item) => item.label),
+    ["Hjk.Account.Ribbon.onButtonClick", "Hjk.Account.Ribbon.buttonVisible", "Type function name"],
+  );
+  assert.strictEqual(functionItems[0]?.description, "Current function");
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /FunctionName="Hjk\.Account\.Ribbon\.onButtonClick"/);
 });
 
 test("offers to save a backup when opening an exported solution", async () => {

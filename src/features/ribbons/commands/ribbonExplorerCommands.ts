@@ -2774,7 +2774,9 @@ async function pickJavaScriptFunctionName(
   const suggestionItems = currentFunctionFirst(suggestions, currentFunctionName).map((name) => ({
     label: name,
     description:
-      currentFunctionName && name === currentFunctionName ? "Current function" : undefined,
+      currentFunctionName && isCurrentFunctionSuggestion(name, currentFunctionName)
+        ? "Current function"
+        : undefined,
   }));
   const pick = await vscode.window.showQuickPick([...suggestionItems, { label: manual }], {
     placeHolder: "JavaScript function name",
@@ -2810,7 +2812,13 @@ async function listJavaScriptFunctionSuggestions(localPath: string | undefined):
 
   const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(localPath));
   const source = Buffer.from(bytes).toString("utf8");
+  return extractJavaScriptFunctionSuggestions(source);
+}
+
+export function extractJavaScriptFunctionSuggestions(source: string): string[] {
   const names = new Set<string>();
+  const namespaceAliases = getCompiledNamespaceAliases(source);
+  const exportedAliases = getCompiledExportedAliases(source, namespaceAliases);
   const patterns = [
     /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g,
     /(?:^|[;\n]\s*)([A-Za-z_$][\w$]*)\s*=\s*function\s*\(/g,
@@ -2819,11 +2827,82 @@ async function listJavaScriptFunctionSuggestions(localPath: string | undefined):
 
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) {
-      names.add(match[1]);
+      const name = match[1];
+      if (isCompiledClassConstructor(source, name)) {
+        continue;
+      }
+      names.add(expandCompiledFunctionName(name, namespaceAliases, exportedAliases));
     }
   }
 
   return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function getCompiledNamespaceAliases(source: string): Map<string, string> {
+  const aliases = new Map<string, string>();
+
+  for (const match of source.matchAll(
+    /\}\)\(\s*([A-Za-z_$][\w$]*)\s*\|\|\s*\(\s*\1\s*=\s*\{\}\s*\)\s*\)/g,
+  )) {
+    aliases.set(match[1], match[1]);
+  }
+
+  for (const match of source.matchAll(
+    /\}\)\(\s*([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\|\|/g,
+  )) {
+    aliases.set(match[1], match[2]);
+  }
+
+  return aliases;
+}
+
+function getCompiledExportedAliases(
+  source: string,
+  namespaceAliases: Map<string, string>,
+): Map<string, string> {
+  const aliases = new Map<string, string>();
+
+  for (const match of source.matchAll(
+    /\b([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\.([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*;/g,
+  )) {
+    const namespaceName = expandCompiledNamespaceName(match[1], namespaceAliases);
+    if (!namespaceName) {
+      continue;
+    }
+    aliases.set(match[3], `${namespaceName}.${match[2]}`);
+  }
+
+  return aliases;
+}
+
+function expandCompiledFunctionName(
+  name: string,
+  namespaceAliases: Map<string, string>,
+  exportedAliases: Map<string, string>,
+): string {
+  const parts = name.split(".");
+  const firstPart = parts[0];
+  const alias = exportedAliases.get(firstPart) ?? namespaceAliases.get(firstPart);
+  return alias ? [alias, ...parts.slice(1)].join(".") : name;
+}
+
+function expandCompiledNamespaceName(
+  name: string,
+  namespaceAliases: Map<string, string>,
+): string | undefined {
+  const parts = name.split(".");
+  const alias = namespaceAliases.get(parts[0]);
+  return alias ? [alias, ...parts.slice(1)].join(".") : undefined;
+}
+
+function isCompiledClassConstructor(source: string, name: string): boolean {
+  return new RegExp(
+    `\\bvar\\s+${escapeRegExp(name)}\\s*=\\s*(?:/\\*\\*[\\s\\S]*?\\*/\\s*)?\\(function\\s*\\(\\)\\s*\\{[\\s\\S]{0,512}?\\bfunction\\s+${escapeRegExp(name)}\\s*\\(`,
+  ).test(source);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function addRibbonRule(
@@ -3012,15 +3091,23 @@ function currentFunctionFirst(
   const currentIndex = suggestions.findIndex(
     (name) => name.toLowerCase() === current.toLowerCase(),
   );
-  if (currentIndex < 0) {
+  const suffixIndex = suggestions.findIndex((name) => isCurrentFunctionSuggestion(name, current));
+  const bestIndex = currentIndex >= 0 ? currentIndex : suffixIndex;
+  if (bestIndex < 0) {
     return [current, ...suggestions];
   }
 
   return [
-    suggestions[currentIndex],
-    ...suggestions.slice(0, currentIndex),
-    ...suggestions.slice(currentIndex + 1),
+    suggestions[bestIndex],
+    ...suggestions.slice(0, bestIndex),
+    ...suggestions.slice(bestIndex + 1),
   ];
+}
+
+function isCurrentFunctionSuggestion(suggestion: string, currentFunctionName: string): boolean {
+  const suggestionKey = suggestion.toLowerCase();
+  const currentKey = currentFunctionName.trim().toLowerCase();
+  return suggestionKey === currentKey || suggestionKey.endsWith(`.${currentKey}`);
 }
 
 async function promptRuleStep(
