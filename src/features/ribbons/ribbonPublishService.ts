@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import type * as vscode from "vscode";
-import { DEFAULT_SOLUTION_NAME } from "../../shared/solutions";
+import { isDefaultSolution } from "../dataverse/dataverseClient";
 import { SolutionImportClient, SolutionImportService } from "../dataverse/solutionImportService";
 import { RibbonDocument } from "./models";
 
@@ -10,7 +10,6 @@ export interface RibbonPublishSolution {
   friendlyName?: string;
   publisherPrefix: string;
   publisherUniqueName?: string;
-  generated?: boolean;
 }
 
 export interface RibbonPublishOptions {
@@ -47,21 +46,22 @@ interface SolutionListResponse {
   }>;
 }
 
-interface SolutionCreateResponse {
-  solutionid?: string;
-}
-
-interface PublisherListResponse {
-  value?: Array<{
-    publisherid?: string;
-    uniquename?: string;
-    customizationprefix?: string;
-  }>;
-}
-
 interface RetrieveVersionResponse {
   Version?: string;
   version?: string;
+}
+
+interface EntityDefinitionResponse {
+  LogicalName?: string;
+  logicalname?: string;
+  MetadataId?: string;
+  metadataid?: string;
+}
+
+interface SolutionComponentListResponse {
+  value?: Array<{
+    solutioncomponentid?: string;
+  }>;
 }
 
 export class RibbonPublishService {
@@ -72,37 +72,13 @@ export class RibbonPublishService {
 
     return (response.value ?? [])
       .map((solution) => ({
+        solutionId: normalizeGuid(solution.solutionid ?? "") || undefined,
         uniqueName: solution.uniquename?.trim() ?? "",
         friendlyName: solution.friendlyname?.trim() || undefined,
         publisherPrefix: solution.publisherid?.customizationprefix?.trim() ?? "",
         publisherUniqueName: solution.publisherid?.uniquename?.trim() || undefined,
       }))
       .filter((solution) => solution.uniqueName && solution.publisherPrefix);
-  }
-
-  async createGeneratedSolution(
-    client: SolutionImportClient,
-    publisherPrefix: string,
-    scopeName: string,
-  ): Promise<RibbonPublishSolution> {
-    const publisher = await this.findPublisherByPrefix(client, publisherPrefix);
-    if (!publisher.publisherid || !publisher.uniquename || !publisher.customizationprefix) {
-      throw new Error(`No publisher was found for prefix ${publisherPrefix}.`);
-    }
-
-    return this.createGeneratedSolutionForPublisher(client, publisher, scopeName);
-  }
-
-  async createGeneratedSolutionFromDefaultPublisher(
-    client: SolutionImportClient,
-    scopeName: string,
-  ): Promise<RibbonPublishSolution> {
-    const publisher = await this.findDefaultPublisher(client);
-    if (!publisher.publisherid || !publisher.uniquename || !publisher.customizationprefix) {
-      throw new Error("The Default solution publisher is missing required data.");
-    }
-
-    return this.createGeneratedSolutionForPublisher(client, publisher, scopeName);
   }
 
   async listGeneratedSolutions(client: SolutionImportClient): Promise<GeneratedRibbonSolution[]> {
@@ -163,7 +139,8 @@ export class RibbonPublishService {
       throw new Error(`Solution ${solution.uniqueName} has no publisher prefix.`);
     }
 
-    await this.preflightEntities(client, target.entities);
+    const entityMetadataIds = await this.preflightEntities(client, target.entities);
+    await this.preflightSolutionEntities(client, solution, entityMetadataIds);
     const packageMetadata = await this.getSolutionPackageMetadata(client);
     const zipBytes = await buildMinimalRibbonSolutionZip({
       solution,
@@ -195,70 +172,88 @@ export class RibbonPublishService {
     };
   }
 
-  private async preflightEntities(client: SolutionImportClient, entities: string[]): Promise<void> {
+  private async preflightEntities(
+    client: SolutionImportClient,
+    entities: string[],
+  ): Promise<Map<string, string>> {
+    const metadataIds = new Map<string, string>();
+
     for (const entity of entities) {
+      let response: EntityDefinitionResponse;
       try {
-        await client.get(
-          `/EntityDefinitions(LogicalName='${escapeODataString(entity)}')?$select=LogicalName`,
+        response = await client.get<EntityDefinitionResponse>(
+          `/EntityDefinitions(LogicalName='${escapeODataString(entity)}')?$select=LogicalName,MetadataId`,
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Entity ${entity} was not found in the target environment: ${message}`);
       }
+
+      const metadataId = normalizeGuid(response.MetadataId ?? response.metadataid ?? "");
+      if (!metadataId) {
+        throw new Error(`Entity ${entity} metadata id was not returned by Dataverse.`);
+      }
+      metadataIds.set(entity, metadataId);
+    }
+
+    return metadataIds;
+  }
+
+  private async preflightSolutionEntities(
+    client: SolutionImportClient,
+    solution: RibbonPublishSolution,
+    entityMetadataIds: Map<string, string>,
+  ): Promise<void> {
+    if (!entityMetadataIds.size || isDefaultSolution(solution.uniqueName)) {
+      return;
+    }
+
+    const solutionId = await this.resolveSolutionId(client, solution);
+    if (!solutionId) {
+      throw new Error(`Solution ${solution.uniqueName} was not found.`);
+    }
+
+    const missing: string[] = [];
+    for (const [entity, metadataId] of entityMetadataIds) {
+      if (!(await this.isEntityInSolution(client, metadataId, solutionId))) {
+        missing.push(entity);
+      }
+    }
+
+    if (missing.length) {
+      throw new Error(
+        `Selected solution ${solution.uniqueName} does not contain ${formatEntityList(missing)}. Select a solution that contains the entity, or add the entity to that solution first.`,
+      );
     }
   }
 
-  private async findPublisherByPrefix(
+  private async resolveSolutionId(
     client: SolutionImportClient,
-    publisherPrefix: string,
-  ): Promise<NonNullable<PublisherListResponse["value"]>[number]> {
-    const response = await client.get<PublisherListResponse>(
-      `/publishers?$select=publisherid,uniquename,customizationprefix&$filter=customizationprefix eq '${escapeODataString(publisherPrefix)}'&$top=1`,
-    );
-    const publisher = response.value?.[0];
-    if (!publisher) {
-      throw new Error(`No publisher was found for prefix ${publisherPrefix}.`);
+    solution: RibbonPublishSolution,
+  ): Promise<string | undefined> {
+    const existingId = normalizeGuid(solution.solutionId ?? "");
+    if (existingId) {
+      return existingId;
     }
 
-    return publisher;
-  }
-
-  private async findDefaultPublisher(
-    client: SolutionImportClient,
-  ): Promise<NonNullable<PublisherListResponse["value"]>[number]> {
     const response = await client.get<SolutionListResponse>(
-      `/solutions?$select=solutionid,uniquename&$expand=publisherid($select=publisherid,uniquename,customizationprefix)&$filter=uniquename eq '${DEFAULT_SOLUTION_NAME}'&$top=1`,
+      `/solutions?$select=solutionid,uniquename&$filter=uniquename eq '${escapeODataString(solution.uniqueName)}'&$top=1`,
     );
-    const publisher = response.value?.[0]?.publisherid;
-    if (!publisher) {
-      throw new Error("Default solution publisher was not found.");
-    }
-
-    return publisher;
+    return normalizeGuid(response.value?.[0]?.solutionid ?? "") || undefined;
   }
 
-  private async createGeneratedSolutionForPublisher(
+  private async isEntityInSolution(
     client: SolutionImportClient,
-    publisher: NonNullable<PublisherListResponse["value"]>[number],
-    scopeName: string,
-  ): Promise<RibbonPublishSolution> {
-    const uniqueName = makeGeneratedSolutionName(scopeName);
-    const friendlyName = `D365 Tools Ribbon ${scopeName}`;
-    const created = await client.post<SolutionCreateResponse>("/solutions", {
-      uniquename: uniqueName,
-      friendlyname: friendlyName,
-      version: "1.0.0.0",
-      "publisherid@odata.bind": `/publishers(${normalizeGuid(publisher.publisherid ?? "")})`,
-    });
-
-    return {
-      solutionId: normalizeGuid(created.solutionid ?? ""),
-      uniqueName,
-      friendlyName,
-      publisherPrefix: publisher.customizationprefix ?? "",
-      publisherUniqueName: publisher.uniquename,
-      generated: true,
-    };
+    entityMetadataId: string,
+    solutionId: string,
+  ): Promise<boolean> {
+    const filter = encodeURIComponent(
+      `componenttype eq ${ENTITY_COMPONENT_TYPE} and objectid eq ${entityMetadataId} and _solutionid_value eq ${solutionId}`,
+    );
+    const response = await client.get<SolutionComponentListResponse>(
+      `/solutioncomponents?$select=solutioncomponentid&$filter=${filter}&$top=1`,
+    );
+    return Boolean(response.value?.length);
   }
 
   private async getSolutionPackageMetadata(
@@ -297,6 +292,7 @@ interface SolutionPackageMetadata {
 }
 
 const DEFAULT_DATAVERSE_VERSION = "9.2.0.0";
+const ENTITY_COMPONENT_TYPE = 1;
 
 export async function buildMinimalRibbonSolutionZip(input: MinimalRibbonZipInput): Promise<Buffer> {
   const zip = new JSZip();
@@ -403,18 +399,16 @@ function buildContentTypesXml(): string {
 </Types>`;
 }
 
-function makeGeneratedSolutionName(scopeName: string): string {
-  const safeScope = scopeName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40);
-  const timestamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
-  return `d365tools_ribbon_${safeScope || "publish"}_${timestamp}`;
-}
-
 function normalizeGuid(value: string): string {
   return value.replace(/[{}]/g, "").trim().toLowerCase();
+}
+
+function formatEntityList(entities: string[]): string {
+  if (entities.length === 1) {
+    return entities[0];
+  }
+
+  return `${entities.slice(0, -1).join(", ")} and ${entities[entities.length - 1]}`;
 }
 
 function normalizeEntityLogicalName(value: string | undefined): string {

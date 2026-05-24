@@ -6,6 +6,7 @@ import test from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
+import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   editRibbonNode,
   listBoundJavaScriptLibraries,
@@ -13,10 +14,11 @@ import {
   moveRibbonNodeUp,
   normalizeWebResourceUniqueName,
   openRibbonsFromSolution,
+  publishRibbonToEnvironment,
 } from "../commands/ribbonExplorerCommands";
 import { RibbonPatch, RibbonSource } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";
-import { RibbonItemNode } from "../ribbonExplorer";
+import { RibbonDocumentNode, RibbonItemNode } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
 import { readRibbonDocuments } from "../ribbonXmlReader";
@@ -291,6 +293,144 @@ test("offers to save a backup when opening an exported solution", async () => {
   assert.ok(saveDialogDefaultUri?.fsPath.startsWith(storageRoot));
   assert.deepStrictEqual(await fs.readFile(backupPath), buffer);
   assert.strictEqual(importedSource?.name, "core.zip");
+});
+
+test("publishes saved ribbon XML to the selected unmanaged solution", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-publish-"));
+  const filePath = path.join(workspaceRoot, "RibbonDiffXml.xml");
+  await fs.writeFile(
+    filePath,
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="d365tools.account.Form.CustomSave.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="d365tools.account.Form.CustomSave.Button" Command="d365tools.account.Form.CustomSave.Command" LabelText="custom save" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`,
+    "utf8",
+  );
+  const source: RibbonSource = {
+    id: `flat:${filePath}`,
+    kind: "flat",
+    name: "RibbonDiffXml.xml",
+    rootUri: workspaceRoot,
+    files: [{ fileUri: filePath, kind: "Entity", entityLogicalName: "account" }],
+  };
+  const state = new RibbonEditorState(new RibbonRepository());
+  const [originalDocument] = await state.loadSource(source);
+  const oldAction = originalDocument.views[0].customActions[0];
+  state.queuePatches(originalDocument, [
+    createDeleteNodePatch(originalDocument.sourceText, oldAction.range),
+  ]);
+  const [documentAfterDelete] = await state.loadSource(source);
+  state.queuePatches(
+    documentAfterDelete,
+    createCustomButtonPatches(documentAfterDelete, {
+      customActionId: "d365tools.account.Form.ValidateAndSave.CustomAction",
+      location: "Mscrm.Form.account.MainTab.Save.Controls._children",
+      buttonId: "d365tools.account.Form.ValidateAndSave.Button",
+      commandId: "d365tools.account.Form.ValidateAndSave.Command",
+      labelLocId: "d365tools.account.Form.ValidateAndSave.Label",
+      action: { kind: "Url", address: "https://contoso.example/validate" },
+      locLabel: {
+        id: "d365tools.account.Form.ValidateAndSave.Label",
+        languageCode: 1033,
+        description: "Validate and save",
+      },
+    }),
+  );
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+  let publishedSolution: string | undefined;
+  let publishedXml = "";
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Select unmanaged solution to update") {
+      return items[0];
+    }
+    return undefined;
+  };
+  (vscode.window as any).showWarningMessage = async (message: string) => {
+    if (message === "Save ribbon changes before publishing?") {
+      return "Save and Publish";
+    }
+    return undefined;
+  };
+
+  try {
+    await publishRibbonToEnvironment(
+      {
+        configuration: {
+          workspaceRoot,
+          loadConfiguration: async () => ({
+            environments: [{ name: "Dev", url: "https://org.crm.dynamics.com" }],
+            solutions: [],
+          }),
+        },
+        ui: {
+          pickEnvironment: async (environments: unknown[]) => environments[0],
+        },
+        auth: {
+          getAccessToken: async () => "token",
+        },
+        secrets: {
+          getCredentials: async () => undefined,
+        },
+        lastSelection: {
+          getLastEnvironment: () => undefined,
+          setLastEnvironment: async () => undefined,
+        },
+        connections: {
+          createConnection: async (env: unknown) => ({
+            env,
+            apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+            token: "token",
+          }),
+        },
+        ribbonEditorState: state,
+        ribbonSourceLocator: {
+          locate: async () => [source],
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+        ribbonPublishService: {
+          listUnmanagedSolutions: async () => [
+            {
+              uniqueName: "core",
+              friendlyName: "Core",
+              publisherPrefix: "new",
+              publisherUniqueName: "newpublisher",
+            },
+          ],
+          publishDocuments: async (_client: unknown, documents: any[], solution: any) => {
+            publishedSolution = solution.uniqueName;
+            publishedXml = documents[0]?.sourceText ?? "";
+            return {
+              importJobId: "job",
+              durationMs: 0,
+              entities: ["account"],
+              includesApplicationRibbon: false,
+            };
+          },
+        },
+      } as any,
+      new RibbonDocumentNode(originalDocument, true),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  assert.strictEqual(publishedSolution, "core");
+  assert.doesNotMatch(publishedXml, /custom save/);
+  assert.match(publishedXml, /Validate and save/);
 });
 
 test("moves ribbon nodes down without losing unequal sibling XML", async () => {

@@ -100,6 +100,7 @@ test("publishDocuments preflights entities, imports, then publishes ribbons", as
     [document],
     {
       uniqueName: "Core",
+      solutionId: "core-solution-id",
       publisherPrefix: "new",
       publisherUniqueName: "newpublisher",
     },
@@ -112,7 +113,10 @@ test("publishDocuments preflights entities, imports, then publishes ribbons", as
   );
   assert.deepStrictEqual(result.entities, ["account"]);
   assert.deepStrictEqual(client.gets, [
-    "/EntityDefinitions(LogicalName='account')?$select=LogicalName",
+    "/EntityDefinitions(LogicalName='account')?$select=LogicalName,MetadataId",
+    `/solutioncomponents?$select=solutioncomponentid&$filter=${encodeURIComponent(
+      "componenttype eq 1 and objectid eq entity-id and _solutionid_value eq core-solution-id",
+    )}&$top=1`,
     "RetrieveVersion()",
     "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage",
     `/importjobs(${importJobId})?$select=importjobid,data,progress,solutionname`,
@@ -131,39 +135,46 @@ test("publishDocuments preflights entities, imports, then publishes ribbons", as
   });
 });
 
-test("createGeneratedSolution uses the publisher that owns the selected prefix", async () => {
+test("publishDocuments blocks entities that are not in the selected solution", async () => {
   const client = new FakeClient();
-  const solution = await new RibbonPublishService().createGeneratedSolution(
-    client,
-    "new",
+  client.entityInSolution = false;
+  const document = makeDocument(
+    "Entity",
     "account",
+    `<RibbonDiffXml><CustomActions /></RibbonDiffXml>`,
   );
 
-  assert.match(solution.uniqueName, /^d365tools_ribbon_account_/);
-  assert.strictEqual(solution.solutionId, "solution-id");
-  assert.strictEqual(solution.publisherPrefix, "new");
-  assert.strictEqual(solution.publisherUniqueName, "newpublisher");
-  assert.strictEqual(client.posts[0].path, "/solutions");
-  assert.strictEqual(client.posts[0].body["publisherid@odata.bind"], "/publishers(pub-id)");
+  await assert.rejects(
+    new RibbonPublishService().publishDocuments(
+      client,
+      [document],
+      {
+        uniqueName: "Other",
+        solutionId: "other-solution-id",
+        publisherPrefix: "new",
+        publisherUniqueName: "newpublisher",
+      },
+      { pollIntervalMs: 0 },
+    ),
+    /Selected solution Other does not contain account/,
+  );
+
+  assert.deepStrictEqual(client.posts, []);
 });
 
-test("createGeneratedSolutionFromDefaultPublisher uses the Default solution publisher", async () => {
+test("listUnmanagedSolutions maps publisher data for publish choices", async () => {
   const client = new FakeClient();
-  const solution = await new RibbonPublishService().createGeneratedSolutionFromDefaultPublisher(
-    client,
-    "account",
-  );
+  const solutions = await new RibbonPublishService().listUnmanagedSolutions(client);
 
-  assert.match(solution.uniqueName, /^d365tools_ribbon_account_/);
-  assert.strictEqual(solution.solutionId, "solution-id");
-  assert.strictEqual(solution.publisherPrefix, "new");
-  assert.strictEqual(solution.publisherUniqueName, "newpublisher");
-  assert.strictEqual(
-    client.gets[0],
-    "/solutions?$select=solutionid,uniquename&$expand=publisherid($select=publisherid,uniquename,customizationprefix)&$filter=uniquename eq 'Default'&$top=1",
-  );
-  assert.strictEqual(client.posts[0].path, "/solutions");
-  assert.strictEqual(client.posts[0].body["publisherid@odata.bind"], "/publishers(pub-id)");
+  assert.deepStrictEqual(solutions, [
+    {
+      solutionId: "core-solution-id",
+      uniqueName: "core",
+      friendlyName: "Core",
+      publisherPrefix: "new",
+      publisherUniqueName: "newpublisher",
+    },
+  ]);
 });
 
 test("deleteGeneratedSolutionByUniqueName resolves and deletes the generated solution", async () => {
@@ -185,32 +196,28 @@ class FakeClient {
   readonly gets: string[] = [];
   readonly posts: Array<{ path: string; body: any }> = [];
   readonly deletes: string[] = [];
+  entityInSolution = true;
 
   async get<T>(path: string): Promise<T> {
     this.gets.push(path);
     if (path.startsWith("/EntityDefinitions")) {
-      return { LogicalName: "account" } as T;
+      return { LogicalName: "account", MetadataId: "{entity-id}" } as T;
+    }
+    if (path.startsWith("/solutioncomponents?$select=solutioncomponentid")) {
+      return {
+        value: this.entityInSolution ? [{ solutioncomponentid: "component-id" }] : [],
+      } as T;
     }
     if (path === "RetrieveVersion()") {
       return { Version: "9.2.26043.165" } as T;
     }
-    if (path.startsWith("/publishers")) {
+    if (path.startsWith("/solutions?$select=solutionid,uniquename,friendlyname&$expand")) {
       return {
         value: [
           {
-            publisherid: "pub-id",
-            uniquename: "newpublisher",
-            customizationprefix: "new",
-          },
-        ],
-      } as T;
-    }
-    if (path.includes("uniquename eq 'Default'")) {
-      return {
-        value: [
-          {
-            solutionid: "default-solution-id",
-            uniquename: "Default",
+            solutionid: "core-solution-id",
+            uniquename: "core",
+            friendlyname: "Core",
             publisherid: {
               publisherid: "pub-id",
               uniquename: "newpublisher",
@@ -246,9 +253,6 @@ class FakeClient {
         AsyncOperationId: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
         ImportJobKey: "11111111-2222-3333-4444-555555555555",
       } as T;
-    }
-    if (path === "/solutions") {
-      return { solutionid: "solution-id" } as T;
     }
     return {} as T;
   }
