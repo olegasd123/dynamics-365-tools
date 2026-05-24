@@ -5,19 +5,19 @@ import { registerCommands } from "./app/registerCommands";
 import { cleanRibbonZipsFolder } from "./features/ribbons/solutionZipService";
 
 const RIBBON_ZIPS_KEEP = 5;
-
-let ribbonZipsPath: string | undefined;
+const RIBBON_ZIPS_CLEAN_DELAY_MS = 30_000;
 
 export async function activate(context: vscode.ExtensionContext) {
-  ribbonZipsPath = path.join(context.globalStorageUri.fsPath, "ribbon-zips");
+  const ribbonZipsPath = path.join(context.globalStorageUri.fsPath, "ribbon-zips");
+
+  const timer = setTimeout(() => {
+    cleanRibbonZipsFolder(ribbonZipsPath, RIBBON_ZIPS_KEEP).catch(() => {});
+  }, RIBBON_ZIPS_CLEAN_DELAY_MS);
+
+  context.subscriptions.push({ dispose: () => clearTimeout(timer) });
+
   const services = await createServices(context);
   context.subscriptions.push(...registerCommands(services));
 }
 
-export async function deactivate() {
-  if (ribbonZipsPath) {
-    await cleanRibbonZipsFolder(ribbonZipsPath, RIBBON_ZIPS_KEEP).catch(() => {
-      // Ignore errors so shutdown is never blocked
-    });
-  }
-}
+export function deactivate() {}
