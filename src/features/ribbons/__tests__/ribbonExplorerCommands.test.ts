@@ -348,14 +348,18 @@ test("prefills saved JavaScript action values while editing", async () => {
   let libraryItems: vscode.QuickPickItem[] = [];
   let parameterItems: vscode.QuickPickItem[] = [];
   let functionInputValue: string | undefined;
+  const quickPickOptions: Array<{ ignoreFocusOut?: boolean }> = [];
+  const inputOptions: Array<{ ignoreFocusOut?: boolean }> = [];
 
   const originalShowQuickPick = vscode.window.showQuickPick;
   const originalShowInputBox = vscode.window.showInputBox;
 
   (vscode.window as any).showQuickPick = async (
     items: any[],
-    options: { placeHolder?: string },
+    options: { placeHolder?: string; ignoreFocusOut?: boolean },
   ) => {
+    quickPickOptions.push(options);
+
     if (options.placeHolder === "Command action") {
       actionKindItems = items;
       return items.find((item) => item.label === "JavaScript function");
@@ -373,7 +377,13 @@ test("prefills saved JavaScript action values while editing", async () => {
 
     return undefined;
   };
-  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+  (vscode.window as any).showInputBox = async (options: {
+    prompt?: string;
+    value?: string;
+    ignoreFocusOut?: boolean;
+  }) => {
+    inputOptions.push(options);
+
     if (options.prompt === "JavaScript function name") {
       functionInputValue = options.value;
       return options.value;
@@ -427,6 +437,10 @@ test("prefills saved JavaScript action values while editing", async () => {
     parameterItems.filter((item) => item.picked).map((item) => item.label),
     ["PrimaryControl", "CommandProperties"],
   );
+  assert.ok(quickPickOptions.length > 0);
+  assert.ok(quickPickOptions.every((options) => options.ignoreFocusOut));
+  assert.ok(inputOptions.length > 0);
+  assert.ok(inputOptions.every((options) => options.ignoreFocusOut));
 
   const updated = applyRibbonPatchSequence(source, patches);
   const [updatedDocument] = readRibbonDocuments(updated, {

@@ -158,12 +158,48 @@ const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
   },
 ];
 
+function withPaletteFocus<T extends vscode.InputBoxOptions | vscode.QuickPickOptions>(
+  options?: T,
+): T & { ignoreFocusOut: true } {
+  return { ...(options ?? ({} as T)), ignoreFocusOut: true };
+}
+
+function showRibbonInputBox(options: vscode.InputBoxOptions): Thenable<string | undefined> {
+  return vscode.window.showInputBox(withPaletteFocus(options));
+}
+
+function showRibbonQuickPick<T extends vscode.QuickPickItem>(
+  items: readonly T[] | Thenable<readonly T[]>,
+  options: vscode.QuickPickOptions & { canPickMany: true },
+): Thenable<T[] | undefined>;
+function showRibbonQuickPick<T extends vscode.QuickPickItem>(
+  items: readonly T[] | Thenable<readonly T[]>,
+  options?: vscode.QuickPickOptions & { canPickMany?: false },
+): Thenable<T | undefined>;
+function showRibbonQuickPick(
+  items: readonly string[] | Thenable<readonly string[]>,
+  options: vscode.QuickPickOptions & { canPickMany: true },
+): Thenable<string[] | undefined>;
+function showRibbonQuickPick(
+  items: readonly string[] | Thenable<readonly string[]>,
+  options?: vscode.QuickPickOptions & { canPickMany?: false },
+): Thenable<string | undefined>;
+function showRibbonQuickPick(
+  items:
+    | readonly vscode.QuickPickItem[]
+    | readonly string[]
+    | Thenable<readonly vscode.QuickPickItem[] | readonly string[]>,
+  options?: vscode.QuickPickOptions,
+): Thenable<vscode.QuickPickItem | vscode.QuickPickItem[] | string | string[] | undefined> {
+  return vscode.window.showQuickPick(items as never, withPaletteFocus(options) as never);
+}
+
 export function refreshRibbonExplorer(ctx: CommandContext): void {
   ctx.ribbonExplorer.refresh();
 }
 
 export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void> {
-  const pick = await vscode.window.showQuickPick<SolutionOpenPick>(
+  const pick = await showRibbonQuickPick<SolutionOpenPick>(
     [
       {
         label: "Download from environment",
@@ -510,7 +546,7 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
     return;
   }
 
-  const picks = await vscode.window.showQuickPick<GeneratedSolutionPick>(
+  const picks = await showRibbonQuickPick<GeneratedSolutionPick>(
     generated.map((solution) => ({
       label: solution.uniqueName,
       description: solution.friendlyName,
@@ -745,7 +781,7 @@ async function resolvePullSource(
     return sources[0];
   }
 
-  const pick = await vscode.window.showQuickPick<RibbonSourcePick>(
+  const pick = await showRibbonQuickPick<RibbonSourcePick>(
     sources.map((source) => ({
       label: source.name,
       description: source.kind,
@@ -781,7 +817,7 @@ function pickDataverseSolution(
   solutions: Awaited<ReturnType<CommandContext["solutionZipService"]["listUnmanagedSolutions"]>>,
   placeHolder: string,
 ): Thenable<DataverseSolutionPick | undefined> {
-  return vscode.window.showQuickPick<DataverseSolutionPick>(
+  return showRibbonQuickPick<DataverseSolutionPick>(
     solutions.map((solution) => ({
       label: solution.uniqueName,
       description: solution.version,
@@ -795,17 +831,15 @@ function pickDataverseSolution(
 function pickRibbonPublishSolution(
   solutions: RibbonPublishSolution[],
 ): Thenable<RibbonPublishSolution | undefined> {
-  return vscode.window
-    .showQuickPick<RibbonPublishSolutionPick>(
-      solutions.map((solution) => ({
-        label: solution.uniqueName,
-        description: solution.publisherPrefix,
-        detail: solution.friendlyName,
-        solution,
-      })),
-      { placeHolder: "Select unmanaged solution to update" },
-    )
-    .then((pick) => pick?.solution);
+  return showRibbonQuickPick<RibbonPublishSolutionPick>(
+    solutions.map((solution) => ({
+      label: solution.uniqueName,
+      description: solution.publisherPrefix,
+      detail: solution.friendlyName,
+      solution,
+    })),
+    { placeHolder: "Select unmanaged solution to update" },
+  ).then((pick) => pick?.solution);
 }
 
 function addImportedRibbonSource(ctx: CommandContext, source: RibbonSource): void {
@@ -968,7 +1002,7 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const label = await vscode.window.showInputBox({
+  const label = await showRibbonInputBox({
     prompt: "Button label",
     placeHolder: "Validate and save",
     validateInput: (value) => (value.trim() ? undefined : "Button label is required."),
@@ -982,7 +1016,7 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const actionKind = await vscode.window.showQuickPick(
+  const actionKind = await showRibbonQuickPick(
     [
       { label: "JavaScript function", description: "Call a workspace web resource" },
       { label: "URL", description: "Open a URL" },
@@ -1001,11 +1035,11 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const image16x16 = await vscode.window.showInputBox({
+  const image16x16 = await showRibbonInputBox({
     prompt: "Small icon web resource",
     placeHolder: "new_/icons/save16.png",
   });
-  const image32x32 = await vscode.window.showInputBox({
+  const image32x32 = await showRibbonInputBox({
     prompt: "Large icon web resource",
     placeHolder: "new_/icons/save32.png",
   });
@@ -1231,7 +1265,7 @@ export async function addRibbonCommandDefinition(
     return;
   }
 
-  const id = await vscode.window.showInputBox({
+  const id = await showRibbonInputBox({
     prompt: "Command definition id",
     placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.Command`,
     validateInput: (value) => validateUniqueId(target.document, value, "Command id is required."),
@@ -1357,7 +1391,7 @@ export async function addRibbonLocLabel(
     return;
   }
 
-  const id = await vscode.window.showInputBox({
+  const id = await showRibbonInputBox({
     prompt: "Loc label id",
     placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.Label`,
     validateInput: (value) => validateUniqueId(target.document, value, "Label id is required."),
@@ -1366,7 +1400,7 @@ export async function addRibbonLocLabel(
     return;
   }
 
-  const description = await vscode.window.showInputBox({
+  const description = await showRibbonInputBox({
     prompt: "Text",
     placeHolder: "Validate and save",
     validateInput: (value) => (value.trim() ? undefined : "Text is required."),
@@ -1375,7 +1409,7 @@ export async function addRibbonLocLabel(
     return;
   }
 
-  const languageCode = await vscode.window.showInputBox({
+  const languageCode = await showRibbonInputBox({
     prompt: "Language code",
     value: "1033",
     validateInput: (value) =>
@@ -1406,7 +1440,7 @@ export async function addRibbonLocLabelTitle(
     return;
   }
 
-  const languageCode = await vscode.window.showInputBox({
+  const languageCode = await showRibbonInputBox({
     prompt: "Language code",
     value: "1033",
     validateInput: (value) => {
@@ -1424,7 +1458,7 @@ export async function addRibbonLocLabelTitle(
     return;
   }
 
-  const description = await vscode.window.showInputBox({
+  const description = await showRibbonInputBox({
     prompt: "Text",
     placeHolder: "Validate and save",
     validateInput: (value) => (value.trim() ? undefined : "Text is required."),
@@ -2166,7 +2200,7 @@ async function editCustomAction(
     return;
   }
 
-  const sequenceText = await vscode.window.showInputBox({
+  const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
     value: action.sequence === undefined ? "" : String(action.sequence),
     validateInput: validateOptionalNumber,
@@ -2267,7 +2301,7 @@ async function editNodeId(
   prompt: string,
   currentId: string,
 ): Promise<void> {
-  const id = await vscode.window.showInputBox({
+  const id = await showRibbonInputBox({
     prompt,
     value: currentId,
     validateInput: (value) =>
@@ -2321,7 +2355,7 @@ async function editLocLabelTitle(
   document: RibbonDocument,
   title: LocLabelTitle,
 ): Promise<void> {
-  const languageCode = await vscode.window.showInputBox({
+  const languageCode = await showRibbonInputBox({
     prompt: "Language code",
     value: String(title.languageCode),
     validateInput: (value) =>
@@ -2367,7 +2401,7 @@ async function pickOobCommand(
     })),
     manual,
   ];
-  const pick = await vscode.window.showQuickPick<OobCommandPick>(items, {
+  const pick = await showRibbonQuickPick<OobCommandPick>(items, {
     placeHolder: options.placeHolder ?? "OOB button command to hide",
   });
 
@@ -2379,7 +2413,7 @@ async function pickOobCommand(
     return pick.command;
   }
 
-  const id = await vscode.window.showInputBox({
+  const id = await showRibbonInputBox({
     prompt: "OOB command id",
     placeHolder: "Mscrm.SavePrimary",
     validateInput: (value) => (value.trim() ? undefined : "Command id is required."),
@@ -2409,7 +2443,7 @@ async function pickOobCommandsForLocation(
   const suggested = catalogLocation
     ? commands.filter((command) => command.locationIds.includes(catalogLocation.id))
     : commands;
-  const picks = await vscode.window.showQuickPick<OobCommandPick>(
+  const picks = await showRibbonQuickPick<OobCommandPick>(
     suggested.map((command) => ({
       label: command.id,
       description: command.label,
@@ -2439,7 +2473,7 @@ async function pickOobCommandOrder(
   const ordered: OobRibbonCommand[] = [];
 
   while (remaining.length) {
-    const pick = await vscode.window.showQuickPick<OobCommandPick>(
+    const pick = await showRibbonQuickPick<OobCommandPick>(
       remaining.map((command) => ({
         label: command.id,
         description: command.label,
@@ -2473,7 +2507,7 @@ async function pickLocation(
     .filter((location): location is NonNullable<typeof location> => !!location);
   const fallbackLocations = listOobRibbonLocations(view.scope, document.entityLogicalName);
   const locations = suggestedLocations.length ? suggestedLocations : fallbackLocations;
-  const pick = await vscode.window.showQuickPick(
+  const pick = await showRibbonQuickPick(
     [
       ...locations.map((location) => ({
         label: location.location,
@@ -2492,7 +2526,7 @@ async function pickLocation(
     return pick.label;
   }
 
-  return vscode.window.showInputBox({
+  return showRibbonInputBox({
     prompt: "Ribbon location",
     placeHolder: "Mscrm.Form.account.MainTab.Save.Controls._children",
     validateInput: (value) => (value.trim() ? undefined : "Location is required."),
@@ -2556,7 +2590,7 @@ async function promptCrmParameters(
   const customCrmValues = currentCrmValues.filter(
     (value) => !knownCrmValues.has(value.toLowerCase()),
   );
-  const picks = await vscode.window.showQuickPick<CrmParameterPick>(
+  const picks = await showRibbonQuickPick<CrmParameterPick>(
     [
       {
         label: CUSTOM_CRM_PARAMETERS,
@@ -2583,7 +2617,7 @@ async function promptCrmParameters(
     return toCrmParameters(values);
   }
 
-  const input = await vscode.window.showInputBox({
+  const input = await showRibbonInputBox({
     prompt: "Custom CRM parameters",
     placeHolder: "CustomValue, OtherValue",
     value: customCrmValues.join(", "),
@@ -2636,7 +2670,7 @@ async function promptCommandAction(
     { label: "JavaScript function", description: "Call a workspace web resource" },
     { label: "URL", description: "Open a URL" },
   ];
-  const actionKind = await vscode.window.showQuickPick(
+  const actionKind = await showRibbonQuickPick(
     currentKind
       ? actionKinds.map((item) =>
           item.label === currentKind ? { ...item, description: "Current action type" } : item,
@@ -2656,7 +2690,7 @@ async function promptCommandAction(
 async function promptOptionalCommandAction(
   ctx: CommandContext,
 ): Promise<NewCommandActionInput | undefined | null> {
-  const actionKind = await vscode.window.showQuickPick(
+  const actionKind = await showRibbonQuickPick(
     [
       { label: "JavaScript function", description: "Call a workspace web resource" },
       { label: "URL", description: "Open a URL" },
@@ -2676,7 +2710,7 @@ async function promptOptionalCommandAction(
 }
 
 async function promptUrlAction(currentAddress?: string) {
-  const address = await vscode.window.showInputBox({
+  const address = await showRibbonInputBox({
     prompt: "URL",
     placeHolder: "https://contoso.example",
     value: currentAddress ?? "",
@@ -2693,7 +2727,7 @@ async function promptUrlAction(currentAddress?: string) {
 }
 
 function promptRequired(prompt: string, value: string | undefined): Thenable<string | undefined> {
-  return vscode.window.showInputBox({
+  return showRibbonInputBox({
     prompt,
     value: value ?? "",
     validateInput: (input) => (input.trim() ? undefined : `${prompt} is required.`),
@@ -2701,7 +2735,7 @@ function promptRequired(prompt: string, value: string | undefined): Thenable<str
 }
 
 function promptOptional(prompt: string, value: string | undefined): Thenable<string | undefined> {
-  return vscode.window.showInputBox({
+  return showRibbonInputBox({
     prompt,
     value: value ?? "",
   });
@@ -2723,7 +2757,7 @@ async function pickWebResourceLibrary(
     manual: true,
   };
 
-  const pick = await vscode.window.showQuickPick([...picks, manualPick], {
+  const pick = await showRibbonQuickPick([...picks, manualPick], {
     placeHolder: "JavaScript web resource",
   });
   if (!pick) {
@@ -2734,7 +2768,7 @@ async function pickWebResourceLibrary(
     return pick;
   }
 
-  const uniqueName = await vscode.window.showInputBox({
+  const uniqueName = await showRibbonInputBox({
     prompt: "JavaScript web resource schema name",
     placeHolder: "new_/scripts/account.js",
     value: currentUniqueName ?? "",
@@ -2809,7 +2843,7 @@ async function pickJavaScriptFunctionName(
 ): Promise<string | undefined> {
   const suggestions = await listJavaScriptFunctionSuggestions(library.localPath);
   if (!suggestions.length) {
-    return vscode.window.showInputBox({
+    return showRibbonInputBox({
       prompt: "JavaScript function name",
       placeHolder: "validateAndSave",
       value: currentFunctionName ?? "",
@@ -2825,7 +2859,7 @@ async function pickJavaScriptFunctionName(
         ? "Current function"
         : undefined,
   }));
-  const pick = await vscode.window.showQuickPick([...suggestionItems, { label: manual }], {
+  const pick = await showRibbonQuickPick([...suggestionItems, { label: manual }], {
     placeHolder: "JavaScript function name",
   });
   if (!pick) {
@@ -2836,7 +2870,7 @@ async function pickJavaScriptFunctionName(
     return pick.label;
   }
 
-  return vscode.window.showInputBox({
+  return showRibbonInputBox({
     prompt: "JavaScript function name",
     placeHolder: "validateAndSave",
     value: currentFunctionName ?? "",
@@ -2963,7 +2997,7 @@ async function addRibbonRule(
     return;
   }
 
-  const id = await vscode.window.showInputBox({
+  const id = await showRibbonInputBox({
     prompt: `${kind} rule id`,
     placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.${kind}Rule`,
     validateInput: (value) => validateUniqueId(target.document, value, "Rule id is required."),
@@ -3034,7 +3068,7 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
     (rule) => !used.has(rule.id),
   );
   const manual = `Type ${label.toLowerCase()} id`;
-  const pick = await vscode.window.showQuickPick(
+  const pick = await showRibbonQuickPick(
     [
       ...rules.map((rule) => ({ label: rule.id })),
       { label: manual, description: "Use an id that is not in this view yet" },
@@ -3049,7 +3083,7 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
     return pick.label;
   }
 
-  const id = await vscode.window.showInputBox({
+  const id = await showRibbonInputBox({
     prompt: `${label} id`,
     validateInput: (value) => {
       const id = value.trim();
@@ -3170,7 +3204,7 @@ async function promptRuleStep(
     { label: "ValueRule", description: "Check a field value" },
     { label: "EntityPrivilegeRule", description: "Check entity privilege" },
   ];
-  const pick = await vscode.window.showQuickPick(
+  const pick = await showRibbonQuickPick(
     [
       ...(ruleKind === "Display" ? displayOnly : []),
       ...common,
@@ -3221,7 +3255,7 @@ async function promptCustomRuleStep(ctx: CommandContext): Promise<NewRuleStepInp
 }
 
 async function promptFormStateRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const state = await vscode.window.showQuickPick(["Create", "Existing", "ReadOnly", "Disabled"], {
+  const state = await showRibbonQuickPick(["Create", "Existing", "ReadOnly", "Disabled"], {
     placeHolder: "Form state",
   });
   if (!state) {
@@ -3237,14 +3271,14 @@ async function promptFormStateRuleStep(): Promise<NewRuleStepInput | undefined> 
 }
 
 async function promptCommandClientTypeRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const type = await vscode.window.showQuickPick(["Modern", "Refresh"], {
+  const type = await showRibbonQuickPick(["Modern", "Refresh"], {
     placeHolder: "Client type",
   });
   return type ? { kind: "CommandClientTypeRule", type: type as "Modern" | "Refresh" } : undefined;
 }
 
 async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const field = await vscode.window.showInputBox({
+  const field = await showRibbonInputBox({
     prompt: "Field name",
     placeHolder: "statuscode",
     validateInput: (value) => (value.trim() ? undefined : "Field name is required."),
@@ -3253,7 +3287,7 @@ async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
     return undefined;
   }
 
-  const value = await vscode.window.showInputBox({
+  const value = await showRibbonInputBox({
     prompt: "Value",
     validateInput: (input) => (input.trim() ? undefined : "Value is required."),
   });
@@ -3270,7 +3304,7 @@ async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
 }
 
 async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const privilegeType = await vscode.window.showQuickPick(
+  const privilegeType = await showRibbonQuickPick(
     ["Create", "Read", "Write", "Delete", "Append", "AppendTo", "Assign", "Share"],
     { placeHolder: "Privilege type" },
   );
@@ -3278,11 +3312,11 @@ async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
     return undefined;
   }
 
-  const entityName = await vscode.window.showInputBox({
+  const entityName = await showRibbonInputBox({
     prompt: "Entity logical name",
     placeHolder: "account",
   });
-  const privilegeDepth = await vscode.window.showQuickPick(["Basic", "Local", "Deep", "Global"], {
+  const privilegeDepth = await showRibbonQuickPick(["Basic", "Local", "Deep", "Global"], {
     placeHolder: "Privilege depth",
   });
   const invertResult = await promptOptionalBoolean("Invert result?");
@@ -3300,7 +3334,7 @@ async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
 }
 
 async function promptOptionalBoolean(prompt: string): Promise<boolean | undefined> {
-  const pick = await vscode.window.showQuickPick(["No", "Yes"], { placeHolder: prompt });
+  const pick = await showRibbonQuickPick(["No", "Yes"], { placeHolder: prompt });
   if (!pick) {
     return undefined;
   }
