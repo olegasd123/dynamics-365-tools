@@ -16,7 +16,9 @@ import {
   normalizeWebResourceUniqueName,
   openRibbonsFromSolution,
   publishRibbonToEnvironment,
+  deleteRibbonNode,
 } from "../commands/ribbonExplorerCommands";
+import { createRibbonCascadeDeletePlan } from "../ribbonCascadeDelete";
 import { RibbonPatch, RibbonSource } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";
 import { RibbonDocumentNode, RibbonItemNode } from "../ribbonExplorer";
@@ -32,6 +34,180 @@ test("normalizes manually typed web resource names", () => {
   assert.strictEqual(
     normalizeWebResourceUniqueName("new_/scripts/account.js"),
     "new_/scripts/account.js",
+  );
+});
+
+test("plans cascade delete for ribbon items with one reference", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules><EnableRule Id="new.Enabled" /></EnableRules>
+      <DisplayRules><DisplayRule Id="new.Visible" /></DisplayRules>
+      <Actions><Url Address="https://contoso.example" /></Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules><EnableRule Id="new.Enabled" /></EnableRules>
+    <DisplayRules><DisplayRule Id="new.Visible" /></DisplayRules>
+  </RuleDefinitions>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const action = document.views[0].customActions[0];
+
+  const plan = createRibbonCascadeDeletePlan(document, "d365RibbonCustomAction", action.range);
+
+  assert.deepStrictEqual(
+    plan?.related.map((item) => `${item.kind}:${item.id}`),
+    [
+      "CommandDefinition:new.Command",
+      "EnableRule:new.Enabled",
+      "DisplayRule:new.Visible",
+      "LocLabel:new.Label",
+    ],
+  );
+});
+
+test("does not cascade delete shared ribbon items", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.First.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.First.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="new.Second.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Second.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions><Url Address="https://contoso.example" /></Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const action = document.views[0].customActions[0];
+
+  const plan = createRibbonCascadeDeletePlan(document, "d365RibbonCustomAction", action.range);
+
+  assert.deepStrictEqual(plan?.related, []);
+});
+
+test("delete command can remove related items and undo restores them", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-cascade-delete-"));
+  const filePath = path.join(workspaceRoot, "RibbonDiffXml.xml");
+  await fs.writeFile(
+    filePath,
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions><Url Address="https://contoso.example" /></Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`,
+    "utf8",
+  );
+  const source: RibbonSource = {
+    id: "source",
+    kind: "flat",
+    name: "Source",
+    rootUri: workspaceRoot,
+    files: [{ fileUri: filePath, kind: "Entity", entityLogicalName: "account" }],
+  };
+  const state = new RibbonEditorState(new RibbonRepository());
+  const [document] = await state.loadSource(source);
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    action.id,
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-method",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+  let warningDetail = "";
+
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    options: { detail?: string },
+  ) => {
+    warningDetail = options.detail ?? "";
+    return "Delete Related Items";
+  };
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: state,
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  assert.match(warningDetail, /Command definition: new\.Command/);
+  assert.match(warningDetail, /Loc label: new\.Label/);
+
+  const [deletedDocument] = await state.loadSource(source);
+  assert.deepStrictEqual(deletedDocument.views[0].customActions, []);
+  assert.deepStrictEqual(deletedDocument.views[0].commandDefinitions, []);
+  assert.deepStrictEqual(deletedDocument.views[0].locLabels, []);
+
+  assert.strictEqual(state.undo(), true);
+
+  const [restoredDocument] = await state.loadSource(source);
+  assert.deepStrictEqual(
+    restoredDocument.views[0].customActions.map((item) => item.id),
+    ["new.Action"],
+  );
+  assert.deepStrictEqual(
+    restoredDocument.views[0].commandDefinitions.map((item) => item.id),
+    ["new.Command"],
+  );
+  assert.deepStrictEqual(
+    restoredDocument.views[0].locLabels.map((item) => item.id),
+    ["new.Label"],
   );
 });
 

@@ -64,6 +64,11 @@ import {
   OobRibbonCommand,
 } from "../oobCatalog";
 import type { RibbonPublishSolution } from "../ribbonPublishService";
+import {
+  createRibbonCascadeDeletePlan,
+  formatRibbonCascadeDeleteItem,
+  RibbonCascadeDeleteItem,
+} from "../ribbonCascadeDelete";
 
 interface OobCommandPick extends vscode.QuickPickItem {
   command?: OobRibbonCommand;
@@ -103,6 +108,8 @@ interface GeneratedSolutionPick extends vscode.QuickPickItem {
 
 const SAVE_EXPORT_BACKUP = "Save Backup";
 const CUSTOM_CRM_PARAMETERS = "Type custom parameters";
+const DELETE_RELATED_ITEMS = "Delete Related Items";
+const DELETE_SELECTED_ONLY = "Delete Selected Only";
 const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
   {
     label: "PrimaryControl",
@@ -851,15 +858,55 @@ function solutionBackupFileName(solutionUniqueName: string, now = new Date()): s
   return `${safeName}-backup-${timestamp}.zip`;
 }
 
-export function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): void {
+export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
   if (!(node instanceof RibbonItemNode) || !node.editTarget) {
     vscode.window.showWarningMessage("Select a ribbon item that can be deleted.");
     return;
   }
 
   const { document, range } = node.editTarget;
-  ctx.ribbonEditorState.queuePatches(document, [createDeleteNodePatch(document.sourceText, range)]);
+  const plan = createRibbonCascadeDeletePlan(document, node.contextValue, range);
+  if (!plan?.related.length) {
+    ctx.ribbonEditorState.queuePatches(document, [
+      createDeleteNodePatch(document.sourceText, range),
+    ]);
+    ctx.ribbonExplorer.refresh();
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Delete ${plan.related.length} related ribbon item${plan.related.length === 1 ? "" : "s"}?`,
+    {
+      modal: true,
+      detail: relatedDeleteMessage(plan.related),
+    },
+    DELETE_RELATED_ITEMS,
+    DELETE_SELECTED_ONLY,
+  );
+  if (!choice) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(
+    document,
+    choice === DELETE_RELATED_ITEMS
+      ? plan.patches
+      : [createDeleteNodePatch(document.sourceText, range)],
+  );
   ctx.ribbonExplorer.refresh();
+}
+
+function relatedDeleteMessage(related: RibbonCascadeDeleteItem[]): string {
+  return [
+    "These items have only one reference, and it is linked to the item you are deleting:",
+    "",
+    ...related.map((item) => {
+      const reason = item.reason ? ` ${item.reason}` : "";
+      return `- ${formatRibbonCascadeDeleteItem(item)}.${reason}`;
+    }),
+    "",
+    "Use Undo Ribbon Edit to restore them.",
+  ].join("\n");
 }
 
 export async function editRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
