@@ -141,6 +141,7 @@ function findRelatedDeleteItems(
     const selectedCustomActionCommandIds = new Set(
       selectedCustomActions.map(commandIdFromCustomAction).filter(isDefined),
     );
+    const selectedLocLabelIds = idsForKind(selected, "LocLabel");
 
     for (const action of inventory.customActions) {
       const commandId = commandIdFromCustomAction(action);
@@ -157,6 +158,23 @@ function findRelatedDeleteItems(
         id: action.id,
         range: action.range,
         reason: `It uses only ${commandId}.`,
+      });
+    }
+
+    for (const action of inventory.customActions) {
+      const actionLabelIds = locLabelIdsFromCustomAction(action);
+      if (
+        !actionLabelIds.some((id) => selectedLocLabelIds.has(id)) ||
+        actionLabelIds.some((id) => (locLabelReferences.get(id) ?? 0) !== 1)
+      ) {
+        continue;
+      }
+
+      changed = addRelated(selected, related, {
+        kind: "CustomAction",
+        id: action.id,
+        range: action.range,
+        reason: "Only this custom action uses the deleted loc label.",
       });
     }
 
@@ -212,9 +230,14 @@ function findRelatedDeleteItems(
       });
     }
 
-    const selectedLocLabelIds = new Set(selectedCustomActions.flatMap(locLabelIdsFromCustomAction));
+    const selectedCustomActionLocLabelIds = new Set(
+      selectedCustomActions.flatMap(locLabelIdsFromCustomAction),
+    );
     for (const label of inventory.locLabels) {
-      if (!selectedLocLabelIds.has(label.id) || (locLabelReferences.get(label.id) ?? 0) !== 1) {
+      if (
+        !selectedCustomActionLocLabelIds.has(label.id) ||
+        (locLabelReferences.get(label.id) ?? 0) !== 1
+      ) {
         continue;
       }
 

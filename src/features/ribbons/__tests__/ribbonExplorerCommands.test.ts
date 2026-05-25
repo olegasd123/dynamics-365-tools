@@ -82,6 +82,40 @@ test("plans cascade delete for ribbon items with one reference", () => {
   );
 });
 
+test("plans cascade delete from loc label to its single custom action", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions><Url Address="https://contoso.example" /></Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const label = document.views[0].locLabels[0];
+
+  const plan = createRibbonCascadeDeletePlan(document, "d365RibbonLocLabel", label.range);
+
+  assert.deepStrictEqual(
+    plan?.related.map((item) => `${item.kind}:${item.id}`),
+    ["CustomAction:new.Action", "CommandDefinition:new.Command"],
+  );
+});
+
 test("does not cascade delete shared ribbon items", () => {
   const source = `<RibbonDiffXml>
   <CustomActions>
@@ -112,10 +146,13 @@ test("does not cascade delete shared ribbon items", () => {
     entityLogicalName: "account",
   });
   const action = document.views[0].customActions[0];
+  const label = document.views[0].locLabels[0];
 
   const plan = createRibbonCascadeDeletePlan(document, "d365RibbonCustomAction", action.range);
+  const labelPlan = createRibbonCascadeDeletePlan(document, "d365RibbonLocLabel", label.range);
 
   assert.deepStrictEqual(plan?.related, []);
+  assert.deepStrictEqual(labelPlan?.related, []);
 });
 
 test("delete command can remove related items and undo restores them", async () => {
