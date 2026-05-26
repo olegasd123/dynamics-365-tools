@@ -105,7 +105,6 @@ export class WebResourcePublisher {
       const encoded = content.toString("base64");
       hash = hash ?? this.hashContent(content);
       const webResourceType = this.detectType(localPath);
-      const displayName = path.posix.basename(remotePath);
 
       this.output.appendLine(`  ${fmt.resource(remotePath)} ← ${localPath}`);
       const canManageMissing = env.manageMissingComponents === true;
@@ -122,7 +121,6 @@ export class WebResourcePublisher {
       if (existingId) {
         resourceId = await this.updateWebResource(client, existingId, {
           content: encoded,
-          displayName,
           name: remotePath,
           type: webResourceType,
         });
@@ -131,7 +129,7 @@ export class WebResourcePublisher {
       } else {
         resourceId = await this.createWebResource(client, {
           content: encoded,
-          displayName,
+          displayName: path.posix.basename(remotePath),
           name: remotePath,
           type: webResourceType,
         });
@@ -334,11 +332,10 @@ export class WebResourcePublisher {
   private async updateWebResource(
     client: DataverseClient,
     id: string,
-    payload: { content: string; displayName: string; name: string; type: number },
+    payload: { content: string; name: string; type: number },
   ): Promise<string> {
     await client.patch(`/webresourceset(${id})`, {
       content: payload.content,
-      displayname: payload.displayName,
       name: payload.name,
       webresourcetype: payload.type,
     });

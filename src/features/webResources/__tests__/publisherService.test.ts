@@ -212,11 +212,11 @@ test("publish creates a new web resource and adds it to the solution", async () 
   const file = path.join(workspaceRoot, "script.js");
   await fs.writeFile(file, "console.log('hi');");
 
-  const calls: Array<{ url: string; method: string | undefined }> = [];
+  const calls: Array<{ url: string; method: string | undefined; body?: string }> = [];
   const originalFetch = global.fetch;
   global.fetch = (async (url: any, init: any = {}) => {
     const method = init.method || "GET";
-    calls.push({ url: String(url), method });
+    calls.push({ url: String(url), method, body: init.body });
 
     if (String(url).includes("/solutions?")) {
       return new Response(JSON.stringify({ value: [{ solutionid: "sol-id" }] }), {
@@ -266,6 +266,9 @@ test("publish creates a new web resource and adds it to the solution", async () 
     });
     assert.strictEqual(calls.filter((c) => c.url.includes("/AddSolutionComponent")).length, 1);
     assert.strictEqual(calls.filter((c) => c.url.includes("/PublishXml")).length, 1);
+    const createCall = calls.find((c) => c.method === "POST" && c.url.includes("/webresourceset"));
+    const createBody = JSON.parse(createCall?.body ?? "{}") as { displayname?: string };
+    assert.strictEqual(createBody.displayname, "script.js");
   } finally {
     global.fetch = originalFetch;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
@@ -280,11 +283,11 @@ test("publish updates an existing web resource for folder binding", async () => 
   await fs.mkdir(folder, { recursive: true });
   await fs.writeFile(file, "console.log('hi');");
 
-  const calls: Array<{ url: string; method: string | undefined }> = [];
+  const calls: Array<{ url: string; method: string | undefined; body?: string }> = [];
   const originalFetch = global.fetch;
   global.fetch = (async (url: any, init: any = {}) => {
     const method = init.method || "GET";
-    calls.push({ url: String(url), method });
+    calls.push({ url: String(url), method, body: init.body });
 
     if (String(url).includes("/solutions?")) {
       return new Response(JSON.stringify({ value: [{ solutionid: "sol-id" }] }), {
@@ -328,6 +331,8 @@ test("publish updates an existing web resource for folder binding", async () => 
     });
     const updateCall = calls.find((c) => c.method === "PATCH");
     assert.ok(updateCall?.url.includes("webresourceset(abc)"));
+    const updateBody = JSON.parse(updateCall?.body ?? "{}") as { displayname?: string };
+    assert.strictEqual("displayname" in updateBody, false);
     assert.strictEqual(
       calls.some((c) => c.url.includes("AddSolutionComponent")),
       false,

@@ -78,6 +78,7 @@ const window = {
   },
   showInputBox: async () => undefined,
   showQuickPick: async () => undefined,
+  showSaveDialog: async () => undefined,
   showTextDocument: async () => undefined,
   withProgress: async (_options, task) => {
     const token = {
@@ -104,7 +105,30 @@ const window = {
     hide: () => {},
     dispose: () => {},
   }),
+  createTreeView: (_viewId, _options) => ({
+    onDidChangeSelection: () => ({ dispose: () => {} }),
+    reveal: async () => undefined,
+    dispose: () => {},
+  }),
+  registerTreeDataProvider: () => ({ dispose: () => {} }),
+  createWebviewPanel: (_viewType, title) => {
+    const disposeEmitter = new EventEmitter();
+    const messageEmitter = new EventEmitter();
+    const panel = {
+      title,
+      webview: {
+        html: "",
+        onDidReceiveMessage: messageEmitter.event,
+        __postMessage: (message) => messageEmitter.fire(message),
+      },
+      onDidDispose: disposeEmitter.event,
+      dispose: () => disposeEmitter.fire(undefined),
+    };
+    window.__lastWebviewPanel = panel;
+    return panel;
+  },
   __messages: messages,
+  __lastWebviewPanel: undefined,
 };
 
 const extensions = {
@@ -258,6 +282,28 @@ class ThemeIcon {
   }
 }
 
+class Disposable {
+  constructor(callOnDispose = () => {}) {
+    this.callOnDispose = callOnDispose;
+  }
+
+  dispose() {
+    this.callOnDispose();
+  }
+
+  static from(...disposables) {
+    return new Disposable(() => {
+      for (const disposable of disposables) {
+        disposable.dispose();
+      }
+    });
+  }
+}
+
+const ViewColumn = {
+  Beside: -2,
+};
+
 module.exports = {
   Uri,
   workspace,
@@ -279,4 +325,6 @@ module.exports = {
   TreeItem,
   TreeItemCollapsibleState,
   ThemeIcon,
+  Disposable,
+  ViewColumn,
 };

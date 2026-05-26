@@ -20,6 +20,14 @@ import { ProcessRunner } from "../features/pcf/processRunner";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
+import { RibbonDiagnosticsService } from "../features/ribbons/ribbonDiagnostics";
+import { RibbonEditorState } from "../features/ribbons/ribbonEditorState";
+import { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
+import { RibbonPublishService } from "../features/ribbons/ribbonPublishService";
+import { RibbonRepository } from "../features/ribbons/ribbonRepository";
+import { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
+import { SolutionZipService } from "../features/ribbons/solutionZipService";
+import { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import { BindingService } from "../features/webResources/bindingService";
 import { PublishCacheService } from "../features/webResources/publishCacheService";
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
@@ -49,6 +57,19 @@ export async function createServices(
 
   const pluginAssemblyIntrospector = new PluginAssemblyIntrospector(extensionContext.extensionPath);
   const pluginRegistration = new PluginRegistrationManager(pluginAssemblyIntrospector);
+  const ribbonSourceLocator = new RibbonSourceLocator();
+  const ribbonRepository = new RibbonRepository();
+  const ribbonPublishService = new RibbonPublishService();
+  const solutionZipService = new SolutionZipService();
+  const ribbonEditorState = new RibbonEditorState(ribbonRepository);
+  const ribbonDiagnostics = new RibbonDiagnosticsService();
+  const ribbonExplorer = new RibbonExplorerProvider(
+    configuration,
+    ribbonSourceLocator,
+    ribbonEditorState,
+    ribbonDiagnostics,
+  );
+  const ribbonFormPanel = new RibbonFormPanel();
   const pluginExplorer = new PluginExplorerProvider(
     configuration,
     connections,
@@ -114,6 +135,14 @@ export async function createServices(
     connections,
     pluginExplorer,
     pluginRegistration,
+    ribbonSourceLocator,
+    ribbonRepository,
+    ribbonPublishService,
+    solutionZipService,
+    ribbonEditorState,
+    ribbonDiagnostics,
+    ribbonExplorer,
+    ribbonFormPanel,
     pcfProcessRunner,
     pacCli,
     npmRunner,

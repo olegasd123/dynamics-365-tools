@@ -19,6 +19,14 @@ import type { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSe
 import type { ProcessRunner } from "../features/pcf/processRunner";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
+import type { RibbonDiagnosticsService } from "../features/ribbons/ribbonDiagnostics";
+import type { RibbonEditorState } from "../features/ribbons/ribbonEditorState";
+import type { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
+import type { RibbonRepository } from "../features/ribbons/ribbonRepository";
+import type { RibbonPublishService } from "../features/ribbons/ribbonPublishService";
+import type { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
+import type { SolutionZipService } from "../features/ribbons/solutionZipService";
+import type { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
@@ -47,6 +55,15 @@ export interface CommandContext {
 
   pluginExplorer: PluginExplorerProvider;
   pluginRegistration: PluginRegistrationManager;
+
+  ribbonSourceLocator: RibbonSourceLocator;
+  ribbonRepository: RibbonRepository;
+  ribbonPublishService: RibbonPublishService;
+  solutionZipService: SolutionZipService;
+  ribbonEditorState: RibbonEditorState;
+  ribbonDiagnostics: RibbonDiagnosticsService;
+  ribbonExplorer: RibbonExplorerProvider;
+  ribbonFormPanel: RibbonFormPanel;
 
   pcfProcessRunner: ProcessRunner;
   pacCli: PacCli;

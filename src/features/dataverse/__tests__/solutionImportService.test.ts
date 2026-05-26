@@ -2,6 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import {
   buildPublishCustomControlsXml,
+  buildPublishRibbonsXml,
   SolutionImportError,
   SolutionImportService,
 } from "../solutionImportService";
@@ -45,7 +46,7 @@ test("SolutionImportService starts async import and polls until success", async 
     },
   ]);
   assert.deepStrictEqual(gets, [
-    "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage,errortext",
+    "/asyncoperations(aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)?$select=asyncoperationid,statecode,statuscode,message,friendlymessage",
     "/importjobs(11111111-2222-3333-4444-555555555555)?$select=importjobid,data,progress,solutionname",
   ]);
 });
@@ -75,6 +76,7 @@ test("SolutionImportService surfaces failed import log messages", async () => {
       assert.ok(error instanceof SolutionImportError);
       assert.match(error.message, /Import failed/);
       assert.match(error.message, /Missing dependency/);
+      assert.match(error.log ?? "", /Missing dependency/);
       return true;
     },
   );
@@ -84,5 +86,12 @@ test("buildPublishCustomControlsXml creates scoped PublishXml payload", () => {
   assert.strictEqual(
     buildPublishCustomControlsXml(["{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}"]),
     "<importexportxml><customcontrols><customcontrol>aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</customcontrol></customcontrols></importexportxml>",
+  );
+});
+
+test("buildPublishRibbonsXml creates entity and app ribbon payload", () => {
+  assert.strictEqual(
+    buildPublishRibbonsXml(["account", "contact"], true),
+    "<importexportxml><entities><entity>account</entity><entity>contact</entity></entities><ribbon /></importexportxml>",
   );
 });
