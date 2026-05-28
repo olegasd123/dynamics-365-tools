@@ -519,7 +519,7 @@ function buildStepDefaultName(
   entity: string | undefined,
 ): string {
   const entityLabel = entity || "global";
-  return `(Step) ${typeName}: ${message} of ${entityLabel}`;
+  return `${typeName}: ${message} of ${entityLabel}`;
 }
 
 async function pickMessageName(
