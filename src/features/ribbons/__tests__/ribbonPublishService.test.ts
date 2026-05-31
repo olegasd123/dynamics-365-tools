@@ -86,7 +86,7 @@ test("buildMinimalRibbonSolutionZip creates the expected solution entries", asyn
   );
 });
 
-test("publishDocuments preflights entities, imports, then publishes ribbons", async () => {
+test("publishDocuments preflights entities, imports, publishes ribbons, and queues metadata", async () => {
   const client = new FakeClient();
   const document = makeDocument(
     "Entity",
@@ -133,6 +133,8 @@ test("publishDocuments preflights entities, imports, then publishes ribbons", as
     ParameterXml:
       "<importexportxml><entities><entity>account</entity></entities></importexportxml>",
   });
+  assert.strictEqual(client.posts[2].path, "QueueUpdateRibbonClientMetadata");
+  assert.strictEqual(client.posts[2].body, undefined);
 });
 
 test("publishDocuments blocks entities that are not in the selected solution", async () => {

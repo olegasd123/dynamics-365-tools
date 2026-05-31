@@ -130,6 +130,10 @@ export class SolutionImportService {
     });
   }
 
+  async queueRibbonClientMetadataUpdate(): Promise<void> {
+    await this.client.post("QueueUpdateRibbonClientMetadata");
+  }
+
   private async pollImport(
     importJobId: string,
     asyncOperationId: string | undefined,
@@ -227,7 +231,9 @@ export function buildPublishRibbonsXml(
     .map((entity) => `<entity>${escapeXml(entity)}</entity>`)
     .join("");
   const entitiesXml = entityXml ? `<entities>${entityXml}</entities>` : "";
-  const ribbonXml = includeApplicationRibbon ? "<ribbon />" : "";
+  const ribbonXml = includeApplicationRibbon
+    ? "<ribbons><ribbon>ApplicationRibbon</ribbon></ribbons>"
+    : "";
   return `<importexportxml>${entitiesXml}${ribbonXml}</importexportxml>`;
 }
 

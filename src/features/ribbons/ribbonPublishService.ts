@@ -163,6 +163,9 @@ export class RibbonPublishService {
     options.onStatus?.("Publishing ribbons");
     await importer.publishRibbons(target.entities, Boolean(target.applicationRibbonXml));
 
+    options.onStatus?.("Queueing ribbon metadata generation");
+    await importer.queueRibbonClientMetadataUpdate();
+
     return {
       importJobId: importResult.importJobId,
       asyncOperationId: importResult.asyncOperationId,

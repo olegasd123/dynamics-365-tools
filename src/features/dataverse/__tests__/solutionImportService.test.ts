@@ -92,6 +92,21 @@ test("buildPublishCustomControlsXml creates scoped PublishXml payload", () => {
 test("buildPublishRibbonsXml creates entity and app ribbon payload", () => {
   assert.strictEqual(
     buildPublishRibbonsXml(["account", "contact"], true),
-    "<importexportxml><entities><entity>account</entity><entity>contact</entity></entities><ribbon /></importexportxml>",
+    "<importexportxml><entities><entity>account</entity><entity>contact</entity></entities><ribbons><ribbon>ApplicationRibbon</ribbon></ribbons></importexportxml>",
   );
+});
+
+test("SolutionImportService queues ribbon client metadata update", async () => {
+  const posts: Array<{ path: string; body: any }> = [];
+  const client = {
+    post: async <T>(path: string, body?: any): Promise<T> => {
+      posts.push({ path, body });
+      return {} as T;
+    },
+    get: async <T>(): Promise<T> => ({}) as T,
+  };
+
+  await new SolutionImportService(client).queueRibbonClientMetadataUpdate();
+
+  assert.deepStrictEqual(posts, [{ path: "QueueUpdateRibbonClientMetadata", body: undefined }]);
 });
