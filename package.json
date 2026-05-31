@@ -991,8 +991,13 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandAction",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonCommandDefinition",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonActions)",
           "group": "navigation@5"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addCommandAction",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonActions",
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",

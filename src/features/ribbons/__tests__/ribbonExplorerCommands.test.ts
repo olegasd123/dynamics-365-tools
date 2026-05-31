@@ -8,6 +8,7 @@ import JSZip from "jszip";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
+  addRibbonCommandAction,
   addRibbonLocLabelTitle,
   editRibbonNode,
   extractJavaScriptFunctionSuggestions,
@@ -62,6 +63,85 @@ test("lists ribbon languages with language codes", () => {
     description: "Use another LCID",
     manual: true,
   });
+});
+
+test("adds command action from actions group node", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions><Url Address="https://first.example" /></Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const command = document.views[0].commandDefinitions[0];
+  const node = new RibbonItemNode("Actions", "1", "d365RibbonActions", "run", [], [], {
+    document,
+    range: command.range,
+  });
+  let patches: RibbonPatch[] = [];
+  let refreshed = false;
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Command action") {
+      return items.find((item) => item.label === "URL");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) => {
+    if (options.prompt === "URL") {
+      return "https://second.example";
+    }
+
+    return undefined;
+  };
+
+  try {
+    await addRibbonCommandAction(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.strictEqual(refreshed, true);
+  assert.deepStrictEqual(
+    updatedDocument.views[0].commandDefinitions[0].actions.map((action) =>
+      action.kind === "Url" ? action.address : action.kind,
+    ),
+    ["https://first.example", "https://second.example"],
+  );
 });
 
 test("adds loc label title from language list", async () => {

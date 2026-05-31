@@ -275,9 +275,14 @@ function itemActions(node: RibbonItemNode): PanelAction[] {
       { command: "dynamics365Tools.ribbons.moveDown", label: "Move Down" },
     );
   }
+  if (
+    node.contextValue === "d365RibbonCommandDefinition" ||
+    node.contextValue === "d365RibbonActions"
+  ) {
+    actions.push({ command: "dynamics365Tools.ribbons.addCommandAction", label: "Add Action" });
+  }
   if (node.contextValue === "d365RibbonCommandDefinition") {
     actions.push(
-      { command: "dynamics365Tools.ribbons.addCommandAction", label: "Add Action" },
       { command: "dynamics365Tools.ribbons.addCommandEnableRuleRef", label: "Add Enable Ref" },
       { command: "dynamics365Tools.ribbons.addCommandDisplayRuleRef", label: "Add Display Ref" },
     );

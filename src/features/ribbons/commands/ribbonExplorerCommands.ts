@@ -1696,7 +1696,10 @@ function resolveCommandTarget(
     return undefined;
   }
 
-  if (!node.contextValue.includes("d365RibbonCommandDefinition")) {
+  if (
+    !node.contextValue.includes("d365RibbonCommandDefinition") &&
+    node.contextValue !== "d365RibbonActions"
+  ) {
     return undefined;
   }
 

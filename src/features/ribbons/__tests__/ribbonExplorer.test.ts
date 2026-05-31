@@ -98,6 +98,12 @@ test("renders located ribbon documents as a read-only tree", async () => {
     commandChildren.map((child) => child.label),
     ["EnableRules", "DisplayRules", "Actions"],
   );
+  assert.ok(commandChildren[2] instanceof RibbonItemNode);
+  assert.strictEqual(commandChildren[2].contextValue, "d365RibbonActions");
+  assert.deepStrictEqual(
+    commandChildren[2].editTarget?.range,
+    (commands[0] as RibbonItemNode).editTarget?.range,
+  );
 
   const actionNodes = await explorer.getChildren(commandChildren[2]);
   assert.strictEqual(actionNodes[0].label, "JavaScript: run");

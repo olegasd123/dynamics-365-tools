@@ -431,7 +431,7 @@ function commandDefinitionNode(
     [
       ruleRefGroupNode("EnableRules", command.enableRuleRefs, "d365RibbonEnableRuleRefs"),
       ruleRefGroupNode("DisplayRules", command.displayRuleRefs, "d365RibbonDisplayRuleRefs"),
-      actionGroupNode(document, command.actions),
+      actionGroupNode(document, command),
     ],
     { document, range: command.range },
   );
@@ -498,14 +498,15 @@ function ruleRefNode(id: string): RibbonItemNode {
   return new RibbonItemNode(id, undefined, "d365RibbonRuleRef", "symbol-key", [["Id", id]]);
 }
 
-function actionGroupNode(document: RibbonDocument, actions: CommandAction[]): RibbonItemNode {
+function actionGroupNode(document: RibbonDocument, command: CommandDefinition): RibbonItemNode {
   return new RibbonItemNode(
     "Actions",
-    String(actions.length),
+    String(command.actions.length),
     "d365RibbonActions",
     "run",
     [],
-    actions.map((action, index) => commandActionNode(document, action, index)),
+    command.actions.map((action, index) => commandActionNode(document, action, index)),
+    { document, range: command.range },
   );
 }
 

@@ -93,6 +93,18 @@ test("does not render delete action for rule reference groups", () => {
   formPanel.dispose();
 });
 
+test("renders add action for command action groups", () => {
+  const formPanel = new RibbonFormPanel();
+  const node = new RibbonItemNode("Actions", "1", "d365RibbonActions", "run", [], []);
+
+  formPanel.show(node);
+
+  const panel = (vscode.window as any).__lastWebviewPanel;
+  assert.match(panel.webview.html, /Add Action/);
+  assert.doesNotMatch(panel.webview.html, /Add Enable Ref/);
+  formPanel.dispose();
+});
+
 test("escapes item detail values before rendering", () => {
   const formPanel = new RibbonFormPanel();
   const node = new RibbonItemNode(
