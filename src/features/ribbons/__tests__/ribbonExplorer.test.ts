@@ -99,6 +99,10 @@ test("renders located ribbon documents as a read-only tree", async () => {
     ["EnableRules", "DisplayRules", "Actions"],
   );
   assert.ok(commandChildren[2] instanceof RibbonItemNode);
+  assert.deepStrictEqual(
+    (commandChildren[0] as RibbonItemNode).editTarget?.range,
+    (commands[0] as RibbonItemNode).editTarget?.range,
+  );
   assert.strictEqual(commandChildren[2].contextValue, "d365RibbonActions");
   assert.deepStrictEqual(
     commandChildren[2].editTarget?.range,

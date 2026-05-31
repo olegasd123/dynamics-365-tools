@@ -1001,13 +1001,23 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonCommandDefinition",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRuleRefs)",
           "group": "navigation@6"
         },
         {
+          "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonEnableRuleRefs",
+          "group": "inline@6"
+        },
+        {
           "command": "dynamics365Tools.ribbons.addCommandDisplayRuleRef",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonCommandDefinition",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonDisplayRuleRefs)",
           "group": "navigation@7"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addCommandDisplayRuleRef",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonDisplayRuleRefs",
+          "group": "inline@7"
         },
         {
           "command": "dynamics365Tools.ribbons.addEnableRule",

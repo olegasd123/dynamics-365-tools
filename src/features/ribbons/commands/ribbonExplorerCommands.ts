@@ -1700,7 +1700,9 @@ function resolveCommandTarget(
 
   if (
     !node.contextValue.includes("d365RibbonCommandDefinition") &&
-    node.contextValue !== "d365RibbonActions"
+    node.contextValue !== "d365RibbonActions" &&
+    node.contextValue !== "d365RibbonEnableRuleRefs" &&
+    node.contextValue !== "d365RibbonDisplayRuleRefs"
   ) {
     return undefined;
   }

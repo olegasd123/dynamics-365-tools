@@ -9,6 +9,7 @@ import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   addRibbonCommandAction,
+  addRibbonCommandEnableRuleRef,
   addRibbonLocLabelTitle,
   editRibbonNode,
   extractJavaScriptFunctionSuggestions,
@@ -190,6 +191,83 @@ test("adds command action from actions group node", async () => {
     ),
     ["https://first.example", "isNaN"],
   );
+});
+
+test("adds command enable rule reference from enable rules group node", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules />
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.Enabled" />
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const command = document.views[0].commandDefinitions[0];
+  const node = new RibbonItemNode(
+    "EnableRules",
+    "0",
+    "d365RibbonEnableRuleRefs",
+    "references",
+    [],
+    [],
+    { document, range: command.range },
+  );
+  let patches: RibbonPatch[] = [];
+  let refreshed = false;
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Enable rule") {
+      return items.find((item) => item.label === "new.Enabled");
+    }
+
+    return undefined;
+  };
+
+  try {
+    await addRibbonCommandEnableRuleRef(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.strictEqual(refreshed, true);
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
+    "new.Enabled",
+  ]);
 });
 
 test("adds loc label title from language list", async () => {

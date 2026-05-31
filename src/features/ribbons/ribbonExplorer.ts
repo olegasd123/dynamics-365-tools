@@ -429,8 +429,20 @@ function commandDefinitionNode(
       ["Actions", command.actions.length],
     ],
     [
-      ruleRefGroupNode("EnableRules", command.enableRuleRefs, "d365RibbonEnableRuleRefs"),
-      ruleRefGroupNode("DisplayRules", command.displayRuleRefs, "d365RibbonDisplayRuleRefs"),
+      ruleRefGroupNode(
+        document,
+        command,
+        "EnableRules",
+        command.enableRuleRefs,
+        "d365RibbonEnableRuleRefs",
+      ),
+      ruleRefGroupNode(
+        document,
+        command,
+        "DisplayRules",
+        command.displayRuleRefs,
+        "d365RibbonDisplayRuleRefs",
+      ),
       actionGroupNode(document, command),
     ],
     { document, range: command.range },
@@ -483,7 +495,13 @@ function locLabelNode(document: RibbonDocument, label: LocLabel): RibbonItemNode
   );
 }
 
-function ruleRefGroupNode(label: string, refs: string[], contextValue: string): RibbonItemNode {
+function ruleRefGroupNode(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  label: string,
+  refs: string[],
+  contextValue: string,
+): RibbonItemNode {
   return new RibbonItemNode(
     label,
     String(refs.length),
@@ -491,6 +509,7 @@ function ruleRefGroupNode(label: string, refs: string[], contextValue: string): 
     "references",
     [],
     refs.map(ruleRefNode),
+    { document, range: command.range },
   );
 }
 
