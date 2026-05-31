@@ -327,15 +327,16 @@ function canMove(node: RibbonItemNode): boolean {
 
 function canDelete(node: RibbonItemNode): boolean {
   return (
-    node.contextValue.includes("d365RibbonCustomAction") ||
-    node.contextValue.includes("d365RibbonHideAction") ||
-    node.contextValue.includes("d365RibbonCommandDefinition") ||
-    node.contextValue.includes("d365RibbonEnableRule") ||
-    node.contextValue.includes("d365RibbonDisplayRule") ||
-    node.contextValue.includes("d365RibbonLocLabel") ||
-    node.contextValue.includes("d365RibbonJavaScriptAction") ||
-    node.contextValue.includes("d365RibbonUrlAction") ||
-    node.contextValue.includes("d365RibbonRuleStep")
+    node.contextValue === "d365RibbonCustomAction" ||
+    node.contextValue === "d365RibbonHideAction" ||
+    node.contextValue === "d365RibbonCommandDefinition" ||
+    node.contextValue === "d365RibbonEnableRule" ||
+    node.contextValue === "d365RibbonDisplayRule" ||
+    node.contextValue === "d365RibbonLocLabel" ||
+    node.contextValue === "d365RibbonJavaScriptAction" ||
+    node.contextValue === "d365RibbonUrlAction" ||
+    node.contextValue === "d365RibbonLocLabelTitle" ||
+    node.contextValue.startsWith("d365RibbonRuleStep")
   );
 }
 

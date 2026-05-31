@@ -75,6 +75,24 @@ test("does not render custom button actions for ribbon sections", () => {
   formPanel.dispose();
 });
 
+test("does not render delete action for rule reference groups", () => {
+  const formPanel = new RibbonFormPanel();
+  const node = new RibbonItemNode(
+    "EnableRules",
+    "0",
+    "d365RibbonEnableRuleRefs",
+    "references",
+    [],
+    [],
+  );
+
+  formPanel.show(node);
+
+  const panel = (vscode.window as any).__lastWebviewPanel;
+  assert.doesNotMatch(panel.webview.html, /Delete/);
+  formPanel.dispose();
+});
+
 test("escapes item detail values before rendering", () => {
   const formPanel = new RibbonFormPanel();
   const node = new RibbonItemNode(
