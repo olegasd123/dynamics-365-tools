@@ -433,6 +433,7 @@ function commandDefinitionNode(
         document,
         command,
         "EnableRules",
+        "EnableRule",
         command.enableRuleRefs,
         "d365RibbonEnableRuleRefs",
       ),
@@ -440,6 +441,7 @@ function commandDefinitionNode(
         document,
         command,
         "DisplayRules",
+        "DisplayRule",
         command.displayRuleRefs,
         "d365RibbonDisplayRuleRefs",
       ),
@@ -499,22 +501,55 @@ function ruleRefGroupNode(
   document: RibbonDocument,
   command: CommandDefinition,
   label: string,
+  refName: "EnableRule" | "DisplayRule",
   refs: string[],
   contextValue: string,
 ): RibbonItemNode {
+  const refElements = commandRuleRefElements(document, command, label, refName);
+
   return new RibbonItemNode(
     label,
     String(refs.length),
     contextValue,
     "references",
     [],
-    refs.map(ruleRefNode),
+    refs.map((id, index) => ruleRefNode(document, id, refName, refElements[index])),
     { document, range: command.range },
   );
 }
 
-function ruleRefNode(id: string): RibbonItemNode {
-  return new RibbonItemNode(id, undefined, "d365RibbonRuleRef", "symbol-key", [["Id", id]]);
+function ruleRefNode(
+  document: RibbonDocument,
+  id: string,
+  refName: "EnableRule" | "DisplayRule",
+  element: XmlElementRange | undefined,
+): RibbonItemNode {
+  return new RibbonItemNode(
+    id,
+    refName,
+    "d365RibbonRuleRef",
+    "symbol-key",
+    [
+      ["Id", id],
+      ["Kind", refName],
+    ],
+    [],
+    element ? { document, range: element.range } : undefined,
+  );
+}
+
+function commandRuleRefElements(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  containerName: string,
+  refName: "EnableRule" | "DisplayRule",
+): XmlElementRange[] {
+  const commandElement = collectElements(scanXmlElements(document.sourceText)).find((node) =>
+    sameRange(node.range, command.range),
+  );
+  const container = commandElement?.children.find((child) => child.name === containerName);
+
+  return container?.children.filter((child) => child.name === refName) ?? [];
 }
 
 function actionGroupNode(document: RibbonDocument, command: CommandDefinition): RibbonItemNode {

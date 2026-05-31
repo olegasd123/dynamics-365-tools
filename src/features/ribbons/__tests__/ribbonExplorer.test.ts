@@ -103,6 +103,9 @@ test("renders located ribbon documents as a read-only tree", async () => {
     (commandChildren[0] as RibbonItemNode).editTarget?.range,
     (commands[0] as RibbonItemNode).editTarget?.range,
   );
+  const enableRefNodes = await explorer.getChildren(commandChildren[0]);
+  assert.strictEqual(enableRefNodes[0].contextValue, "d365RibbonRuleRef");
+  assert.ok((enableRefNodes[0] as RibbonItemNode).editTarget);
   assert.strictEqual(commandChildren[2].contextValue, "d365RibbonActions");
   assert.deepStrictEqual(
     commandChildren[2].editTarget?.range,

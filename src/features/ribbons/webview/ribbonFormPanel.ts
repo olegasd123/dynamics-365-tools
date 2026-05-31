@@ -322,6 +322,7 @@ function canMove(node: RibbonItemNode): boolean {
     node.contextValue === "d365RibbonCommandDefinition" ||
     node.contextValue === "d365RibbonEnableRule" ||
     node.contextValue === "d365RibbonDisplayRule" ||
+    node.contextValue === "d365RibbonRuleRef" ||
     node.contextValue === "d365RibbonLocLabel" ||
     node.contextValue === "d365RibbonJavaScriptAction" ||
     node.contextValue === "d365RibbonUrlAction" ||

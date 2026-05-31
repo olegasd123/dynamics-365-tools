@@ -24,12 +24,12 @@ import {
   deleteRibbonNode,
 } from "../commands/ribbonExplorerCommands";
 import { createRibbonCascadeDeletePlan } from "../ribbonCascadeDelete";
-import { RibbonPatch, RibbonSource } from "../models";
+import { RibbonPatch, RibbonSource, XmlElementRange } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";
 import { RibbonDocumentNode, RibbonItemNode } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
-import { readRibbonDocuments } from "../ribbonXmlReader";
+import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
 
 test("normalizes manually typed web resource names", () => {
   assert.strictEqual(
@@ -369,6 +369,93 @@ test("prefills manual command rule reference ids from the command id", async () 
   assert.deepStrictEqual(updatedDisplayDocument.views[0].commandDefinitions[0].displayRuleRefs, [
     "new.account.Form.Validate.DisplayRule",
   ]);
+});
+
+test("deletes command rule references", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules><EnableRule Id="new.Enabled" /></EnableRules>
+      <DisplayRules><DisplayRule Id="new.Visible" /></DisplayRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const enableRuleRef = findXmlElement(source, "EnableRule", "new.Enabled");
+  const displayRuleRef = findXmlElement(source, "DisplayRule", "new.Visible");
+  let patches: RibbonPatch[] = [];
+  let refreshed = false;
+
+  await deleteRibbonNode(
+    {
+      ribbonEditorState: {
+        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+          patches = queuedPatches;
+        },
+      },
+      ribbonExplorer: {
+        refresh: () => {
+          refreshed = true;
+        },
+      },
+    } as any,
+    new RibbonItemNode("new.Enabled", "EnableRule", "d365RibbonRuleRef", "symbol-key", [], [], {
+      document,
+      range: enableRuleRef.range,
+    }),
+  );
+
+  const withoutEnableRef = applyRibbonPatchSequence(source, patches);
+  const [documentWithoutEnableRef] = readRibbonDocuments(withoutEnableRef, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.strictEqual(refreshed, true);
+  assert.deepStrictEqual(
+    documentWithoutEnableRef.views[0].commandDefinitions[0].enableRuleRefs,
+    [],
+  );
+  assert.deepStrictEqual(documentWithoutEnableRef.views[0].commandDefinitions[0].displayRuleRefs, [
+    "new.Visible",
+  ]);
+
+  await deleteRibbonNode(
+    {
+      ribbonEditorState: {
+        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+          patches = queuedPatches;
+        },
+      },
+      ribbonExplorer: {
+        refresh: () => undefined,
+      },
+    } as any,
+    new RibbonItemNode("new.Visible", "DisplayRule", "d365RibbonRuleRef", "symbol-key", [], [], {
+      document,
+      range: displayRuleRef.range,
+    }),
+  );
+
+  const withoutDisplayRef = applyRibbonPatchSequence(source, patches);
+  const [documentWithoutDisplayRef] = readRibbonDocuments(withoutDisplayRef, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(documentWithoutDisplayRef.views[0].commandDefinitions[0].enableRuleRefs, [
+    "new.Enabled",
+  ]);
+  assert.deepStrictEqual(
+    documentWithoutDisplayRef.views[0].commandDefinitions[0].displayRuleRefs,
+    [],
+  );
 });
 
 test("adds loc label title from language list", async () => {
@@ -1512,3 +1599,18 @@ test("moves the same stale JavaScript parameter node down after moving it up", a
     ["PrimaryControl", "FirstPrimaryItemId", "PrimaryEntityTypeName"],
   );
 });
+
+function findXmlElement(source: string, name: string, id: string): XmlElementRange {
+  const element = collectXmlElements(scanXmlElements(source)).find(
+    (item) =>
+      item.name === name &&
+      item.attributes.some((attribute) => attribute.name === "Id" && attribute.value === id),
+  );
+
+  assert.ok(element);
+  return element;
+}
+
+function collectXmlElements(elements: XmlElementRange[]): XmlElementRange[] {
+  return elements.flatMap((element) => [element, ...collectXmlElements(element.children)]);
+}
