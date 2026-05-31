@@ -8,8 +8,10 @@ import JSZip from "jszip";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
+  addRibbonLocLabelTitle,
   editRibbonNode,
   extractJavaScriptFunctionSuggestions,
+  listRibbonLanguageCodePicks,
   listBoundJavaScriptLibraries,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
@@ -35,6 +37,100 @@ test("normalizes manually typed web resource names", () => {
     normalizeWebResourceUniqueName("new_/scripts/account.js"),
     "new_/scripts/account.js",
   );
+});
+
+test("lists ribbon languages with language codes", () => {
+  const picks = listRibbonLanguageCodePicks({ preferredLanguageCode: 1033 });
+
+  assert.deepStrictEqual(picks[0], {
+    label: "English (United States)",
+    description: "1033",
+    detail: "en-US",
+    languageCode: 1033,
+  });
+  assert.deepStrictEqual(
+    picks.find((pick) => pick.languageCode === 1058),
+    {
+      label: "Ukrainian",
+      description: "1058",
+      detail: "uk-UA",
+      languageCode: 1058,
+    },
+  );
+  assert.deepStrictEqual(picks[picks.length - 1], {
+    label: "Type language code",
+    description: "Use another LCID",
+    manual: true,
+  });
+});
+
+test("adds loc label title from language list", async () => {
+  const source = `<RibbonDiffXml>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const label = document.views[0].locLabels[0];
+  const node = new RibbonItemNode(
+    label.id,
+    undefined,
+    "d365RibbonLocLabel",
+    "symbol-string",
+    [],
+    [],
+    { document, range: label.range },
+  );
+  let patches: RibbonPatch[] = [];
+  let languageItems: vscode.QuickPickItem[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Language") {
+      languageItems = items;
+      return items.find((item) => item.languageCode === 1058);
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) =>
+    options.prompt === "Text" ? "Run UA" : undefined;
+
+  try {
+    await addRibbonLocLabelTitle(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.strictEqual(
+    languageItems.some((item: any) => item.languageCode === 1033),
+    false,
+  );
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /<Title languagecode="1058" description="Run UA" \/>/);
 });
 
 test("plans cascade delete for ribbon items with one reference", () => {
