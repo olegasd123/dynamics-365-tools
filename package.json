@@ -478,13 +478,13 @@
         "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",
         "title": "Add Enable Rule Reference",
         "category": "Dynamics 365 Tools",
-        "icon": "$(references)"
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.addCommandDisplayRuleRef",
         "title": "Add Display Rule Reference",
         "category": "Dynamics 365 Tools",
-        "icon": "$(references)"
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.addEnableRule",

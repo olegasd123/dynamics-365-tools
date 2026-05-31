@@ -9,6 +9,7 @@ import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   addRibbonCommandAction,
+  addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
   addRibbonLocLabelTitle,
   editRibbonNode,
@@ -267,6 +268,106 @@ test("adds command enable rule reference from enable rules group node", async ()
   assert.strictEqual(refreshed, true);
   assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
     "new.Enabled",
+  ]);
+});
+
+test("prefills manual command rule reference ids from the command id", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Form.Validate.Command" />
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const command = document.views[0].commandDefinitions[0];
+  const baseContext = {
+    ribbonExplorer: {
+      refresh: () => undefined,
+    },
+  };
+  const inputValues: string[] = [];
+  const patchesByKind: RibbonPatch[][] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) =>
+    items.find((item) =>
+      options.placeHolder === "Enable rule"
+        ? item.label === "Type enable rule id"
+        : item.label === "Type display rule id",
+    );
+  (vscode.window as any).showInputBox = async (options: { value?: string }) => {
+    inputValues.push(options.value ?? "");
+    return options.value;
+  };
+
+  try {
+    await addRibbonCommandEnableRuleRef(
+      {
+        ...baseContext,
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patchesByKind.push(queuedPatches);
+          },
+        },
+      } as any,
+      new RibbonItemNode("EnableRules", "0", "d365RibbonEnableRuleRefs", "references", [], [], {
+        document,
+        range: command.range,
+      }),
+    );
+    await addRibbonCommandDisplayRuleRef(
+      {
+        ...baseContext,
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patchesByKind.push(queuedPatches);
+          },
+        },
+      } as any,
+      new RibbonItemNode("DisplayRules", "0", "d365RibbonDisplayRuleRefs", "references", [], [], {
+        document,
+        range: command.range,
+      }),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(inputValues, [
+    "new.account.Form.Validate.EnableRule",
+    "new.account.Form.Validate.DisplayRule",
+  ]);
+  const [updatedEnableDocument] = readRibbonDocuments(
+    applyRibbonPatchSequence(source, patchesByKind[0]),
+    {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    },
+  );
+  const [updatedDisplayDocument] = readRibbonDocuments(
+    applyRibbonPatchSequence(source, patchesByKind[1]),
+    {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    },
+  );
+
+  assert.deepStrictEqual(updatedEnableDocument.views[0].commandDefinitions[0].enableRuleRefs, [
+    "new.account.Form.Validate.EnableRule",
+  ]);
+  assert.deepStrictEqual(updatedDisplayDocument.views[0].commandDefinitions[0].displayRuleRefs, [
+    "new.account.Form.Validate.DisplayRule",
   ]);
 });
 

@@ -3202,12 +3202,14 @@ async function addRibbonCommandRuleRef(
           "Enable rule",
           target.document,
           target.command.enableRuleRefs,
+          suggestedCommandRuleRefId(target.command.id, kind),
           (view) => view.enableRules,
         )
       : await pickRuleId(
           "Display rule",
           target.document,
           target.command.displayRuleRefs,
+          suggestedCommandRuleRefId(target.command.id, kind),
           (view) => view.displayRules,
         );
   if (!ruleId) {
@@ -3224,6 +3226,7 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
   label: string,
   document: RibbonDocument,
   currentRefs: string[],
+  suggestedId: string,
   selectRules: (view: RibbonView) => T[],
 ): Promise<string | undefined> {
   const used = new Set(currentRefs);
@@ -3248,6 +3251,7 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
 
   const id = await showRibbonInputBox({
     prompt: `${label} id`,
+    value: suggestedId,
     validateInput: (value) => {
       const id = value.trim();
       if (!id) {
@@ -3257,6 +3261,12 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
     },
   });
   return id?.trim();
+}
+
+function suggestedCommandRuleRefId(commandId: string, kind: "EnableRule" | "DisplayRule"): string {
+  return commandId.endsWith(".Command")
+    ? `${commandId.slice(0, -".Command".length)}.${kind}`
+    : `${commandId}.${kind}`;
 }
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
