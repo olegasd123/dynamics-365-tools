@@ -961,22 +961,22 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addCustomButton",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
           "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.hideOobButton",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
           "group": "inline@6"
         },
         {
           "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
           "group": "navigation@1"
         },
         {
           "command": "dynamics365Tools.ribbons.reorderOobButtons",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
           "group": "navigation@2"
         },
         {
