@@ -70,6 +70,8 @@ import {
   RibbonCascadeDeleteItem,
 } from "../ribbonCascadeDelete";
 
+const DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS = ["isNaN"];
+
 interface OobCommandPick extends vscode.QuickPickItem {
   command?: OobRibbonCommand;
   manual?: boolean;
@@ -2985,7 +2987,9 @@ async function pickJavaScriptFunctionName(
   library: WebResourceLibraryPick,
   currentFunctionName?: string,
 ): Promise<string | undefined> {
-  const suggestions = await listJavaScriptFunctionSuggestions(library.localPath);
+  const suggestions = withDefaultJavaScriptFunctionSuggestions(
+    await listJavaScriptFunctionSuggestions(library.localPath),
+  );
   if (!suggestions.length) {
     return showRibbonInputBox({
       prompt: "JavaScript function name",
@@ -3038,6 +3042,19 @@ async function listJavaScriptFunctionSuggestions(localPath: string | undefined):
   const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(localPath));
   const source = Buffer.from(bytes).toString("utf8");
   return extractJavaScriptFunctionSuggestions(source);
+}
+
+function withDefaultJavaScriptFunctionSuggestions(suggestions: string[]): string[] {
+  const names = new Set<string>();
+
+  for (const name of DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS) {
+    names.add(name);
+  }
+  for (const name of suggestions) {
+    names.add(name);
+  }
+
+  return [...names];
 }
 
 export function extractJavaScriptFunctionSuggestions(source: string): string[] {

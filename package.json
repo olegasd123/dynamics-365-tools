@@ -472,7 +472,7 @@
         "command": "dynamics365Tools.ribbons.addCommandAction",
         "title": "Add Command Action",
         "category": "Dynamics 365 Tools",
-        "icon": "$(run)"
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",

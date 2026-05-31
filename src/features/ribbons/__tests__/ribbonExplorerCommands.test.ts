@@ -66,6 +66,16 @@ test("lists ribbon languages with language codes", () => {
 });
 
 test("adds command action from actions group node", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-action-"));
+  await fs.mkdir(path.join(workspaceRoot, "src/account"), { recursive: true });
+  await fs.writeFile(
+    path.join(workspaceRoot, "src/account/ribbon.js"),
+    `function onValidateAndSaveClick() {
+  return true;
+}`,
+    "utf8",
+  );
+
   const source = `<RibbonDiffXml>
   <CommandDefinitions>
     <CommandDefinition Id="new.Command">
@@ -85,6 +95,7 @@ test("adds command action from actions group node", async () => {
   });
   let patches: RibbonPatch[] = [];
   let refreshed = false;
+  let functionItems: vscode.QuickPickItem[] = [];
 
   const originalShowQuickPick = vscode.window.showQuickPick;
   const originalShowInputBox = vscode.window.showInputBox;
@@ -94,7 +105,20 @@ test("adds command action from actions group node", async () => {
     options: { placeHolder?: string },
   ) => {
     if (options.placeHolder === "Command action") {
-      return items.find((item) => item.label === "URL");
+      return items.find((item) => item.label === "JavaScript function");
+    }
+
+    if (options.placeHolder === "JavaScript web resource") {
+      return items[0];
+    }
+
+    if (options.placeHolder === "JavaScript function name") {
+      functionItems = items;
+      return items[0];
+    }
+
+    if (options.placeHolder === "CRM parameters") {
+      return [];
     }
 
     return undefined;
@@ -110,6 +134,22 @@ test("adds command action from actions group node", async () => {
   try {
     await addRibbonCommandAction(
       {
+        bindings: {
+          listBindings: async () => ({
+            bindings: [
+              {
+                kind: "file",
+                relativeLocalPath: "src/account/ribbon.js",
+                remotePath: "hjk_/account/ribbon.js",
+                solutionName: "core",
+              },
+            ],
+          }),
+        },
+        configuration: {
+          resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
+          getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
+        },
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -137,10 +177,18 @@ test("adds command action from actions group node", async () => {
 
   assert.strictEqual(refreshed, true);
   assert.deepStrictEqual(
+    functionItems.map((item) => item.label),
+    ["isNaN", "onValidateAndSaveClick", "Type function name"],
+  );
+  assert.deepStrictEqual(
     updatedDocument.views[0].commandDefinitions[0].actions.map((action) =>
-      action.kind === "Url" ? action.address : action.kind,
+      action.kind === "Url"
+        ? action.address
+        : action.kind === "JavaScriptFunction"
+          ? action.functionName
+          : action.kind,
     ),
-    ["https://first.example", "https://second.example"],
+    ["https://first.example", "isNaN"],
   );
 });
 
@@ -546,6 +594,10 @@ test("prefills saved JavaScript action values while editing", async () => {
       return items[0];
     }
 
+    if (options.placeHolder === "JavaScript function name") {
+      return items.find((item) => item.label === "Type function name");
+    }
+
     if (options.placeHolder === "CRM parameters") {
       parameterItems = items;
       return items.filter((item) => item.picked);
@@ -751,7 +803,12 @@ var Hjk;
 
   assert.deepStrictEqual(
     functionItems.map((item) => item.label),
-    ["Hjk.Account.Ribbon.onButtonClick", "Hjk.Account.Ribbon.buttonVisible", "Type function name"],
+    [
+      "Hjk.Account.Ribbon.onButtonClick",
+      "isNaN",
+      "Hjk.Account.Ribbon.buttonVisible",
+      "Type function name",
+    ],
   );
   assert.strictEqual(functionItems[0]?.description, "Current function");
 
