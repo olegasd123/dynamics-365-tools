@@ -12,7 +12,12 @@ import {
   LocLabel,
   LocLabelTitle,
   MenuSectionNode,
+  RibbonCommandClientType,
   RibbonDocument,
+  RibbonRuleAppliesTo,
+  RibbonRuleFormState,
+  RibbonRulePrivilegeDepth,
+  RibbonRulePrivilegeType,
   RibbonScope,
   RibbonSectionRanges,
   RibbonView,
@@ -775,8 +780,12 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
       return {
         kind: "EntityPrivilegeRule",
         entityName: optionalAttr(node, "EntityName"),
-        privilegeType: optionalAttr(node, "PrivilegeType"),
-        privilegeDepth: optionalAttr(node, "PrivilegeDepth"),
+        privilegeType: optionalAttr(node, "PrivilegeType") as RibbonRulePrivilegeType | undefined,
+        privilegeDepth: optionalAttr(node, "PrivilegeDepth") as
+          | RibbonRulePrivilegeDepth
+          | undefined,
+        appliesTo: optionalAttr(node, "AppliesTo") as RibbonRuleAppliesTo | undefined,
+        default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
@@ -785,20 +794,53 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
         kind: "ValueRule",
         field: optionalAttr(node, "Field"),
         value: optionalAttr(node, "Value"),
+        default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
     case "FormStateRule":
       return {
         kind: "FormStateRule",
-        state: optionalAttr(node, "State"),
+        state: optionalAttr(node, "State") as RibbonRuleFormState | undefined,
+        default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
     case "CommandClientTypeRule":
       return {
         kind: "CommandClientTypeRule",
-        type: optionalAttr(node, "Type") as "Modern" | "Refresh" | undefined,
+        type: optionalAttr(node, "Type") as RibbonCommandClientType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "SelectionCountRule":
+      return {
+        kind: "SelectionCountRule",
+        appliesTo: optionalAttr(node, "AppliesTo") as RibbonRuleAppliesTo | undefined,
+        minimum: numberAttr(node, "Minimum"),
+        maximum: numberAttr(node, "Maximum"),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "RecordPrivilegeRule":
+      return {
+        kind: "RecordPrivilegeRule",
+        privilegeType: optionalAttr(node, "PrivilegeType") as RibbonRulePrivilegeType | undefined,
+        appliesTo: optionalAttr(node, "AppliesTo") as "PrimaryEntity" | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "EntityRule":
+      return {
+        kind: "EntityRule",
+        entityName: optionalAttr(node, "EntityName"),
+        appliesTo: optionalAttr(node, "AppliesTo") as RibbonRuleAppliesTo | undefined,
+        context: optionalAttr(node, "Context"),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
     default:

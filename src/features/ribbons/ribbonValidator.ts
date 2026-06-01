@@ -12,6 +12,7 @@ import {
   RuleStep,
   TextRange,
 } from "./models";
+import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
 
 export type RibbonValidationSeverity = "error" | "warning";
@@ -184,12 +185,16 @@ function validateRuleRefs(
   range: TextRange,
 ): RibbonValidationIssue[] {
   return refs
-    .filter((id) => id && !knownIds.has(id))
+    .filter((id) => id && !knownIds.has(id) && !isKnownBuiltInRuleRef(label, id))
     .map((id) => ({
       severity: "error" as const,
       message: `CommandDefinition references missing ${label} '${id}'.`,
       range,
     }));
+}
+
+function isKnownBuiltInRuleRef(label: "EnableRule" | "DisplayRule", id: string): boolean {
+  return label === "EnableRule" && isBuiltInEnableRule(id);
 }
 
 function validateCommandAction(action: CommandAction): RibbonValidationIssue[] {
@@ -225,14 +230,43 @@ function validateRules(
 }
 
 function validateRuleStep(step: RuleStep): RibbonValidationIssue[] {
-  if (step.kind !== "CustomRule") {
-    return [];
+  switch (step.kind) {
+    case "CustomRule":
+      return [
+        ...required(step.library.uniqueName, "CustomRule library", step.range),
+        ...required(step.functionName, "CustomRule function name", step.range),
+      ];
+    case "ValueRule":
+      return [
+        ...required(step.field, "ValueRule field", step.range),
+        ...required(step.value, "ValueRule value", step.range),
+      ];
+    case "FormStateRule":
+      return required(step.state, "FormStateRule state", step.range);
+    case "CommandClientTypeRule":
+      return required(step.type, "CommandClientTypeRule type", step.range);
+    case "EntityPrivilegeRule":
+      return [
+        ...required(step.privilegeType, "EntityPrivilegeRule privilege type", step.range),
+        ...required(step.privilegeDepth, "EntityPrivilegeRule privilege depth", step.range),
+      ];
+    case "RecordPrivilegeRule":
+      return required(step.privilegeType, "RecordPrivilegeRule privilege type", step.range);
+    case "SelectionCountRule":
+      return step.minimum === undefined && step.maximum === undefined
+        ? [
+            {
+              severity: "error",
+              message: "SelectionCountRule minimum or maximum is required.",
+              range: step.range,
+            },
+          ]
+        : [];
+    case "EntityRule":
+      return [];
+    case "Unknown":
+      return [];
   }
-
-  return [
-    ...required(step.library.uniqueName, "CustomRule library", step.range),
-    ...required(step.functionName, "CustomRule function name", step.range),
-  ];
 }
 
 function validateLocLabels(labels: LocLabel[]): RibbonValidationIssue[] {

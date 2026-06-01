@@ -557,6 +557,113 @@ test("creates custom rules with CRM parameters", () => {
   assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
+test("creates common enable rule step types", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const cases = [
+    {
+      id: "new.SelectionCount",
+      step: {
+        kind: "SelectionCountRule" as const,
+        appliesTo: "SelectedEntity" as const,
+        minimum: 1,
+        maximum: 1,
+      },
+    },
+    {
+      id: "new.RecordPrivilege",
+      step: {
+        kind: "RecordPrivilegeRule" as const,
+        privilegeType: "AppendTo" as const,
+        appliesTo: "PrimaryEntity" as const,
+      },
+    },
+    {
+      id: "new.Entity",
+      step: {
+        kind: "EntityRule" as const,
+        entityName: "account",
+        appliesTo: "SelectedEntity" as const,
+        context: "HomePageGrid",
+      },
+    },
+    {
+      id: "new.Legacy",
+      step: {
+        kind: "CommandClientTypeRule" as const,
+        type: "Legacy" as const,
+      },
+    },
+  ];
+
+  for (const input of cases) {
+    const updated = applyRibbonPatchSequence(source, [createEnableRulePatches(document, input)[0]]);
+    const [updatedDocument] = readRibbonDocuments(updated, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+
+    assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, input.step.kind);
+  }
+});
+
+test("replaces rule steps with common enable rule step types", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="old.enable">
+        <CustomRule Library="$webresource:new_/scripts/account.js" FunctionName="isEnabled" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const replacements = [
+    {
+      kind: "SelectionCountRule" as const,
+      minimum: 1,
+      maximum: 1,
+    },
+    {
+      kind: "RecordPrivilegeRule" as const,
+      privilegeType: "Read" as const,
+    },
+    {
+      kind: "EntityRule" as const,
+      entityName: "account",
+    },
+  ];
+
+  for (const replacement of replacements) {
+    const [document] = readRibbonDocuments(source, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+    const updated = applyRibbonPatchSequence(source, [
+      createRuleStepReplacePatch(
+        document.sourceText,
+        document.views[0].enableRules[0].steps[0],
+        replacement,
+      ),
+    ]);
+    const [updatedDocument] = readRibbonDocuments(updated, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+
+    assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, replacement.kind);
+  }
+});
+
 test("creates a loc label section when needed", () => {
   const source = `<RibbonDiffXml>
   <Templates />

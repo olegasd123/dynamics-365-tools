@@ -4,8 +4,13 @@ import {
   CommandDefinition,
   HideAction,
   LocLabelTitle,
+  RibbonCommandClientType,
   RibbonDocument,
   RibbonPatch,
+  RibbonRuleAppliesTo,
+  RibbonRuleFormState,
+  RibbonRulePrivilegeDepth,
+  RibbonRulePrivilegeType,
   RuleStep,
   TextRange,
   XmlElementRange,
@@ -56,24 +61,53 @@ export type NewRuleStepInput =
   | {
       kind: "EntityPrivilegeRule";
       entityName?: string;
-      privilegeType: string;
-      privilegeDepth?: string;
+      privilegeType: RibbonRulePrivilegeType;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      appliesTo?: RibbonRuleAppliesTo;
+      default?: boolean;
       invertResult?: boolean;
     }
   | {
       kind: "ValueRule";
       field: string;
       value: string;
+      default?: boolean;
       invertResult?: boolean;
     }
   | {
       kind: "FormStateRule";
-      state: string;
+      state: RibbonRuleFormState;
+      default?: boolean;
       invertResult?: boolean;
     }
   | {
       kind: "CommandClientTypeRule";
-      type: "Modern" | "Refresh";
+      type: RibbonCommandClientType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "SelectionCountRule";
+      appliesTo?: RibbonRuleAppliesTo;
+      minimum?: number;
+      maximum?: number;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "RecordPrivilegeRule";
+      privilegeType: RibbonRulePrivilegeType;
+      appliesTo?: "PrimaryEntity";
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "EntityRule";
+      entityName?: string;
+      appliesTo?: RibbonRuleAppliesTo;
+      context?: string;
+      default?: boolean;
+      invertResult?: boolean;
     };
 
 export interface NewRuleInput {
@@ -834,21 +868,52 @@ function renderRuleStep(step: NewRuleStepInput): string {
         ["EntityName", step.entityName],
         ["PrivilegeType", step.privilegeType],
         ["PrivilegeDepth", step.privilegeDepth],
+        ["AppliesTo", step.appliesTo],
+        ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
     case "ValueRule":
       return `<ValueRule ${renderAttributes([
         ["Field", step.field],
         ["Value", step.value],
+        ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
     case "FormStateRule":
       return `<FormStateRule ${renderAttributes([
         ["State", step.state],
+        ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
     case "CommandClientTypeRule":
-      return `<CommandClientTypeRule Type="${escapeXmlAttribute(step.type)}" />`;
+      return `<CommandClientTypeRule ${renderAttributes([
+        ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "SelectionCountRule":
+      return `<SelectionCountRule ${renderAttributes([
+        ["AppliesTo", step.appliesTo],
+        ["Minimum", step.minimum],
+        ["Maximum", step.maximum],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "RecordPrivilegeRule":
+      return `<RecordPrivilegeRule ${renderAttributes([
+        ["PrivilegeType", step.privilegeType],
+        ["AppliesTo", step.appliesTo],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "EntityRule":
+      return `<EntityRule ${renderAttributes([
+        ["EntityName", step.entityName],
+        ["AppliesTo", step.appliesTo],
+        ["Context", step.context],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
   }
 }
 

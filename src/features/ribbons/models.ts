@@ -2,6 +2,24 @@ export type RibbonScope = "Application" | "Form" | "HomepageGrid" | "SubGrid";
 
 export type RibbonSourceKind = "unpacked" | "flat" | "zip";
 
+export type RibbonRuleAppliesTo = "PrimaryEntity" | "SelectedEntity";
+
+export type RibbonRulePrivilegeType =
+  | "Create"
+  | "Read"
+  | "Write"
+  | "Delete"
+  | "Assign"
+  | "Share"
+  | "Append"
+  | "AppendTo";
+
+export type RibbonRulePrivilegeDepth = "None" | "Basic" | "Local" | "Deep" | "Global";
+
+export type RibbonRuleFormState = "Create" | "Existing" | "ReadOnly" | "Disabled" | "BulkEdit";
+
+export type RibbonCommandClientType = "Modern" | "Refresh" | "Legacy";
+
 export interface RibbonSource {
   id: string;
   kind: RibbonSourceKind;
@@ -198,14 +216,61 @@ export type RuleStep =
   | {
       kind: "EntityPrivilegeRule";
       entityName?: string;
-      privilegeType?: string;
-      privilegeDepth?: string;
+      privilegeType?: RibbonRulePrivilegeType;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      appliesTo?: RibbonRuleAppliesTo;
+      default?: boolean;
       invertResult?: boolean;
       range: TextRange;
     }
-  | { kind: "ValueRule"; field?: string; value?: string; invertResult?: boolean; range: TextRange }
-  | { kind: "FormStateRule"; state?: string; invertResult?: boolean; range: TextRange }
-  | { kind: "CommandClientTypeRule"; type?: "Modern" | "Refresh"; range: TextRange }
+  | {
+      kind: "ValueRule";
+      field?: string;
+      value?: string;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "FormStateRule";
+      state?: RibbonRuleFormState;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "CommandClientTypeRule";
+      type?: RibbonCommandClientType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "SelectionCountRule";
+      appliesTo?: RibbonRuleAppliesTo;
+      minimum?: number;
+      maximum?: number;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "RecordPrivilegeRule";
+      privilegeType?: RibbonRulePrivilegeType;
+      appliesTo?: "PrimaryEntity";
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "EntityRule";
+      entityName?: string;
+      appliesTo?: RibbonRuleAppliesTo;
+      context?: string;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
   | { kind: "Unknown"; raw: string; range: TextRange };
 
 export interface LocLabel {

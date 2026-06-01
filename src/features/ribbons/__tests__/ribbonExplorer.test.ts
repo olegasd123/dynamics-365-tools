@@ -170,6 +170,57 @@ test("labels OOB command overrides in the tree", async () => {
   assert.strictEqual(commands[0].description, "0 actions • OOB command");
 });
 
+test("shows details for built-in refs and common enable rule steps", async () => {
+  const workspaceRoot = await makeWorkspace();
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  await writeFile(
+    workspaceRoot,
+    "AppRibbon/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules><EnableRule Id="Mscrm.ShowOnGrid" /></EnableRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.Enable">
+        <SelectionCountRule AppliesTo="SelectedEntity" Minimum="1" Maximum="1" />
+        <RecordPrivilegeRule PrivilegeType="Read" AppliesTo="PrimaryEntity" />
+        <EntityRule EntityName="account" Context="HomePageGrid" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    new ConfigurationService(),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  const roots = await explorer.getChildren();
+  const documents = await explorer.getChildren(roots[0]);
+  const sections = await explorer.getChildren(documents[0]);
+  const commandSection = sections.find((section) => section.label === "Command Definitions");
+  const enableSection = sections.find((section) => section.label === "Enable Rules");
+  assert.ok(commandSection);
+  assert.ok(enableSection);
+
+  const commands = await explorer.getChildren(commandSection);
+  const commandChildren = await explorer.getChildren(commands[0]);
+  const refs = await explorer.getChildren(commandChildren[0]);
+  const rules = await explorer.getChildren(enableSection);
+  const steps = await explorer.getChildren(rules[0]);
+
+  assert.strictEqual(refs[0].description, "Built-in enable rule");
+  assert.deepStrictEqual(
+    steps.map((step) => step.description),
+    ["1", "Read", "account"],
+  );
+  assert.deepStrictEqual((steps[0] as RibbonItemNode).details[3], ["Minimum", 1]);
+});
+
 test("scopes known OOB command overrides to matching entity views", async () => {
   const workspaceRoot = await makeWorkspace();
   (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];

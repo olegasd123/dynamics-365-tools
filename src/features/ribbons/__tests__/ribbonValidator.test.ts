@@ -98,3 +98,54 @@ test("warns about unknown CRM parameters", () => {
 
   assert.ok(messages.includes("Unknown CRM parameter 'ASD'."));
 });
+
+test("allows known built-in enable rule references", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Command">
+      <EnableRules>
+        <EnableRule Id="Mscrm.SelectionCountExactlyOne" />
+        <EnableRule Id="Mscrm.ShowOnGrid" />
+      </EnableRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(
+    !messages.includes(
+      "CommandDefinition references missing EnableRule 'Mscrm.SelectionCountExactlyOne'.",
+    ),
+  );
+  assert.ok(
+    !messages.includes("CommandDefinition references missing EnableRule 'Mscrm.ShowOnGrid'."),
+  );
+});
+
+test("validates required typed rule step attributes", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.account.Enable">
+        <SelectionCountRule />
+        <RecordPrivilegeRule />
+        <ValueRule />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("SelectionCountRule minimum or maximum is required."));
+  assert.ok(messages.includes("RecordPrivilegeRule privilege type is required."));
+  assert.ok(messages.includes("ValueRule field is required."));
+  assert.ok(messages.includes("ValueRule value is required."));
+});

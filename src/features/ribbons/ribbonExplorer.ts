@@ -20,6 +20,7 @@ import {
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonEditorState } from "./ribbonEditorState";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
+import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
 import { scanXmlElements } from "./ribbonXmlReader";
 
@@ -524,14 +525,15 @@ function ruleRefNode(
   refName: "EnableRule" | "DisplayRule",
   element: XmlElementRange | undefined,
 ): RibbonItemNode {
+  const builtIn = refName === "EnableRule" && isBuiltInEnableRule(id);
   return new RibbonItemNode(
     id,
-    refName,
+    builtIn ? "Built-in enable rule" : refName,
     "d365RibbonRuleRef",
     "symbol-key",
     [
       ["Id", id],
-      ["Kind", refName],
+      ["Kind", builtIn ? "Built-in EnableRule" : refName],
     ],
     [],
     element ? { document, range: element.range } : undefined,
@@ -639,6 +641,12 @@ function ruleStepDescription(step: RuleStep): string | undefined {
       return step.state;
     case "CommandClientTypeRule":
       return step.type;
+    case "SelectionCountRule":
+      return selectionCountText(step.minimum, step.maximum);
+    case "RecordPrivilegeRule":
+      return step.privilegeType;
+    case "EntityRule":
+      return step.entityName ?? step.appliesTo ?? step.context;
     case "Unknown":
       return undefined;
   }
@@ -666,6 +674,8 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
         ["Entity", step.entityName],
         ["Privilege", step.privilegeType],
         ["Depth", step.privilegeDepth],
+        ["Applies to", step.appliesTo],
+        ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];
     case "ValueRule":
@@ -673,15 +683,64 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
         ...base,
         ["Field", step.field],
         ["Value", step.value],
+        ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];
     case "FormStateRule":
-      return [...base, ["State", step.state], ["Invert result", boolText(step.invertResult)]];
+      return [
+        ...base,
+        ["State", step.state],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
     case "CommandClientTypeRule":
-      return [...base, ["Type", step.type]];
+      return [
+        ...base,
+        ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "SelectionCountRule":
+      return [
+        ...base,
+        ["Applies to", step.appliesTo],
+        ["Minimum", step.minimum],
+        ["Maximum", step.maximum],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "RecordPrivilegeRule":
+      return [
+        ...base,
+        ["Privilege", step.privilegeType],
+        ["Applies to", step.appliesTo],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "EntityRule":
+      return [
+        ...base,
+        ["Entity", step.entityName],
+        ["Applies to", step.appliesTo],
+        ["Context", step.context],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
     case "Unknown":
       return [...base, ["Raw XML", step.raw]];
   }
+}
+
+function selectionCountText(minimum: number | undefined, maximum: number | undefined): string {
+  if (minimum !== undefined && maximum !== undefined) {
+    return minimum === maximum ? String(minimum) : `${minimum}-${maximum}`;
+  }
+
+  if (minimum !== undefined) {
+    return `>= ${minimum}`;
+  }
+
+  return maximum !== undefined ? `<= ${maximum}` : "Any";
 }
 
 function parameterNodes(document: RibbonDocument, parameters: ActionParameter[]): RibbonItemNode[] {

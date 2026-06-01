@@ -11,6 +11,7 @@ import {
   addRibbonCommandAction,
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
+  addRibbonEnableRule,
   addRibbonLocLabelTitle,
   editRibbonNode,
   extractJavaScriptFunctionSuggestions,
@@ -269,6 +270,201 @@ test("adds command enable rule reference from enable rules group node", async ()
   assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
     "new.Enabled",
   ]);
+});
+
+test("adds built-in command enable rule references", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules><EnableRule Id="Mscrm.SelectionCountExactlyOne" /></EnableRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const command = document.views[0].commandDefinitions[0];
+  const node = new RibbonItemNode(
+    "EnableRules",
+    "1",
+    "d365RibbonEnableRuleRefs",
+    "references",
+    [],
+    [],
+    { document, range: command.range },
+  );
+  let patches: RibbonPatch[] = [];
+  let offeredLabels: string[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+
+  (vscode.window as any).showQuickPick = async (items: vscode.QuickPickItem[]) => {
+    offeredLabels = items.map((item) => item.label);
+    return items.find((item) => item.label === "Mscrm.ShowOnGrid");
+  };
+
+  try {
+    await addRibbonCommandEnableRuleRef(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  assert.ok(!offeredLabels.includes("Mscrm.SelectionCountExactlyOne"));
+  assert.ok(offeredLabels.includes("Mscrm.ShowOnGrid"));
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
+    "Mscrm.SelectionCountExactlyOne",
+    "Mscrm.ShowOnGrid",
+  ]);
+});
+
+test("creates common enable rules from prompts", async () => {
+  const source = `<RibbonDiffXml>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const cases = [
+    {
+      inputByPrompt: new Map([
+        ["Enable rule id", "new.SelectionCount"],
+        ["Minimum selected rows", "1"],
+        ["Maximum selected rows", "1"],
+      ]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "SelectionCountRule"],
+        ["Applies to", "SelectedEntity"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "SelectionCountRule",
+    },
+    {
+      inputByPrompt: new Map([["Enable rule id", "new.RecordPrivilege"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "RecordPrivilegeRule"],
+        ["Privilege type", "AppendTo"],
+        ["Applies to", "PrimaryEntity"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "RecordPrivilegeRule",
+    },
+    {
+      inputByPrompt: new Map([
+        ["Enable rule id", "new.Entity"],
+        ["Entity logical name", "account"],
+        ["Context", "HomePageGrid"],
+      ]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "EntityRule"],
+        ["Applies to", "SelectedEntity"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "EntityRule",
+    },
+  ];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  try {
+    for (const item of cases) {
+      let patches: RibbonPatch[] = [];
+      (vscode.window as any).showQuickPick = async (
+        picks: vscode.QuickPickItem[] | string[],
+        options: { placeHolder?: string },
+      ) => {
+        const label = item.pickByPlaceHolder.get(options.placeHolder ?? "");
+        return typeof picks[0] === "string"
+          ? label
+          : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === label);
+      };
+      (vscode.window as any).showInputBox = async (options: { prompt?: string }) =>
+        item.inputByPrompt.get(options.prompt ?? "");
+
+      await addRibbonEnableRule(
+        {
+          ribbonEditorState: {
+            queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+              patches = queuedPatches;
+            },
+          },
+          ribbonExplorer: {
+            refresh: () => undefined,
+          },
+        } as any,
+        new RibbonDocumentNode(document),
+      );
+
+      const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+        sourceId: "source",
+        fileUri: "/tmp/RibbonDiffXml.xml",
+        kind: "Application",
+      });
+
+      assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, item.expectedKind);
+    }
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+});
+
+test("does not queue patches when enable rule creation is cancelled", async () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+</RibbonDiffXml>`,
+    {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    },
+  );
+  let queued = false;
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async () => undefined;
+
+  try {
+    await addRibbonEnableRule(
+      {
+        ribbonEditorState: {
+          queuePatches: () => {
+            queued = true;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      new RibbonDocumentNode(document),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.strictEqual(queued, false);
 });
 
 test("prefills manual command rule reference ids from the command id", async () => {

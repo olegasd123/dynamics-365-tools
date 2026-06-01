@@ -102,6 +102,44 @@ test("reads major ribbon sections and known nodes with ranges", () => {
   assert.strictEqual(document.views[2].customActions.length, 0);
 });
 
+test("reads common enable rule step types", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.account.Enable">
+        <SelectionCountRule AppliesTo="SelectedEntity" Minimum="1" Maximum="2" Default="true" />
+        <RecordPrivilegeRule PrivilegeType="AppendTo" AppliesTo="PrimaryEntity" InvertResult="true" />
+        <EntityRule EntityName="account" AppliesTo="SelectedEntity" Context="HomePageGrid" />
+        <CommandClientTypeRule Type="Legacy" />
+        <UnknownRule Foo="Bar" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Application" },
+  );
+
+  const steps = document.views[0].enableRules[0].steps;
+
+  assert.deepStrictEqual(
+    steps.map((step) => step.kind),
+    ["SelectionCountRule", "RecordPrivilegeRule", "EntityRule", "CommandClientTypeRule", "Unknown"],
+  );
+  assert.strictEqual(steps[0].kind === "SelectionCountRule" ? steps[0].minimum : undefined, 1);
+  assert.strictEqual(steps[0].kind === "SelectionCountRule" ? steps[0].maximum : undefined, 2);
+  assert.strictEqual(
+    steps[1].kind === "RecordPrivilegeRule" ? steps[1].privilegeType : undefined,
+    "AppendTo",
+  );
+  assert.strictEqual(steps[2].kind === "EntityRule" ? steps[2].context : undefined, "HomePageGrid");
+  assert.strictEqual(
+    steps[3].kind === "CommandClientTypeRule" ? steps[3].type : undefined,
+    "Legacy",
+  );
+  assert.match(steps[4].kind === "Unknown" ? steps[4].raw : "", /UnknownRule/);
+});
+
 test("projects entity ribbon nodes into scoped views", () => {
   const multiScopeXml = `<RibbonDiffXml>
   <CustomActions>

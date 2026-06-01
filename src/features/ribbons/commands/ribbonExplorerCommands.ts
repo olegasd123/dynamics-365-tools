@@ -51,12 +51,18 @@ import {
   HideAction,
   LocLabel,
   LocLabelTitle,
+  RibbonCommandClientType,
   RibbonDocument,
+  RibbonRuleAppliesTo,
+  RibbonRuleFormState,
+  RibbonRulePrivilegeDepth,
+  RibbonRulePrivilegeType,
   RibbonSource,
   RibbonView,
   RuleStep,
   TextRange,
 } from "../models";
+import { BUILT_IN_ENABLE_RULES } from "../enableRuleCatalog";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
@@ -3233,9 +3239,18 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
   const rules = uniqueById(document.views.flatMap(selectRules)).filter(
     (rule) => !used.has(rule.id),
   );
+  const builtInRules =
+    label === "Enable rule"
+      ? BUILT_IN_ENABLE_RULES.filter((rule) => !used.has(rule.id)).map((rule) => ({
+          label: rule.id,
+          description: "Built-in",
+          detail: rule.description,
+        }))
+      : [];
   const manual = `Type ${label.toLowerCase()} id`;
   const pick = await showRibbonQuickPick(
     [
+      ...builtInRules,
       ...rules.map((rule) => ({ label: rule.id })),
       { label: manual, description: "Use an id that is not in this view yet" },
     ],
@@ -3371,14 +3386,18 @@ async function promptRuleStep(
   const common = [
     { label: "CustomRule", description: "Call a JavaScript function" },
     { label: "FormStateRule", description: "Check form state" },
-    { label: "CommandClientTypeRule", description: "Modern or refresh client" },
-  ];
-  const displayOnly = [
+    { label: "CommandClientTypeRule", description: "Check client type" },
     { label: "ValueRule", description: "Check a field value" },
-    { label: "EntityPrivilegeRule", description: "Check entity privilege" },
+    { label: "EntityRule", description: "Check table or context" },
+  ];
+  const displayOnly = [{ label: "EntityPrivilegeRule", description: "Check entity privilege" }];
+  const enableOnly = [
+    { label: "SelectionCountRule", description: "Check selected rows" },
+    { label: "RecordPrivilegeRule", description: "Check record privilege" },
   ];
   const pick = await showRibbonQuickPick(
     [
+      ...(ruleKind === "Enable" ? enableOnly : []),
       ...(ruleKind === "Display" ? displayOnly : []),
       ...common,
       { label: "No step", description: "Create an empty rule" },
@@ -3402,6 +3421,12 @@ async function promptRuleStep(
       return promptValueRuleStep();
     case "EntityPrivilegeRule":
       return promptEntityPrivilegeRuleStep();
+    case "SelectionCountRule":
+      return promptSelectionCountRuleStep();
+    case "RecordPrivilegeRule":
+      return promptRecordPrivilegeRuleStep();
+    case "EntityRule":
+      return promptEntityRuleStep();
     default:
       return undefined;
   }
@@ -3428,9 +3453,10 @@ async function promptCustomRuleStep(ctx: CommandContext): Promise<NewRuleStepInp
 }
 
 async function promptFormStateRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const state = await showRibbonQuickPick(["Create", "Existing", "ReadOnly", "Disabled"], {
-    placeHolder: "Form state",
-  });
+  const state = (await showRibbonQuickPick(
+    ["Create", "Existing", "ReadOnly", "Disabled", "BulkEdit"],
+    { placeHolder: "Form state" },
+  )) as RibbonRuleFormState | undefined;
   if (!state) {
     return undefined;
   }
@@ -3444,10 +3470,10 @@ async function promptFormStateRuleStep(): Promise<NewRuleStepInput | undefined> 
 }
 
 async function promptCommandClientTypeRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const type = await showRibbonQuickPick(["Modern", "Refresh"], {
+  const type = (await showRibbonQuickPick(["Modern", "Refresh", "Legacy"], {
     placeHolder: "Client type",
-  });
-  return type ? { kind: "CommandClientTypeRule", type: type as "Modern" | "Refresh" } : undefined;
+  })) as RibbonCommandClientType | undefined;
+  return type ? { kind: "CommandClientTypeRule", type } : undefined;
 }
 
 async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
@@ -3477,10 +3503,10 @@ async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
 }
 
 async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const privilegeType = await showRibbonQuickPick(
+  const privilegeType = (await showRibbonQuickPick(
     ["Create", "Read", "Write", "Delete", "Append", "AppendTo", "Assign", "Share"],
     { placeHolder: "Privilege type" },
-  );
+  )) as RibbonRulePrivilegeType | undefined;
   if (!privilegeType) {
     return undefined;
   }
@@ -3489,9 +3515,9 @@ async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
     prompt: "Entity logical name",
     placeHolder: "account",
   });
-  const privilegeDepth = await showRibbonQuickPick(["Basic", "Local", "Deep", "Global"], {
+  const privilegeDepth = (await showRibbonQuickPick(["None", "Basic", "Local", "Deep", "Global"], {
     placeHolder: "Privilege depth",
-  });
+  })) as RibbonRulePrivilegeDepth | undefined;
   const invertResult = await promptOptionalBoolean("Invert result?");
   if (invertResult === undefined) {
     return undefined;
@@ -3504,6 +3530,137 @@ async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
     privilegeDepth,
     invertResult,
   };
+}
+
+async function promptSelectionCountRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const appliesTo = await promptAppliesTo("Applies to");
+  if (appliesTo === undefined) {
+    return undefined;
+  }
+
+  const minimum = await promptOptionalInteger("Minimum selected rows", "1");
+  if (minimum === undefined) {
+    return undefined;
+  }
+
+  const maximum = await promptOptionalInteger("Maximum selected rows", minimum?.toString() ?? "1");
+  if (maximum === undefined) {
+    return undefined;
+  }
+
+  if (minimum === null && maximum === null) {
+    void vscode.window.showWarningMessage("Set minimum or maximum selected rows.");
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "SelectionCountRule",
+    appliesTo: appliesTo ?? undefined,
+    minimum: minimum ?? undefined,
+    maximum: maximum ?? undefined,
+    invertResult,
+  };
+}
+
+async function promptRecordPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const privilegeType = (await showRibbonQuickPick(
+    ["Create", "Read", "Write", "Delete", "Append", "AppendTo", "Assign", "Share"],
+    { placeHolder: "Privilege type" },
+  )) as RibbonRulePrivilegeType | undefined;
+  if (!privilegeType) {
+    return undefined;
+  }
+
+  const appliesTo = (await showRibbonQuickPick(["PrimaryEntity", "No value"], {
+    placeHolder: "Applies to",
+  })) as "PrimaryEntity" | "No value" | undefined;
+  if (!appliesTo) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "RecordPrivilegeRule",
+    privilegeType,
+    appliesTo: appliesTo === "No value" ? undefined : appliesTo,
+    invertResult,
+  };
+}
+
+async function promptEntityRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const entityName = await showRibbonInputBox({
+    prompt: "Entity logical name",
+    placeHolder: "account",
+  });
+  if (entityName === undefined) {
+    return undefined;
+  }
+
+  const appliesTo = await promptAppliesTo("Applies to");
+  if (appliesTo === undefined) {
+    return undefined;
+  }
+
+  const context = await showRibbonInputBox({
+    prompt: "Context",
+    placeHolder: "Form",
+  });
+  if (context === undefined) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "EntityRule",
+    entityName: entityName.trim() || undefined,
+    appliesTo: appliesTo ?? undefined,
+    context: context.trim() || undefined,
+    invertResult,
+  };
+}
+
+async function promptAppliesTo(prompt: string): Promise<RibbonRuleAppliesTo | null | undefined> {
+  const appliesTo = (await showRibbonQuickPick(["SelectedEntity", "PrimaryEntity", "No value"], {
+    placeHolder: prompt,
+  })) as RibbonRuleAppliesTo | "No value" | undefined;
+
+  if (!appliesTo) {
+    return undefined;
+  }
+
+  return appliesTo === "No value" ? null : appliesTo;
+}
+
+async function promptOptionalInteger(
+  prompt: string,
+  placeHolder: string,
+): Promise<number | null | undefined> {
+  const value = await showRibbonInputBox({
+    prompt,
+    placeHolder,
+    validateInput: (input) => {
+      const trimmed = input.trim();
+      return !trimmed || /^\d+$/.test(trimmed) ? undefined : "Use a whole number.";
+    },
+  });
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value.trim() ? Number(value.trim()) : null;
 }
 
 async function promptOptionalBoolean(prompt: string): Promise<boolean | undefined> {
