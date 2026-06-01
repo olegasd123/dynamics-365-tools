@@ -5,7 +5,11 @@ import * as path from "node:path";
 import test from "node:test";
 import JSZip from "jszip";
 import { RibbonRepository } from "../ribbonRepository";
-import { cleanRibbonZipsFolder, SolutionZipService } from "../solutionZipService";
+import {
+  cleanRibbonZipsFolder,
+  isSolutionExportCancelledError,
+  SolutionZipService,
+} from "../solutionZipService";
 
 test("opens solution zip as a ribbon source", async () => {
   const storageRoot = await makeWorkspace();
@@ -87,6 +91,57 @@ test("saves exported solution buffer to a zip", async () => {
 
   assert.strictEqual(savedPath, outputPath);
   assert.deepStrictEqual(await fs.readFile(outputPath), buffer);
+});
+
+test("does not start solution export when already cancelled", async () => {
+  let postCalled = false;
+  const token = {
+    isCancellationRequested: true,
+    onCancellationRequested: () => ({ dispose: () => undefined }),
+  };
+
+  await assert.rejects(
+    () =>
+      new SolutionZipService().downloadSolutionZip(
+        {
+          post: async () => {
+            postCalled = true;
+            return {};
+          },
+        } as any,
+        "core",
+        token as any,
+      ),
+    isSolutionExportCancelledError,
+  );
+
+  assert.strictEqual(postCalled, false);
+});
+
+test("aborts active solution export on cancellation", async () => {
+  let listener: (() => void) | undefined;
+  let signal: AbortSignal | undefined;
+  const token = {
+    isCancellationRequested: false,
+    onCancellationRequested: (callback: () => void) => {
+      listener = callback;
+      return { dispose: () => undefined };
+    },
+  };
+  const exportPromise = new SolutionZipService().downloadSolutionZip(
+    {
+      post: async (_path: string, _body: unknown, options?: { signal?: AbortSignal }) => {
+        signal = options?.signal;
+        listener?.();
+        throw new DOMException("The operation was aborted.", "AbortError");
+      },
+    } as any,
+    "core",
+    token as any,
+  );
+
+  await assert.rejects(() => exportPromise, isSolutionExportCancelledError);
+  assert.strictEqual(signal?.aborted, true);
 });
 
 test("fails zip save when an extracted entry is missing", async () => {

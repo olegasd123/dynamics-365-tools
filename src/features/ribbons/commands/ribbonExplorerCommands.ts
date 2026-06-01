@@ -76,6 +76,7 @@ import {
   formatRibbonCascadeDeleteItem,
   RibbonCascadeDeleteItem,
 } from "../ribbonCascadeDelete";
+import { isSolutionExportCancelledError } from "../solutionZipService";
 
 const DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS = ["isNaN"];
 
@@ -643,14 +644,23 @@ export async function pullRibbonsFromEnvironment(
     return;
   }
 
-  const buffer = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Exporting ${solutionPick.uniqueName}`,
-      cancellable: false,
-    },
-    () => ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName),
-  );
+  let buffer: Buffer;
+  try {
+    buffer = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Exporting ${solutionPick.uniqueName}`,
+        cancellable: true,
+      },
+      (_progress, token) =>
+        ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName, token),
+    );
+  } catch (error) {
+    if (isSolutionExportCancelledError(error)) {
+      return;
+    }
+    throw error;
+  }
   await offerExportedSolutionBackup(ctx, buffer, solutionPick.uniqueName);
   const incomingSource = await ctx.solutionZipService.openZipBuffer(buffer, {
     storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
@@ -915,14 +925,23 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const buffer = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Exporting ${solutionPick.uniqueName}`,
-      cancellable: false,
-    },
-    () => ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName),
-  );
+  let buffer: Buffer;
+  try {
+    buffer = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Exporting ${solutionPick.uniqueName}`,
+        cancellable: true,
+      },
+      (_progress, token) =>
+        ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName, token),
+    );
+  } catch (error) {
+    if (isSolutionExportCancelledError(error)) {
+      return;
+    }
+    throw error;
+  }
   await offerExportedSolutionBackup(ctx, buffer, solutionPick.uniqueName);
   const source = await ctx.solutionZipService.openZipBuffer(buffer, {
     storageRoot: ctx.extensionContext.globalStorageUri.fsPath,

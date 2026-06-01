@@ -1450,10 +1450,13 @@ test("offers to save a backup when opening an exported solution", async () => {
   let backupPromptShown = false;
   let saveDialogDefaultUri: vscode.Uri | undefined;
   let importedSource: RibbonSource | undefined;
+  let exportProgressCancellable: boolean | undefined;
+  let exportTokenPassed = false;
 
   const originalShowQuickPick = vscode.window.showQuickPick;
   const originalShowInformationMessage = vscode.window.showInformationMessage;
   const originalShowSaveDialog = vscode.window.showSaveDialog;
+  const originalWithProgress = vscode.window.withProgress;
 
   (vscode.window as any).showQuickPick = async (items: any[]) => {
     if (items[0]?.sourceKind === "environment") {
@@ -1471,6 +1474,16 @@ test("offers to save a backup when opening an exported solution", async () => {
   (vscode.window as any).showSaveDialog = async (options: { defaultUri?: vscode.Uri }) => {
     saveDialogDefaultUri = options.defaultUri;
     return vscode.Uri.file(backupPath);
+  };
+  (vscode.window as any).withProgress = async (options: any, task: any) => {
+    const token = {
+      isCancellationRequested: false,
+      onCancellationRequested: () => ({ dispose: () => undefined }),
+    };
+    if (String(options.title).startsWith("Exporting ")) {
+      exportProgressCancellable = options.cancellable;
+    }
+    return task({ report: () => undefined }, token);
   };
 
   try {
@@ -1507,7 +1520,10 @@ test("offers to save a backup when opening an exported solution", async () => {
         listUnmanagedSolutions: async () => [
           { uniqueName: "core", friendlyName: "Core", version: "1.0.0" },
         ],
-        downloadSolutionZip: async () => buffer,
+        downloadSolutionZip: async (_client: unknown, _uniqueName: string, token: unknown) => {
+          exportTokenPassed = Boolean(token);
+          return buffer;
+        },
         saveBufferToZip: service.saveBufferToZip.bind(service),
         openZipBuffer: service.openZipBuffer.bind(service),
       },
@@ -1524,8 +1540,11 @@ test("offers to save a backup when opening an exported solution", async () => {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInformationMessage = originalShowInformationMessage;
     (vscode.window as any).showSaveDialog = originalShowSaveDialog;
+    (vscode.window as any).withProgress = originalWithProgress;
   }
 
+  assert.strictEqual(exportProgressCancellable, true);
+  assert.strictEqual(exportTokenPassed, true);
   assert.strictEqual(backupPromptShown, true);
   assert.ok(saveDialogDefaultUri?.fsPath.startsWith(storageRoot));
   assert.deepStrictEqual(await fs.readFile(backupPath), buffer);

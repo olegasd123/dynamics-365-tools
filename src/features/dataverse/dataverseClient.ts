@@ -1,23 +1,27 @@
 import { DEFAULT_SOLUTION_NAME } from "../../shared/solutions";
 import { EnvironmentConnection } from "./environmentConnectionService";
 
+export interface DataverseRequestOptions {
+  signal?: AbortSignal;
+}
+
 export class DataverseClient {
   constructor(private readonly connection: EnvironmentConnection) {}
 
-  async get<T>(path: string): Promise<T> {
-    return this.request<T>("GET", path);
+  async get<T>(path: string, options?: DataverseRequestOptions): Promise<T> {
+    return this.request<T>("GET", path, undefined, options);
   }
 
-  async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>("POST", path, body);
+  async post<T>(path: string, body?: unknown, options?: DataverseRequestOptions): Promise<T> {
+    return this.request<T>("POST", path, body, options);
   }
 
-  async patch<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>("PATCH", path, body);
+  async patch<T>(path: string, body: unknown, options?: DataverseRequestOptions): Promise<T> {
+    return this.request<T>("PATCH", path, body, options);
   }
 
-  async delete(path: string): Promise<void> {
-    await this.request<void>("DELETE", path);
+  async delete(path: string, options?: DataverseRequestOptions): Promise<void> {
+    await this.request<void>("DELETE", path, undefined, options);
   }
 
   get apiRoot(): string {
@@ -28,7 +32,12 @@ export class DataverseClient {
     return this.connection.env.name;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options?: DataverseRequestOptions,
+  ): Promise<T> {
     const url = this.normalizePath(path);
     let response: Response;
     try {
@@ -41,6 +50,7 @@ export class DataverseClient {
           ...(method === "POST" ? { Prefer: "return=representation" } : {}),
         }),
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: options?.signal,
       });
     } catch (error) {
       throw this.buildFetchError(method, path, url, error);

@@ -64,6 +64,30 @@ test("post adds content headers, prefer, and user-agent", async () => {
   }
 });
 
+test("request forwards abort signal", async () => {
+  const calls: Array<{ url: string; options: RequestInit }> = [];
+  const originalFetch = global.fetch;
+  global.fetch = (async (url: any, options: any) => {
+    calls.push({ url: String(url), options: options ?? {} });
+    return createResponse("{}", { status: 200 });
+  }) as any;
+
+  try {
+    const connection: EnvironmentConnection = {
+      env: { name: "dev" } as any,
+      apiRoot: "https://example/api/data/v9.2",
+      token: "token",
+    };
+    const controller = new AbortController();
+    const client = new DataverseClient(connection);
+    await client.post("/entities", { name: "test" }, { signal: controller.signal });
+
+    assert.strictEqual(calls[0].options.signal, controller.signal);
+  } finally {
+    global.fetch = originalFetch!;
+  }
+});
+
 test("request normalizes absolute paths", async () => {
   const calls: Array<{ url: string }> = [];
   const originalFetch = global.fetch;
