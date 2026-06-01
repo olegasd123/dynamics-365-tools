@@ -131,6 +131,7 @@ const SAVE_EXPORT_BACKUP = "Save Backup";
 const CUSTOM_CRM_PARAMETERS = "Type custom parameters";
 const DELETE_RELATED_ITEMS = "Delete Related Items";
 const DELETE_SELECTED_ONLY = "Delete Selected Only";
+const REMOVE_IMPORTED_SOLUTION = "Remove";
 const DEFAULT_LANGUAGE_CODE = 1033;
 const CUSTOM_LANGUAGE_CODE = "Type language code";
 const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
@@ -425,6 +426,48 @@ export async function saveRibbonSolutionZip(
   const savedPath = await ctx.solutionZipService.saveSourceToZip(source, target.fsPath);
   ctx.ribbonExplorer.refresh();
   void vscode.window.showInformationMessage(`Saved solution zip to ${savedPath}.`);
+}
+
+export async function openRibbonSolutionLocation(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const source = await resolveSource(ctx, node);
+  if (!source) {
+    vscode.window.showWarningMessage("Select a ribbon source first.");
+    return;
+  }
+
+  await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(source.rootUri));
+}
+
+export async function removeRibbonSolutionSource(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const source = await resolveSource(ctx, node);
+  if (!source || source.kind !== "zip") {
+    vscode.window.showWarningMessage("Select an imported solution zip source first.");
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Remove ${source.name} from the explorer?`,
+    {
+      modal: true,
+      detail: ctx.ribbonEditorState.isSourceDirty(source.id)
+        ? "Unsaved ribbon edits for this solution will be lost. Files on disk will not be deleted."
+        : "Files on disk will not be deleted.",
+    },
+    REMOVE_IMPORTED_SOLUTION,
+  );
+  if (choice !== REMOVE_IMPORTED_SOLUTION) {
+    return;
+  }
+
+  ctx.ribbonSourceLocator.removeImportedSource(source.id);
+  ctx.ribbonEditorState.removeSource(source.id);
+  ctx.ribbonExplorer.refresh();
 }
 
 export async function saveRibbonSource(

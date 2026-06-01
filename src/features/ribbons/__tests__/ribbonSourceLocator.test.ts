@@ -85,6 +85,25 @@ test("keeps imported zip sources with workspace sources", async () => {
   assert.strictEqual(sources[0].name, "core.zip");
 });
 
+test("removes imported zip sources", async () => {
+  const workspaceRoot = await makeWorkspace();
+  const locator = new RibbonSourceLocator();
+  locator.addImportedSource({
+    id: "zip:/tmp/core",
+    kind: "zip",
+    name: "core.zip",
+    rootUri: "/tmp/core",
+    files: [],
+    zip: {
+      extractedRootUri: "/tmp/core",
+      entries: [],
+    },
+  });
+
+  assert.strictEqual(locator.removeImportedSource("zip:/tmp/core"), true);
+  assert.deepStrictEqual(await locator.locate(workspaceRoot), []);
+});
+
 async function makeWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-locator-"));
 }

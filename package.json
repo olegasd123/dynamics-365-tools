@@ -77,6 +77,8 @@
     "onCommand:dynamics365Tools.ribbons.redo",
     "onCommand:dynamics365Tools.ribbons.openFile",
     "onCommand:dynamics365Tools.ribbons.openSolutionZip",
+    "onCommand:dynamics365Tools.ribbons.openSolutionLocation",
+    "onCommand:dynamics365Tools.ribbons.removeSolutionSource",
     "onCommand:dynamics365Tools.ribbons.saveSolutionZip",
     "onCommand:dynamics365Tools.ribbons.publishToEnvironment",
     "onCommand:dynamics365Tools.ribbons.pullFromEnvironment",
@@ -409,6 +411,18 @@
         "icon": "$(file-zip)"
       },
       {
+        "command": "dynamics365Tools.ribbons.openSolutionLocation",
+        "title": "Open Solution Location",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.removeSolutionSource",
+        "title": "Remove Solution from Explorer",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(close)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.saveSolutionZip",
         "title": "Save Solution Zip...",
         "category": "Dynamics 365 Tools",
@@ -726,6 +740,12 @@
           "command": "dynamics365Tools.ribbons.openSolutionZip"
         },
         {
+          "command": "dynamics365Tools.ribbons.openSolutionLocation"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.removeSolutionSource"
+        },
+        {
           "command": "dynamics365Tools.ribbons.openFile"
         },
         {
@@ -935,6 +955,11 @@
           "group": "inline@3"
         },
         {
+          "command": "dynamics365Tools.ribbons.openSolutionLocation",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /d365RibbonSource/",
+          "group": "inline@0"
+        },
+        {
           "command": "dynamics365Tools.ribbons.openFile",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource:flat/ || viewItem =~ /d365RibbonDocument:application/ || viewItem == d365RibbonTemplates || viewItem == d365RibbonUnknownXml)",
           "group": "inline@1"
@@ -953,6 +978,11 @@
           "command": "dynamics365Tools.ribbons.publishToEnvironment",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/)",
           "group": "inline@4"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.removeSolutionSource",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /d365RibbonSource:zip/",
+          "group": "inline@99"
         },
         {
           "command": "dynamics365Tools.ribbons.pullFromEnvironment",

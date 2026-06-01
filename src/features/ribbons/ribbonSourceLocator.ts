@@ -9,6 +9,10 @@ export class RibbonSourceLocator {
     this.importedSources.set(source.id, source);
   }
 
+  removeImportedSource(sourceId: string): boolean {
+    return this.importedSources.delete(sourceId);
+  }
+
   async locate(workspaceRoot: string | undefined): Promise<RibbonSource[]> {
     const imported = [...this.importedSources.values()].sort((a, b) =>
       a.name.localeCompare(b.name),

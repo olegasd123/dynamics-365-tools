@@ -20,14 +20,21 @@ import {
   moveRibbonNodeDown,
   moveRibbonNodeUp,
   normalizeWebResourceUniqueName,
+  openRibbonSolutionLocation,
   openRibbonsFromSolution,
   publishRibbonToEnvironment,
+  removeRibbonSolutionSource,
   deleteRibbonNode,
 } from "../commands/ribbonExplorerCommands";
 import { createRibbonCascadeDeletePlan } from "../ribbonCascadeDelete";
 import { RibbonPatch, RibbonSource, XmlElementRange } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";
-import { RibbonDocumentNode, RibbonItemNode, RibbonSectionNode } from "../ribbonExplorer";
+import {
+  RibbonDocumentNode,
+  RibbonItemNode,
+  RibbonSectionNode,
+  RibbonSourceNode,
+} from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
 import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
@@ -66,6 +73,99 @@ test("lists ribbon languages with language codes", () => {
     description: "Use another LCID",
     manual: true,
   });
+});
+
+test("opens ribbon source location in the OS", async () => {
+  const source: RibbonSource = {
+    id: "zip:/tmp/core",
+    kind: "zip",
+    name: "core.zip",
+    rootUri: "/tmp/core",
+    files: [],
+    zip: {
+      extractedRootUri: "/tmp/core",
+      entries: [],
+    },
+  };
+  const node = new RibbonSourceNode(source);
+  const originalExecuteCommand = vscode.commands.executeCommand;
+  let executedCommand: string | undefined;
+  let openedPath: string | undefined;
+
+  (vscode.commands as any).executeCommand = async (command: string, uri: vscode.Uri) => {
+    executedCommand = command;
+    openedPath = uri.fsPath;
+  };
+
+  try {
+    await openRibbonSolutionLocation({} as any, node);
+  } finally {
+    (vscode.commands as any).executeCommand = originalExecuteCommand;
+  }
+
+  assert.strictEqual(executedCommand, "revealFileInOS");
+  assert.strictEqual(openedPath, "/tmp/core");
+});
+
+test("removes imported ribbon solution after confirmation", async () => {
+  const source: RibbonSource = {
+    id: "zip:/tmp/core",
+    kind: "zip",
+    name: "core.zip",
+    rootUri: "/tmp/core",
+    files: [{ fileUri: "/tmp/core/customizations.xml", kind: "Flat" }],
+    zip: {
+      extractedRootUri: "/tmp/core",
+      entries: ["customizations.xml"],
+    },
+  };
+  const node = new RibbonSourceNode(source);
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+  let removedSourceId: string | undefined;
+  let cleanedSourceId: string | undefined;
+  let refreshed = false;
+  let confirmationDetail = "";
+
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    options: { detail?: string },
+    action: string,
+  ) => {
+    confirmationDetail = options.detail ?? "";
+    return action;
+  };
+
+  try {
+    await removeRibbonSolutionSource(
+      {
+        ribbonSourceLocator: {
+          removeImportedSource: (sourceId: string) => {
+            removedSourceId = sourceId;
+            return true;
+          },
+        },
+        ribbonEditorState: {
+          isSourceDirty: () => true,
+          removeSource: (sourceId: string) => {
+            cleanedSourceId = sourceId;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  assert.strictEqual(removedSourceId, source.id);
+  assert.strictEqual(cleanedSourceId, source.id);
+  assert.strictEqual(refreshed, true);
+  assert.match(confirmationDetail, /Unsaved ribbon edits/);
 });
 
 test("adds command action from actions group node", async () => {

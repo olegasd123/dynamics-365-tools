@@ -49,6 +49,7 @@ import {
   editRibbonNode,
   hideAndStubOobRibbonButtons,
   hideOobRibbonButton,
+  openRibbonSolutionLocation,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
   openRibbonsFromSolution,
@@ -57,6 +58,7 @@ import {
   publishRibbonToEnvironment,
   pullRibbonsFromEnvironment,
   refreshRibbonExplorer,
+  removeRibbonSolutionSource,
   reorderOobRibbonButtons,
   saveRibbonSolutionZip,
   saveRibbonSource,
@@ -166,9 +168,23 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.openSolutionLocation",
+      (node) => openRibbonSolutionLocation(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.ribbons.openSolutionZip", () => openRibbonsFromSolution(ctx), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.removeSolutionSource",
+      (node) => removeRibbonSolutionSource(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register(
       "dynamics365Tools.ribbons.saveSolutionZip",
       (node) => saveRibbonSolutionZip(ctx, node),

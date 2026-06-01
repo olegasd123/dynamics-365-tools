@@ -93,6 +93,20 @@ export class RibbonEditorState {
     this.documentsBySourceId.clear();
   }
 
+  removeSource(sourceId: string): void {
+    const source = this.sourcesById.get(sourceId);
+    this.sourcesById.delete(sourceId);
+    this.documentsBySourceId.delete(sourceId);
+    if (!source) {
+      return;
+    }
+
+    for (const file of source.files) {
+      this.patchesByFileUri.delete(file.fileUri);
+    }
+    this.removeHistoryForFiles(source.files.map((file) => file.fileUri));
+  }
+
   async saveSource(sourceId: string): Promise<RibbonSaveResult> {
     const source = this.sourcesById.get(sourceId);
     if (!source) {
