@@ -5,7 +5,7 @@ import * as path from "node:path";
 import test from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
-import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
+import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   addRibbonCommandAction,
@@ -279,6 +279,9 @@ test("adds built-in command enable rule references", async () => {
       <EnableRules><EnableRule Id="Mscrm.SelectionCountExactlyOne" /></EnableRules>
     </CommandDefinition>
   </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules><EnableRule Id="mso.account.Pptx.EnableRule" /></EnableRules>
+  </RuleDefinitions>
 </RibbonDiffXml>`;
   const [document] = readRibbonDocuments(source, {
     sourceId: "source",
@@ -323,6 +326,11 @@ test("adds built-in command enable rule references", async () => {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
   }
 
+  assert.deepStrictEqual(offeredLabels.slice(0, 3), [
+    "Add new enable rule",
+    "mso.account.Pptx.EnableRule",
+    "Type enable rule id",
+  ]);
   assert.ok(!offeredLabels.includes("Mscrm.SelectionCountExactlyOne"));
   assert.ok(offeredLabels.includes("Mscrm.ShowOnGrid"));
 
@@ -335,6 +343,91 @@ test("adds built-in command enable rule references", async () => {
   assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
     "Mscrm.SelectionCountExactlyOne",
     "Mscrm.ShowOnGrid",
+  ]);
+});
+
+test("creates new enable rule and references it from command refs", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Form.Validate.Command" />
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const command = document.views[0].commandDefinitions[0];
+  const node = new RibbonItemNode(
+    "EnableRules",
+    "0",
+    "d365RibbonEnableRuleRefs",
+    "references",
+    [],
+    [],
+    { document, range: command.range },
+  );
+  let patches: RibbonPatch[] = [];
+  const offeredLabels: string[] = [];
+  const inputValues: string[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Enable rule") {
+      offeredLabels.push(...items.map((item) => item.label));
+      return items.find((item) => item.label === "Add new enable rule");
+    }
+
+    if (options.placeHolder === "First rule step") {
+      return items.find((item) => item.label === "No step");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { value?: string }) => {
+    inputValues.push(options.value ?? "");
+    return options.value;
+  };
+
+  try {
+    await addRibbonCommandEnableRuleRef(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(offeredLabels.slice(0, 2), ["Add new enable rule", "Type enable rule id"]);
+  assert.deepStrictEqual(inputValues, ["new.account.Form.Validate.EnableRule"]);
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatches(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(
+    updatedDocument.views[0].enableRules.map((rule) => rule.id),
+    ["new.account.Form.Validate.EnableRule"],
+  );
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
+    "new.account.Form.Validate.EnableRule",
   ]);
 });
 

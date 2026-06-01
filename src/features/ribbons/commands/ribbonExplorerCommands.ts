@@ -53,6 +53,7 @@ import {
   LocLabelTitle,
   RibbonCommandClientType,
   RibbonDocument,
+  RibbonPatch,
   RibbonRuleAppliesTo,
   RibbonRuleFormState,
   RibbonRulePrivilegeDepth,
@@ -3206,39 +3207,53 @@ async function addRibbonCommandRuleRef(
     return;
   }
 
-  const ruleId =
+  const selection =
     kind === "EnableRule"
-      ? await pickRuleId(
+      ? await pickRuleRef(
           "Enable rule",
           target.document,
           target.command.enableRuleRefs,
           suggestedCommandRuleRefId(target.command.id, kind),
           (view) => view.enableRules,
+          () =>
+            promptNewEnableRuleRef(
+              ctx,
+              target.document,
+              target.command.enableRuleRefs,
+              suggestedCommandRuleRefId(target.command.id, kind),
+            ),
         )
-      : await pickRuleId(
+      : await pickRuleRef(
           "Display rule",
           target.document,
           target.command.displayRuleRefs,
           suggestedCommandRuleRefId(target.command.id, kind),
           (view) => view.displayRules,
         );
-  if (!ruleId) {
+  if (!selection) {
     return;
   }
 
   ctx.ribbonEditorState.queuePatches(target.document, [
-    createCommandRuleRefPatch(target.document, target.command, kind, ruleId.trim()),
+    ...selection.patches,
+    createCommandRuleRefPatch(target.document, target.command, kind, selection.id),
   ]);
   ctx.ribbonExplorer.refresh();
 }
 
-async function pickRuleId<T extends EnableRule | DisplayRule>(
+interface RuleRefSelection {
+  id: string;
+  patches: RibbonPatch[];
+}
+
+async function pickRuleRef<T extends EnableRule | DisplayRule>(
   label: string,
   document: RibbonDocument,
   currentRefs: string[],
   suggestedId: string,
   selectRules: (view: RibbonView) => T[],
-): Promise<string | undefined> {
+  createNewRule?: () => Promise<RuleRefSelection | undefined>,
+): Promise<RuleRefSelection | undefined> {
   const used = new Set(currentRefs);
   const rules = uniqueById(document.views.flatMap(selectRules)).filter(
     (rule) => !used.has(rule.id),
@@ -3252,11 +3267,15 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
         }))
       : [];
   const manual = `Type ${label.toLowerCase()} id`;
+  const createNew = `Add new ${label.toLowerCase()}`;
   const pick = await showRibbonQuickPick(
     [
-      ...builtInRules,
+      ...(createNewRule
+        ? [{ label: createNew, description: "Create a rule and add its reference" }]
+        : []),
       ...rules.map((rule) => ({ label: rule.id })),
       { label: manual, description: "Use an id that is not in this view yet" },
+      ...builtInRules,
     ],
     { placeHolder: label },
   );
@@ -3264,8 +3283,12 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
     return undefined;
   }
 
+  if (pick.label === createNew && createNewRule) {
+    return createNewRule();
+  }
+
   if (pick.label !== manual) {
-    return pick.label;
+    return { id: pick.label, patches: [] };
   }
 
   const id = await showRibbonInputBox({
@@ -3279,7 +3302,45 @@ async function pickRuleId<T extends EnableRule | DisplayRule>(
       return currentRefs.includes(id) ? "This command already references this rule." : undefined;
     },
   });
-  return id?.trim();
+  return id ? { id: id.trim(), patches: [] } : undefined;
+}
+
+async function promptNewEnableRuleRef(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  currentRefs: string[],
+  suggestedId: string,
+): Promise<RuleRefSelection | undefined> {
+  const usedIds = new Set([...collectRibbonIds(document), ...currentRefs]);
+  const id = await showRibbonInputBox({
+    prompt: "Enable rule id",
+    value: nextBatchId(usedIds, suggestedId),
+    validateInput: (value) => {
+      const trimmed = value.trim();
+      if (currentRefs.includes(trimmed)) {
+        return "This command already references this rule.";
+      }
+
+      return validateUniqueId(document, trimmed, "Rule id is required.");
+    },
+  });
+  if (!id) {
+    return undefined;
+  }
+
+  const step = await promptRuleStep(ctx, "Enable");
+  if (step === undefined) {
+    return undefined;
+  }
+
+  const trimmedId = id.trim();
+  return {
+    id: trimmedId,
+    patches: createEnableRulePatches(document, {
+      id: trimmedId,
+      step: step ?? undefined,
+    }),
+  };
 }
 
 function suggestedCommandRuleRefId(commandId: string, kind: "EnableRule" | "DisplayRule"): string {
