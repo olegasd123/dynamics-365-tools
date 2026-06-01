@@ -3166,9 +3166,13 @@ async function addRibbonRule(
     return;
   }
 
+  const suggestedId = nextBatchId(
+    collectRibbonIds(target.document),
+    `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.${kind}Rule`,
+  );
   const id = await showRibbonInputBox({
     prompt: `${kind} rule id`,
-    placeHolder: `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.${kind}Rule`,
+    value: suggestedId,
     validateInput: (value) => validateUniqueId(target.document, value, "Rule id is required."),
   });
   if (!id) {

@@ -27,7 +27,7 @@ import {
 import { createRibbonCascadeDeletePlan } from "../ribbonCascadeDelete";
 import { RibbonPatch, RibbonSource, XmlElementRange } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";
-import { RibbonDocumentNode, RibbonItemNode } from "../ribbonExplorer";
+import { RibbonDocumentNode, RibbonItemNode, RibbonSectionNode } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
 import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
@@ -465,6 +465,75 @@ test("does not queue patches when enable rule creation is cancelled", async () =
   }
 
   assert.strictEqual(queued, false);
+});
+
+test("prefills enable rule ids from the ribbon scope", async () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="d365tools.account.Form.EnableRule" />
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+  const inputValues: string[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) =>
+    options.placeHolder === "First rule step"
+      ? items.find((item) => item.label === "No step")
+      : undefined;
+  (vscode.window as any).showInputBox = async (options: { value?: string }) => {
+    inputValues.push(options.value ?? "");
+    return options.value;
+  };
+
+  try {
+    await addRibbonEnableRule(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      new RibbonSectionNode(
+        document,
+        document.views.find((view) => view.scope === "Form") ?? document.views[0],
+        "enableRules",
+        document.views[0].enableRules.length,
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(inputValues, ["d365tools.account.Form.EnableRule.2"]);
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  assert.deepStrictEqual(
+    updatedDocument.views[0].enableRules.map((rule) => rule.id),
+    ["d365tools.account.Form.EnableRule", "d365tools.account.Form.EnableRule.2"],
+  );
 });
 
 test("prefills manual command rule reference ids from the command id", async () => {

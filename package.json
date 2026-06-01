@@ -490,7 +490,7 @@
         "command": "dynamics365Tools.ribbons.addEnableRule",
         "title": "Add Enable Rule",
         "category": "Dynamics 365 Tools",
-        "icon": "$(check)"
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.addDisplayRule",
@@ -1023,6 +1023,11 @@
           "command": "dynamics365Tools.ribbons.addEnableRule",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:enableRules)",
           "group": "navigation@8"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addEnableRule",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:enableRules",
+          "group": "inline@8"
         },
         {
           "command": "dynamics365Tools.ribbons.addDisplayRule",
