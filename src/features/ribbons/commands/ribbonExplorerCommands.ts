@@ -1253,10 +1253,11 @@ export async function addCustomRibbonButton(
   if (!label) {
     return;
   }
+  const labelValue = label.trim();
 
   const alt = await showRibbonInputBox({
     prompt: "Alt",
-    placeHolder: "Validate and save",
+    value: labelValue,
   });
   if (alt === undefined) {
     return;
@@ -1264,7 +1265,7 @@ export async function addCustomRibbonButton(
 
   const toolTipTitle = await showRibbonInputBox({
     prompt: "Tool tip title",
-    placeHolder: "Validate",
+    value: labelValue,
   });
   if (toolTipTitle === undefined) {
     return;
@@ -1272,7 +1273,7 @@ export async function addCustomRibbonButton(
 
   const toolTipDescription = await showRibbonInputBox({
     prompt: "Tool tip description",
-    placeHolder: "Validate and save this row",
+    value: labelValue,
   });
   if (toolTipDescription === undefined) {
     return;
@@ -1353,7 +1354,7 @@ export async function addCustomRibbonButton(
       locLabel: {
         id: labelLocId,
         languageCode: 1033,
-        description: label.trim(),
+        description: labelValue,
       },
     }),
   );
@@ -2503,20 +2504,24 @@ async function editCustomAction(
   if (labelText === undefined) {
     return;
   }
+  const labelDefault = getButtonLabelDefault(document, labelLocId, labelText);
 
-  const alt = await promptOptional("Alt", action.commandUI.alt);
+  const alt = await promptOptional("Alt", action.commandUI.alt || labelDefault);
   if (alt === undefined) {
     return;
   }
 
-  const toolTipTitle = await promptOptional("Tool tip title", action.commandUI.toolTipTitle);
+  const toolTipTitle = await promptOptional(
+    "Tool tip title",
+    action.commandUI.toolTipTitle || labelDefault,
+  );
   if (toolTipTitle === undefined) {
     return;
   }
 
   const toolTipDescription = await promptOptional(
     "Tool tip description",
-    action.commandUI.toolTipDescription,
+    action.commandUI.toolTipDescription || labelDefault,
   );
   if (toolTipDescription === undefined) {
     return;
@@ -2582,6 +2587,33 @@ async function editCustomAction(
     createCustomButtonReplacePatch(document.sourceText, action.range, input),
   ]);
   ctx.ribbonExplorer.refresh();
+}
+
+function getButtonLabelDefault(
+  document: RibbonDocument,
+  labelLocId: string,
+  labelText: string,
+): string | undefined {
+  const inlineLabel = labelText.trim();
+  if (inlineLabel) {
+    return inlineLabel;
+  }
+
+  const locLabelId = labelLocId.trim();
+  if (!locLabelId) {
+    return undefined;
+  }
+
+  for (const view of document.views) {
+    const title = view.locLabels
+      .find((label) => label.id === locLabelId)
+      ?.titles.find((item) => item.description.trim());
+    if (title) {
+      return title.description;
+    }
+  }
+
+  return undefined;
 }
 
 async function editHideAction(

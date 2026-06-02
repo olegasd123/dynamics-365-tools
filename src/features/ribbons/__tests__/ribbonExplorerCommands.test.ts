@@ -8,6 +8,7 @@ import JSZip from "jszip";
 import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
+  addCustomRibbonButton,
   addRibbonCommandAction,
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
@@ -73,6 +74,162 @@ test("lists ribbon languages with language codes", () => {
     description: "Use another LCID",
     manual: true,
   });
+});
+
+test("prefills custom button text metadata from the label", async () => {
+  const source = `<RibbonDiffXml>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const label = "Validate and save";
+  const defaultsByPrompt = new Map<string, string | undefined>();
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items[0];
+    }
+
+    if (options.placeHolder === "Button action") {
+      return items.find((item) => item.label === "URL");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt) {
+      defaultsByPrompt.set(options.prompt, options.value);
+    }
+
+    switch (options.prompt) {
+      case "Button label":
+        return label;
+      case "Alt":
+      case "Tool tip title":
+      case "Tool tip description":
+      case "Sequence":
+        return options.value ?? "";
+      case "Image 16 web resource":
+      case "Image 32 web resource":
+      case "Modern image web resource":
+        return "";
+      case "URL":
+        return "https://contoso.example/validate";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonButton(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      new RibbonDocumentNode(document),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.strictEqual(defaultsByPrompt.get("Alt"), label);
+  assert.strictEqual(defaultsByPrompt.get("Tool tip title"), label);
+  assert.strictEqual(defaultsByPrompt.get("Tool tip description"), label);
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /Alt="Validate and save"/);
+  assert.match(updated, /ToolTipTitle="Validate and save"/);
+  assert.match(updated, /ToolTipDescription="Validate and save"/);
+});
+
+test("prefills empty custom button text metadata from loc label while editing", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <LocLabels>
+    <LocLabel Id="new.Label">
+      <Titles>
+        <Title languagecode="1033" description="Run report" />
+      </Titles>
+    </LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    "CustomAction: new.Action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-event",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  const defaultsByPrompt = new Map<string, string | undefined>();
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt) {
+      defaultsByPrompt.set(options.prompt, options.value);
+    }
+
+    return options.value ?? "";
+  };
+
+  try {
+    await editRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.strictEqual(defaultsByPrompt.get("Alt"), "Run report");
+  assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "Run report");
+  assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "Run report");
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /Alt="Run report"/);
+  assert.match(updated, /ToolTipTitle="Run report"/);
+  assert.match(updated, /ToolTipDescription="Run report"/);
 });
 
 test("opens ribbon source location in the OS", async () => {
