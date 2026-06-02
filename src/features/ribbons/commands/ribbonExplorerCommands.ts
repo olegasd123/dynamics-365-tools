@@ -2495,12 +2495,12 @@ async function editCustomAction(
     return;
   }
 
-  const labelLocId = await promptOptional("Label LocLabel id", action.commandUI.labelLocId);
+  const labelLocId = await promptOptional("Button label Id", action.commandUI.labelLocId);
   if (labelLocId === undefined) {
     return;
   }
 
-  const labelText = await promptOptional("Inline label text", action.commandUI.labelText);
+  const labelText = await promptOptional("Button label", action.commandUI.labelText);
   if (labelText === undefined) {
     return;
   }
