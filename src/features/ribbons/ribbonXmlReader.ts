@@ -612,6 +612,11 @@ function readCommandUINode(
         command: attr(node, "Command"),
         labelLocId: optionalAttr(node, "LabelLocId") ?? locLabelIdFromReference(labelText),
         labelText: isLocLabelReference(labelText) ? undefined : labelText,
+        alt: optionalAttr(node, "Alt"),
+        toolTipTitle: isLocLabelReference(toolTipTitle) ? undefined : toolTipTitle,
+        toolTipDescription: isLocLabelReference(toolTipDescription)
+          ? undefined
+          : toolTipDescription,
         toolTipTitleLocId:
           optionalAttr(node, "ToolTipTitleLocId") ?? locLabelIdFromReference(toolTipTitle),
         toolTipDescriptionLocId:
@@ -619,6 +624,7 @@ function readCommandUINode(
           locLabelIdFromReference(toolTipDescription),
         image16x16: readImageRef(node, "Image16by16"),
         image32x32: readImageRef(node, "Image32by32"),
+        modernImage: readImageRef(node, "ModernImage"),
         templateAlias: optionalAttr(node, "TemplateAlias"),
         sequence: numberAttr(node, "Sequence"),
         range: node.range,

@@ -8,7 +8,7 @@ const ribbonXml = `<RibbonDiffXml>
     <!-- keep this comment -->
     <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="10">
       <CommandUIDefinition>
-        <Button Id="new.account.Form.Button" Command="new.account.Validate.Command" LabelText="Validate" Image16by16="$webresource:new_/img/validate16.png" />
+        <Button Id="new.account.Form.Button" Command="new.account.Validate.Command" LabelText="Validate" Alt="Validate" ToolTipTitle="Validate" ToolTipDescription="Validate and save the row" Image16by16="$webresource:new_/img/validate16.png" Image32by32="$webresource:new_/img/validate32.png" ModernImage="$webresource:new_/img/validate.svg" />
       </CommandUIDefinition>
     </CustomAction>
     <HideCustomAction HideActionId="new.account.Form.Hide.Save" Location="Mscrm.Form.account.MainTab.Save.Controls._children" />
@@ -91,6 +91,21 @@ test("reads major ribbon sections and known nodes with ranges", () => {
   assert.strictEqual(view.customActions[0].id, "new.account.Form.Button.CustomAction");
   assert.strictEqual(view.customActions[0].sequence, 10);
   assert.strictEqual(view.customActions[0].commandUI?.kind, "Button");
+  const button = view.customActions[0].commandUI;
+  assert.strictEqual(button?.kind === "Button" ? button.alt : undefined, "Validate");
+  assert.strictEqual(button?.kind === "Button" ? button.toolTipTitle : undefined, "Validate");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescription : undefined,
+    "Validate and save the row",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.image32x32?.webResourceUniqueName : undefined,
+    "new_/img/validate32.png",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.modernImage?.webResourceUniqueName : undefined,
+    "new_/img/validate.svg",
+  );
   assert.strictEqual(view.hideActions[0].hideActionId, "new.account.Form.Hide.Save");
   assert.strictEqual(view.commandDefinitions[0].enableRuleRefs[0], "new.account.Enable");
   assert.strictEqual(view.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");

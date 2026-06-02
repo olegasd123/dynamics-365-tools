@@ -543,12 +543,12 @@ test("creates common enable rules from prompts", async () => {
     {
       inputByPrompt: new Map([
         ["Enable rule id", "new.SelectionCount"],
-        ["Minimum selected rows", "1"],
-        ["Maximum selected rows", "1"],
+        ["Selected rows", "1"],
       ]),
       pickByPlaceHolder: new Map([
         ["First rule step", "SelectionCountRule"],
         ["Applies to", "SelectedEntity"],
+        ["Selected row condition", "Equal to"],
         ["Invert result?", "No"],
       ]),
       expectedKind: "SelectionCountRule",
@@ -617,6 +617,134 @@ test("creates common enable rules from prompts", async () => {
       });
 
       assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, item.expectedKind);
+    }
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+});
+
+test("creates selection count enable rule conditions from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions />
+</RibbonDiffXml>`;
+  const cases = [
+    {
+      condition: "Equal to",
+      inputs: new Map([
+        ["Enable rule id", "new.SelectionCount.Equal"],
+        ["Selected rows", "1"],
+      ]),
+      expectedMinimum: 1,
+      expectedMaximum: 1,
+    },
+    {
+      condition: "Greater than",
+      inputs: new Map([
+        ["Enable rule id", "new.SelectionCount.GreaterThan"],
+        ["Selected rows", "1"],
+      ]),
+      expectedMinimum: 2,
+      expectedMaximum: undefined,
+    },
+    {
+      condition: "Greater than or equal",
+      inputs: new Map([
+        ["Enable rule id", "new.SelectionCount.GreaterThanOrEqual"],
+        ["Selected rows", "1"],
+      ]),
+      expectedMinimum: 1,
+      expectedMaximum: undefined,
+    },
+    {
+      condition: "Less than",
+      inputs: new Map([
+        ["Enable rule id", "new.SelectionCount.LessThan"],
+        ["Selected rows", "2"],
+      ]),
+      expectedMinimum: undefined,
+      expectedMaximum: 1,
+    },
+    {
+      condition: "Less than or equal",
+      inputs: new Map([
+        ["Enable rule id", "new.SelectionCount.LessThanOrEqual"],
+        ["Selected rows", "1"],
+      ]),
+      expectedMinimum: undefined,
+      expectedMaximum: 1,
+    },
+    {
+      condition: "Between",
+      inputs: new Map([
+        ["Enable rule id", "new.SelectionCount.Between"],
+        ["Minimum selected rows", "1"],
+        ["Maximum selected rows", "3"],
+      ]),
+      expectedMinimum: 1,
+      expectedMaximum: 3,
+    },
+  ];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  try {
+    for (const item of cases) {
+      const [document] = readRibbonDocuments(source, {
+        sourceId: "source",
+        fileUri: "/tmp/RibbonDiffXml.xml",
+        kind: "Application",
+      });
+      let patches: RibbonPatch[] = [];
+      (vscode.window as any).showQuickPick = async (
+        picks: vscode.QuickPickItem[] | string[],
+        options: { placeHolder?: string },
+      ) => {
+        const labels = new Map([
+          ["First rule step", "SelectionCountRule"],
+          ["Applies to", "SelectedEntity"],
+          ["Selected row condition", item.condition],
+          ["Invert result?", "No"],
+        ]);
+        const label = labels.get(options.placeHolder ?? "");
+        return typeof picks[0] === "string"
+          ? label
+          : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === label);
+      };
+      (vscode.window as any).showInputBox = async (options: { prompt?: string }) =>
+        item.inputs.get(options.prompt ?? "");
+
+      await addRibbonEnableRule(
+        {
+          ribbonEditorState: {
+            queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+              patches = queuedPatches;
+            },
+          },
+          ribbonExplorer: {
+            refresh: () => undefined,
+          },
+        } as any,
+        new RibbonDocumentNode(document),
+      );
+
+      const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+        sourceId: "source",
+        fileUri: "/tmp/RibbonDiffXml.xml",
+        kind: "Application",
+      });
+      const step = updatedDocument.views[0].enableRules[0].steps[0];
+
+      assert.strictEqual(step.kind, "SelectionCountRule");
+      assert.strictEqual(
+        step.kind === "SelectionCountRule" ? step.minimum : undefined,
+        item.expectedMinimum,
+      );
+      assert.strictEqual(
+        step.kind === "SelectionCountRule" ? step.maximum : undefined,
+        item.expectedMaximum,
+      );
     }
   } finally {
     (vscode.window as any).showQuickPick = originalShowQuickPick;

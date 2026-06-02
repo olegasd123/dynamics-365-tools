@@ -110,10 +110,14 @@ export interface ButtonNode {
   command: string;
   labelLocId?: string;
   labelText?: string;
+  alt?: string;
+  toolTipTitle?: string;
+  toolTipDescription?: string;
   toolTipTitleLocId?: string;
   toolTipDescriptionLocId?: string;
   image16x16?: ImageRef;
   image32x32?: ImageRef;
+  modernImage?: ImageRef;
   templateAlias?: string;
   sequence?: number;
   range: TextRange;

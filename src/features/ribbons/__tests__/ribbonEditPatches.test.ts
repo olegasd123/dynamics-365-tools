@@ -44,8 +44,12 @@ test("creates a custom button with command action and label", () => {
       buttonId: "d365tools.account.Form.Validate.Button",
       commandId: "d365tools.account.Form.Validate.Command",
       labelLocId: "d365tools.account.Form.Validate.Label",
+      alt: "Validate",
+      toolTipTitle: "Validate",
+      toolTipDescription: "Validate and save the row",
       image16x16: "new_/icons/save16.png",
       image32x32: "new_/icons/save32.png",
+      modernImage: "new_/icons/save.svg",
       action: {
         kind: "JavaScriptFunction",
         library: "new_/scripts/account.js",
@@ -74,6 +78,17 @@ test("creates a custom button with command action and label", () => {
   assert.match(updated, /<CommandDefinitions>/);
   assert.match(updated, /<LocLabels>/);
   assert.strictEqual(form.customActions[0].commandUI?.kind, "Button");
+  const button = form.customActions[0].commandUI;
+  assert.strictEqual(button?.kind === "Button" ? button.alt : undefined, "Validate");
+  assert.strictEqual(button?.kind === "Button" ? button.toolTipTitle : undefined, "Validate");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescription : undefined,
+    "Validate and save the row",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.modernImage?.webResourceUniqueName : undefined,
+    "new_/icons/save.svg",
+  );
   assert.strictEqual(form.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
   assert.deepStrictEqual(
     form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
@@ -87,7 +102,10 @@ test("creates a custom button with command action and label", () => {
   assert.strictEqual(form.locLabels[0].titles[0].description, "Validate and save");
   assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
   assert.match(updated, /LabelText="\$LocLabels:d365tools\.account\.Form\.Validate\.Label"/);
-  assert.match(updated, /<Button[^>]+Sequence="10"/);
+  assert.match(
+    updated,
+    /LabelText="\$LocLabels:d365tools\.account\.Form\.Validate\.Label" Alt="Validate" ToolTipTitle="Validate" ToolTipDescription="Validate and save the row" Image16by16="\$webresource:new_\/icons\/save16\.png" Image32by32="\$webresource:new_\/icons\/save32\.png" ModernImage="\$webresource:new_\/icons\/save\.svg" Sequence="10"/,
+  );
   assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
@@ -766,6 +784,12 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
       buttonId: "new.button",
       commandId: "new.command",
       labelText: "New label",
+      alt: "New alt",
+      toolTipTitle: "New title",
+      toolTipDescription: "New description",
+      image16x16: "new_/icons/new16.png",
+      image32x32: "new_/icons/new32.png",
+      modernImage: "new_/icons/new.svg",
       action: { kind: "Url", address: "" },
     }),
     createHideActionReplacePatch(document.sourceText, view.hideActions[0].range, {
@@ -800,6 +824,17 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
   assert.strictEqual(updatedView.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
   assert.strictEqual(updatedView.displayRules[0].steps[0].kind, "ValueRule");
   assert.strictEqual(updatedView.locLabels[0].titles[0].description, "New label");
+  const button = updatedView.customActions[0].commandUI;
+  assert.strictEqual(button?.kind === "Button" ? button.alt : undefined, "New alt");
+  assert.strictEqual(button?.kind === "Button" ? button.toolTipTitle : undefined, "New title");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescription : undefined,
+    "New description",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.modernImage?.webResourceUniqueName : undefined,
+    "new_/icons/new.svg",
+  );
   assert.match(updated, /<CommandDefinitions>/);
   assert.doesNotMatch(updated, /old\.hide/);
 });

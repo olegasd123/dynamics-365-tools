@@ -96,6 +96,18 @@ interface CrmParameterPick extends vscode.QuickPickItem {
   custom?: boolean;
 }
 
+type SelectionCountCondition =
+  | "EqualTo"
+  | "GreaterThan"
+  | "GreaterThanOrEqual"
+  | "LessThan"
+  | "LessThanOrEqual"
+  | "Between";
+
+interface SelectionCountConditionPick extends vscode.QuickPickItem {
+  condition: SelectionCountCondition;
+}
+
 interface RibbonLanguageCodePick extends vscode.QuickPickItem {
   languageCode?: number;
   manual?: boolean;
@@ -1242,6 +1254,63 @@ export async function addCustomRibbonButton(
     return;
   }
 
+  const alt = await showRibbonInputBox({
+    prompt: "Alt",
+    placeHolder: "Validate and save",
+  });
+  if (alt === undefined) {
+    return;
+  }
+
+  const toolTipTitle = await showRibbonInputBox({
+    prompt: "Tool tip title",
+    placeHolder: "Validate",
+  });
+  if (toolTipTitle === undefined) {
+    return;
+  }
+
+  const toolTipDescription = await showRibbonInputBox({
+    prompt: "Tool tip description",
+    placeHolder: "Validate and save this row",
+  });
+  if (toolTipDescription === undefined) {
+    return;
+  }
+
+  const image16x16 = await showRibbonInputBox({
+    prompt: "Image 16 web resource",
+    placeHolder: "new_/icons/save16.png",
+  });
+  if (image16x16 === undefined) {
+    return;
+  }
+
+  const image32x32 = await showRibbonInputBox({
+    prompt: "Image 32 web resource",
+    placeHolder: "new_/icons/save32.png",
+  });
+  if (image32x32 === undefined) {
+    return;
+  }
+
+  const modernImage = await showRibbonInputBox({
+    prompt: "Modern image web resource",
+    placeHolder: "new_/icons/save.svg",
+  });
+  if (modernImage === undefined) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: String(nextCustomActionSequence(target.view)),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
   const location = await pickLocation(target.document, target.view);
   if (!location) {
     return;
@@ -1266,25 +1335,20 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const image16x16 = await showRibbonInputBox({
-    prompt: "Small icon web resource",
-    placeHolder: "new_/icons/save16.png",
-  });
-  const image32x32 = await showRibbonInputBox({
-    prompt: "Large icon web resource",
-    placeHolder: "new_/icons/save32.png",
-  });
-
   ctx.ribbonEditorState.queuePatches(
     target.document,
     createCustomButtonPatches(target.document, {
       ...ids,
       location,
       action,
-      sequence: nextCustomActionSequence(target.view),
+      sequence: sequenceText.trim() ? Number(sequenceText.trim()) : undefined,
       labelLocId,
+      alt: alt.trim() || undefined,
+      toolTipTitle: toolTipTitle.trim() || undefined,
+      toolTipDescription: toolTipDescription.trim() || undefined,
       image16x16: image16x16?.trim() || undefined,
       image32x32: image32x32?.trim() || undefined,
+      modernImage: modernImage.trim() || undefined,
       templateAlias: "o1",
       locLabel: {
         id: labelLocId,
@@ -2420,15 +2484,6 @@ async function editCustomAction(
     return;
   }
 
-  const sequenceText = await showRibbonInputBox({
-    prompt: "Sequence",
-    value: action.sequence === undefined ? "" : String(action.sequence),
-    validateInput: validateOptionalNumber,
-  });
-  if (sequenceText === undefined) {
-    return;
-  }
-
   const buttonId = await promptRequired("Button id", action.commandUI.id);
   if (buttonId === undefined) {
     return;
@@ -2449,8 +2504,26 @@ async function editCustomAction(
     return;
   }
 
+  const alt = await promptOptional("Alt", action.commandUI.alt);
+  if (alt === undefined) {
+    return;
+  }
+
+  const toolTipTitle = await promptOptional("Tool tip title", action.commandUI.toolTipTitle);
+  if (toolTipTitle === undefined) {
+    return;
+  }
+
+  const toolTipDescription = await promptOptional(
+    "Tool tip description",
+    action.commandUI.toolTipDescription,
+  );
+  if (toolTipDescription === undefined) {
+    return;
+  }
+
   const image16x16 = await promptOptional(
-    "Small icon web resource",
+    "Image 16 web resource",
     action.commandUI.image16x16?.webResourceUniqueName,
   );
   if (image16x16 === undefined) {
@@ -2458,10 +2531,27 @@ async function editCustomAction(
   }
 
   const image32x32 = await promptOptional(
-    "Large icon web resource",
+    "Image 32 web resource",
     action.commandUI.image32x32?.webResourceUniqueName,
   );
   if (image32x32 === undefined) {
+    return;
+  }
+
+  const modernImage = await promptOptional(
+    "Modern image web resource",
+    action.commandUI.modernImage?.webResourceUniqueName,
+  );
+  if (modernImage === undefined) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: action.sequence === undefined ? "" : String(action.sequence),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
     return;
   }
 
@@ -2479,8 +2569,12 @@ async function editCustomAction(
     action: { kind: "Url", address: "" },
     labelLocId: labelLocId.trim() || undefined,
     labelText: labelText.trim() || undefined,
+    alt: alt.trim() || undefined,
+    toolTipTitle: toolTipTitle.trim() || undefined,
+    toolTipDescription: toolTipDescription.trim() || undefined,
     image16x16: image16x16.trim() || undefined,
     image32x32: image32x32.trim() || undefined,
+    modernImage: modernImage.trim() || undefined,
     templateAlias: templateAlias.trim() || undefined,
   };
 
@@ -3665,18 +3759,31 @@ async function promptSelectionCountRuleStep(): Promise<NewRuleStepInput | undefi
     return undefined;
   }
 
-  const minimum = await promptOptionalInteger("Minimum selected rows", "1");
-  if (minimum === undefined) {
+  const condition = await showRibbonQuickPick<SelectionCountConditionPick>(
+    [
+      { label: "Equal to", description: "= selected rows", condition: "EqualTo" },
+      { label: "Greater than", description: "> selected rows", condition: "GreaterThan" },
+      {
+        label: "Greater than or equal",
+        description: ">= selected rows",
+        condition: "GreaterThanOrEqual",
+      },
+      { label: "Less than", description: "< selected rows", condition: "LessThan" },
+      {
+        label: "Less than or equal",
+        description: "<= selected rows",
+        condition: "LessThanOrEqual",
+      },
+      { label: "Between", description: "Minimum and maximum selected rows", condition: "Between" },
+    ],
+    { placeHolder: "Selected row condition" },
+  );
+  if (!condition) {
     return undefined;
   }
 
-  const maximum = await promptOptionalInteger("Maximum selected rows", minimum?.toString() ?? "1");
-  if (maximum === undefined) {
-    return undefined;
-  }
-
-  if (minimum === null && maximum === null) {
-    void vscode.window.showWarningMessage("Set minimum or maximum selected rows.");
+  const bounds = await promptSelectionCountBounds(condition.condition);
+  if (!bounds) {
     return undefined;
   }
 
@@ -3688,10 +3795,49 @@ async function promptSelectionCountRuleStep(): Promise<NewRuleStepInput | undefi
   return {
     kind: "SelectionCountRule",
     appliesTo: appliesTo ?? undefined,
-    minimum: minimum ?? undefined,
-    maximum: maximum ?? undefined,
+    minimum: bounds.minimum,
+    maximum: bounds.maximum,
     invertResult,
   };
+}
+
+async function promptSelectionCountBounds(
+  condition: SelectionCountCondition,
+): Promise<{ minimum?: number; maximum?: number } | undefined> {
+  switch (condition) {
+    case "EqualTo": {
+      const count = await promptRequiredInteger("Selected rows", "1");
+      return count === undefined ? undefined : { minimum: count, maximum: count };
+    }
+    case "GreaterThan": {
+      const count = await promptRequiredInteger("Selected rows", "1");
+      return count === undefined ? undefined : { minimum: count + 1 };
+    }
+    case "GreaterThanOrEqual": {
+      const count = await promptRequiredInteger("Selected rows", "1");
+      return count === undefined ? undefined : { minimum: count };
+    }
+    case "LessThan": {
+      const count = await promptRequiredInteger("Selected rows", "1", 1);
+      return count === undefined ? undefined : { maximum: count - 1 };
+    }
+    case "LessThanOrEqual": {
+      const count = await promptRequiredInteger("Selected rows", "1");
+      return count === undefined ? undefined : { maximum: count };
+    }
+    case "Between": {
+      const minimum = await promptRequiredInteger("Minimum selected rows", "1");
+      if (minimum === undefined) {
+        return undefined;
+      }
+      const maximum = await promptRequiredInteger(
+        "Maximum selected rows",
+        minimum.toString(),
+        minimum,
+      );
+      return maximum === undefined ? undefined : { minimum, maximum };
+    }
+  }
 }
 
 async function promptRecordPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
@@ -3771,23 +3917,30 @@ async function promptAppliesTo(prompt: string): Promise<RibbonRuleAppliesTo | nu
   return appliesTo === "No value" ? null : appliesTo;
 }
 
-async function promptOptionalInteger(
+async function promptRequiredInteger(
   prompt: string,
   placeHolder: string,
-): Promise<number | null | undefined> {
+  minimum = 0,
+): Promise<number | undefined> {
   const value = await showRibbonInputBox({
     prompt,
     placeHolder,
     validateInput: (input) => {
       const trimmed = input.trim();
-      return !trimmed || /^\d+$/.test(trimmed) ? undefined : "Use a whole number.";
+      if (!trimmed) {
+        return "Value is required.";
+      }
+      if (!/^\d+$/.test(trimmed)) {
+        return "Use a whole number.";
+      }
+      return Number(trimmed) >= minimum ? undefined : `Use ${minimum} or more.`;
     },
   });
   if (value === undefined) {
     return undefined;
   }
 
-  return value.trim() ? Number(value.trim()) : null;
+  return Number(value.trim());
 }
 
 async function promptOptionalBoolean(prompt: string): Promise<boolean | undefined> {

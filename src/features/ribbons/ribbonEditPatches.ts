@@ -124,8 +124,12 @@ export interface NewCustomButtonInput {
   sequence?: number;
   labelLocId?: string;
   labelText?: string;
+  alt?: string;
+  toolTipTitle?: string;
+  toolTipDescription?: string;
   image16x16?: string;
   image32x32?: string;
+  modernImage?: string;
   templateAlias?: string;
   enableRuleIds?: string[];
   displayRuleIds?: string[];
@@ -718,9 +722,13 @@ function renderCustomButtonAction(input: NewCustomButtonInput): string {
     ["Id", input.buttonId],
     ["Command", input.commandId],
     ["LabelText", labelText],
-    ["Sequence", input.sequence],
+    ["Alt", input.alt],
+    ["ToolTipTitle", input.toolTipTitle],
+    ["ToolTipDescription", input.toolTipDescription],
     ["Image16by16", webResourceValue(input.image16x16)],
     ["Image32by32", webResourceValue(input.image32x32)],
+    ["ModernImage", webResourceValue(input.modernImage)],
+    ["Sequence", input.sequence],
     ["TemplateAlias", input.templateAlias],
   ];
 
