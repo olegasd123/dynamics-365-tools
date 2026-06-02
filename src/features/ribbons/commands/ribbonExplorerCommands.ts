@@ -79,6 +79,7 @@ import {
 import { isSolutionExportCancelledError } from "../solutionZipService";
 
 const DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS = ["isNaN"];
+const IMAGE_WEB_RESOURCE_EXTENSIONS = [".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg"];
 const IMAGE_WEB_RESOURCE_TYPES = [5, 6, 7, 11, 12] as const;
 
 interface OobCommandPick extends vscode.QuickPickItem {
@@ -3304,7 +3305,7 @@ export async function listEnvironmentImageWebResources(
       }
 
       const uniqueName = normalizeWebResourceUniqueName(item.name ?? "");
-      if (!uniqueName) {
+      if (!uniqueName || !isImageWebResourceName(uniqueName)) {
         continue;
       }
 
@@ -3325,6 +3326,11 @@ export async function listEnvironmentImageWebResources(
 
 function isImageWebResourceType(type: number | undefined): boolean {
   return IMAGE_WEB_RESOURCE_TYPES.some((imageType) => imageType === type);
+}
+
+function isImageWebResourceName(uniqueName: string): boolean {
+  const extension = path.posix.extname(uniqueName.toLowerCase());
+  return IMAGE_WEB_RESOURCE_EXTENSIONS.includes(extension);
 }
 
 async function listFolderJavaScriptLibraries(

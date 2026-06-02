@@ -1565,6 +1565,7 @@ test("lists image web resources from an environment", async () => {
             },
             { name: "new_/account/image32x32.png", webresourcetype: 5 },
             { name: "new_/account/image.svg", webresourcetype: 12 },
+            { name: "new_/Loc/account.1033.resx", webresourcetype: 12 },
             { name: "new_/scripts/account.js", webresourcetype: 3 },
           ],
           "@odata.nextLink": "/webresourceset?page=2",
