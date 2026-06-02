@@ -26,7 +26,7 @@ test("renders located ribbon documents as a read-only tree", async () => {
   <CustomActions>
     <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
       <CommandUIDefinition>
-        <Button Id="new.account.Form.Button" Command="new.account.Command" LabelText="Run" />
+        <Button Id="new.account.Form.Button" Command="new.account.Command" LabelText="Run" Alt="Run" ToolTipTitle="Run" ToolTipDescription="Run the command" Image16by16="$webresource:new_/icons/run16.png" Image32by32="$webresource:new_/icons/run32.png" ModernImage="$webresource:new_/icons/run.svg" />
       </CommandUIDefinition>
     </CustomAction>
   </CustomActions>
@@ -89,6 +89,19 @@ test("renders located ribbon documents as a read-only tree", async () => {
 
   const buttonNodes = await explorer.getChildren(items[0]);
   assert.strictEqual(buttonNodes[0].label, "Button: new.account.Form.Button");
+  assert.deepStrictEqual((buttonNodes[0] as RibbonItemNode).details, [
+    ["Id", "new.account.Form.Button"],
+    ["Kind", "Button"],
+    ["Command", "new.account.Command"],
+    ["Label", "Run"],
+    ["Alt", "Run"],
+    ["Tool tip title", "Run"],
+    ["Tool tip description", "Run the command"],
+    ["Image 16", "new_/icons/run16.png"],
+    ["Image 32", "new_/icons/run32.png"],
+    ["Modern image", "new_/icons/run.svg"],
+    ["Sequence", undefined],
+  ]);
 
   const commandSection = sections.find((section) => section.label === "Command Definitions");
   assert.ok(commandSection);
@@ -133,6 +146,58 @@ test("renders located ribbon documents as a read-only tree", async () => {
   assert.ok(unknownSection);
   const unknownNodes = await explorer.getChildren(unknownSection);
   assert.strictEqual(unknownNodes[0].label, "Unknown XML: CustomXml");
+});
+
+test("shows empty button metadata details", async () => {
+  const workspaceRoot = await makeWorkspace();
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  await writeFile(
+    workspaceRoot,
+    "Entities/account/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.Form.Button" Command="new.account.Command" LabelText="Run" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    new ConfigurationService(),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  const roots = await explorer.getChildren();
+  const documents = await explorer.getChildren(roots[0]);
+  const views = await explorer.getChildren(documents[0]);
+  const sections = await explorer.getChildren(views[0]);
+  const customActions = await explorer.getChildren(sections[0]);
+  const buttonNodes = await explorer.getChildren(customActions[0]);
+  const details = (buttonNodes[0] as RibbonItemNode).details;
+
+  assert.deepStrictEqual(
+    details.filter(([name]) =>
+      [
+        "Alt",
+        "Tool tip title",
+        "Tool tip description",
+        "Image 16",
+        "Image 32",
+        "Modern image",
+      ].includes(name),
+    ),
+    [
+      ["Alt", undefined],
+      ["Tool tip title", undefined],
+      ["Tool tip description", undefined],
+      ["Image 16", undefined],
+      ["Image 32", undefined],
+      ["Modern image", undefined],
+    ],
+  );
 });
 
 test("labels OOB command overrides in the tree", async () => {

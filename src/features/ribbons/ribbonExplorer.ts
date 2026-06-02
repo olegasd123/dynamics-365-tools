@@ -16,6 +16,7 @@ import {
   RuleStep,
   TextRange,
   XmlElementRange,
+  ButtonNode,
 } from "./models";
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonEditorState } from "./ribbonEditorState";
@@ -361,21 +362,7 @@ function customActionNode(document: RibbonDocument, action: CustomAction): Ribbo
             action.commandUI.kind === "Button" ? action.commandUI.command : undefined,
             `d365Ribbon${action.commandUI.kind}`,
             action.commandUI.kind === "Button" ? "symbol-method" : "symbol-misc",
-            [
-              ["Id", commandUiId(action.commandUI)],
-              ["Kind", action.commandUI.kind],
-              [
-                "Command",
-                action.commandUI.kind === "Button" ? action.commandUI.command : undefined,
-              ],
-              [
-                "Label",
-                action.commandUI.kind === "Button"
-                  ? (action.commandUI.labelText ?? action.commandUI.labelLocId)
-                  : undefined,
-              ],
-              ["Sequence", commandUiSequence(action.commandUI)],
-            ],
+            commandUiDetails(action.commandUI),
             [],
             { document, range: action.commandUI.range },
           ),
@@ -383,6 +370,37 @@ function customActionNode(document: RibbonDocument, action: CustomAction): Ribbo
       : [],
     { document, range: action.range },
   );
+}
+
+function commandUiDetails(commandUI: NonNullable<CustomAction["commandUI"]>) {
+  const rows: Array<[string, RibbonDetailValue]> = [
+    ["Id", commandUiId(commandUI)],
+    ["Kind", commandUI.kind],
+  ];
+
+  if (commandUI.kind === "Button") {
+    rows.push(
+      ["Command", commandUI.command],
+      ["Label", commandUI.labelText ?? commandUI.labelLocId],
+      ...optionalButtonDetails(commandUI),
+      ["Sequence", commandUI.sequence],
+    );
+    return rows;
+  }
+
+  rows.push(["Sequence", commandUiSequence(commandUI)]);
+  return rows;
+}
+
+function optionalButtonDetails(button: ButtonNode): Array<[string, RibbonDetailValue]> {
+  return [
+    ["Alt", button.alt],
+    ["Tool tip title", button.toolTipTitle],
+    ["Tool tip description", button.toolTipDescription],
+    ["Image 16", button.image16x16?.webResourceUniqueName],
+    ["Image 32", button.image32x32?.webResourceUniqueName],
+    ["Modern image", button.modernImage?.webResourceUniqueName],
+  ];
 }
 
 function commandUiId(commandUI: NonNullable<CustomAction["commandUI"]>): string {
