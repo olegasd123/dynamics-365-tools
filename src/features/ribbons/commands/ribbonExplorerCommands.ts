@@ -79,6 +79,7 @@ import {
 import { isSolutionExportCancelledError } from "../solutionZipService";
 
 const DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS = ["isNaN"];
+const IMAGE_WEB_RESOURCE_TYPES = [5, 6, 7, 11, 12] as const;
 
 interface OobCommandPick extends vscode.QuickPickItem {
   command?: OobRibbonCommand;
@@ -89,6 +90,13 @@ interface WebResourceLibraryPick extends vscode.QuickPickItem {
   uniqueName: string;
   localPath?: string;
   manual?: boolean;
+}
+
+type RibbonImageWebResourceKind = "image16x16" | "image32x32" | "modernImage";
+
+interface ImageWebResourcePrompt {
+  prompt: string;
+  placeHolder: string;
 }
 
 interface CrmParameterPick extends vscode.QuickPickItem {
@@ -244,6 +252,21 @@ const RIBBON_LANGUAGE_CODES: RibbonLanguageCode[] = [
   { code: 1106, name: "Welsh", locale: "cy-GB" },
   { code: 1110, name: "Galician", locale: "gl-ES" },
 ];
+
+const IMAGE_WEB_RESOURCE_PROMPTS: Record<RibbonImageWebResourceKind, ImageWebResourcePrompt> = {
+  image16x16: {
+    prompt: "Image 16 web resource",
+    placeHolder: "new_/account/image16x16.png",
+  },
+  image32x32: {
+    prompt: "Image 32 web resource",
+    placeHolder: "new_/account/image32x32.png",
+  },
+  modernImage: {
+    prompt: "Modern image web resource",
+    placeHolder: "new_/account/image.svg",
+  },
+};
 
 function withPaletteFocus<T extends vscode.InputBoxOptions | vscode.QuickPickOptions>(
   options?: T,
@@ -1279,26 +1302,17 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const image16x16 = await showRibbonInputBox({
-    prompt: "Image 16 web resource",
-    placeHolder: "new_/icons/save16.png",
-  });
+  const image16x16 = await pickImageWebResource(ctx, "image16x16");
   if (image16x16 === undefined) {
     return;
   }
 
-  const image32x32 = await showRibbonInputBox({
-    prompt: "Image 32 web resource",
-    placeHolder: "new_/icons/save32.png",
-  });
+  const image32x32 = await pickImageWebResource(ctx, "image32x32");
   if (image32x32 === undefined) {
     return;
   }
 
-  const modernImage = await showRibbonInputBox({
-    prompt: "Modern image web resource",
-    placeHolder: "new_/icons/save.svg",
-  });
+  const modernImage = await pickImageWebResource(ctx, "modernImage");
   if (modernImage === undefined) {
     return;
   }
@@ -2536,24 +2550,27 @@ async function editCustomAction(
     return;
   }
 
-  const image16x16 = await promptOptional(
-    "Image 16 web resource",
+  const image16x16 = await pickImageWebResource(
+    ctx,
+    "image16x16",
     action.commandUI.image16x16?.webResourceUniqueName,
   );
   if (image16x16 === undefined) {
     return;
   }
 
-  const image32x32 = await promptOptional(
-    "Image 32 web resource",
+  const image32x32 = await pickImageWebResource(
+    ctx,
+    "image32x32",
     action.commandUI.image32x32?.webResourceUniqueName,
   );
   if (image32x32 === undefined) {
     return;
   }
 
-  const modernImage = await promptOptional(
-    "Modern image web resource",
+  const modernImage = await pickImageWebResource(
+    ctx,
+    "modernImage",
     action.commandUI.modernImage?.webResourceUniqueName,
   );
   if (modernImage === undefined) {
@@ -3116,6 +3133,86 @@ function validateOptionalNumber(value: string): string | undefined {
   return value.trim() === "" || /^\d+$/.test(value.trim()) ? undefined : "Use a number.";
 }
 
+async function pickImageWebResource(
+  ctx: CommandContext,
+  kind: RibbonImageWebResourceKind,
+  currentUniqueName?: string,
+): Promise<string | undefined> {
+  const prompt = IMAGE_WEB_RESOURCE_PROMPTS[kind];
+  const mode = await showRibbonQuickPick(
+    [
+      { label: "Fill manually", description: "Type a web resource name" },
+      { label: "Pick from environment", description: "Use a Dataverse image web resource" },
+    ],
+    { placeHolder: prompt.prompt },
+  );
+  if (!mode) {
+    return undefined;
+  }
+
+  if (mode.label === "Fill manually") {
+    return promptImageWebResourceManually(prompt, currentUniqueName);
+  }
+
+  const picked = await pickImageWebResourceFromEnvironment(ctx, prompt, currentUniqueName);
+  return picked?.uniqueName;
+}
+
+async function promptImageWebResourceManually(
+  prompt: ImageWebResourcePrompt,
+  currentUniqueName?: string,
+): Promise<string | undefined> {
+  return showRibbonInputBox({
+    prompt: prompt.prompt,
+    placeHolder: prompt.placeHolder,
+    value: currentUniqueName ?? "",
+  });
+}
+
+async function pickImageWebResourceFromEnvironment(
+  ctx: CommandContext,
+  prompt: ImageWebResourcePrompt,
+  currentUniqueName?: string,
+): Promise<WebResourceLibraryPick | undefined> {
+  const config = await ctx.configuration.loadConfiguration();
+  const target = await pickEnvironmentAndAuth(
+    ctx.configuration,
+    ctx.ui,
+    ctx.secrets,
+    ctx.auth,
+    ctx.lastSelection,
+    config,
+    undefined,
+    { placeHolder: "Select environment for image resources" },
+  );
+  if (!target) {
+    return undefined;
+  }
+
+  const connection = await ctx.connections.createConnection(target.env, target.auth);
+  if (!connection) {
+    return undefined;
+  }
+
+  const client = new DataverseClient(connection);
+  const picks = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Loading image web resources from ${target.env.name}`,
+      cancellable: false,
+    },
+    () => listEnvironmentImageWebResources(client),
+  );
+  if (!picks.length) {
+    vscode.window.showWarningMessage("No image web resources were found in this environment.");
+    return undefined;
+  }
+
+  return showRibbonQuickPick(currentWebResourceFirst(picks, currentUniqueName), {
+    placeHolder: prompt.prompt,
+  });
+}
+
 async function pickWebResourceLibrary(
   ctx: CommandContext,
   currentUniqueName?: string,
@@ -3184,6 +3281,50 @@ export async function listBoundJavaScriptLibraries(
   return uniqueByWebResourceUniqueName(picks).sort((a, b) =>
     a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
   );
+}
+
+export async function listEnvironmentImageWebResources(
+  client: Pick<DataverseClient, "get">,
+): Promise<WebResourceLibraryPick[]> {
+  const typeFilter = IMAGE_WEB_RESOURCE_TYPES.map((type) => `webresourcetype eq ${type}`).join(
+    " or ",
+  );
+  let url = `/webresourceset?$select=name,displayname,webresourcetype&$filter=${encodeURIComponent(`(${typeFilter})`)}&$orderby=name asc&$top=5000`;
+  const picks: WebResourceLibraryPick[] = [];
+
+  while (url) {
+    const response = await client.get<{
+      value?: Array<{ name?: string; displayname?: string; webresourcetype?: number }>;
+      "@odata.nextLink"?: string;
+    }>(url);
+
+    for (const item of response.value ?? []) {
+      if (!isImageWebResourceType(item.webresourcetype)) {
+        continue;
+      }
+
+      const uniqueName = normalizeWebResourceUniqueName(item.name ?? "");
+      if (!uniqueName) {
+        continue;
+      }
+
+      picks.push({
+        label: uniqueName,
+        description: item.displayname?.trim() || imageWebResourceTypeLabel(item.webresourcetype),
+        uniqueName,
+      });
+    }
+
+    url = response["@odata.nextLink"] ?? "";
+  }
+
+  return uniqueByWebResourceUniqueName(picks).sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+  );
+}
+
+function isImageWebResourceType(type: number | undefined): boolean {
+  return IMAGE_WEB_RESOURCE_TYPES.some((imageType) => imageType === type);
 }
 
 async function listFolderJavaScriptLibraries(
@@ -3594,6 +3735,23 @@ function uniqueByWebResourceUniqueName(items: WebResourceLibraryPick[]): WebReso
   }
 
   return result;
+}
+
+function imageWebResourceTypeLabel(type: number | undefined): string | undefined {
+  switch (type) {
+    case 5:
+      return "PNG";
+    case 6:
+      return "JPG";
+    case 7:
+      return "GIF";
+    case 11:
+      return "ICO";
+    case 12:
+      return "SVG";
+    default:
+      return undefined;
+  }
 }
 
 function currentWebResourceFirst(

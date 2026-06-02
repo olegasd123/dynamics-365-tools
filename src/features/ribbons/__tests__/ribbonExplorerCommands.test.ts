@@ -18,6 +18,7 @@ import {
   extractJavaScriptFunctionSuggestions,
   listRibbonLanguageCodePicks,
   listBoundJavaScriptLibraries,
+  listEnvironmentImageWebResources,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
   normalizeWebResourceUniqueName,
@@ -102,6 +103,14 @@ test("prefills custom button text metadata from the label", async () => {
 
     if (options.placeHolder === "Button action") {
       return items.find((item) => item.label === "URL");
+    }
+
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
     }
 
     return undefined;
@@ -194,7 +203,23 @@ test("prefills empty custom button text metadata from loc label while editing", 
   const defaultsByPrompt = new Map<string, string | undefined>();
   let patches: RibbonPatch[] = [];
 
+  const originalShowQuickPick = vscode.window.showQuickPick;
   const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
 
   (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
     if (options.prompt) {
@@ -219,6 +244,7 @@ test("prefills empty custom button text metadata from loc label while editing", 
       node,
     );
   } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
 
@@ -1521,6 +1547,46 @@ test("lists each bound JavaScript web resource once", async () => {
   assert.deepStrictEqual(
     picks.map((pick) => pick.uniqueName),
     ["new_/account/form-copy.js", "new_/account/form.js"],
+  );
+});
+
+test("lists image web resources from an environment", async () => {
+  const requestedUrls: string[] = [];
+  const picks = await listEnvironmentImageWebResources({
+    get: async <T>(url: string): Promise<T> => {
+      requestedUrls.push(url);
+      if (requestedUrls.length === 1) {
+        return {
+          value: [
+            {
+              name: "new_\\account\\image32x32.png",
+              displayname: "Account icon",
+              webresourcetype: 5,
+            },
+            { name: "new_/account/image32x32.png", webresourcetype: 5 },
+            { name: "new_/account/image.svg", webresourcetype: 12 },
+            { name: "new_/scripts/account.js", webresourcetype: 3 },
+          ],
+          "@odata.nextLink": "/webresourceset?page=2",
+        } as T;
+      }
+
+      return {
+        value: [{ name: "new_/account/image16x16.png", webresourcetype: 5 }],
+      } as T;
+    },
+  });
+
+  assert.match(decodeURIComponent(requestedUrls[0]), /webresourcetype eq 5/);
+  assert.match(decodeURIComponent(requestedUrls[0]), /webresourcetype eq 12/);
+  assert.strictEqual(requestedUrls[1], "/webresourceset?page=2");
+  assert.deepStrictEqual(
+    picks.map((pick) => [pick.uniqueName, pick.description]),
+    [
+      ["new_/account/image.svg", "SVG"],
+      ["new_/account/image16x16.png", "PNG"],
+      ["new_/account/image32x32.png", "Account icon"],
+    ],
   );
 });
 
