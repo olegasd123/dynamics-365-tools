@@ -222,11 +222,14 @@ test("prefills empty custom button text metadata from loc label while editing", 
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
 
+  assert.strictEqual(defaultsByPrompt.get("Button label"), "Run report");
   assert.strictEqual(defaultsByPrompt.get("Alt"), "Run report");
   assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "Run report");
   assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "Run report");
 
   const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /LabelText="\$LocLabels:new\.Label"/);
+  assert.doesNotMatch(updated, /LabelText="Run report"/);
   assert.match(updated, /Alt="Run report"/);
   assert.match(updated, /ToolTipTitle="Run report"/);
   assert.match(updated, /ToolTipDescription="Run report"/);

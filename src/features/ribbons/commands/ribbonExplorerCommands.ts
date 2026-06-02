@@ -2500,11 +2500,20 @@ async function editCustomAction(
     return;
   }
 
-  const labelText = await promptOptional("Button label", action.commandUI.labelText);
+  const labelText = await promptOptional(
+    "Button label",
+    action.commandUI.labelText ?? getButtonLabelDefault(document, labelLocId, ""),
+  );
   if (labelText === undefined) {
     return;
   }
   const labelDefault = getButtonLabelDefault(document, labelLocId, labelText);
+  const inlineLabelText = getEditedInlineButtonLabelText(
+    document,
+    labelLocId,
+    labelText,
+    action.commandUI.labelText,
+  );
 
   const alt = await promptOptional("Alt", action.commandUI.alt || labelDefault);
   if (alt === undefined) {
@@ -2573,7 +2582,7 @@ async function editCustomAction(
     commandId: commandId.trim(),
     action: { kind: "Url", address: "" },
     labelLocId: labelLocId.trim() || undefined,
-    labelText: labelText.trim() || undefined,
+    labelText: inlineLabelText,
     alt: alt.trim() || undefined,
     toolTipTitle: toolTipTitle.trim() || undefined,
     toolTipDescription: toolTipDescription.trim() || undefined,
@@ -2614,6 +2623,25 @@ function getButtonLabelDefault(
   }
 
   return undefined;
+}
+
+function getEditedInlineButtonLabelText(
+  document: RibbonDocument,
+  labelLocId: string,
+  labelText: string,
+  existingInlineLabelText: string | undefined,
+): string | undefined {
+  const inlineLabel = labelText.trim();
+  if (!inlineLabel) {
+    return undefined;
+  }
+
+  if (existingInlineLabelText !== undefined) {
+    return inlineLabel;
+  }
+
+  const locLabelDefault = getButtonLabelDefault(document, labelLocId, "")?.trim();
+  return locLabelDefault === inlineLabel ? undefined : inlineLabel;
 }
 
 async function editHideAction(
