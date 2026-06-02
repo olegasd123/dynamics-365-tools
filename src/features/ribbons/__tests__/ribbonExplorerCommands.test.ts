@@ -1593,6 +1593,51 @@ test("lists image web resources from an environment", async () => {
   );
 });
 
+test("searches environment image web resources by typed text", async () => {
+  const requestedUrls: string[] = [];
+  const picks = await listEnvironmentImageWebResources(
+    {
+      get: async <T>(url: string): Promise<T> => {
+        requestedUrls.push(url);
+        return {
+          value: [
+            {
+              name: "msdyn_/ext60/themes/classic_theme/images/btn/btn_default_medium_over_sides.gif",
+              webresourcetype: 7,
+            },
+            { name: "new_/Loc/msdyn_label.1033.resx", webresourcetype: 12 },
+          ],
+        } as T;
+      },
+    },
+    "msdyn",
+  );
+
+  const firstUrl = decodeURIComponent(requestedUrls[0]);
+  assert.match(firstUrl, /\$filter=contains\(name,'msdyn'\)/);
+  assert.doesNotMatch(firstUrl, /\$top=/);
+  assert.deepStrictEqual(
+    picks.map((pick) => [pick.uniqueName, pick.description]),
+    [["msdyn_/ext60/themes/classic_theme/images/btn/btn_default_medium_over_sides.gif", "GIF"]],
+  );
+});
+
+test("does not query environment image web resources before two characters", async () => {
+  let called = false;
+  const picks = await listEnvironmentImageWebResources(
+    {
+      get: async <T>(): Promise<T> => {
+        called = true;
+        return { value: [] } as T;
+      },
+    },
+    "m",
+  );
+
+  assert.strictEqual(called, false);
+  assert.deepStrictEqual(picks, []);
+});
+
 test("extracts full names from compiled TypeScript namespace JavaScript", () => {
   const source = `"use strict";
 var Hjk;

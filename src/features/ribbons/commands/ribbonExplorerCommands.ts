@@ -3195,21 +3195,106 @@ async function pickImageWebResourceFromEnvironment(
   }
 
   const client = new DataverseClient(connection);
-  const picks = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Loading image web resources from ${target.env.name}`,
-      cancellable: false,
-    },
-    () => listEnvironmentImageWebResources(client),
-  );
-  if (!picks.length) {
-    vscode.window.showWarningMessage("No image web resources were found in this environment.");
-    return undefined;
-  }
+  return pickEnvironmentImageWebResource(client, prompt, target.env.name, currentUniqueName);
+}
 
-  return showRibbonQuickPick(currentWebResourceFirst(picks, currentUniqueName), {
-    placeHolder: prompt.prompt,
+function pickEnvironmentImageWebResource(
+  client: Pick<DataverseClient, "get">,
+  prompt: ImageWebResourcePrompt,
+  environmentName: string,
+  currentUniqueName?: string,
+): Promise<WebResourceLibraryPick | undefined> {
+  const quickPick = vscode.window.createQuickPick<WebResourceLibraryPick>();
+  const disposables: vscode.Disposable[] = [];
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  let requestId = 0;
+  let settled = false;
+
+  quickPick.ignoreFocusOut = true;
+  quickPick.matchOnDescription = true;
+  quickPick.placeholder = "Type at least 2 characters to search image web resources.";
+  quickPick.title = `${prompt.prompt} - ${environmentName}`;
+  quickPick.items = currentWebResourceFirst([], currentUniqueName);
+
+  const cleanup = () => {
+    if (debounce) {
+      clearTimeout(debounce);
+      debounce = undefined;
+    }
+    for (const disposable of disposables) {
+      disposable.dispose();
+    }
+    quickPick.dispose();
+  };
+
+  const resolveOnce = (
+    resolve: (value: WebResourceLibraryPick | undefined) => void,
+    value: WebResourceLibraryPick | undefined,
+  ) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    cleanup();
+    resolve(value);
+  };
+
+  return new Promise<WebResourceLibraryPick | undefined>((resolve) => {
+    const search = async (value: string) => {
+      const query = value.trim();
+      requestId += 1;
+      const currentRequest = requestId;
+
+      if (query.length < 2) {
+        quickPick.busy = false;
+        quickPick.placeholder = "Type at least 2 characters to search image web resources.";
+        quickPick.items = currentWebResourceFirst([], currentUniqueName);
+        return;
+      }
+
+      quickPick.busy = true;
+      quickPick.placeholder = `Searching image web resources for "${query}"...`;
+      try {
+        const picks = await listEnvironmentImageWebResources(client, query);
+        if (currentRequest !== requestId) {
+          return;
+        }
+
+        quickPick.items = currentWebResourceFirst(picks, currentUniqueName);
+        quickPick.placeholder = picks.length
+          ? prompt.prompt
+          : `No image web resources found for "${query}".`;
+      } catch (error) {
+        if (currentRequest !== requestId) {
+          return;
+        }
+        quickPick.items = currentWebResourceFirst([], currentUniqueName);
+        quickPick.placeholder = `Search failed: ${describeError(error)}`;
+      } finally {
+        if (currentRequest === requestId) {
+          quickPick.busy = false;
+        }
+      }
+    };
+
+    disposables.push(
+      quickPick.onDidChangeValue((value) => {
+        if (debounce) {
+          clearTimeout(debounce);
+        }
+        debounce = setTimeout(() => {
+          void search(value);
+        }, 300);
+      }),
+      quickPick.onDidAccept(() => {
+        resolveOnce(resolve, quickPick.selectedItems[0]);
+      }),
+      quickPick.onDidHide(() => {
+        resolveOnce(resolve, undefined);
+      }),
+    );
+
+    quickPick.show();
   });
 }
 
@@ -3285,8 +3370,17 @@ export async function listBoundJavaScriptLibraries(
 
 export async function listEnvironmentImageWebResources(
   client: Pick<DataverseClient, "get">,
+  searchText?: string,
 ): Promise<WebResourceLibraryPick[]> {
-  let url = `/webresourceset?$select=name,displayname,webresourcetype&$orderby=name asc`;
+  const search = searchText?.trim();
+  if (search !== undefined && search.length < 2) {
+    return [];
+  }
+
+  const filter = search
+    ? `&$filter=${encodeURIComponent(`contains(name,'${escapeODataString(search)}')`)}`
+    : "";
+  let url = `/webresourceset?$select=name,displayname,webresourcetype${filter}&$orderby=name asc`;
   const picks: WebResourceLibraryPick[] = [];
 
   while (url) {
@@ -3322,6 +3416,14 @@ export async function listEnvironmentImageWebResources(
 function isImageWebResourceName(uniqueName: string): boolean {
   const extension = path.posix.extname(uniqueName.toLowerCase());
   return IMAGE_WEB_RESOURCE_EXTENSIONS.includes(extension);
+}
+
+function escapeODataString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function listFolderJavaScriptLibraries(
