@@ -80,7 +80,6 @@ import { isSolutionExportCancelledError } from "../solutionZipService";
 
 const DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS = ["isNaN"];
 const IMAGE_WEB_RESOURCE_EXTENSIONS = [".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg"];
-const IMAGE_WEB_RESOURCE_TYPES = [5, 6, 7, 11, 12] as const;
 
 interface OobCommandPick extends vscode.QuickPickItem {
   command?: OobRibbonCommand;
@@ -3287,10 +3286,7 @@ export async function listBoundJavaScriptLibraries(
 export async function listEnvironmentImageWebResources(
   client: Pick<DataverseClient, "get">,
 ): Promise<WebResourceLibraryPick[]> {
-  const typeFilter = IMAGE_WEB_RESOURCE_TYPES.map((type) => `webresourcetype eq ${type}`).join(
-    " or ",
-  );
-  let url = `/webresourceset?$select=name,displayname,webresourcetype&$filter=${encodeURIComponent(`(${typeFilter})`)}&$orderby=name asc&$top=5000`;
+  let url = `/webresourceset?$select=name,displayname,webresourcetype&$orderby=name asc`;
   const picks: WebResourceLibraryPick[] = [];
 
   while (url) {
@@ -3300,10 +3296,6 @@ export async function listEnvironmentImageWebResources(
     }>(url);
 
     for (const item of response.value ?? []) {
-      if (!isImageWebResourceType(item.webresourcetype)) {
-        continue;
-      }
-
       const uniqueName = normalizeWebResourceUniqueName(item.name ?? "");
       if (!uniqueName || !isImageWebResourceName(uniqueName)) {
         continue;
@@ -3311,7 +3303,10 @@ export async function listEnvironmentImageWebResources(
 
       picks.push({
         label: uniqueName,
-        description: item.displayname?.trim() || imageWebResourceTypeLabel(item.webresourcetype),
+        description:
+          item.displayname?.trim() ||
+          imageWebResourceTypeLabel(item.webresourcetype) ||
+          imageWebResourceExtensionLabel(uniqueName),
         uniqueName,
       });
     }
@@ -3322,10 +3317,6 @@ export async function listEnvironmentImageWebResources(
   return uniqueByWebResourceUniqueName(picks).sort((a, b) =>
     a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
   );
-}
-
-function isImageWebResourceType(type: number | undefined): boolean {
-  return IMAGE_WEB_RESOURCE_TYPES.some((imageType) => imageType === type);
 }
 
 function isImageWebResourceName(uniqueName: string): boolean {
@@ -3751,13 +3742,18 @@ function imageWebResourceTypeLabel(type: number | undefined): string | undefined
       return "JPG";
     case 7:
       return "GIF";
-    case 11:
+    case 10:
       return "ICO";
-    case 12:
+    case 11:
       return "SVG";
     default:
       return undefined;
   }
+}
+
+function imageWebResourceExtensionLabel(uniqueName: string): string | undefined {
+  const extension = path.posix.extname(uniqueName).replace(/^\./, "");
+  return extension ? extension.toUpperCase() : undefined;
 }
 
 function currentWebResourceFirst(

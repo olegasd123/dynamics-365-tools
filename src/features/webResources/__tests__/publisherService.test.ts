@@ -70,7 +70,10 @@ test("detectType maps known extensions to correct codes", () => {
   assert.strictEqual((publisher as any).detectType("file.js"), 3);
   assert.strictEqual((publisher as any).detectType("file.xml"), 4);
   assert.strictEqual((publisher as any).detectType("file.png"), 5);
-  assert.strictEqual((publisher as any).detectType("file.svg"), 12);
+  assert.strictEqual((publisher as any).detectType("file.xsl"), 9);
+  assert.strictEqual((publisher as any).detectType("file.ico"), 10);
+  assert.strictEqual((publisher as any).detectType("file.svg"), 11);
+  assert.strictEqual((publisher as any).detectType("file.resx"), 12);
 });
 
 test("publish fails fast when solution is missing", async () => {

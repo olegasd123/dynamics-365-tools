@@ -263,7 +263,6 @@ export class WebResourcePublisher {
       case ".ts":
         return 3;
       case ".xml":
-      case ".resx":
       case ".json":
         return 4;
       case ".png":
@@ -275,10 +274,12 @@ export class WebResourcePublisher {
         return 7;
       case ".xsl":
       case ".xslt":
-        return 10;
+        return 9;
       case ".ico":
-        return 11;
+        return 10;
       case ".svg":
+        return 11;
+      case ".resx":
         return 12;
       default:
         return 3;

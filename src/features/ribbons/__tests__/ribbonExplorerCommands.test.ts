@@ -1564,6 +1564,7 @@ test("lists image web resources from an environment", async () => {
               webresourcetype: 5,
             },
             { name: "new_/account/image32x32.png", webresourcetype: 5 },
+            { name: "new_/account/icon.ico", webresourcetype: 10 },
             { name: "new_/account/image.svg", webresourcetype: 12 },
             { name: "new_/Loc/account.1033.resx", webresourcetype: 12 },
             { name: "new_/scripts/account.js", webresourcetype: 3 },
@@ -1578,12 +1579,13 @@ test("lists image web resources from an environment", async () => {
     },
   });
 
-  assert.match(decodeURIComponent(requestedUrls[0]), /webresourcetype eq 5/);
-  assert.match(decodeURIComponent(requestedUrls[0]), /webresourcetype eq 12/);
+  assert.doesNotMatch(decodeURIComponent(requestedUrls[0]), /\$filter=.*webresourcetype/);
+  assert.doesNotMatch(decodeURIComponent(requestedUrls[0]), /\$top=/);
   assert.strictEqual(requestedUrls[1], "/webresourceset?page=2");
   assert.deepStrictEqual(
     picks.map((pick) => [pick.uniqueName, pick.description]),
     [
+      ["new_/account/icon.ico", "ICO"],
       ["new_/account/image.svg", "SVG"],
       ["new_/account/image16x16.png", "PNG"],
       ["new_/account/image32x32.png", "Account icon"],
