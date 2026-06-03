@@ -1091,7 +1091,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.deleteNode",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonRuleRef || viewItem == d365RibbonLocLabel || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem == d365RibbonLocLabelTitle || viewItem =~ /d365RibbonRuleStep/)",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonRuleRef || viewItem == d365RibbonLocLabel || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem == d365RibbonParameter || viewItem == d365RibbonLocLabelTitle || viewItem =~ /d365RibbonRuleStep/)",
           "group": "inline@9"
         }
       ]

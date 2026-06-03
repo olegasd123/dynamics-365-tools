@@ -164,6 +164,7 @@ const SAVE_EXPORT_BACKUP = "Save Backup";
 const CUSTOM_CRM_PARAMETERS = "Type custom parameters";
 const DELETE_RELATED_ITEMS = "Delete Related Items";
 const DELETE_SELECTED_ONLY = "Delete Selected Only";
+const DELETE_PARAMETER = "Delete Parameter";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 const DEFAULT_LANGUAGE_CODE = 1033;
 const CUSTOM_LANGUAGE_CODE = "Type language code";
@@ -1229,6 +1230,20 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
   }
 
   const { document, range } = node.editTarget;
+  if (node.contextValue === "d365RibbonParameter") {
+    const choice = await vscode.window.showWarningMessage(
+      `Delete parameter ${node.label}?`,
+      {
+        modal: true,
+        detail: "This removes the parameter XML from the ribbon action.",
+      },
+      DELETE_PARAMETER,
+    );
+    if (choice !== DELETE_PARAMETER) {
+      return;
+    }
+  }
+
   const plan = createRibbonCascadeDeletePlan(document, node.contextValue, range);
   if (!plan?.related.length) {
     ctx.ribbonEditorState.queuePatches(document, [

@@ -1341,6 +1341,147 @@ test("deletes command rule references", async () => {
   );
 });
 
+test("deletes action parameters after confirmation", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions>
+        <Url Address="https://www.contoso.com">
+          <CrmParameter Name="recordId" Value="FirstPrimaryItemId" />
+          <StringParameter Name="data" Value="string1" />
+        </Url>
+        <JavaScriptFunction Library="$webresource:new_/scripts/account.js" FunctionName="run">
+          <CrmParameter Value="PrimaryControl" />
+          <StringParameter Value="string1" />
+        </JavaScriptFunction>
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const actions = document.views[0].commandDefinitions[0].actions;
+  const urlAction = actions[0];
+  const jsAction = actions[1];
+  assert.strictEqual(urlAction.kind, "Url");
+  assert.strictEqual(jsAction.kind, "JavaScriptFunction");
+  const urlParameter = urlAction.parameters[0];
+  const jsParameter = jsAction.parameters[1];
+  assert.ok(urlParameter.range);
+  assert.ok(jsParameter.range);
+
+  let patches: RibbonPatch[] = [];
+  let refreshed = false;
+  const warningMessages: string[] = [];
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  (vscode.window as any).showWarningMessage = async (message: string) => {
+    warningMessages.push(message);
+    return "Delete Parameter";
+  };
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      new RibbonItemNode(
+        `1. ${urlParameter.value}`,
+        urlParameter.kind,
+        "d365RibbonParameter",
+        "symbol-parameter",
+        [],
+        [],
+        { document, range: urlParameter.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  const withoutUrlParameter = applyRibbonPatchSequence(source, patches);
+  const [documentWithoutUrlParameter] = readRibbonDocuments(withoutUrlParameter, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedUrlAction = documentWithoutUrlParameter.views[0].commandDefinitions[0].actions[0];
+
+  assert.strictEqual(refreshed, true);
+  assert.deepStrictEqual(warningMessages, ["Delete parameter 1. FirstPrimaryItemId?"]);
+  assert.deepStrictEqual(
+    updatedUrlAction.kind === "Url"
+      ? updatedUrlAction.parameters.map((parameter) => parameter.value)
+      : [],
+    ["string1"],
+  );
+
+  refreshed = false;
+  patches = [];
+  warningMessages.length = 0;
+  (vscode.window as any).showWarningMessage = async (message: string) => {
+    warningMessages.push(message);
+    return "Delete Parameter";
+  };
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      new RibbonItemNode(
+        `2. ${jsParameter.value}`,
+        jsParameter.kind,
+        "d365RibbonParameter",
+        "symbol-parameter",
+        [],
+        [],
+        { document, range: jsParameter.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  const withoutJsParameter = applyRibbonPatchSequence(source, patches);
+  const [documentWithoutJsParameter] = readRibbonDocuments(withoutJsParameter, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedJsAction = documentWithoutJsParameter.views[0].commandDefinitions[0].actions[1];
+
+  assert.strictEqual(refreshed, true);
+  assert.deepStrictEqual(warningMessages, ["Delete parameter 2. string1?"]);
+  assert.deepStrictEqual(
+    updatedJsAction.kind === "JavaScriptFunction"
+      ? updatedJsAction.parameters.map((parameter) => parameter.value)
+      : [],
+    ["PrimaryControl"],
+  );
+});
+
 test("adds loc label title from language list", async () => {
   const source = `<RibbonDiffXml>
   <LocLabels>

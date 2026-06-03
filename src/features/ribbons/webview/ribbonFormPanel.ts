@@ -310,6 +310,7 @@ function canEdit(node: RibbonItemNode): boolean {
     node.contextValue === "d365RibbonLocLabel" ||
     node.contextValue === "d365RibbonJavaScriptAction" ||
     node.contextValue === "d365RibbonUrlAction" ||
+    node.contextValue === "d365RibbonParameter" ||
     node.contextValue === "d365RibbonLocLabelTitle" ||
     node.contextValue.startsWith("d365RibbonRuleStep")
   );
