@@ -216,6 +216,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
         validateConfiguration: false,
       },
     ),
+    register(
+      "dynamics365Tools.ribbons.addHideOobButton",
+      (node) => hideOobRibbonButton(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.ribbons.hideOobButton", (node) => hideOobRibbonButton(ctx, node), {
       validateConfiguration: false,
     }),

@@ -84,6 +84,7 @@
     "onCommand:dynamics365Tools.ribbons.pullFromEnvironment",
     "onCommand:dynamics365Tools.ribbons.cleanupGeneratedSolutions",
     "onCommand:dynamics365Tools.ribbons.addCustomButton",
+    "onCommand:dynamics365Tools.ribbons.addHideOobButton",
     "onCommand:dynamics365Tools.ribbons.hideOobButton",
     "onCommand:dynamics365Tools.ribbons.hideAndStubOobButtons",
     "onCommand:dynamics365Tools.ribbons.reorderOobButtons",
@@ -449,6 +450,12 @@
       {
         "command": "dynamics365Tools.ribbons.addCustomButton",
         "title": "Add Custom Button",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.addHideOobButton",
+        "title": "Hide OOB Button",
         "category": "Dynamics 365 Tools",
         "icon": "$(add)"
       },
@@ -998,6 +1005,11 @@
           "command": "dynamics365Tools.ribbons.hideOobButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
           "group": "inline@6"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addHideOobButton",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:hideActions",
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
