@@ -165,6 +165,7 @@ const CUSTOM_CRM_PARAMETERS = "Type custom parameters";
 const DELETE_RELATED_ITEMS = "Delete Related Items";
 const DELETE_SELECTED_ONLY = "Delete Selected Only";
 const DELETE_PARAMETER = "Delete Parameter";
+const DELETE_HIDE_ACTION = "Delete Hide Action";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 const DEFAULT_LANGUAGE_CODE = 1033;
 const CUSTOM_LANGUAGE_CODE = "Type language code";
@@ -1240,6 +1241,19 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
       DELETE_PARAMETER,
     );
     if (choice !== DELETE_PARAMETER) {
+      return;
+    }
+  }
+  if (node.contextValue === "d365RibbonHideAction") {
+    const choice = await vscode.window.showWarningMessage(
+      `Delete hide action ${node.label}?`,
+      {
+        modal: true,
+        detail: "This removes the HideCustomAction XML from the ribbon.",
+      },
+      DELETE_HIDE_ACTION,
+    );
+    if (choice !== DELETE_HIDE_ACTION) {
       return;
     }
   }

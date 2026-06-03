@@ -1341,6 +1341,125 @@ test("deletes command rule references", async () => {
   );
 });
 
+test("deletes hide action after confirmation", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <HideCustomAction HideActionId="new.Hide.Save" Location="Mscrm.Form.account.Save" />
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const hideAction = document.views[0].hideActions[0];
+  let patches: RibbonPatch[] = [];
+  let refreshed = false;
+  let warningMessage = "";
+  let warningDetail = "";
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  (vscode.window as any).showWarningMessage = async (
+    message: string,
+    options: { detail?: string },
+    action: string,
+  ) => {
+    warningMessage = message;
+    warningDetail = options.detail ?? "";
+    return action;
+  };
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      new RibbonItemNode(
+        hideAction.hideActionId,
+        undefined,
+        "d365RibbonHideAction",
+        "eye-closed",
+        [],
+        [],
+        { document, range: hideAction.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.strictEqual(refreshed, true);
+  assert.strictEqual(warningMessage, "Delete hide action new.Hide.Save?");
+  assert.strictEqual(warningDetail, "This removes the HideCustomAction XML from the ribbon.");
+  assert.deepStrictEqual(updatedDocument.views[0].hideActions, []);
+});
+
+test("keeps hide action when delete confirmation is canceled", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <HideCustomAction HideActionId="new.Hide.Save" Location="Mscrm.Form.account.Save" />
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const hideAction = document.views[0].hideActions[0];
+  let queued = false;
+  let refreshed = false;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  (vscode.window as any).showWarningMessage = async () => undefined;
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: () => {
+            queued = true;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      new RibbonItemNode(
+        hideAction.hideActionId,
+        undefined,
+        "d365RibbonHideAction",
+        "eye-closed",
+        [],
+        [],
+        { document, range: hideAction.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  assert.strictEqual(queued, false);
+  assert.strictEqual(refreshed, false);
+});
+
 test("deletes action parameters after confirmation", async () => {
   const source = `<RibbonDiffXml>
   <CommandDefinitions>
