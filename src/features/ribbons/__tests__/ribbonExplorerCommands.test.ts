@@ -536,6 +536,10 @@ test("adds URL command action parameters from a list flow", async () => {
       return items.find((item) => item.label === "true");
     }
 
+    if (options.placeHolder === "Window mode") {
+      return items.find((item) => item.label === "1");
+    }
+
     return undefined;
   };
   (vscode.window as any).showInputBox = async (options: { prompt?: string }) => {
@@ -546,8 +550,6 @@ test("adds URL command action parameters from a list flow", async () => {
         return parameterKinds.length === 1 ? "recordId" : "data";
       case "Parameter value":
         return "source";
-      case "Window mode":
-        return "1";
       case "Window params":
         return "height=600,width=800";
       default:

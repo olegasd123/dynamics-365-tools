@@ -136,6 +136,10 @@ interface ActionParameterEditPick extends vscode.QuickPickItem {
   action: "edit" | "delete" | "back";
 }
 
+interface UrlWindowModePick extends vscode.QuickPickItem {
+  value?: number;
+}
+
 interface SolutionOpenPick extends vscode.QuickPickItem {
   sourceKind: "environment" | "disk";
 }
@@ -3196,8 +3200,8 @@ async function promptUrlAction(
     kind: "Url" as const,
     address: address.trim(),
     passParams: await promptOptionalUrlBoolean("Pass URL context parameters", current?.passParams),
-    winMode: await promptOptionalNumber("Window mode", current?.winMode),
-    winParams: await promptOptionalText("Window params", current?.winParams),
+    winMode: await promptUrlWindowMode(current?.winMode),
+    winParams: await promptUrlWindowParams(current?.winParams),
     parameters: parameters ?? current?.parameters ?? [],
   };
 }
@@ -3226,27 +3230,56 @@ async function promptOptionalUrlBoolean(
   return pick.label === "true";
 }
 
-async function promptOptionalNumber(prompt: string, current?: number): Promise<number | undefined> {
-  const value = await showRibbonInputBox({
-    prompt,
-    value: current === undefined ? "" : String(current),
-    validateInput: (input) =>
-      input.trim() === "" || /^-?\d+$/.test(input.trim()) ? undefined : "Use a number.",
-  });
-  if (value === undefined) {
+async function promptUrlWindowMode(current?: number): Promise<number | undefined> {
+  const known = new Set([0, 1]);
+  const currentPick: UrlWindowModePick[] =
+    current !== undefined && !known.has(current)
+      ? [
+          {
+            label: String(current),
+            description: "Current custom mode",
+            value: current,
+          },
+        ]
+      : [];
+  const pick = await showRibbonQuickPick<UrlWindowModePick>(
+    [
+      {
+        label: "Not set",
+        description:
+          current === undefined
+            ? "Current value. Use default client behavior."
+            : "Use default client behavior.",
+      },
+      {
+        label: "0",
+        description: current === 0 ? "Current value. Open normally." : "Open normally.",
+        value: 0,
+      },
+      {
+        label: "1",
+        description:
+          current === 1
+            ? "Current value. Open in a new popup window."
+            : "Open in a new popup window.",
+        value: 1,
+      },
+      ...currentPick,
+    ],
+    { placeHolder: "Window mode" },
+  );
+
+  if (!pick) {
     return current;
   }
 
-  if (!value.trim()) {
-    return undefined;
-  }
-
-  return Number(value.trim());
+  return pick.value;
 }
 
-async function promptOptionalText(prompt: string, current?: string): Promise<string | undefined> {
+async function promptUrlWindowParams(current?: string): Promise<string | undefined> {
   const value = await showRibbonInputBox({
-    prompt,
+    prompt: "Window params",
+    placeHolder: "For example height=600,width=800,resizable=yes,scrollbars=yes,menubar=no",
     value: current ?? "",
   });
 
