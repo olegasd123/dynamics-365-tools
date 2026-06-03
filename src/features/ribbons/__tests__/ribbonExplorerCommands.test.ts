@@ -1670,6 +1670,72 @@ test("adds loc label title from language list", async () => {
   assert.match(updated, /<Title languagecode="1058" description="Run UA" \/>/);
 });
 
+test("adds loc label title from selected language title", async () => {
+  const source = `<RibbonDiffXml>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const title = document.views[0].locLabels[0].titles[0];
+  const node = new RibbonItemNode(
+    String(title.languageCode),
+    title.description,
+    "d365RibbonLocLabelTitle",
+    "symbol-string",
+    [],
+    [],
+    { document, range: title.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Language") {
+      assert.strictEqual(
+        items.some((item) => item.languageCode === 1033),
+        false,
+      );
+      return items.find((item) => item.languageCode === 1058);
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) =>
+    options.prompt === "Text" ? "Run UA" : undefined;
+
+  try {
+    await addRibbonLocLabelTitle(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /<Title languagecode="1058" description="Run UA" \/>/);
+});
+
 test("plans cascade delete for ribbon items with one reference", () => {
   const source = `<RibbonDiffXml>
   <CustomActions>

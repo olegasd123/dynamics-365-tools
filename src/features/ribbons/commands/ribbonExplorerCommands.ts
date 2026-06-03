@@ -1969,13 +1969,20 @@ function resolveLocLabelTarget(
     return undefined;
   }
 
-  if (node.contextValue !== "d365RibbonLocLabel") {
+  if (
+    node.contextValue !== "d365RibbonLocLabel" &&
+    node.contextValue !== "d365RibbonLocLabelTitle"
+  ) {
     return undefined;
   }
 
   const target = node.editTarget;
   for (const view of target.document.views) {
-    const label = view.locLabels.find((item) => sameRange(item.range, target.range));
+    const label = view.locLabels.find(
+      (item) =>
+        sameRange(item.range, target.range) ||
+        item.titles.some((title) => sameRange(title.range, target.range)),
+    );
     if (label) {
       return { document: target.document, label };
     }
