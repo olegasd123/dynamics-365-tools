@@ -166,6 +166,7 @@ const DELETE_RELATED_ITEMS = "Delete Related Items";
 const DELETE_SELECTED_ONLY = "Delete Selected Only";
 const DELETE_PARAMETER = "Delete Parameter";
 const DELETE_HIDE_ACTION = "Delete Hide Action";
+const DELETE_LOC_LABEL_LANGUAGE = "Delete Language";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 const DEFAULT_LANGUAGE_CODE = 1033;
 const CUSTOM_LANGUAGE_CODE = "Type language code";
@@ -1257,6 +1258,23 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
       return;
     }
   }
+  if (node.contextValue === "d365RibbonLocLabelTitle") {
+    const target = findLocLabelTitleDeleteTarget(document, range);
+    const labelText = target
+      ? `Loc label language ${target.title.languageCode} from ${target.label.id}`
+      : `Loc label language ${node.label}`;
+    const choice = await vscode.window.showWarningMessage(
+      `Delete ${labelText}?`,
+      {
+        modal: true,
+        detail: "This removes this language title from the LocLabel.",
+      },
+      DELETE_LOC_LABEL_LANGUAGE,
+    );
+    if (choice !== DELETE_LOC_LABEL_LANGUAGE) {
+      return;
+    }
+  }
 
   const plan = createRibbonCascadeDeletePlan(document, node.contextValue, range);
   if (!plan?.related.length) {
@@ -1287,6 +1305,22 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
       : [createDeleteNodePatch(document.sourceText, range)],
   );
   ctx.ribbonExplorer.refresh();
+}
+
+function findLocLabelTitleDeleteTarget(
+  document: RibbonDocument,
+  range: TextRange,
+): { label: LocLabel; title: LocLabelTitle } | undefined {
+  for (const view of document.views) {
+    for (const label of view.locLabels) {
+      const title = label.titles.find((item) => sameRange(item.range, range));
+      if (title) {
+        return { label, title };
+      }
+    }
+  }
+
+  return undefined;
 }
 
 function relatedDeleteMessage(related: RibbonCascadeDeleteItem[]): string {

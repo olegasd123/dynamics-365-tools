@@ -1736,6 +1736,133 @@ test("adds loc label title from selected language title", async () => {
   assert.match(updated, /<Title languagecode="1058" description="Run UA" \/>/);
 });
 
+test("deletes loc label title after confirmation", async () => {
+  const source = `<RibbonDiffXml>
+  <LocLabels>
+    <LocLabel Id="new.Label">
+      <Titles>
+        <Title languagecode="1033" description="Run" />
+        <Title languagecode="1026" description="Run BG" />
+      </Titles>
+    </LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const title = document.views[0].locLabels[0].titles[1];
+  let patches: RibbonPatch[] = [];
+  let refreshed = false;
+  let warningMessage = "";
+  let warningDetail = "";
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  (vscode.window as any).showWarningMessage = async (
+    message: string,
+    options: { detail?: string },
+    action: string,
+  ) => {
+    warningMessage = message;
+    warningDetail = options.detail ?? "";
+    return action;
+  };
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      new RibbonItemNode(
+        String(title.languageCode),
+        title.description,
+        "d365RibbonLocLabelTitle",
+        "symbol-string",
+        [],
+        [],
+        { document, range: title.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.strictEqual(refreshed, true);
+  assert.strictEqual(warningMessage, "Delete Loc label language 1026 from new.Label?");
+  assert.strictEqual(warningDetail, "This removes this language title from the LocLabel.");
+  assert.deepStrictEqual(
+    updatedDocument.views[0].locLabels[0].titles.map((item) => item.languageCode),
+    [1033],
+  );
+});
+
+test("keeps loc label title when delete confirmation is canceled", async () => {
+  const source = `<RibbonDiffXml>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Run" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const title = document.views[0].locLabels[0].titles[0];
+  let queued = false;
+  let refreshed = false;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  (vscode.window as any).showWarningMessage = async () => undefined;
+
+  try {
+    await deleteRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: () => {
+            queued = true;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
+        },
+      } as any,
+      new RibbonItemNode(
+        String(title.languageCode),
+        title.description,
+        "d365RibbonLocLabelTitle",
+        "symbol-string",
+        [],
+        [],
+        { document, range: title.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  assert.strictEqual(queued, false);
+  assert.strictEqual(refreshed, false);
+});
+
 test("plans cascade delete for ribbon items with one reference", () => {
   const source = `<RibbonDiffXml>
   <CustomActions>
