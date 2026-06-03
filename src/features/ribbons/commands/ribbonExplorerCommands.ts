@@ -163,6 +163,7 @@ const DELETE_SELECTED_ONLY = "Delete Selected Only";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 const DEFAULT_LANGUAGE_CODE = 1033;
 const CUSTOM_LANGUAGE_CODE = "Type language code";
+const CUSTOM_CRM_PARAMETER_VALUE = "Type custom CRM parameter";
 const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
   {
     label: "PrimaryControl",
@@ -3389,11 +3390,65 @@ async function promptActionParameterValue(
   kind: ActionParameter["kind"],
   current?: string,
 ): Promise<string | undefined> {
+  if (kind === "Crm") {
+    return promptActionParameterCrmValue(current);
+  }
+
   const value = await showRibbonInputBox({
     prompt: "Parameter value",
     placeHolder: actionParameterValuePlaceholder(kind),
     value: current ?? "",
     validateInput: (input) => validateActionParameterValueInput(kind, input),
+  });
+
+  return value?.trim() || undefined;
+}
+
+async function promptActionParameterCrmValue(current?: string): Promise<string | undefined> {
+  const currentKnown = CRM_PARAMETER_PICKS.some(
+    (pick) => pick.value?.toLowerCase() === current?.toLowerCase(),
+  );
+  const currentPick =
+    current && !currentKnown
+      ? [
+          {
+            label: current,
+            description: "Current value",
+            value: current,
+          },
+        ]
+      : [];
+  const pick = await showRibbonQuickPick<CrmParameterPick>(
+    [
+      ...currentPick,
+      ...CRM_PARAMETER_PICKS.map((item) => ({
+        ...item,
+        description:
+          current && item.value?.toLowerCase() === current.toLowerCase()
+            ? "Current value"
+            : item.description,
+      })),
+      {
+        label: CUSTOM_CRM_PARAMETER_VALUE,
+        description: "Type a CRM parameter value",
+        custom: true,
+      },
+    ],
+    { placeHolder: "CRM parameter" },
+  );
+  if (!pick) {
+    return undefined;
+  }
+
+  if (!pick.custom) {
+    return pick.value;
+  }
+
+  const value = await showRibbonInputBox({
+    prompt: "CRM parameter value",
+    placeHolder: "FirstPrimaryItemId",
+    value: current ?? "",
+    validateInput: (input) => (input.trim() ? undefined : "CRM parameter value is required."),
   });
 
   return value?.trim() || undefined;

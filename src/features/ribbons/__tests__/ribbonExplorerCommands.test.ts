@@ -501,6 +501,7 @@ test("adds URL command action parameters from a list flow", async () => {
   });
   let patches: RibbonPatch[] = [];
   const parameterListLabels: string[][] = [];
+  let crmParameterLabels: string[] = [];
   const parameterKinds = ["Crm", "String"];
 
   const originalShowQuickPick = vscode.window.showQuickPick;
@@ -526,6 +527,11 @@ test("adds URL command action parameters from a list flow", async () => {
       return items.find((item) => item.label === label);
     }
 
+    if (options.placeHolder === "CRM parameter") {
+      crmParameterLabels = items.map((item) => item.label);
+      return items.find((item) => item.label === "FirstPrimaryItemId");
+    }
+
     if (options.placeHolder === "Pass URL context parameters") {
       return items.find((item) => item.label === "true");
     }
@@ -539,7 +545,7 @@ test("adds URL command action parameters from a list flow", async () => {
       case "Parameter name":
         return parameterKinds.length === 1 ? "recordId" : "data";
       case "Parameter value":
-        return parameterKinds.length === 1 ? "FirstPrimaryItemId" : "source";
+        return "source";
       case "Window mode":
         return "1";
       case "Window params":
@@ -575,6 +581,7 @@ test("adds URL command action parameters from a list flow", async () => {
     ["Done", "Add parameter", "1. Crm:recordId=FirstPrimaryItemId"],
     ["Done", "Add parameter", "1. Crm:recordId=FirstPrimaryItemId", "2. String:data=source"],
   ]);
+  assert.ok(crmParameterLabels.includes("FirstPrimaryItemId"));
   assert.match(
     updated,
     /<Url Address="\$webresource:new_\/page\.htm" PassParams="true" WinMode="1" WinParams="height=600,width=800">/,
