@@ -718,6 +718,10 @@ function readActions(sourceText: string, commandDefinition: XmlElementRange): Co
       return {
         kind: "Url",
         address: attr(node, "Address"),
+        passParams: booleanAttr(node, "PassParams"),
+        winMode: numberAttr(node, "WinMode"),
+        winParams: optionalAttr(node, "WinParams"),
+        parameters: readActionParameters(node),
         range: node.range,
       };
     }
@@ -741,6 +745,10 @@ function actionParameter(node: XmlElementRange): ActionParameter {
     kind: parameterKind(node.name),
     value: attr(node, "Value"),
   };
+  const name = optionalAttr(node, "Name");
+  if (name !== undefined) {
+    parameter.name = name;
+  }
 
   Object.defineProperty(parameter, "range", {
     value: node.range,
@@ -908,7 +916,7 @@ function booleanAttr(node: XmlElementRange, name: string): boolean | undefined {
     return undefined;
   }
 
-  return value.toLowerCase() === "true";
+  return value.toLowerCase() === "true" || value === "1";
 }
 
 function readImageRef(node: XmlElementRange, name: string): ImageRef | undefined {

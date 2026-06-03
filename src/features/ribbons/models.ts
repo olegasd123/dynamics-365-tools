@@ -181,7 +181,15 @@ export type CommandAction =
       parameters: ActionParameter[];
       range: TextRange;
     }
-  | { kind: "Url"; address: string; range: TextRange }
+  | {
+      kind: "Url";
+      address: string;
+      passParams?: boolean;
+      winMode?: number;
+      winParams?: string;
+      parameters: ActionParameter[];
+      range: TextRange;
+    }
   | { kind: "Unknown"; raw: string; range: TextRange };
 
 export interface WebResourceRef {
@@ -192,6 +200,7 @@ export interface WebResourceRef {
 export interface ActionParameter {
   kind: "Crm" | "Bool" | "Int" | "Float" | "String" | "Decimal";
   value: string;
+  name?: string;
   range?: TextRange;
 }
 

@@ -26,13 +26,23 @@ export interface RibbonValidationIssue {
 const KNOWN_CRM_PARAMETERS = new Set([
   "PrimaryControl",
   "SelectedControl",
+  "SelectedControlSelectedItemCount",
   "SelectedControlSelectedItemIds",
   "SelectedControlSelectedItemReferences",
+  "SelectedControlAllItemCount",
+  "SelectedControlAllItemIds",
+  "SelectedControlAllItemReferences",
+  "SelectedControlUnselectedItemCount",
+  "SelectedControlUnselectedItemIds",
+  "SelectedControlUnselectedItemReferences",
   "SelectedEntityTypeName",
   "FirstPrimaryItemId",
   "PrimaryEntityTypeName",
   "PrimaryItemIds",
   "CommandProperties",
+  "OrgName",
+  "OrgLcid",
+  "UserLcid",
 ]);
 
 export function validateRibbonDocument(document: RibbonDocument): RibbonValidationIssue[] {
@@ -198,15 +208,29 @@ function isKnownBuiltInRuleRef(label: "EnableRule" | "DisplayRule", id: string):
 }
 
 function validateCommandAction(action: CommandAction): RibbonValidationIssue[] {
-  if (action.kind !== "JavaScriptFunction") {
-    return [];
+  if (action.kind === "JavaScriptFunction") {
+    return [
+      ...required(action.library.uniqueName, "JavaScript library", action.range),
+      ...required(action.functionName, "JavaScript function name", action.range),
+      ...validateActionParameters(action.parameters),
+    ];
   }
 
-  return [
-    ...required(action.library.uniqueName, "JavaScript library", action.range),
-    ...required(action.functionName, "JavaScript function name", action.range),
-    ...validateActionParameters(action.parameters),
-  ];
+  if (action.kind === "Url") {
+    return [
+      ...required(action.address, "URL address", action.range),
+      ...validateActionParameters(action.parameters),
+      ...action.parameters
+        .filter((parameter) => !parameter.name)
+        .map((parameter) => ({
+          severity: "error" as const,
+          message: "URL action parameter name is required.",
+          range: parameter.range ?? action.range,
+        })),
+    ];
+  }
+
+  return [];
 }
 
 function validateActionParameters(parameters: ActionParameter[]): RibbonValidationIssue[] {

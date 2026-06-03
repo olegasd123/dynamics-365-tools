@@ -32,6 +32,10 @@ export type NewCommandActionInput =
   | {
       kind: "Url";
       address: string;
+      passParams?: boolean;
+      winMode?: number;
+      winParams?: string;
+      parameters?: ActionParameter[];
     };
 
 export interface NewLocLabelInput {
@@ -779,7 +783,16 @@ function renderCommandAction(action: NewCommandActionInput): string {
     );
   }
 
-  return `<Url Address="${escapeXmlAttribute(action.address)}" />`;
+  return renderJavaScriptNode(
+    "Url",
+    [
+      ["Address", action.address],
+      ["PassParams", action.passParams === undefined ? undefined : String(action.passParams)],
+      ["WinMode", action.winMode],
+      ["WinParams", action.winParams],
+    ],
+    action.parameters,
+  );
 }
 
 function renderLocLabel(input: NewLocLabelInput): string {
@@ -926,7 +939,7 @@ function renderRuleStep(step: NewRuleStepInput): string {
 }
 
 function renderJavaScriptNode(
-  name: "JavaScriptFunction" | "CustomRule",
+  name: "JavaScriptFunction" | "CustomRule" | "Url",
   attributes: Array<[string, string | number | undefined]>,
   parameters: ActionParameter[] | undefined,
 ): string {
@@ -941,7 +954,11 @@ ${indentBlock(parameters.map(renderActionParameter).join("\n"), "  ")}
 }
 
 function renderActionParameter(parameter: ActionParameter): string {
-  return `<${parameter.kind}Parameter Value="${escapeXmlAttribute(parameter.value)}" />`;
+  const attributes = renderAttributes([
+    ["Name", parameter.name],
+    ["Value", parameter.value],
+  ]);
+  return `<${parameter.kind}Parameter ${attributes} />`;
 }
 
 function createReplaceNodePatch(sourceText: string, range: TextRange, text: string): RibbonPatch {

@@ -615,8 +615,12 @@ function commandActionNode(
       [
         ["Index", index + 1],
         ["Address", action.address],
+        ["Pass params", boolText(action.passParams)],
+        ["Window mode", action.winMode],
+        ["Window params", action.winParams],
+        ["Parameters", parameterValues(action.parameters)],
       ],
-      [],
+      parameterNodes(document, action.parameters),
       { document, range: action.range },
     );
   }
@@ -771,6 +775,7 @@ function parameterNodes(document: RibbonDocument, parameters: ActionParameter[])
         "symbol-parameter",
         [
           ["Kind", parameter.kind],
+          ["Name", parameter.name],
           ["Value", parameter.value],
         ],
         [],
@@ -780,7 +785,11 @@ function parameterNodes(document: RibbonDocument, parameters: ActionParameter[])
 }
 
 function parameterValues(parameters: ActionParameter[]): string[] | undefined {
-  return parameters.length ? parameters.map((parameter) => parameter.value) : undefined;
+  return parameters.length
+    ? parameters.map((parameter) =>
+        parameter.name ? `${parameter.name}=${parameter.value}` : parameter.value,
+      )
+    : undefined;
 }
 
 function locLabelTitleNode(document: RibbonDocument, title: LocLabelTitle): RibbonItemNode {

@@ -171,9 +171,44 @@ const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
     value: "SelectedControlSelectedItemIds",
   },
   {
+    label: "SelectedControlSelectedItemCount",
+    description: "Selected grid row count",
+    value: "SelectedControlSelectedItemCount",
+  },
+  {
     label: "SelectedControlSelectedItemReferences",
     description: "Selected grid row references",
     value: "SelectedControlSelectedItemReferences",
+  },
+  {
+    label: "SelectedControlAllItemIds",
+    description: "All grid row ids",
+    value: "SelectedControlAllItemIds",
+  },
+  {
+    label: "SelectedControlAllItemCount",
+    description: "All grid row count",
+    value: "SelectedControlAllItemCount",
+  },
+  {
+    label: "SelectedControlAllItemReferences",
+    description: "All grid row references",
+    value: "SelectedControlAllItemReferences",
+  },
+  {
+    label: "SelectedControlUnselectedItemIds",
+    description: "Unselected grid row ids",
+    value: "SelectedControlUnselectedItemIds",
+  },
+  {
+    label: "SelectedControlUnselectedItemCount",
+    description: "Unselected grid row count",
+    value: "SelectedControlUnselectedItemCount",
+  },
+  {
+    label: "SelectedControlUnselectedItemReferences",
+    description: "Unselected grid row references",
+    value: "SelectedControlUnselectedItemReferences",
   },
   {
     label: "SelectedEntityTypeName",
@@ -199,6 +234,21 @@ const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
     label: "CommandProperties",
     description: "Command metadata",
     value: "CommandProperties",
+  },
+  {
+    label: "OrgName",
+    description: "Organization name",
+    value: "OrgName",
+  },
+  {
+    label: "OrgLcid",
+    description: "Organization language code",
+    value: "OrgLcid",
+  },
+  {
+    label: "UserLcid",
+    description: "User language code",
+    value: "UserLcid",
   },
 ];
 const RIBBON_LANGUAGE_CODES: RibbonLanguageCode[] = [
@@ -2200,25 +2250,24 @@ function resolveReorderIdentity(
 
     for (const command of view.commandDefinitions) {
       const actionIndex = command.actions.findIndex((action) =>
-        action.kind === "JavaScriptFunction"
-          ? action.parameters.some(
-              (parameter) => parameter.range && sameRange(parameter.range, range),
-            )
-          : false,
+        commandActionParameters(action).some(
+          (parameter) => parameter.range && sameRange(parameter.range, range),
+        ),
       );
       const action = command.actions[actionIndex];
-      if (node.contextValue === "d365RibbonParameter" && action?.kind === "JavaScriptFunction") {
-        const parameterIndex = action.parameters.findIndex(
+      const parameters = action ? commandActionParameters(action) : [];
+      if (node.contextValue === "d365RibbonParameter" && parameters.length) {
+        const parameterIndex = parameters.findIndex(
           (parameter) => parameter.range && sameRange(parameter.range, range),
         );
-        const parameter = action.parameters[parameterIndex];
+        const parameter = parameters[parameterIndex];
         if (parameter) {
           return {
             kind: "ActionParameter",
             parent: { kind: "CommandAction", commandId: command.id, actionIndex },
             parameterKind: parameter.kind,
             value: parameter.value,
-            occurrence: parameterOccurrence(action.parameters, parameterIndex),
+            occurrence: parameterOccurrence(parameters, parameterIndex),
           };
         }
       }
@@ -2285,7 +2334,8 @@ function findCommandActionParameterTarget(
   identity: ReorderIdentity | undefined,
 ): { parameters: ActionParameter[]; index: number } | undefined {
   for (const [actionIndex, action] of command.actions.entries()) {
-    if (action.kind !== "JavaScriptFunction") {
+    const parameters = commandActionParameters(action);
+    if (!parameters.length) {
       continue;
     }
 
@@ -2295,17 +2345,25 @@ function findCommandActionParameterTarget(
       identity.parent.commandId === command.id &&
       identity.parent.actionIndex === actionIndex
     ) {
-      const index = findParameterByIdentity(action.parameters, identity);
-      return index >= 0 ? { parameters: action.parameters, index } : undefined;
+      const index = findParameterByIdentity(parameters, identity);
+      return index >= 0 ? { parameters, index } : undefined;
     }
 
-    const index = findParameterRangeIndex(action.parameters, range);
+    const index = findParameterRangeIndex(parameters, range);
     if (index >= 0) {
-      return { parameters: action.parameters, index };
+      return { parameters, index };
     }
   }
 
   return undefined;
+}
+
+function commandActionParameters(action: CommandAction): ActionParameter[] {
+  if (action.kind === "JavaScriptFunction" || action.kind === "Url") {
+    return action.parameters;
+  }
+
+  return [];
 }
 
 function findRuleStepParameterTarget(
@@ -2955,16 +3013,24 @@ async function promptJavaScriptAction(
     return undefined;
   }
 
-  const parameters = await promptCrmParameters(current?.parameters);
-  if (parameters === undefined) {
+  const crmParameters = await promptCrmParameters(current?.parameters);
+  if (crmParameters === undefined) {
     return undefined;
   }
+  const currentTypedParameters = current?.parameters.filter(
+    (parameter) => parameter.kind !== "Crm",
+  );
+  const typedParameters = await promptTypedActionParameters(currentTypedParameters ?? [], {
+    prompt: "Typed parameters",
+    placeHolder: "String:beforeSave, Bool:true, Int:1",
+    requireNames: false,
+  });
 
   return {
     kind: "JavaScriptFunction" as const,
     library: library.uniqueName,
     functionName: functionName.trim(),
-    parameters,
+    parameters: [...crmParameters, ...(typedParameters ?? currentTypedParameters ?? [])],
   };
 }
 
@@ -3071,7 +3137,7 @@ async function promptCommandAction(
   }
 
   return actionKind.label === "URL"
-    ? promptUrlAction(current?.kind === "Url" ? current.address : undefined)
+    ? promptUrlAction(current?.kind === "Url" ? current : undefined)
     : promptJavaScriptAction(ctx, current?.kind === "JavaScriptFunction" ? current : undefined);
 }
 
@@ -3097,21 +3163,189 @@ async function promptOptionalCommandAction(
   return actionKind.label === "URL" ? promptUrlAction() : promptJavaScriptAction(ctx);
 }
 
-async function promptUrlAction(currentAddress?: string) {
+async function promptUrlAction(
+  current?: Extract<CommandAction, { kind: "Url" }>,
+): Promise<NewCommandActionInput | undefined> {
   const address = await showRibbonInputBox({
     prompt: "URL",
     placeHolder: "https://contoso.example",
-    value: currentAddress ?? "",
+    value: current?.address ?? "",
     validateInput: (value) => (value.trim() ? undefined : "URL is required."),
   });
   if (!address) {
     return undefined;
   }
 
+  const parameters = await promptTypedActionParameters(current?.parameters ?? [], {
+    prompt: "URL parameters",
+    placeHolder: "Crm:recordId=FirstPrimaryItemId, String:data=source",
+    requireNames: true,
+  });
+
   return {
     kind: "Url" as const,
     address: address.trim(),
+    passParams: await promptOptionalUrlBoolean("Pass URL context parameters", current?.passParams),
+    winMode: await promptOptionalNumber("Window mode", current?.winMode),
+    winParams: await promptOptionalText("Window params", current?.winParams),
+    parameters: parameters ?? current?.parameters ?? [],
   };
+}
+
+async function promptOptionalUrlBoolean(
+  prompt: string,
+  current?: boolean,
+): Promise<boolean | undefined> {
+  const pick = await showRibbonQuickPick(
+    [
+      { label: "Not set", description: current === undefined ? "Current value" : undefined },
+      { label: "true", description: current === true ? "Current value" : undefined },
+      { label: "false", description: current === false ? "Current value" : undefined },
+    ],
+    { placeHolder: prompt },
+  );
+
+  if (!pick) {
+    return current;
+  }
+
+  if (pick.label === "Not set") {
+    return undefined;
+  }
+
+  return pick.label === "true";
+}
+
+async function promptOptionalNumber(prompt: string, current?: number): Promise<number | undefined> {
+  const value = await showRibbonInputBox({
+    prompt,
+    value: current === undefined ? "" : String(current),
+    validateInput: (input) =>
+      input.trim() === "" || /^-?\d+$/.test(input.trim()) ? undefined : "Use a number.",
+  });
+  if (value === undefined) {
+    return current;
+  }
+
+  if (!value.trim()) {
+    return undefined;
+  }
+
+  return Number(value.trim());
+}
+
+async function promptOptionalText(prompt: string, current?: string): Promise<string | undefined> {
+  const value = await showRibbonInputBox({
+    prompt,
+    value: current ?? "",
+  });
+
+  if (value === undefined) {
+    return current;
+  }
+
+  return value.trim() || undefined;
+}
+
+async function promptTypedActionParameters(
+  currentParameters: ActionParameter[],
+  options: {
+    prompt: string;
+    placeHolder: string;
+    requireNames: boolean;
+  },
+): Promise<ActionParameter[] | undefined> {
+  const input = await showRibbonInputBox({
+    prompt: options.prompt,
+    placeHolder: options.placeHolder,
+    value: serializeActionParameters(currentParameters),
+    validateInput: (value) => validateTypedActionParameters(value, options.requireNames),
+  });
+
+  return input === undefined ? undefined : parseTypedActionParameters(input, options.requireNames);
+}
+
+function serializeActionParameters(parameters: ActionParameter[]): string {
+  return parameters
+    .map((parameter) => {
+      const value = parameter.name ? `${parameter.name}=${parameter.value}` : parameter.value;
+      return `${parameter.kind}:${value}`;
+    })
+    .join(", ");
+}
+
+function validateTypedActionParameters(input: string, requireNames: boolean): string | undefined {
+  try {
+    parseTypedActionParameters(input, requireNames);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function parseTypedActionParameters(input: string, requireNames: boolean): ActionParameter[] {
+  const items = input
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return items.map((item) => parseTypedActionParameter(item, requireNames));
+}
+
+function parseTypedActionParameter(input: string, requireNames: boolean): ActionParameter {
+  const separator = input.indexOf(":");
+  if (separator <= 0) {
+    throw new Error("Use Kind:Value, for example String:beforeSave.");
+  }
+
+  const kind = normalizeActionParameterKind(input.slice(0, separator));
+  const body = input.slice(separator + 1).trim();
+  if (!body) {
+    throw new Error(`${kind} parameter value is required.`);
+  }
+
+  const nameSeparator = body.indexOf("=");
+  const name = nameSeparator >= 0 ? body.slice(0, nameSeparator).trim() : undefined;
+  const value = nameSeparator >= 0 ? body.slice(nameSeparator + 1).trim() : body;
+  if (requireNames && !name) {
+    throw new Error("URL parameters need names, for example Crm:recordId=FirstPrimaryItemId.");
+  }
+  if (!value) {
+    throw new Error(`${kind} parameter value is required.`);
+  }
+
+  validateActionParameterValue(kind, value);
+
+  return {
+    kind,
+    name,
+    value,
+  };
+}
+
+function normalizeActionParameterKind(value: string): ActionParameter["kind"] {
+  const normalized = value.trim().toLowerCase();
+  const kinds: ActionParameter["kind"][] = ["Crm", "Bool", "Int", "Float", "String", "Decimal"];
+  const kind = kinds.find((item) => item.toLowerCase() === normalized);
+  if (!kind) {
+    throw new Error("Parameter kind must be Crm, Bool, Int, Float, String, or Decimal.");
+  }
+
+  return kind;
+}
+
+function validateActionParameterValue(kind: ActionParameter["kind"], value: string): void {
+  if (kind === "Bool" && !/^(true|false)$/i.test(value)) {
+    throw new Error("Bool parameter value must be true or false.");
+  }
+
+  if (kind === "Int" && !/^-?\d+$/.test(value)) {
+    throw new Error("Int parameter value must be a whole number.");
+  }
+
+  if ((kind === "Float" || kind === "Decimal") && !/^-?\d+(\.\d+)?$/.test(value)) {
+    throw new Error(`${kind} parameter value must be a number.`);
+  }
 }
 
 function promptRequired(prompt: string, value: string | undefined): Thenable<string | undefined> {

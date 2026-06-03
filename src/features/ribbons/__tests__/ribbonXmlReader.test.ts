@@ -26,7 +26,9 @@ const ribbonXml = `<RibbonDiffXml>
         <JavaScriptFunction Library="$webresource:new_/scripts/account.js" FunctionName="validate">
           <StringParameter Value="beforeSave" />
         </JavaScriptFunction>
-        <Url Address="https://example.com" />
+        <Url Address="https://example.com" PassParams="true" WinMode="1" WinParams="height=600,width=800">
+          <CrmParameter Name="recordId" Value="FirstPrimaryItemId" />
+        </Url>
         <UnknownAction Foo="Bar" />
       </Actions>
     </CommandDefinition>
@@ -108,7 +110,34 @@ test("reads major ribbon sections and known nodes with ranges", () => {
   );
   assert.strictEqual(view.hideActions[0].hideActionId, "new.account.Form.Hide.Save");
   assert.strictEqual(view.commandDefinitions[0].enableRuleRefs[0], "new.account.Enable");
-  assert.strictEqual(view.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
+  const command = view.commandDefinitions[0];
+  assert.strictEqual(command.actions[0].kind, "JavaScriptFunction");
+  assert.deepStrictEqual(
+    command.actions[0].kind === "JavaScriptFunction"
+      ? command.actions[0].parameters.map((parameter) => parameter.kind)
+      : [],
+    ["String"],
+  );
+  assert.strictEqual(command.actions[1].kind, "Url");
+  assert.strictEqual(
+    command.actions[1].kind === "Url" ? command.actions[1].passParams : false,
+    true,
+  );
+  assert.strictEqual(command.actions[1].kind === "Url" ? command.actions[1].winMode : undefined, 1);
+  assert.strictEqual(
+    command.actions[1].kind === "Url" ? command.actions[1].winParams : undefined,
+    "height=600,width=800",
+  );
+  assert.deepStrictEqual(
+    command.actions[1].kind === "Url"
+      ? command.actions[1].parameters.map((parameter) => ({
+          kind: parameter.kind,
+          name: parameter.name,
+          value: parameter.value,
+        }))
+      : [],
+    [{ kind: "Crm", name: "recordId", value: "FirstPrimaryItemId" }],
+  );
   assert.strictEqual(view.enableRules[0].steps[0].kind, "CustomRule");
   assert.strictEqual(view.displayRules[0].steps[0].kind, "EntityPrivilegeRule");
   assert.strictEqual(view.locLabels[0].titles[0].description, "Validate & Save");

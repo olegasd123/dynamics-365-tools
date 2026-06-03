@@ -434,6 +434,40 @@ test("adds an action to an existing command definition", () => {
   assert.match(updated, /FunctionName="validateAndSave"/);
 });
 
+test("adds URL action options and named parameters", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="d365tools.account.Form.Open.Command" />
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const updated = applyRibbonPatchSequence(source, [
+    createCommandActionPatch(document, document.views[0].commandDefinitions[0], {
+      kind: "Url",
+      address: "$webresource:new_/page.htm",
+      passParams: true,
+      winMode: 1,
+      winParams: "height=600,width=800",
+      parameters: [
+        { kind: "Crm", name: "recordId", value: "FirstPrimaryItemId" },
+        { kind: "String", name: "source", value: "ribbon" },
+      ],
+    }),
+  ]);
+
+  assert.match(
+    updated,
+    /<Url Address="\$webresource:new_\/page\.htm" PassParams="true" WinMode="1" WinParams="height=600,width=800">/,
+  );
+  assert.match(updated, /<CrmParameter Name="recordId" Value="FirstPrimaryItemId" \/>/);
+  assert.match(updated, /<StringParameter Name="source" Value="ribbon" \/>/);
+});
+
 test("adds rule references to command definitions", () => {
   const source = `<RibbonDiffXml>
   <CommandDefinitions>
