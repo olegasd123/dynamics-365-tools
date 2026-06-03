@@ -127,6 +127,15 @@ interface RibbonLanguageCode {
   locale: string;
 }
 
+interface ActionParameterListPick extends vscode.QuickPickItem {
+  action: "add" | "done" | "edit";
+  index?: number;
+}
+
+interface ActionParameterEditPick extends vscode.QuickPickItem {
+  action: "edit" | "delete" | "back";
+}
+
 interface SolutionOpenPick extends vscode.QuickPickItem {
   sourceKind: "environment" | "disk";
 }
@@ -3255,72 +3264,160 @@ async function promptTypedActionParameters(
     requireNames: boolean;
   },
 ): Promise<ActionParameter[] | undefined> {
-  const input = await showRibbonInputBox({
-    prompt: options.prompt,
-    placeHolder: options.placeHolder,
-    value: serializeActionParameters(currentParameters),
-    validateInput: (value) => validateTypedActionParameters(value, options.requireNames),
+  const parameters = [...currentParameters];
+
+  while (true) {
+    const pick = await showRibbonQuickPick<ActionParameterListPick>(
+      actionParameterListPicks(parameters),
+      { placeHolder: options.prompt },
+    );
+    if (!pick) {
+      return undefined;
+    }
+
+    if (pick.action === "done") {
+      return parameters;
+    }
+
+    if (pick.action === "add") {
+      const parameter = await promptActionParameter(options.requireNames);
+      if (parameter) {
+        parameters.push(parameter);
+      }
+      continue;
+    }
+
+    const index = pick.index;
+    if (index === undefined || !parameters[index]) {
+      continue;
+    }
+
+    const editPick = await showRibbonQuickPick<ActionParameterEditPick>(
+      [
+        { label: "Edit", description: formatActionParameter(parameters[index]), action: "edit" },
+        {
+          label: "Delete",
+          description: formatActionParameter(parameters[index]),
+          action: "delete",
+        },
+        { label: "Back", action: "back" },
+      ],
+      { placeHolder: formatActionParameter(parameters[index]) },
+    );
+    if (!editPick || editPick.action === "back") {
+      continue;
+    }
+
+    if (editPick.action === "delete") {
+      parameters.splice(index, 1);
+      continue;
+    }
+
+    const updated = await promptActionParameter(options.requireNames, parameters[index]);
+    if (updated) {
+      parameters[index] = updated;
+    }
+  }
+}
+
+function actionParameterListPicks(parameters: ActionParameter[]): ActionParameterListPick[] {
+  return [
+    {
+      label: "Done",
+      description: `${parameters.length} parameter${parameters.length === 1 ? "" : "s"}`,
+      action: "done",
+    },
+    { label: "Add parameter", description: "Create a parameter", action: "add" },
+    ...parameters.map((parameter, index) => ({
+      label: `${index + 1}. ${formatActionParameter(parameter)}`,
+      description: parameter.kind,
+      action: "edit" as const,
+      index,
+    })),
+  ];
+}
+
+async function promptActionParameter(
+  requireName: boolean,
+  current?: ActionParameter,
+): Promise<ActionParameter | undefined> {
+  const kind = await promptActionParameterKind(current?.kind);
+  if (!kind) {
+    return undefined;
+  }
+
+  const name = requireName ? await promptActionParameterName(current?.name) : undefined;
+  if (requireName && name === undefined) {
+    return undefined;
+  }
+
+  const value = await promptActionParameterValue(kind, current?.value);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return { kind, name, value };
+}
+
+async function promptActionParameterKind(
+  current?: ActionParameter["kind"],
+): Promise<ActionParameter["kind"] | undefined> {
+  const kinds: ActionParameter["kind"][] = ["Crm", "String", "Bool", "Int", "Decimal", "Float"];
+  const pick = await showRibbonQuickPick(
+    kinds.map((kind) => ({
+      label: kind,
+      description: kind === current ? "Current kind" : undefined,
+    })),
+    { placeHolder: "Parameter kind" },
+  );
+
+  return pick ? normalizeActionParameterKind(pick.label) : undefined;
+}
+
+async function promptActionParameterName(current?: string): Promise<string | undefined> {
+  const name = await showRibbonInputBox({
+    prompt: "Parameter name",
+    placeHolder: "recordId",
+    value: current ?? "",
+    validateInput: (value) => (value.trim() ? undefined : "Parameter name is required."),
   });
 
-  return input === undefined ? undefined : parseTypedActionParameters(input, options.requireNames);
+  return name?.trim() || undefined;
 }
 
-function serializeActionParameters(parameters: ActionParameter[]): string {
-  return parameters
-    .map((parameter) => {
-      const value = parameter.name ? `${parameter.name}=${parameter.value}` : parameter.value;
-      return `${parameter.kind}:${value}`;
-    })
-    .join(", ");
+async function promptActionParameterValue(
+  kind: ActionParameter["kind"],
+  current?: string,
+): Promise<string | undefined> {
+  const value = await showRibbonInputBox({
+    prompt: "Parameter value",
+    placeHolder: actionParameterValuePlaceholder(kind),
+    value: current ?? "",
+    validateInput: (input) => validateActionParameterValueInput(kind, input),
+  });
+
+  return value?.trim() || undefined;
 }
 
-function validateTypedActionParameters(input: string, requireNames: boolean): string | undefined {
-  try {
-    parseTypedActionParameters(input, requireNames);
-    return undefined;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+function actionParameterValuePlaceholder(kind: ActionParameter["kind"]): string {
+  switch (kind) {
+    case "Crm":
+      return "FirstPrimaryItemId";
+    case "Bool":
+      return "true";
+    case "Int":
+      return "1";
+    case "Decimal":
+    case "Float":
+      return "1.0";
+    case "String":
+      return "source";
   }
 }
 
-function parseTypedActionParameters(input: string, requireNames: boolean): ActionParameter[] {
-  const items = input
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return items.map((item) => parseTypedActionParameter(item, requireNames));
-}
-
-function parseTypedActionParameter(input: string, requireNames: boolean): ActionParameter {
-  const separator = input.indexOf(":");
-  if (separator <= 0) {
-    throw new Error("Use Kind:Value, for example String:beforeSave.");
-  }
-
-  const kind = normalizeActionParameterKind(input.slice(0, separator));
-  const body = input.slice(separator + 1).trim();
-  if (!body) {
-    throw new Error(`${kind} parameter value is required.`);
-  }
-
-  const nameSeparator = body.indexOf("=");
-  const name = nameSeparator >= 0 ? body.slice(0, nameSeparator).trim() : undefined;
-  const value = nameSeparator >= 0 ? body.slice(nameSeparator + 1).trim() : body;
-  if (requireNames && !name) {
-    throw new Error("URL parameters need names, for example Crm:recordId=FirstPrimaryItemId.");
-  }
-  if (!value) {
-    throw new Error(`${kind} parameter value is required.`);
-  }
-
-  validateActionParameterValue(kind, value);
-
-  return {
-    kind,
-    name,
-    value,
-  };
+function formatActionParameter(parameter: ActionParameter): string {
+  const value = parameter.name ? `${parameter.name}=${parameter.value}` : parameter.value;
+  return `${parameter.kind}:${value}`;
 }
 
 function normalizeActionParameterKind(value: string): ActionParameter["kind"] {
@@ -3334,18 +3431,28 @@ function normalizeActionParameterKind(value: string): ActionParameter["kind"] {
   return kind;
 }
 
-function validateActionParameterValue(kind: ActionParameter["kind"], value: string): void {
+function validateActionParameterValueInput(
+  kind: ActionParameter["kind"],
+  input: string,
+): string | undefined {
+  const value = input.trim();
+  if (!value) {
+    return `${kind} parameter value is required.`;
+  }
+
   if (kind === "Bool" && !/^(true|false)$/i.test(value)) {
-    throw new Error("Bool parameter value must be true or false.");
+    return "Bool parameter value must be true or false.";
   }
 
   if (kind === "Int" && !/^-?\d+$/.test(value)) {
-    throw new Error("Int parameter value must be a whole number.");
+    return "Int parameter value must be a whole number.";
   }
 
   if ((kind === "Float" || kind === "Decimal") && !/^-?\d+(\.\d+)?$/.test(value)) {
-    throw new Error(`${kind} parameter value must be a number.`);
+    return `${kind} parameter value must be a number.`;
   }
+
+  return undefined;
 }
 
 function promptRequired(prompt: string, value: string | undefined): Thenable<string | undefined> {

@@ -481,6 +481,108 @@ test("adds command action from actions group node", async () => {
   );
 });
 
+test("adds URL command action parameters from a list flow", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions />
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const command = document.views[0].commandDefinitions[0];
+  const node = new RibbonItemNode("Actions", "0", "d365RibbonActions", "run", [], [], {
+    document,
+    range: command.range,
+  });
+  let patches: RibbonPatch[] = [];
+  const parameterListLabels: string[][] = [];
+  const parameterKinds = ["Crm", "String"];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Command action") {
+      return items.find((item) => item.label === "URL");
+    }
+
+    if (options.placeHolder === "URL parameters") {
+      parameterListLabels.push(items.map((item) => item.label));
+      return parameterListLabels.length <= 2
+        ? items.find((item) => item.label === "Add parameter")
+        : items.find((item) => item.label === "Done");
+    }
+
+    if (options.placeHolder === "Parameter kind") {
+      const label = parameterKinds.shift();
+      return items.find((item) => item.label === label);
+    }
+
+    if (options.placeHolder === "Pass URL context parameters") {
+      return items.find((item) => item.label === "true");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) => {
+    switch (options.prompt) {
+      case "URL":
+        return "$webresource:new_/page.htm";
+      case "Parameter name":
+        return parameterKinds.length === 1 ? "recordId" : "data";
+      case "Parameter value":
+        return parameterKinds.length === 1 ? "FirstPrimaryItemId" : "source";
+      case "Window mode":
+        return "1";
+      case "Window params":
+        return "height=600,width=800";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addRibbonCommandAction(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+
+  assert.deepStrictEqual(parameterListLabels, [
+    ["Done", "Add parameter"],
+    ["Done", "Add parameter", "1. Crm:recordId=FirstPrimaryItemId"],
+    ["Done", "Add parameter", "1. Crm:recordId=FirstPrimaryItemId", "2. String:data=source"],
+  ]);
+  assert.match(
+    updated,
+    /<Url Address="\$webresource:new_\/page\.htm" PassParams="true" WinMode="1" WinParams="height=600,width=800">/,
+  );
+  assert.match(updated, /<CrmParameter Name="recordId" Value="FirstPrimaryItemId" \/>/);
+  assert.match(updated, /<StringParameter Name="data" Value="source" \/>/);
+});
+
 test("adds command enable rule reference from enable rules group node", async () => {
   const source = `<RibbonDiffXml>
   <CommandDefinitions>
