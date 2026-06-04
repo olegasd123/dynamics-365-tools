@@ -12,6 +12,7 @@ import {
   addRibbonCommandAction,
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
+  addRibbonDisplayRule,
   addRibbonEnableRule,
   addRibbonLocLabelTitle,
   editRibbonNode,
@@ -914,6 +915,120 @@ test("creates common enable rules from prompts", async () => {
       });
 
       assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, item.expectedKind);
+    }
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+});
+
+test("creates flat display rules from prompts", async () => {
+  const source = `<RibbonDiffXml>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const cases = [
+    {
+      inputByPrompt: new Map([["Display rule id", "new.FormType"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "FormTypeRule"],
+        ["Form type", "Main"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "FormTypeRule",
+    },
+    {
+      inputByPrompt: new Map([["Display rule id", "new.EntityProperty"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "EntityPropertyRule"],
+        ["Entity property", "HasNotes"],
+        ["Property value", "Yes"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "EntityPropertyRule",
+    },
+    {
+      inputByPrompt: new Map([["Display rule id", "new.MiscPrivilege"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "MiscellaneousPrivilegeRule"],
+        ["Privilege name", "ExportToExcel"],
+        ["Privilege depth", "No value"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "MiscellaneousPrivilegeRule",
+    },
+    {
+      inputByPrompt: new Map([
+        ["Display rule id", "new.OrganizationSetting"],
+        ["Organization setting", "IsSharePointIntegrationEnabled"],
+      ]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "OrganizationSettingRule"],
+        ["Organization setting", "Type organization setting"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "OrganizationSettingRule",
+      expectedSetting: "IsSharePointIntegrationEnabled",
+    },
+    {
+      inputByPrompt: new Map([["Display rule id", "new.HideForTablet"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "HideForTabletExperienceRule"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "HideForTabletExperienceRule",
+    },
+  ];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  try {
+    for (const item of cases) {
+      let patches: RibbonPatch[] = [];
+      (vscode.window as any).showQuickPick = async (
+        picks: vscode.QuickPickItem[] | string[],
+        options: { placeHolder?: string },
+      ) => {
+        const label = item.pickByPlaceHolder.get(options.placeHolder ?? "");
+        return typeof picks[0] === "string"
+          ? label
+          : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === label);
+      };
+      (vscode.window as any).showInputBox = async (options: { prompt?: string }) =>
+        item.inputByPrompt.get(options.prompt ?? "");
+
+      await addRibbonDisplayRule(
+        {
+          ribbonEditorState: {
+            queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+              patches = queuedPatches;
+            },
+          },
+          ribbonExplorer: {
+            refresh: () => undefined,
+          },
+        } as any,
+        new RibbonDocumentNode(document),
+      );
+
+      const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+        sourceId: "source",
+        fileUri: "/tmp/RibbonDiffXml.xml",
+        kind: "Application",
+      });
+      const step = updatedDocument.views[0].displayRules[0].steps[0];
+
+      assert.strictEqual(step.kind, item.expectedKind);
+      if (item.expectedSetting) {
+        assert.strictEqual(
+          step.kind === "OrganizationSettingRule" ? step.setting : undefined,
+          item.expectedSetting,
+        );
+      }
     }
   } finally {
     (vscode.window as any).showQuickPick = originalShowQuickPick;

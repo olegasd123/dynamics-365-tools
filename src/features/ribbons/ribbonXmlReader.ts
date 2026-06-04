@@ -14,7 +14,10 @@ import {
   MenuSectionNode,
   RibbonCommandClientType,
   RibbonDocument,
+  RibbonEntityPropertyName,
+  RibbonOrganizationSetting,
   RibbonRuleAppliesTo,
+  RibbonRuleFormType,
   RibbonRuleFormState,
   RibbonRulePrivilegeDepth,
   RibbonRulePrivilegeType,
@@ -824,6 +827,49 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
       return {
         kind: "CommandClientTypeRule",
         type: optionalAttr(node, "Type") as RibbonCommandClientType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "FormTypeRule":
+      return {
+        kind: "FormTypeRule",
+        type: optionalAttr(node, "Type") as RibbonRuleFormType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "EntityPropertyRule":
+      return {
+        kind: "EntityPropertyRule",
+        propertyName: optionalAttr(node, "PropertyName") as RibbonEntityPropertyName | undefined,
+        propertyValue: booleanAttr(node, "PropertyValue"),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "MiscellaneousPrivilegeRule":
+      return {
+        kind: "MiscellaneousPrivilegeRule",
+        privilegeName: optionalAttr(node, "PrivilegeName"),
+        privilegeDepth: optionalAttr(node, "PrivilegeDepth") as
+          | RibbonRulePrivilegeDepth
+          | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "OrganizationSettingRule":
+      return {
+        kind: "OrganizationSettingRule",
+        setting: optionalAttr(node, "Setting") as RibbonOrganizationSetting | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "HideForTabletExperienceRule":
+      return {
+        kind: "HideForTabletExperienceRule",
         default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,

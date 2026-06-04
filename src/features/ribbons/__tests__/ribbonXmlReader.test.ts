@@ -184,6 +184,59 @@ test("reads common enable rule step types", () => {
   assert.match(steps[4].kind === "Unknown" ? steps[4].raw : "", /UnknownRule/);
 });
 
+test("reads flat display rule step types", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <FormTypeRule Type="Main" />
+        <EntityPropertyRule PropertyName="HasNotes" PropertyValue="true" />
+        <MiscellaneousPrivilegeRule PrivilegeName="ExportToExcel" PrivilegeDepth="Basic" />
+        <OrganizationSettingRule Setting="IsSharepointEnabled" />
+        <HideForTabletExperienceRule InvertResult="true" />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Application" },
+  );
+
+  const steps = document.views[0].displayRules[0].steps;
+
+  assert.deepStrictEqual(
+    steps.map((step) => step.kind),
+    [
+      "FormTypeRule",
+      "EntityPropertyRule",
+      "MiscellaneousPrivilegeRule",
+      "OrganizationSettingRule",
+      "HideForTabletExperienceRule",
+    ],
+  );
+  assert.strictEqual(steps[0].kind === "FormTypeRule" ? steps[0].type : undefined, "Main");
+  assert.strictEqual(
+    steps[1].kind === "EntityPropertyRule" ? steps[1].propertyName : undefined,
+    "HasNotes",
+  );
+  assert.strictEqual(
+    steps[1].kind === "EntityPropertyRule" ? steps[1].propertyValue : undefined,
+    true,
+  );
+  assert.strictEqual(
+    steps[2].kind === "MiscellaneousPrivilegeRule" ? steps[2].privilegeName : undefined,
+    "ExportToExcel",
+  );
+  assert.strictEqual(
+    steps[3].kind === "OrganizationSettingRule" ? steps[3].setting : undefined,
+    "IsSharepointEnabled",
+  );
+  assert.strictEqual(
+    steps[4].kind === "HideForTabletExperienceRule" ? steps[4].invertResult : undefined,
+    true,
+  );
+});
+
 test("projects entity ribbon nodes into scoped views", () => {
   const multiScopeXml = `<RibbonDiffXml>
   <CustomActions>

@@ -20,10 +20,11 @@ The ribbon editor can create these display rule steps now:
 The model, XML reader, XML writer, validator, and command prompts already use one shared rule step flow for enable and display rules.
 
 Important:
+
 - Create a list of possible values and possibility to write a custom one, when it's possible, instead of just text value when user has to write a value themselves on creation / modifying rules. List of values will help user to create / edit rules faster.
 - Mark a milestone as `[Done]` when it's completed.
 
-## Milestone 1: Add Core Flat Display Rules
+## Milestone 1: Add Core Flat Display Rules [Done]
 
 Add these display rule types first:
 

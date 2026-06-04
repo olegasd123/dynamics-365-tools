@@ -269,6 +269,19 @@ function validateRuleStep(step: RuleStep): RibbonValidationIssue[] {
       return required(step.state, "FormStateRule state", step.range);
     case "CommandClientTypeRule":
       return required(step.type, "CommandClientTypeRule type", step.range);
+    case "FormTypeRule":
+      return required(step.type, "FormTypeRule type", step.range);
+    case "EntityPropertyRule":
+      return [
+        ...required(step.propertyName, "EntityPropertyRule property name", step.range),
+        ...requiredBoolean(step.propertyValue, "EntityPropertyRule property value", step.range),
+      ];
+    case "MiscellaneousPrivilegeRule":
+      return required(step.privilegeName, "MiscellaneousPrivilegeRule privilege name", step.range);
+    case "OrganizationSettingRule":
+      return required(step.setting, "OrganizationSettingRule setting", step.range);
+    case "HideForTabletExperienceRule":
+      return [];
     case "EntityPrivilegeRule":
       return [
         ...required(step.privilegeType, "EntityPrivilegeRule privilege type", step.range),
@@ -348,4 +361,20 @@ function required(
           range,
         },
       ];
+}
+
+function requiredBoolean(
+  value: boolean | undefined,
+  label: string,
+  range: TextRange,
+): RibbonValidationIssue[] {
+  return value === undefined
+    ? [
+        {
+          severity: "error",
+          message: `${label} is required.`,
+          range,
+        },
+      ]
+    : [];
 }

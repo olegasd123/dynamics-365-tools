@@ -663,6 +663,16 @@ function ruleStepDescription(step: RuleStep): string | undefined {
       return step.state;
     case "CommandClientTypeRule":
       return step.type;
+    case "FormTypeRule":
+      return step.type;
+    case "EntityPropertyRule":
+      return step.propertyName;
+    case "MiscellaneousPrivilegeRule":
+      return step.privilegeName;
+    case "OrganizationSettingRule":
+      return step.setting;
+    case "HideForTabletExperienceRule":
+      return undefined;
     case "SelectionCountRule":
       return selectionCountText(step.minimum, step.maximum);
     case "RecordPrivilegeRule":
@@ -719,6 +729,42 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
       return [
         ...base,
         ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "FormTypeRule":
+      return [
+        ...base,
+        ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "EntityPropertyRule":
+      return [
+        ...base,
+        ["Property", step.propertyName],
+        ["Value", boolText(step.propertyValue)],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "MiscellaneousPrivilegeRule":
+      return [
+        ...base,
+        ["Privilege", step.privilegeName],
+        ["Depth", step.privilegeDepth],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "OrganizationSettingRule":
+      return [
+        ...base,
+        ["Setting", step.setting],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "HideForTabletExperienceRule":
+      return [
+        ...base,
         ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];

@@ -53,8 +53,11 @@ import {
   LocLabelTitle,
   RibbonCommandClientType,
   RibbonDocument,
+  RibbonEntityPropertyName,
+  RibbonOrganizationSetting,
   RibbonPatch,
   RibbonRuleAppliesTo,
+  RibbonRuleFormType,
   RibbonRuleFormState,
   RibbonRulePrivilegeDepth,
   RibbonRulePrivilegeType,
@@ -118,6 +121,11 @@ interface SelectionCountConditionPick extends vscode.QuickPickItem {
 
 interface RibbonLanguageCodePick extends vscode.QuickPickItem {
   languageCode?: number;
+  manual?: boolean;
+}
+
+interface RibbonValuePick extends vscode.QuickPickItem {
+  value?: string;
   manual?: boolean;
 }
 
@@ -267,6 +275,43 @@ const CRM_PARAMETER_PICKS: CrmParameterPick[] = [
     description: "User language code",
     value: "UserLcid",
   },
+];
+const FORM_TYPE_RULE_TYPES = [
+  "Main",
+  "Preview",
+  "AppointmentBook",
+  "Dashboard",
+  "Quick",
+  "QuickCreate",
+  "Card",
+  "MainInteractionCentric",
+];
+const ENTITY_PROPERTY_RULE_PROPERTIES = [
+  "DuplicateDetectionEnabled",
+  "GridFiltersEnabled",
+  "HasStateCode",
+  "IsConnectionsEnabled",
+  "MailMergeEnabled",
+  "WorksWithQueue",
+  "HasActivities",
+  "IsActivity",
+  "HasNotes",
+  "IsActivityParty",
+  "HasEmailAddresses",
+  "IsChildEntity",
+  "IsImportable",
+  "IsEnabledForCharts",
+  "IsBusinessProcessEnabled",
+  "HasFeedback",
+  "IsBPFEntity",
+];
+const MISCELLANEOUS_PRIVILEGE_RULE_NAMES = ["ExportToExcel", "MailMerge", "GoOffline"];
+const ORGANIZATION_SETTING_RULE_SETTINGS = [
+  "IsSharepointEnabled",
+  "IsSOPIntegrationEnabled",
+  "IsFiscalCalendarDefined",
+  "IsReadFormModeDefined",
+  "IsBPFEntityCustomizationFeatureEnabled",
 ];
 const RIBBON_LANGUAGE_CODES: RibbonLanguageCode[] = [
   { code: 1025, name: "Arabic", locale: "ar-SA" },
@@ -4432,7 +4477,14 @@ async function promptRuleStep(
     { label: "ValueRule", description: "Check a field value" },
     { label: "EntityRule", description: "Check table or context" },
   ];
-  const displayOnly = [{ label: "EntityPrivilegeRule", description: "Check entity privilege" }];
+  const displayOnly = [
+    { label: "EntityPrivilegeRule", description: "Check entity privilege" },
+    { label: "FormTypeRule", description: "Check form type" },
+    { label: "EntityPropertyRule", description: "Check table property" },
+    { label: "MiscellaneousPrivilegeRule", description: "Check global privilege" },
+    { label: "OrganizationSettingRule", description: "Check organization setting" },
+    { label: "HideForTabletExperienceRule", description: "Hide for tablet experience" },
+  ];
   const enableOnly = [
     { label: "SelectionCountRule", description: "Check selected rows" },
     { label: "RecordPrivilegeRule", description: "Check record privilege" },
@@ -4463,6 +4515,16 @@ async function promptRuleStep(
       return promptValueRuleStep();
     case "EntityPrivilegeRule":
       return promptEntityPrivilegeRuleStep();
+    case "FormTypeRule":
+      return promptFormTypeRuleStep();
+    case "EntityPropertyRule":
+      return promptEntityPropertyRuleStep();
+    case "MiscellaneousPrivilegeRule":
+      return promptMiscellaneousPrivilegeRuleStep();
+    case "OrganizationSettingRule":
+      return promptOrganizationSettingRuleStep();
+    case "HideForTabletExperienceRule":
+      return promptHideForTabletExperienceRuleStep();
     case "SelectionCountRule":
       return promptSelectionCountRuleStep();
     case "RecordPrivilegeRule":
@@ -4572,6 +4634,112 @@ async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
     privilegeDepth,
     invertResult,
   };
+}
+
+async function promptFormTypeRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const type = await promptKnownOrCustomValue("Form type", FORM_TYPE_RULE_TYPES, "Type form type");
+  if (!type) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "FormTypeRule", type: type as RibbonRuleFormType, invertResult };
+}
+
+async function promptEntityPropertyRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const propertyName = await promptKnownOrCustomValue(
+    "Entity property",
+    ENTITY_PROPERTY_RULE_PROPERTIES,
+    "Type entity property",
+  );
+  if (!propertyName) {
+    return undefined;
+  }
+
+  const propertyValue = await promptOptionalBoolean("Property value");
+  if (propertyValue === undefined) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "EntityPropertyRule",
+    propertyName: propertyName as RibbonEntityPropertyName,
+    propertyValue,
+    invertResult,
+  };
+}
+
+async function promptMiscellaneousPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const privilegeName = await promptKnownOrCustomValue(
+    "Privilege name",
+    MISCELLANEOUS_PRIVILEGE_RULE_NAMES,
+    "Type privilege name",
+  );
+  if (!privilegeName) {
+    return undefined;
+  }
+
+  const privilegeDepth = (await showRibbonQuickPick(
+    ["No value", "None", "Basic", "Local", "Deep", "Global"],
+    {
+      placeHolder: "Privilege depth",
+    },
+  )) as RibbonRulePrivilegeDepth | "No value" | undefined;
+  if (!privilegeDepth) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "MiscellaneousPrivilegeRule",
+    privilegeName,
+    privilegeDepth: privilegeDepth === "No value" ? undefined : privilegeDepth,
+    invertResult,
+  };
+}
+
+async function promptOrganizationSettingRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const setting = await promptKnownOrCustomValue(
+    "Organization setting",
+    ORGANIZATION_SETTING_RULE_SETTINGS,
+    "Type organization setting",
+  );
+  if (!setting) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "OrganizationSettingRule",
+    setting: setting as RibbonOrganizationSetting,
+    invertResult,
+  };
+}
+
+async function promptHideForTabletExperienceRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "HideForTabletExperienceRule", invertResult };
 }
 
 async function promptSelectionCountRuleStep(): Promise<NewRuleStepInput | undefined> {
@@ -4762,6 +4930,37 @@ async function promptRequiredInteger(
   }
 
   return Number(value.trim());
+}
+
+async function promptKnownOrCustomValue(
+  placeHolder: string,
+  values: string[],
+  manualLabel: string,
+): Promise<string | undefined> {
+  const pick = await showRibbonQuickPick<RibbonValuePick>(
+    [
+      ...values.map((value) => ({ label: value, value })),
+      {
+        label: manualLabel,
+        description: "Type a custom value",
+        manual: true,
+      },
+    ],
+    { placeHolder },
+  );
+  if (!pick) {
+    return undefined;
+  }
+
+  if (!pick.manual) {
+    return pick.value ?? pick.label;
+  }
+
+  const value = await showRibbonInputBox({
+    prompt: placeHolder,
+    validateInput: (input) => (input.trim() ? undefined : "Value is required."),
+  });
+  return value?.trim() || undefined;
 }
 
 async function promptOptionalBoolean(prompt: string): Promise<boolean | undefined> {

@@ -667,6 +667,70 @@ test("creates common enable rule step types", () => {
   }
 });
 
+test("creates flat display rule step types", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const cases = [
+    {
+      id: "new.FormType",
+      step: {
+        kind: "FormTypeRule" as const,
+        type: "Main" as const,
+      },
+    },
+    {
+      id: "new.EntityProperty",
+      step: {
+        kind: "EntityPropertyRule" as const,
+        propertyName: "HasNotes" as const,
+        propertyValue: true,
+      },
+    },
+    {
+      id: "new.MiscPrivilege",
+      step: {
+        kind: "MiscellaneousPrivilegeRule" as const,
+        privilegeName: "ExportToExcel",
+        privilegeDepth: "Basic" as const,
+      },
+    },
+    {
+      id: "new.OrganizationSetting",
+      step: {
+        kind: "OrganizationSettingRule" as const,
+        setting: "IsSharepointEnabled" as const,
+      },
+    },
+    {
+      id: "new.HideForTablet",
+      step: {
+        kind: "HideForTabletExperienceRule" as const,
+      },
+    },
+  ];
+
+  for (const input of cases) {
+    const updated = applyRibbonPatchSequence(source, [
+      createDisplayRulePatches(document, input)[0],
+    ]);
+    const [updatedDocument] = readRibbonDocuments(updated, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+
+    assert.strictEqual(updatedDocument.views[0].displayRules[0].steps[0].kind, input.step.kind);
+    assert.match(updated, new RegExp(`<${input.step.kind}`));
+  }
+});
+
 test("replaces rule steps with common enable rule step types", () => {
   const source = `<RibbonDiffXml>
   <RuleDefinitions>

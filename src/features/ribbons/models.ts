@@ -18,6 +18,45 @@ export type RibbonRulePrivilegeDepth = "None" | "Basic" | "Local" | "Deep" | "Gl
 
 export type RibbonRuleFormState = "Create" | "Existing" | "ReadOnly" | "Disabled" | "BulkEdit";
 
+export type RibbonRuleFormType =
+  | "Main"
+  | "Preview"
+  | "AppointmentBook"
+  | "Dashboard"
+  | "Quick"
+  | "QuickCreate"
+  | "Card"
+  | "MainInteractionCentric"
+  | string;
+
+export type RibbonEntityPropertyName =
+  | "DuplicateDetectionEnabled"
+  | "GridFiltersEnabled"
+  | "HasStateCode"
+  | "IsConnectionsEnabled"
+  | "MailMergeEnabled"
+  | "WorksWithQueue"
+  | "HasActivities"
+  | "IsActivity"
+  | "HasNotes"
+  | "IsActivityParty"
+  | "HasEmailAddresses"
+  | "IsChildEntity"
+  | "IsImportable"
+  | "IsEnabledForCharts"
+  | "IsBusinessProcessEnabled"
+  | "HasFeedback"
+  | "IsBPFEntity"
+  | string;
+
+export type RibbonOrganizationSetting =
+  | "IsSharepointEnabled"
+  | "IsSOPIntegrationEnabled"
+  | "IsFiscalCalendarDefined"
+  | "IsReadFormModeDefined"
+  | "IsBPFEntityCustomizationFeatureEnabled"
+  | string;
+
 export type RibbonCommandClientType = "Modern" | "Refresh" | "Legacy";
 
 export interface RibbonSource {
@@ -254,6 +293,42 @@ export type RuleStep =
   | {
       kind: "CommandClientTypeRule";
       type?: RibbonCommandClientType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "FormTypeRule";
+      type?: RibbonRuleFormType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "EntityPropertyRule";
+      propertyName?: RibbonEntityPropertyName;
+      propertyValue?: boolean;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "MiscellaneousPrivilegeRule";
+      privilegeName?: string;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "OrganizationSettingRule";
+      setting?: RibbonOrganizationSetting;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "HideForTabletExperienceRule";
       default?: boolean;
       invertResult?: boolean;
       range: TextRange;

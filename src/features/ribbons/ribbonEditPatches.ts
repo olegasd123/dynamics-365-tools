@@ -4,10 +4,13 @@ import {
   CommandDefinition,
   HideAction,
   LocLabelTitle,
+  RibbonEntityPropertyName,
   RibbonCommandClientType,
   RibbonDocument,
   RibbonPatch,
+  RibbonOrganizationSetting,
   RibbonRuleAppliesTo,
+  RibbonRuleFormType,
   RibbonRuleFormState,
   RibbonRulePrivilegeDepth,
   RibbonRulePrivilegeType,
@@ -87,6 +90,37 @@ export type NewRuleStepInput =
   | {
       kind: "CommandClientTypeRule";
       type: RibbonCommandClientType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "FormTypeRule";
+      type: RibbonRuleFormType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "EntityPropertyRule";
+      propertyName: RibbonEntityPropertyName;
+      propertyValue: boolean;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "MiscellaneousPrivilegeRule";
+      privilegeName: string;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "OrganizationSettingRule";
+      setting: RibbonOrganizationSetting;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "HideForTabletExperienceRule";
       default?: boolean;
       invertResult?: boolean;
     }
@@ -909,6 +943,37 @@ function renderRuleStep(step: NewRuleStepInput): string {
     case "CommandClientTypeRule":
       return `<CommandClientTypeRule ${renderAttributes([
         ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "FormTypeRule":
+      return `<FormTypeRule ${renderAttributes([
+        ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "EntityPropertyRule":
+      return `<EntityPropertyRule ${renderAttributes([
+        ["PropertyName", step.propertyName],
+        ["PropertyValue", optionalBoolean(step.propertyValue)],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "MiscellaneousPrivilegeRule":
+      return `<MiscellaneousPrivilegeRule ${renderAttributes([
+        ["PrivilegeName", step.privilegeName],
+        ["PrivilegeDepth", step.privilegeDepth],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "OrganizationSettingRule":
+      return `<OrganizationSettingRule ${renderAttributes([
+        ["Setting", step.setting],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "HideForTabletExperienceRule":
+      return `<HideForTabletExperienceRule ${renderAttributes([
         ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;

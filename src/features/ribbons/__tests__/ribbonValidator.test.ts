@@ -149,3 +149,30 @@ test("validates required typed rule step attributes", () => {
   assert.ok(messages.includes("ValueRule field is required."));
   assert.ok(messages.includes("ValueRule value is required."));
 });
+
+test("validates required flat display rule attributes", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <FormTypeRule />
+        <EntityPropertyRule />
+        <MiscellaneousPrivilegeRule />
+        <OrganizationSettingRule />
+        <HideForTabletExperienceRule />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("FormTypeRule type is required."));
+  assert.ok(messages.includes("EntityPropertyRule property name is required."));
+  assert.ok(messages.includes("EntityPropertyRule property value is required."));
+  assert.ok(messages.includes("MiscellaneousPrivilegeRule privilege name is required."));
+  assert.ok(messages.includes("OrganizationSettingRule setting is required."));
+});
