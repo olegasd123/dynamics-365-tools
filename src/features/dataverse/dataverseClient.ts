@@ -1,12 +1,46 @@
 import { DEFAULT_SOLUTION_NAME } from "../../shared/solutions";
-import { EnvironmentConnection } from "./environmentConnectionService";
+import type { EnvironmentConnection } from "./environmentConnectionService";
 
 export interface DataverseRequestOptions {
   signal?: AbortSignal;
 }
 
+export interface DataverseClientOptions {
+  fetch?: typeof fetch;
+  maxAttempts?: number;
+  retryDelayBaseMs?: number;
+  retryDelayMaxMs?: number;
+  retryJitter?: boolean;
+  sleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
+}
+
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY_BASE_MS = 500;
+const DEFAULT_RETRY_DELAY_MAX_MS = 8000;
+
 export class DataverseClient {
-  constructor(private readonly connection: EnvironmentConnection) {}
+  private readonly fetchImpl: typeof fetch;
+  private readonly maxAttempts: number;
+  private readonly retryDelayBaseMs: number;
+  private readonly retryDelayMaxMs: number;
+  private readonly retryJitter: boolean;
+  private readonly sleepImpl: (delayMs: number, signal?: AbortSignal) => Promise<void>;
+
+  constructor(
+    private readonly connection: EnvironmentConnection,
+    options: DataverseClientOptions = {},
+  ) {
+    this.fetchImpl = options.fetch ?? fetch;
+    this.maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS));
+    this.retryDelayBaseMs = Math.max(0, options.retryDelayBaseMs ?? DEFAULT_RETRY_DELAY_BASE_MS);
+    this.retryDelayMaxMs = Math.max(
+      this.retryDelayBaseMs,
+      options.retryDelayMaxMs ?? DEFAULT_RETRY_DELAY_MAX_MS,
+    );
+    this.retryJitter = options.retryJitter ?? true;
+    this.sleepImpl = options.sleep ?? this.sleep;
+  }
 
   async get<T>(path: string, options?: DataverseRequestOptions): Promise<T> {
     return this.request<T>("GET", path, undefined, options);
@@ -39,37 +73,46 @@ export class DataverseClient {
     options?: DataverseRequestOptions,
   ): Promise<T> {
     const url = this.normalizePath(path);
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method,
-        headers: this.withUserAgent({
-          Authorization: `Bearer ${this.connection.token}`,
-          Accept: "application/json",
-          ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-          ...(method === "POST" ? { Prefer: "return=representation" } : {}),
-        }),
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: options?.signal,
-      });
-    } catch (error) {
-      throw this.buildFetchError(method, path, url, error);
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          method,
+          headers: this.withUserAgent({
+            Authorization: `Bearer ${this.connection.token}`,
+            Accept: "application/json",
+            ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+            ...(method === "POST" ? { Prefer: "return=representation" } : {}),
+          }),
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+          signal: options?.signal,
+        });
+      } catch (error) {
+        throw this.buildFetchError(method, path, url, error);
+      }
+
+      if (!response.ok) {
+        if (!this.shouldRetry(response, attempt, options?.signal)) {
+          throw await this.buildError(method, path, url, response);
+        }
+
+        await this.sleepImpl(this.getRetryDelayMs(response, attempt), options?.signal);
+        continue;
+      }
+
+      if (response.status === 204) {
+        return {} as T;
+      }
+
+      const text = await response.text();
+      if (!text.trim()) {
+        return {} as T;
+      }
+
+      return JSON.parse(text) as T;
     }
 
-    if (!response.ok) {
-      throw await this.buildError(method, path, url, response);
-    }
-
-    if (response.status === 204) {
-      return {} as T;
-    }
-
-    const text = await response.text();
-    if (!text.trim()) {
-      return {} as T;
-    }
-
-    return JSON.parse(text) as T;
+    throw new Error(`Dataverse ${method} ${path}: Request retry attempts were exhausted.`);
   }
 
   private normalizePath(path: string): string {
@@ -110,6 +153,78 @@ export class DataverseClient {
       return headers;
     }
     return { ...headers, "User-Agent": userAgent };
+  }
+
+  private shouldRetry(response: Response, attempt: number, signal?: AbortSignal): boolean {
+    return (
+      !signal?.aborted && attempt < this.maxAttempts && RETRYABLE_STATUSES.has(response.status)
+    );
+  }
+
+  private getRetryDelayMs(response: Response, attempt: number): number {
+    const serverDelayMs = this.parseRetryAfterMs(response);
+    if (serverDelayMs !== undefined) {
+      return serverDelayMs;
+    }
+
+    const delayMs = Math.min(
+      this.retryDelayBaseMs * 2 ** Math.max(0, attempt - 1),
+      this.retryDelayMaxMs,
+    );
+    if (!this.retryJitter || delayMs === 0) {
+      return delayMs;
+    }
+
+    const jitterFactor = 0.8 + Math.random() * 0.4;
+    return Math.round(delayMs * jitterFactor);
+  }
+
+  private parseRetryAfterMs(response: Response): number | undefined {
+    const retryAfterMs = response.headers.get("x-ms-retry-after-ms");
+    if (retryAfterMs) {
+      const parsed = Number(retryAfterMs);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        return parsed;
+      }
+    }
+
+    const retryAfter = response.headers.get("Retry-After");
+    if (!retryAfter) {
+      return undefined;
+    }
+
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1000;
+    }
+
+    const dateMs = Date.parse(retryAfter);
+    if (Number.isNaN(dateMs)) {
+      return undefined;
+    }
+
+    return Math.max(0, dateMs - Date.now());
+  }
+
+  private sleep(delayMs: number, signal?: AbortSignal): Promise<void> {
+    if (delayMs <= 0) {
+      return Promise.resolve();
+    }
+    if (signal?.aborted) {
+      return Promise.reject(new Error("Dataverse request retry was cancelled."));
+    }
+
+    return new Promise((resolve, reject) => {
+      const onAbort = () => {
+        clearTimeout(timeout);
+        reject(new Error("Dataverse request retry was cancelled."));
+      };
+      const timeout = setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, delayMs);
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
   }
 
   private async buildError(

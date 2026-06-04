@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { CommandContext } from "../../../app/commandContext";
-import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
+import { pickDataverseClient } from "../../../platform/vscode/commandUtils";
 import { BindingEntry } from "../../config/domain/models";
-import { DataverseClient } from "../../dataverse/dataverseClient";
+import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionImportError } from "../../dataverse/solutionImportService";
 import { createRibbonPullPlan } from "../ribbonPullService";
 import {
@@ -689,26 +689,15 @@ export async function publishRibbonToEnvironment(
   }
 
   const config = await ctx.configuration.loadConfiguration();
-  const target = await pickEnvironmentAndAuth(
-    ctx.configuration,
-    ctx.ui,
-    ctx.secrets,
-    ctx.auth,
-    ctx.lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment for ribbon publish" },
-  );
+    placeHolder: "Select environment for ribbon publish",
+  });
   if (!target) {
     return;
   }
 
-  const connection = await ctx.connections.createConnection(target.env, target.auth);
-  if (!connection) {
-    return;
-  }
-
-  const client = new DataverseClient(connection);
+  const client = target.client;
   const solutions = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -805,26 +794,15 @@ export async function pullRibbonsFromEnvironment(
   }
 
   const config = await ctx.configuration.loadConfiguration();
-  const target = await pickEnvironmentAndAuth(
-    ctx.configuration,
-    ctx.ui,
-    ctx.secrets,
-    ctx.auth,
-    ctx.lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment to pull ribbons from" },
-  );
+    placeHolder: "Select environment to pull ribbons from",
+  });
   if (!target) {
     return;
   }
 
-  const connection = await ctx.connections.createConnection(target.env, target.auth);
-  if (!connection) {
-    return;
-  }
-
-  const client = new DataverseClient(connection);
+  const client = target.client;
   const solutions = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -893,26 +871,15 @@ export async function pullRibbonsFromEnvironment(
 
 export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Promise<void> {
   const config = await ctx.configuration.loadConfiguration();
-  const target = await pickEnvironmentAndAuth(
-    ctx.configuration,
-    ctx.ui,
-    ctx.secrets,
-    ctx.auth,
-    ctx.lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment for generated solution cleanup" },
-  );
+    placeHolder: "Select environment for generated solution cleanup",
+  });
   if (!target) {
     return;
   }
 
-  const connection = await ctx.connections.createConnection(target.env, target.auth);
-  if (!connection) {
-    return;
-  }
-
-  const client = new DataverseClient(connection);
+  const client = target.client;
   const generated = await ctx.ribbonPublishService.listGeneratedSolutions(client);
   if (!generated.length) {
     void vscode.window.showInformationMessage("No generated ribbon solutions were found.");
@@ -1086,26 +1053,15 @@ function describeRibbonPublishError(error: unknown): string {
 
 async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
   const config = await ctx.configuration.loadConfiguration();
-  const target = await pickEnvironmentAndAuth(
-    ctx.configuration,
-    ctx.ui,
-    ctx.secrets,
-    ctx.auth,
-    ctx.lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment for solution export" },
-  );
+    placeHolder: "Select environment for solution export",
+  });
   if (!target) {
     return;
   }
 
-  const connection = await ctx.connections.createConnection(target.env, target.auth);
-  if (!connection) {
-    return;
-  }
-
-  const client = new DataverseClient(connection);
+  const client = target.client;
   const solutions = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -3813,26 +3769,15 @@ async function pickImageWebResourceFromEnvironment(
   currentUniqueName?: string,
 ): Promise<WebResourceLibraryPick | undefined> {
   const config = await ctx.configuration.loadConfiguration();
-  const target = await pickEnvironmentAndAuth(
-    ctx.configuration,
-    ctx.ui,
-    ctx.secrets,
-    ctx.auth,
-    ctx.lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment for image resources" },
-  );
+    placeHolder: "Select environment for image resources",
+  });
   if (!target) {
     return undefined;
   }
 
-  const connection = await ctx.connections.createConnection(target.env, target.auth);
-  if (!connection) {
-    return undefined;
-  }
-
-  const client = new DataverseClient(connection);
+  const client = target.client;
   return pickEnvironmentImageWebResource(client, prompt, target.env.name, currentUniqueName);
 }
 

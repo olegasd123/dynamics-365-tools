@@ -1,5 +1,4 @@
 import { EnvironmentConfig } from "../config/domain/models";
-import { DataverseClient } from "../dataverse/dataverseClient";
 import { EnvironmentConnectionService } from "../dataverse/environmentConnectionService";
 import {
   SolutionComponentService,
@@ -39,12 +38,11 @@ export class PcfEnvironmentService {
     env: EnvironmentConfig,
     options: PcfEnvironmentListOptions = {},
   ): Promise<DeployedPcfControl[] | undefined> {
-    const connection = await this.connections.createConnection(env);
-    if (!connection) {
+    const client = await this.connections.createClient(env);
+    if (!client) {
       return undefined;
     }
 
-    const client = new DataverseClient(connection);
     const solutionComponents = new SolutionComponentService(client);
     return listDeployedPcfControls(client, solutionComponents, options);
   }

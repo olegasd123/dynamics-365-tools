@@ -89,14 +89,13 @@ export class WebResourcePublisher {
       }
 
       this.throwIfCancelled(cancellationToken);
-      const connection = await this.connections.createConnection(env, auth);
-      if (!connection) {
+      const client = await this.connections.createClient(env, auth);
+      if (!client) {
         throw new Error(
           "No credentials available. Sign in interactively or set client credentials first.",
         );
       }
 
-      const client = new DataverseClient(connection);
       const solutionComponents = new SolutionComponentService(client);
 
       this.throwIfCancelled(cancellationToken);

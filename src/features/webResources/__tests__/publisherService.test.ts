@@ -4,6 +4,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
+import { DataverseClient } from "../../dataverse/dataverseClient";
 import { WebResourcePublisher } from "../webResourcePublisher";
 
 class FakeConnections {
@@ -14,6 +15,11 @@ class FakeConnections {
       token: auth.accessToken ?? "token",
       userAgent: undefined,
     };
+  }
+
+  async createClient(env: { name: string; url: string }, auth: { accessToken?: string }) {
+    const connection = await this.createConnection(env, auth);
+    return new DataverseClient(connection as any);
   }
 }
 

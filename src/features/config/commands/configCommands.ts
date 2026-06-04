@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { buildDefaultEnvironmentUrl } from "../../../shared/environmentUrl";
-import { DataverseClient, isDefaultSolution } from "../../dataverse/dataverseClient";
+import { isDefaultSolution, type DataverseClient } from "../../dataverse/dataverseClient";
 import {
   Dynamics365Configuration,
   NormalizedEnvironmentConfig,
@@ -137,11 +137,10 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
 
   await lastSelection.setLastEnvironment(env.name);
 
-  const connection = await connections.createConnection(env);
-  if (!connection) {
+  const client = await connections.createClient(env);
+  if (!client) {
     return;
   }
-  const client = new DataverseClient(connection);
 
   let unmanaged: Array<{ uniqueName: string; friendlyName?: string; publisherPrefix?: string }>;
   try {

@@ -5,6 +5,7 @@ import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
 import { ConfigurationService } from "../../config/configurationService";
+import { DataverseClient } from "../../dataverse/dataverseClient";
 import { PcfControlProject } from "../models";
 import { PcfDeployService } from "../pcfDeployService";
 import { PcfWorkspaceSettingsService } from "../pcfWorkspaceSettings";
@@ -59,6 +60,12 @@ test("PcfDeployService imports last packaged zip and publishes deployed custom c
         apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
         token: "token",
       }),
+      createClient: async (env: any) =>
+        new DataverseClient({
+          env,
+          apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+          token: "token",
+        }),
     };
     const service = new PcfDeployService(connections as any, settings, configuration);
     const result = await service.deployLastPackage(

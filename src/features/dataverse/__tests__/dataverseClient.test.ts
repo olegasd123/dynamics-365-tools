@@ -7,6 +7,14 @@ function createResponse(body: string, init: ResponseInit = {}): Response {
   return new Response(body, init);
 }
 
+function createConnection(): EnvironmentConnection {
+  return {
+    env: { name: "dev" } as any,
+    apiRoot: "https://example/api/data/v9.2",
+    token: "token",
+  };
+}
+
 test("request builds full URL and headers for GET", async () => {
   const calls: Array<{ url: string; options: RequestInit }> = [];
   const originalFetch = global.fetch;
@@ -33,6 +41,109 @@ test("request builds full URL and headers for GET", async () => {
   } finally {
     global.fetch = originalFetch!;
   }
+});
+
+test("request retries throttled responses with Retry-After delay", async () => {
+  const calls: string[] = [];
+  const delays: number[] = [];
+  const fetchImpl = (async (url: any) => {
+    calls.push(String(url));
+    if (calls.length === 1) {
+      return createResponse(JSON.stringify({ error: { message: "too many requests" } }), {
+        status: 429,
+        headers: { "Retry-After": "2" },
+      });
+    }
+    return createResponse(JSON.stringify({ ok: true }), { status: 200 });
+  }) as typeof fetch;
+
+  const client = new DataverseClient(createConnection(), {
+    fetch: fetchImpl,
+    retryJitter: false,
+    sleep: async (delayMs) => {
+      delays.push(delayMs);
+    },
+  });
+
+  const result = await client.get<{ ok: boolean }>("/contacts");
+
+  assert.deepStrictEqual(result, { ok: true });
+  assert.strictEqual(calls.length, 2);
+  assert.deepStrictEqual(delays, [2000]);
+});
+
+test("request uses x-ms retry delay before exponential backoff", async () => {
+  const delays: number[] = [];
+  let attempts = 0;
+  const fetchImpl = (async () => {
+    attempts += 1;
+    if (attempts === 1) {
+      return createResponse("", {
+        status: 503,
+        headers: { "x-ms-retry-after-ms": "1500" },
+      });
+    }
+    return createResponse(JSON.stringify({ ok: true }), { status: 200 });
+  }) as typeof fetch;
+
+  const client = new DataverseClient(createConnection(), {
+    fetch: fetchImpl,
+    retryDelayBaseMs: 10,
+    retryJitter: false,
+    sleep: async (delayMs) => {
+      delays.push(delayMs);
+    },
+  });
+
+  await client.get("/contacts");
+
+  assert.strictEqual(attempts, 2);
+  assert.deepStrictEqual(delays, [1500]);
+});
+
+test("request does not retry non-transient errors", async () => {
+  let attempts = 0;
+  const fetchImpl = (async () => {
+    attempts += 1;
+    return createResponse(JSON.stringify({ error: { message: "bad request" } }), {
+      status: 400,
+    });
+  }) as typeof fetch;
+
+  const client = new DataverseClient(createConnection(), {
+    fetch: fetchImpl,
+    sleep: async () => {
+      throw new Error("Sleep should not be called.");
+    },
+  });
+
+  await assert.rejects(client.get("/contacts"), (error: any) =>
+    error.message.includes("Dataverse GET /contacts: bad request (400)"),
+  );
+  assert.strictEqual(attempts, 1);
+});
+
+test("request stops retrying after max attempts", async () => {
+  let attempts = 0;
+  const fetchImpl = (async () => {
+    attempts += 1;
+    return createResponse(JSON.stringify({ error: { message: "busy" } }), {
+      status: 503,
+    });
+  }) as typeof fetch;
+
+  const client = new DataverseClient(createConnection(), {
+    fetch: fetchImpl,
+    maxAttempts: 2,
+    retryDelayBaseMs: 10,
+    retryJitter: false,
+    sleep: async () => undefined,
+  });
+
+  await assert.rejects(client.get("/contacts"), (error: any) =>
+    error.message.includes("Dataverse GET /contacts: busy (503)"),
+  );
+  assert.strictEqual(attempts, 2);
 });
 
 test("post adds content headers, prefer, and user-agent", async () => {

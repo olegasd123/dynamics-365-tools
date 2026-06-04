@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
 import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
-import { pickEnvironmentAndAuth, resolveTargetUri } from "../../../platform/vscode/commandUtils";
-import { DataverseClient } from "../../dataverse/dataverseClient";
+import { pickDataverseClient, resolveTargetUri } from "../../../platform/vscode/commandUtils";
+import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
@@ -77,28 +77,16 @@ async function confirmFolderBinding(
   remotePath: string,
   config: Dynamics365Configuration,
 ): Promise<boolean> {
-  const { configuration, ui, secrets, auth, lastSelection, connections } = ctx;
   const supportedFiles = await collectSupportedFiles(folderUri, buildSupportedSet());
   if (!supportedFiles.length) {
     return true;
   }
 
-  const authContext = await pickEnvironmentAndAuth(
-    configuration,
-    ui,
-    secrets,
-    auth,
-    lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment to compare local and CRM resources" },
-  );
-  if (!authContext) {
-    return false;
-  }
-
-  const connection = await connections.createConnection(authContext.env, authContext.auth);
-  if (!connection) {
+    placeHolder: "Select environment to compare local and CRM resources",
+  });
+  if (!target) {
     return false;
   }
 
@@ -108,7 +96,7 @@ async function confirmFolderBinding(
   });
 
   try {
-    const client = new DataverseClient(connection);
+    const client = target.client;
     const crmResources = await listWebResourceNamesByPrefix(client, remotePath);
     const summary = compareFolderBindingResources(localRemotePaths, crmResources);
     if (!summary.hasDifferences) {
@@ -116,14 +104,14 @@ async function confirmFolderBinding(
     }
 
     logBindingDiff(
-      authContext.env.name,
+      target.env.name,
       folderUri.fsPath,
       remotePath,
       summary.onlyLocal,
       summary.onlyCrm,
     );
     const decision = await vscode.window.showWarningMessage(
-      `Binding check for ${authContext.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
+      `Binding check for ${target.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
       "Create Binding",
       "Cancel",
     );

@@ -9,7 +9,6 @@ import {
   EnvironmentAuthContext,
   EnvironmentConnectionService,
 } from "../../dataverse/environmentConnectionService";
-import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
 import { PluginAssembly, PluginType } from "../models";
 import { PluginService } from "../pluginService";
@@ -1034,11 +1033,10 @@ async function createPluginService(
   authContext: EnvironmentAuthContext,
   env: Parameters<EnvironmentConnectionService["createConnection"]>[0],
 ): Promise<PluginService> {
-  const connection = await connections.createConnection(env, authContext);
-  if (!connection) {
+  const client = await connections.createClient(env, authContext);
+  if (!client) {
     throw new Error(`Authentication failed for ${env.name}.`);
   }
-  const client = new DataverseClient(connection);
   const solutionComponents = new SolutionComponentService(client);
   return new PluginService(client, solutionComponents);
 }

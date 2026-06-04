@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { EnvironmentConfig } from "../config/domain/models";
 import { AuthService } from "../auth/authService";
 import { EnvironmentCredentials, SecretService } from "../auth/secretService";
+import { DataverseClient } from "./dataverseClient";
 
 export interface EnvironmentConnection {
   env: EnvironmentConfig;
@@ -40,6 +41,14 @@ export class EnvironmentConnectionService {
       token,
       userAgent,
     };
+  }
+
+  async createClient(
+    env: EnvironmentConfig,
+    authContext: EnvironmentAuthContext = {},
+  ): Promise<DataverseClient | undefined> {
+    const connection = await this.createConnection(env, authContext);
+    return connection ? new DataverseClient(connection) : undefined;
   }
 
   private async resolveToken(

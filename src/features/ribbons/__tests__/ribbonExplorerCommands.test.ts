@@ -5,6 +5,7 @@ import * as path from "node:path";
 import test from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
+import { DataverseClient } from "../../dataverse/dataverseClient";
 import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
@@ -3030,6 +3031,12 @@ test("offers to save a backup when opening an exported solution", async () => {
           apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
           token: "token",
         }),
+        createClient: async (env: any) =>
+          new DataverseClient({
+            env,
+            apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+            token: "token",
+          }),
       },
       solutionZipService: {
         listUnmanagedSolutions: async () => [
@@ -3163,6 +3170,12 @@ test("publishes saved ribbon XML to the selected unmanaged solution", async () =
             apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
             token: "token",
           }),
+          createClient: async (env: any) =>
+            new DataverseClient({
+              env,
+              apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+              token: "token",
+            }),
         },
         ribbonEditorState: state,
         ribbonSourceLocator: {

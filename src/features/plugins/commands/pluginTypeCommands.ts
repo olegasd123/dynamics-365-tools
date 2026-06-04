@@ -8,7 +8,6 @@ import { AuthService } from "../../auth/authService";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
 import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
 import { PluginTypeNode } from "../pluginExplorer";
-import { DataverseClient } from "../../dataverse/dataverseClient";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
 
@@ -79,10 +78,9 @@ async function resolvePluginService(
   );
   if (!selection) return undefined;
 
-  const connection = await connections.createConnection(selection.env, selection.auth);
-  if (!connection) return undefined;
+  const client = await connections.createClient(selection.env, selection.auth);
+  if (!client) return undefined;
 
-  const client = new DataverseClient(connection);
   const solutionComponents = new SolutionComponentService(client);
   return new PluginService(client, solutionComponents);
 }

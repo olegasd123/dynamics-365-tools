@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ConfigurationService } from "../config/configurationService";
 import { EnvironmentConnectionService } from "../dataverse/environmentConnectionService";
-import { DataverseClient, isDefaultSolution } from "../dataverse/dataverseClient";
+import { isDefaultSolution } from "../dataverse/dataverseClient";
 import { SolutionComponentService } from "../dataverse/solutionComponentService";
 import { PluginService } from "./pluginService";
 import { PluginAssembly, PluginImage, PluginStep, PluginType } from "./models";
@@ -307,11 +307,10 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
 
   private async getPluginService(env: EnvironmentConfig): Promise<PluginService | undefined> {
     try {
-      const connection = await this.connections.createConnection(env);
-      if (!connection) {
+      const client = await this.connections.createClient(env);
+      if (!client) {
         return undefined;
       }
-      const client = new DataverseClient(connection);
       const solutionComponents = new SolutionComponentService(client);
       return new PluginService(client, solutionComponents);
     } catch (error) {

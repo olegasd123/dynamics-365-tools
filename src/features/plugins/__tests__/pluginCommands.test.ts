@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
+import { DataverseClient } from "../../dataverse/dataverseClient";
 import {
   AssemblyIdentityValidationError,
   extractToken,
@@ -209,6 +210,12 @@ test("updatePluginAssembly opens file dialog in the last DLL folder", async () =
             apiRoot: "https://dev.crm.dynamics.com/api/data/v9.2",
             token: "token",
           }),
+          createClient: async () =>
+            new DataverseClient({
+              env,
+              apiRoot: "https://dev.crm.dynamics.com/api/data/v9.2",
+              token: "token",
+            }),
         },
         pluginRegistration: {},
         pluginExplorer: {},

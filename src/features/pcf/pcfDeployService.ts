@@ -3,7 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { ConfigurationService } from "../config/configurationService";
 import { EnvironmentConfig } from "../config/domain/models";
-import { DataverseClient } from "../dataverse/dataverseClient";
+import type { DataverseClient } from "../dataverse/dataverseClient";
 import { EnvironmentConnectionService } from "../dataverse/environmentConnectionService";
 import { SolutionImportError, SolutionImportService } from "../dataverse/solutionImportService";
 import { PcfControlProject } from "./models";
@@ -66,12 +66,11 @@ export class PcfDeployService implements vscode.Disposable {
       return undefined;
     }
 
-    const connection = await this.connections.createConnection(env);
-    if (!connection) {
+    const client = await this.connections.createClient(env);
+    if (!client) {
       return undefined;
     }
 
-    const client = new DataverseClient(connection);
     const importer = new SolutionImportService(client);
     this.output.show(true);
     this.output.appendLine("");
