@@ -288,6 +288,16 @@ function validateRuleStep(step: RuleStep): RibbonValidationIssue[] {
       return [];
     case "PageRule":
       return required(step.address, "PageRule address", step.range);
+    case "OrRule":
+      return step.children.length
+        ? step.children.flatMap(validateRuleStep)
+        : [
+            {
+              severity: "error",
+              message: "OrRule child rule step is required.",
+              range: step.range,
+            },
+          ];
     case "EntityPrivilegeRule":
       return [
         ...required(step.privilegeType, "EntityPrivilegeRule privilege type", step.range),

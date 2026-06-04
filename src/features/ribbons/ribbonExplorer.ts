@@ -640,13 +640,20 @@ function commandActionNode(
 }
 
 function ruleStepNode(document: RibbonDocument, step: RuleStep, index: number): RibbonItemNode {
+  const children =
+    step.kind === "OrRule"
+      ? step.children.map((child, childIndex) => ruleStepNode(document, child, childIndex))
+      : step.kind === "CustomRule"
+        ? parameterNodes(document, step.parameters)
+        : [];
+
   return new RibbonItemNode(
     `${index + 1}. ${step.kind}`,
     ruleStepDescription(step),
     `d365RibbonRuleStep:${step.kind}`,
     step.kind === "Unknown" ? "warning" : "symbol-property",
     ruleStepDetails(step, index),
-    step.kind === "CustomRule" ? parameterNodes(document, step.parameters) : [],
+    children,
     { document, range: step.range },
   );
 }
@@ -679,6 +686,8 @@ function ruleStepDescription(step: RuleStep): string | undefined {
       return undefined;
     case "PageRule":
       return step.address;
+    case "OrRule":
+      return `${step.children.length} child step${step.children.length === 1 ? "" : "s"}`;
     case "SelectionCountRule":
       return selectionCountText(step.minimum, step.maximum);
     case "RecordPrivilegeRule":
@@ -791,6 +800,13 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
       return [
         ...base,
         ["Address", step.address],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "OrRule":
+      return [
+        ...base,
+        ["Child steps", step.children.length],
         ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];

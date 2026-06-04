@@ -358,6 +358,13 @@ export type RuleStep =
       range: TextRange;
     }
   | {
+      kind: "OrRule";
+      children: RuleStep[];
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
       kind: "SelectionCountRule";
       appliesTo?: RibbonRuleAppliesTo;
       minimum?: number;

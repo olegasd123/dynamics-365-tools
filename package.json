@@ -95,6 +95,7 @@
     "onCommand:dynamics365Tools.ribbons.addCommandDisplayRuleRef",
     "onCommand:dynamics365Tools.ribbons.addEnableRule",
     "onCommand:dynamics365Tools.ribbons.addDisplayRule",
+    "onCommand:dynamics365Tools.ribbons.addRuleChildStep",
     "onCommand:dynamics365Tools.ribbons.addLocLabel",
     "onCommand:dynamics365Tools.ribbons.addLocLabelTitle",
     "onCommand:dynamics365Tools.ribbons.moveUp",
@@ -516,6 +517,12 @@
       {
         "command": "dynamics365Tools.ribbons.addDisplayRule",
         "title": "Add Display Rule",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.addRuleChildStep",
+        "title": "Add Rule Step",
         "category": "Dynamics 365 Tools",
         "icon": "$(add)"
       },
@@ -1080,6 +1087,11 @@
           "command": "dynamics365Tools.ribbons.addDisplayRule",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:displayRules",
           "group": "inline@9"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addRuleChildStep",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonRuleStep:OrRule",
+          "group": "inline@10"
         },
         {
           "command": "dynamics365Tools.ribbons.addLocLabel",

@@ -899,6 +899,14 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
+    case "OrRule":
+      return {
+        kind: "OrRule",
+        children: node.children.map((child) => readRuleStep(sourceText, child)),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
     case "SelectionCountRule":
       return {
         kind: "SelectionCountRule",

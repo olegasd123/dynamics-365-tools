@@ -42,6 +42,7 @@ import {
   addRibbonCommandEnableRuleRef,
   addRibbonDisplayRule,
   addRibbonEnableRule,
+  addRibbonRuleChildStep,
   addRibbonLocLabel,
   addRibbonLocLabelTitle,
   addCustomRibbonButton,
@@ -281,6 +282,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.addDisplayRule", (node) => addRibbonDisplayRule(ctx, node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.addRuleChildStep",
+      (node) => addRibbonRuleChildStep(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.ribbons.addLocLabel", (node) => addRibbonLocLabel(ctx, node), {
       validateConfiguration: false,
     }),

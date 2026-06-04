@@ -15,6 +15,7 @@ import {
   addRibbonDisplayRule,
   addRibbonEnableRule,
   addRibbonLocLabelTitle,
+  addRibbonRuleChildStep,
   editRibbonNode,
   extractJavaScriptFunctionSuggestions,
   listRibbonLanguageCodePicks,
@@ -1010,6 +1011,11 @@ test("creates flat display rules from prompts", async () => {
       expectedKind: "PageRule",
       expectedAddress: "/dashboards/dashboard.aspx",
     },
+    {
+      inputByPrompt: new Map([["Display rule id", "new.Or"]]),
+      pickByPlaceHolder: new Map([["First rule step", "OrRule"]]),
+      expectedKind: "OrRule",
+    },
   ];
 
   const originalShowQuickPick = vscode.window.showQuickPick;
@@ -1069,6 +1075,299 @@ test("creates flat display rules from prompts", async () => {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
+});
+
+test("adds a nested child rule step from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.Display">
+        <OrRule />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const orRule = document.views[0].displayRules[0].steps[0];
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    picks: vscode.QuickPickItem[] | string[],
+    options: { placeHolder?: string },
+  ) => {
+    const label = new Map([
+      ["First rule step", "FormStateRule"],
+      ["Form state", "Create"],
+      ["Invert result?", "No"],
+    ]).get(options.placeHolder ?? "");
+    return typeof picks[0] === "string"
+      ? label
+      : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === label);
+  };
+
+  try {
+    await addRibbonRuleChildStep(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      new RibbonItemNode(
+        "1. OrRule",
+        undefined,
+        "d365RibbonRuleStep:OrRule",
+        "symbol-property",
+        [],
+        [],
+        {
+          document,
+          range: orRule.range,
+        },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedOrRule = updatedDocument.views[0].displayRules[0].steps[0];
+
+  assert.strictEqual(updatedOrRule.kind, "OrRule");
+  assert.strictEqual(
+    updatedOrRule.kind === "OrRule" && updatedOrRule.children[0].kind === "FormStateRule"
+      ? updatedOrRule.children[0].state
+      : undefined,
+    "Create",
+  );
+});
+
+test("edits a nested child rule step", async () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.Display">
+        <OrRule>
+          <FormStateRule State="Create" />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const orRule = document.views[0].displayRules[0].steps[0];
+  assert.strictEqual(orRule.kind, "OrRule");
+  const child = orRule.children[0];
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    picks: vscode.QuickPickItem[] | string[],
+    options: { placeHolder?: string },
+  ) => {
+    const label = new Map([
+      ["First rule step", "FormStateRule"],
+      ["Form state", "Existing"],
+      ["Invert result?", "No"],
+    ]).get(options.placeHolder ?? "");
+    return typeof picks[0] === "string"
+      ? label
+      : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === label);
+  };
+
+  try {
+    await editRibbonNode(
+      {
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any,
+      new RibbonItemNode(
+        "1. FormStateRule",
+        "Create",
+        "d365RibbonRuleStep:FormStateRule",
+        "symbol-property",
+        [],
+        [],
+        { document, range: child.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedOrRule = updatedDocument.views[0].displayRules[0].steps[0];
+
+  assert.strictEqual(
+    updatedOrRule.kind === "OrRule" && updatedOrRule.children[0].kind === "FormStateRule"
+      ? updatedOrRule.children[0].state
+      : undefined,
+    "Existing",
+  );
+});
+
+test("deletes a nested child rule step", async () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.Display">
+        <OrRule>
+          <FormStateRule State="Create" />
+          <FormStateRule State="Existing" />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const orRule = document.views[0].displayRules[0].steps[0];
+  assert.strictEqual(orRule.kind, "OrRule");
+  let patches: RibbonPatch[] = [];
+
+  await deleteRibbonNode(
+    {
+      ribbonEditorState: {
+        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+          patches = queuedPatches;
+        },
+      },
+      ribbonExplorer: {
+        refresh: () => undefined,
+      },
+    } as any,
+    new RibbonItemNode(
+      "1. FormStateRule",
+      "Create",
+      "d365RibbonRuleStep:FormStateRule",
+      "symbol-property",
+      [],
+      [],
+      { document, range: orRule.children[0].range },
+    ),
+  );
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedOrRule = updatedDocument.views[0].displayRules[0].steps[0];
+
+  assert.deepStrictEqual(
+    updatedOrRule.kind === "OrRule"
+      ? updatedOrRule.children.map((step) =>
+          step.kind === "FormStateRule" ? step.state : undefined,
+        )
+      : [],
+    ["Existing"],
+  );
+});
+
+test("moves nested child rule steps", async () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.Display">
+        <OrRule>
+          <FormStateRule State="Create" />
+          <FormStateRule State="Existing" />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const orRule = document.views[0].displayRules[0].steps[0];
+  assert.strictEqual(orRule.kind, "OrRule");
+  let patches: RibbonPatch[] = [];
+
+  await moveRibbonNodeUp(
+    {
+      configuration: {
+        workspaceRoot: "/tmp",
+      },
+      ribbonSourceLocator: {
+        locate: async () => [
+          {
+            id: "source",
+            kind: "flat",
+            name: "Source",
+            rootUri: "/tmp",
+            files: [{ fileUri: "/tmp/RibbonDiffXml.xml", kind: "Application" }],
+          },
+        ],
+      },
+      ribbonEditorState: {
+        loadSource: async () => [document],
+        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+          patches = queuedPatches;
+        },
+      },
+      ribbonExplorer: {
+        refresh: () => undefined,
+      },
+    } as any,
+    new RibbonItemNode(
+      "2. FormStateRule",
+      "Existing",
+      "d365RibbonRuleStep:FormStateRule",
+      "symbol-property",
+      [],
+      [],
+      { document, range: orRule.children[1].range },
+    ),
+  );
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedOrRule = updatedDocument.views[0].displayRules[0].steps[0];
+
+  assert.deepStrictEqual(
+    updatedOrRule.kind === "OrRule"
+      ? updatedOrRule.children.map((step) =>
+          step.kind === "FormStateRule" ? step.state : undefined,
+        )
+      : [],
+    ["Existing", "Create"],
+  );
 });
 
 test("creates selection count enable rule conditions from prompts", async () => {

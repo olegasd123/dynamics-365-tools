@@ -32,6 +32,7 @@ import {
   createNodeAttributeValuePatch,
   createOobButtonReorderPatches,
   createOobStubReplacementPatches,
+  createRuleChildStepPatch,
   createRuleStepReplacePatch,
   createSwapNodePatches,
   makeCustomButtonIds,
@@ -1866,6 +1867,27 @@ export async function addRibbonDisplayRule(
   await addRibbonRule(ctx, node, "Display");
 }
 
+export async function addRibbonRuleChildStep(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRuleStepTarget(node);
+  if (!target || target.step.kind !== "OrRule") {
+    vscode.window.showWarningMessage("Select an OrRule first.");
+    return;
+  }
+
+  const step = await promptRuleStep(ctx, target.ruleKind);
+  if (!step) {
+    return;
+  }
+
+  ctx.ribbonEditorState.queuePatches(target.document, [
+    createRuleChildStepPatch(target.document.sourceText, target.step, step),
+  ]);
+  ctx.ribbonExplorer.refresh();
+}
+
 export async function addRibbonLocLabel(
   ctx: CommandContext,
   node?: RibbonExplorerNode,
@@ -2305,6 +2327,15 @@ function resolveReorderTargetInDocument(
         };
       }
 
+      const childStep = findRuleStepSiblingTarget(rule.steps, range);
+      if (contextValue.startsWith("d365RibbonRuleStep:") && childStep) {
+        return {
+          document,
+          ranges: childStep.steps.map((item) => item.range),
+          index: childStep.index,
+        };
+      }
+
       const ruleParameter = findRuleStepParameterTarget(rule, "EnableRule", range, identity);
       if (contextValue === "d365RibbonParameter" && ruleParameter) {
         return {
@@ -2324,6 +2355,15 @@ function resolveReorderTargetInDocument(
           document,
           ranges: rule.steps.map((item) => item.range),
           index: step,
+        };
+      }
+
+      const childStep = findRuleStepSiblingTarget(rule.steps, range);
+      if (contextValue.startsWith("d365RibbonRuleStep:") && childStep) {
+        return {
+          document,
+          ranges: childStep.steps.map((item) => item.range),
+          index: childStep.index,
         };
       }
 
@@ -2529,6 +2569,29 @@ function findRuleStepParameterTarget(
   return undefined;
 }
 
+function findRuleStepSiblingTarget(
+  steps: RuleStep[],
+  range: TextRange,
+): { steps: RuleStep[]; index: number } | undefined {
+  for (const step of steps) {
+    if (step.kind !== "OrRule") {
+      continue;
+    }
+
+    const index = findRangeIndex(step.children, range);
+    if (index >= 0) {
+      return { steps: step.children, index };
+    }
+
+    const child = findRuleStepSiblingTarget(step.children, range);
+    if (child) {
+      return child;
+    }
+  }
+
+  return undefined;
+}
+
 function ruleStepParameterIdentity(
   rule: EnableRule | DisplayRule,
   ruleKind: "EnableRule" | "DisplayRule",
@@ -2633,7 +2696,7 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
         return { kind: "EnableRule", document: target.document, rule };
       }
 
-      const step = rule.steps.find((item) => sameRange(item.range, target.range));
+      const step = findRuleStepByRange(rule.steps, target.range);
       if (step && step.kind !== "Unknown") {
         return { kind: "RuleStep", document: target.document, ruleKind: "Enable", step };
       }
@@ -2644,7 +2707,7 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
         return { kind: "DisplayRule", document: target.document, rule };
       }
 
-      const step = rule.steps.find((item) => sameRange(item.range, target.range));
+      const step = findRuleStepByRange(rule.steps, target.range);
       if (step && step.kind !== "Unknown") {
         return { kind: "RuleStep", document: target.document, ruleKind: "Display", step };
       }
@@ -2658,6 +2721,34 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
       const title = label.titles.find((item) => sameRange(item.range, target.range));
       if (title) {
         return { kind: "LocLabelTitle", document: target.document, title };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function resolveRuleStepTarget(
+  node: RibbonExplorerNode | undefined,
+): Extract<EditableTarget, { kind: "RuleStep" }> | undefined {
+  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
+    return undefined;
+  }
+
+  const target = resolveEditableTarget(node);
+  return target?.kind === "RuleStep" ? target : undefined;
+}
+
+function findRuleStepByRange(steps: RuleStep[], range: TextRange): RuleStep | undefined {
+  for (const step of steps) {
+    if (sameRange(step.range, range)) {
+      return step;
+    }
+
+    if (step.kind === "OrRule") {
+      const child = findRuleStepByRange(step.children, range);
+      if (child) {
+        return child;
       }
     }
   }
@@ -4481,6 +4572,7 @@ async function promptRuleStep(
     { label: "EntityRule", description: "Check table or context" },
   ];
   const displayOnly = [
+    { label: "OrRule", description: "Match one child rule" },
     { label: "EntityPrivilegeRule", description: "Check entity privilege" },
     { label: "FormTypeRule", description: "Check form type" },
     { label: "EntityPropertyRule", description: "Check table property" },
@@ -4540,6 +4632,8 @@ async function promptRuleStep(
       return promptReferencingAttributeRequiredRuleStep();
     case "PageRule":
       return promptPageRuleStep();
+    case "OrRule":
+      return { kind: "OrRule" };
     case "SelectionCountRule":
       return promptSelectionCountRuleStep();
     case "RecordPrivilegeRule":

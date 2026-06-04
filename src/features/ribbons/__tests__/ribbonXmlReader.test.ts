@@ -255,6 +255,38 @@ test("reads flat display rule step types", () => {
   );
 });
 
+test("reads nested display rule steps", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <OrRule>
+          <FormStateRule State="Create" />
+          <FormStateRule State="Existing" />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Application" },
+  );
+
+  const step = document.views[0].displayRules[0].steps[0];
+
+  assert.strictEqual(step.kind, "OrRule");
+  assert.deepStrictEqual(step.kind === "OrRule" ? step.children.map((child) => child.kind) : [], [
+    "FormStateRule",
+    "FormStateRule",
+  ]);
+  assert.strictEqual(
+    step.kind === "OrRule" && step.children[0].kind === "FormStateRule"
+      ? step.children[0].state
+      : undefined,
+    "Create",
+  );
+});
+
 test("projects entity ribbon nodes into scoped views", () => {
   const multiScopeXml = `<RibbonDiffXml>
   <CustomActions>

@@ -20,6 +20,7 @@ import {
   createNodeAttributeValuePatch,
   createOobButtonReorderPatches,
   createOobStubReplacementPatches,
+  createRuleChildStepPatch,
   createRuleStepReplacePatch,
   createSwapNodePatches,
 } from "../ribbonEditPatches";
@@ -734,6 +735,22 @@ test("creates flat display rule step types", () => {
         address: "/dashboards/dashboard.aspx",
       },
     },
+    {
+      id: "new.Or",
+      step: {
+        kind: "OrRule" as const,
+        children: [
+          {
+            kind: "FormStateRule" as const,
+            state: "Create" as const,
+          },
+          {
+            kind: "FormStateRule" as const,
+            state: "Existing" as const,
+          },
+        ],
+      },
+    },
   ];
 
   for (const input of cases) {
@@ -749,6 +766,48 @@ test("creates flat display rule step types", () => {
     assert.strictEqual(updatedDocument.views[0].displayRules[0].steps[0].kind, input.step.kind);
     assert.match(updated, new RegExp(`<${input.step.kind}`));
   }
+});
+
+test("adds a child step to an OrRule", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.Display">
+        <OrRule />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const orRule = document.views[0].displayRules[0].steps[0];
+
+  const updated = applyRibbonPatchSequence(source, [
+    createRuleChildStepPatch(document.sourceText, orRule, {
+      kind: "FormStateRule",
+      state: "Create",
+    }),
+  ]);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedOrRule = updatedDocument.views[0].displayRules[0].steps[0];
+
+  assert.strictEqual(updatedOrRule.kind, "OrRule");
+  assert.deepStrictEqual(
+    updatedOrRule.kind === "OrRule"
+      ? updatedOrRule.children.map((step) =>
+          step.kind === "FormStateRule" ? step.state : undefined,
+        )
+      : [],
+    ["Create"],
+  );
+  assert.match(updated, /<OrRule>\n\s+<FormStateRule State="Create" \/>\n\s+<\/OrRule>/);
 });
 
 test("replaces rule steps with common enable rule step types", () => {

@@ -181,3 +181,26 @@ test("validates required flat display rule attributes", () => {
   assert.ok(messages.includes("RelationshipTypeRule type is required."));
   assert.ok(messages.includes("PageRule address is required."));
 });
+
+test("validates nested display rule steps", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <OrRule />
+        <OrRule>
+          <FormStateRule />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("OrRule child rule step is required."));
+  assert.ok(messages.includes("FormStateRule state is required."));
+});

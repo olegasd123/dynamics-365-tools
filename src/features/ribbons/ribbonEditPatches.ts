@@ -144,6 +144,12 @@ export type NewRuleStepInput =
       invertResult?: boolean;
     }
   | {
+      kind: "OrRule";
+      children?: NewRuleStepInput[];
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
       kind: "SelectionCountRule";
       appliesTo?: RibbonRuleAppliesTo;
       minimum?: number;
@@ -448,6 +454,46 @@ export function createRuleStepReplacePatch(
   input: NewRuleStepInput,
 ): RibbonPatch {
   return createReplaceNodePatch(sourceText, step.range, renderRuleStep(input));
+}
+
+export function createRuleChildStepPatch(
+  sourceText: string,
+  parent: RuleStep,
+  input: NewRuleStepInput,
+): RibbonPatch {
+  if (parent.kind !== "OrRule") {
+    throw new Error("Rule child steps can only be added to OrRule.");
+  }
+
+  const parentElement = findElementByRange(sourceText, parent.range);
+  if (parentElement.name !== "OrRule") {
+    throw new Error("OrRule range was not found in the current document text.");
+  }
+
+  const parentIndent = indentationBefore(sourceText, parentElement.range.start);
+  const childIndent = findChildIndent(sourceText, parentElement) ?? `${parentIndent}  `;
+  const stepText = indentBlock(renderRuleStep(input), childIndent);
+
+  if (parentElement.selfClosing) {
+    const attributes = renderAttributes([
+      ["Default", optionalBoolean(parent.default)],
+      ["InvertResult", optionalBoolean(parent.invertResult)],
+    ]);
+    const name = attributes ? `OrRule ${attributes}` : "OrRule";
+    return {
+      kind: "replace",
+      range: parentElement.range,
+      text: `<${name}>\n${stepText}\n${parentIndent}</OrRule>`,
+    };
+  }
+
+  return {
+    kind: "insert",
+    offset: parentElement.children.length
+      ? parentElement.innerRange.end
+      : parentElement.startTagRange.end,
+    text: `\n${stepText}\n${parentIndent}`,
+  };
 }
 
 export function createLocLabelTitleReplacePatch(
@@ -1013,6 +1059,20 @@ function renderRuleStep(step: NewRuleStepInput): string {
         ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
+    case "OrRule": {
+      const attributes = renderAttributes([
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ]);
+      const name = attributes ? `OrRule ${attributes}` : "OrRule";
+      if (!step.children?.length) {
+        return `<${name} />`;
+      }
+
+      return `<${name}>
+${indentBlock(step.children.map(renderRuleStep).join("\n"), "  ")}
+</OrRule>`;
+    }
     case "SelectionCountRule":
       return `<SelectionCountRule ${renderAttributes([
         ["AppliesTo", step.appliesTo],
