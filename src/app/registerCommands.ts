@@ -393,37 +393,75 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
         validateConfiguration: false,
       },
     ),
-    vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
-    vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
+    registerLazyTreeDataProvider("dynamics365Tools.pluginExplorer", () => ctx.plugins.explorer),
+    registerLazyTreeDataProvider("dynamics365Tools.pcfExplorer", () => ctx.pcf.explorer),
     createRibbonTreeView(ctx),
-    ctx.pcfProjectLocator,
-    ctx.pcfBuildService,
-    ctx.pcfPushService,
-    ctx.pcfDeployService,
-    ctx.pcfPackageService,
-    ctx.pcfProcessRunner,
-    ctx.pcfStatusBar,
-    ctx.pcfTelemetry,
-    ctx.ribbonDiagnostics,
-    ctx.ribbonFormPanel,
-    ctx.statusBar,
-    ctx.assemblyStatusBar,
   );
 
   return disposables;
 }
 
 function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
+  const treeDataProvider = new LazyTreeDataProvider(() => ctx.ribbon.explorer);
   const treeView = vscode.window.createTreeView("dynamics365Tools.ribbonExplorer", {
-    treeDataProvider: ctx.ribbonExplorer,
+    treeDataProvider,
   });
 
   const selectionSubscription = treeView.onDidChangeSelection((event) => {
     const [node] = event.selection;
     if (node) {
-      ctx.ribbonFormPanel.show(node);
+      ctx.ribbon.formPanel.show(node);
     }
   });
 
-  return vscode.Disposable.from(treeView, selectionSubscription);
+  return vscode.Disposable.from(treeView, selectionSubscription, treeDataProvider);
+}
+
+function registerLazyTreeDataProvider<T>(
+  viewId: string,
+  loadProvider: () => vscode.TreeDataProvider<T>,
+): vscode.Disposable {
+  const treeDataProvider = new LazyTreeDataProvider(loadProvider);
+  return vscode.Disposable.from(
+    vscode.window.registerTreeDataProvider(viewId, treeDataProvider),
+    treeDataProvider,
+  );
+}
+
+class LazyTreeDataProvider<T> implements vscode.TreeDataProvider<T>, vscode.Disposable {
+  private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
+    T | T[] | null | undefined | void
+  >();
+  readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
+  private providerPromise?: Promise<vscode.TreeDataProvider<T>>;
+  private eventSubscription?: vscode.Disposable;
+
+  constructor(private readonly loadProvider: () => vscode.TreeDataProvider<T>) {}
+
+  async getTreeItem(element: T): Promise<vscode.TreeItem> {
+    const provider = await this.getProvider();
+    return provider.getTreeItem(element);
+  }
+
+  async getChildren(element?: T): Promise<T[]> {
+    const provider = await this.getProvider();
+    return (await provider.getChildren?.(element)) ?? [];
+  }
+
+  dispose(): void {
+    this.eventSubscription?.dispose();
+    this.onDidChangeTreeDataEmitter.dispose();
+  }
+
+  private async getProvider(): Promise<vscode.TreeDataProvider<T>> {
+    if (!this.providerPromise) {
+      this.providerPromise = Promise.resolve(this.loadProvider()).then((provider) => {
+        this.eventSubscription = provider.onDidChangeTreeData?.((event) => {
+          this.onDidChangeTreeDataEmitter.fire(event);
+        });
+        return provider;
+      });
+    }
+    return this.providerPromise;
+  }
 }

@@ -26,6 +26,7 @@ const IGNORED_GENERATED_DIRECTORIES = new Set([
 ]);
 
 export async function refreshPcfExplorer(ctx: CommandContext): Promise<void> {
+  await ctx.pcfProjectLocator.initialize();
   await ctx.pcfProjectLocator.refresh();
   ctx.pcfExplorer.refresh();
 }
@@ -394,6 +395,7 @@ export async function resolvePcfProject(
     return nodeOrUri.project;
   }
 
+  await ctx.pcfProjectLocator.initialize();
   const projects = ctx.pcfProjectLocator.getProjects();
   const uri =
     nodeOrUri instanceof vscode.Uri ? nodeOrUri : vscode.window.activeTextEditor?.document.uri;

@@ -18,12 +18,18 @@ const IGNORED_DIRECTORIES = new Set([
 export class PcfProjectLocator implements vscode.Disposable {
   private projects: PcfControlProject[] = [];
   private watcher?: vscode.FileSystemWatcher;
+  private initializePromise?: Promise<void>;
   private readonly onDidChangeProjectsEmitter = new vscode.EventEmitter<void>();
   readonly onDidChangeProjects = this.onDidChangeProjectsEmitter.event;
 
   constructor(private readonly manifestReader = new PcfManifestReader()) {}
 
   async initialize(): Promise<void> {
+    this.initializePromise ??= this.doInitialize();
+    await this.initializePromise;
+  }
+
+  private async doInitialize(): Promise<void> {
     await this.refresh();
     this.startWatching();
   }

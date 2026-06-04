@@ -117,6 +117,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
   >();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
   private filterByConfiguredSolutions = true;
+  private initializePromise?: Promise<void>;
 
   constructor(
     private readonly configuration: ConfigurationService,
@@ -125,6 +126,11 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
   ) {}
 
   async initialize(): Promise<void> {
+    this.initializePromise ??= this.doInitialize();
+    await this.initializePromise;
+  }
+
+  private async doInitialize(): Promise<void> {
     this.filterByConfiguredSolutions = this.state.get<boolean>(SOLUTION_FILTER_STATE_KEY, true);
     await this.state.update(SOLUTION_FILTER_STATE_KEY, this.filterByConfiguredSolutions);
     this.updateFilterContext();
@@ -135,10 +141,12 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
   }
 
   async toggleSolutionFilter(): Promise<void> {
+    await this.initialize();
     await this.setSolutionFilter(!this.filterByConfiguredSolutions);
   }
 
   async setSolutionFilter(enabled: boolean): Promise<void> {
+    await this.initialize();
     if (this.filterByConfiguredSolutions === enabled) {
       return;
     }
@@ -154,6 +162,8 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
   }
 
   async getChildren(element?: PluginExplorerNode): Promise<PluginExplorerNode[]> {
+    await this.initialize();
+
     if (!element) {
       return this.loadEnvironments();
     }

@@ -171,6 +171,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   private toolchainStatus?: PcfToolchainStatus;
   private filterByConfiguredSolutions = true;
   private workspaceFolderFilterRoot?: string;
+  private initializePromise?: Promise<void>;
 
   constructor(
     private readonly configuration: ConfigurationService,
@@ -186,6 +187,12 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async initialize(): Promise<void> {
+    this.initializePromise ??= this.doInitialize();
+    await this.initializePromise;
+  }
+
+  private async doInitialize(): Promise<void> {
+    await this.locator.initialize();
     this.filterByConfiguredSolutions = this.state.get<boolean>(SOLUTION_FILTER_STATE_KEY, true);
     this.workspaceFolderFilterRoot = this.state.get<string | undefined>(
       WORKSPACE_FOLDER_FILTER_STATE_KEY,
@@ -207,6 +214,8 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async getChildren(element?: PcfExplorerNode): Promise<PcfExplorerNode[]> {
+    await this.initialize();
+
     if (!element) {
       const projects = this.getVisibleProjects();
       const roots: PcfExplorerNode[] = [
@@ -255,10 +264,12 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async toggleSolutionFilter(): Promise<void> {
+    await this.initialize();
     await this.setSolutionFilter(!this.filterByConfiguredSolutions);
   }
 
   async setSolutionFilter(enabled: boolean): Promise<void> {
+    await this.initialize();
     if (this.filterByConfiguredSolutions === enabled) {
       return;
     }
@@ -270,6 +281,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async setWorkspaceFolderFilter(rootUri: string | undefined): Promise<void> {
+    await this.initialize();
     this.workspaceFolderFilterRoot = rootUri;
     await this.state.update(WORKSPACE_FOLDER_FILTER_STATE_KEY, rootUri);
     this.refresh();

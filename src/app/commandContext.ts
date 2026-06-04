@@ -38,6 +38,12 @@ import type { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
 export interface CommandContext {
   extensionContext: vscode.ExtensionContext;
 
+  core: CoreServices;
+  webResource: WebResourceServices;
+  plugins: PluginServices;
+  ribbon: RibbonServices;
+  pcf: PcfServices;
+
   configuration: ConfigurationService;
   ui: SolutionPicker;
 
@@ -81,4 +87,57 @@ export interface CommandContext {
 
   statusBar: StatusBarService;
   assemblyStatusBar: AssemblyStatusBarService;
+
+  dispose(): void;
+}
+
+export interface CoreServices {
+  configuration: ConfigurationService;
+  ui: SolutionPicker;
+  auth: AuthService;
+  authorizations: AuthorizationStore;
+  secrets: SecretService;
+  lastSelection: LastSelectionService;
+  connections: EnvironmentConnectionService;
+  statusBar: StatusBarService;
+  assemblyStatusBar: AssemblyStatusBarService;
+}
+
+export interface WebResourceServices {
+  bindings: BindingService;
+  publishCache: PublishCacheService;
+  publisher: WebResourcePublisher;
+  urls: WebResourceUrlService;
+}
+
+export interface PluginServices {
+  explorer: PluginExplorerProvider;
+  registration: PluginRegistrationManager;
+}
+
+export interface RibbonServices {
+  sourceLocator: RibbonSourceLocator;
+  repository: RibbonRepository;
+  publishService: RibbonPublishService;
+  solutionZipService: SolutionZipService;
+  editorState: RibbonEditorState;
+  diagnostics: RibbonDiagnosticsService;
+  explorer: RibbonExplorerProvider;
+  formPanel: RibbonFormPanel;
+}
+
+export interface PcfServices {
+  processRunner: ProcessRunner;
+  pacCli: PacCli;
+  npmRunner: NpmRunner;
+  buildService: PcfBuildService;
+  deployService: PcfDeployService;
+  environmentService: PcfEnvironmentService;
+  packageService: PcfPackageService;
+  pushService: PcfPushService;
+  workspaceSettings: PcfWorkspaceSettingsService;
+  projectLocator: PcfProjectLocator;
+  explorer: PcfExplorerProvider;
+  statusBar: PcfStatusBarService;
+  telemetry: PcfTelemetryService;
 }

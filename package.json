@@ -103,7 +103,9 @@
     "onCommand:dynamics365Tools.ribbons.editNode",
     "onCommand:dynamics365Tools.ribbons.deleteNode",
     "onCommand:dynamics365Tools.publishLastResource",
-    "onStartupFinished"
+    "onView:dynamics365Tools.pluginExplorer",
+    "onView:dynamics365Tools.pcfExplorer",
+    "onView:dynamics365Tools.ribbonExplorer"
   ],
   "main": "./out/extension.js",
   "contributes": {
