@@ -677,6 +677,8 @@ function ruleStepDescription(step: RuleStep): string | undefined {
       return step.type;
     case "ReferencingAttributeRequiredRule":
       return undefined;
+    case "PageRule":
+      return step.address;
     case "SelectionCountRule":
       return selectionCountText(step.minimum, step.maximum);
     case "RecordPrivilegeRule":
@@ -782,6 +784,13 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
     case "ReferencingAttributeRequiredRule":
       return [
         ...base,
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "PageRule":
+      return [
+        ...base,
+        ["Address", step.address],
         ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];

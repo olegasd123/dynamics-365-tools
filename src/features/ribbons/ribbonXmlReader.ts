@@ -16,6 +16,7 @@ import {
   RibbonDocument,
   RibbonEntityPropertyName,
   RibbonOrganizationSetting,
+  RibbonPageRuleAddress,
   RibbonRelationshipType,
   RibbonRuleAppliesTo,
   RibbonRuleFormType,
@@ -886,6 +887,14 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
     case "ReferencingAttributeRequiredRule":
       return {
         kind: "ReferencingAttributeRequiredRule",
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "PageRule":
+      return {
+        kind: "PageRule",
+        address: optionalAttr(node, "Address") as RibbonPageRuleAddress | undefined,
         default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,

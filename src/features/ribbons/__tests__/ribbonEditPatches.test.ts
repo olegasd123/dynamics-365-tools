@@ -727,6 +727,13 @@ test("creates flat display rule step types", () => {
         kind: "ReferencingAttributeRequiredRule" as const,
       },
     },
+    {
+      id: "new.Page",
+      step: {
+        kind: "PageRule" as const,
+        address: "/dashboards/dashboard.aspx",
+      },
+    },
   ];
 
   for (const input of cases) {

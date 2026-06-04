@@ -286,6 +286,8 @@ function validateRuleStep(step: RuleStep): RibbonValidationIssue[] {
       return required(step.type, "RelationshipTypeRule type", step.range);
     case "ReferencingAttributeRequiredRule":
       return [];
+    case "PageRule":
+      return required(step.address, "PageRule address", step.range);
     case "EntityPrivilegeRule":
       return [
         ...required(step.privilegeType, "EntityPrivilegeRule privilege type", step.range),

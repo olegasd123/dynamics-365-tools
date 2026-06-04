@@ -197,6 +197,7 @@ test("reads flat display rule step types", () => {
         <HideForTabletExperienceRule InvertResult="true" />
         <RelationshipTypeRule Type="OneToMany" />
         <ReferencingAttributeRequiredRule Default="true" />
+        <PageRule Address="/dashboards/dashboard.aspx" />
       </DisplayRule>
     </DisplayRules>
   </RuleDefinitions>
@@ -216,6 +217,7 @@ test("reads flat display rule step types", () => {
       "HideForTabletExperienceRule",
       "RelationshipTypeRule",
       "ReferencingAttributeRequiredRule",
+      "PageRule",
     ],
   );
   assert.strictEqual(steps[0].kind === "FormTypeRule" ? steps[0].type : undefined, "Main");
@@ -246,6 +248,10 @@ test("reads flat display rule step types", () => {
   assert.strictEqual(
     steps[6].kind === "ReferencingAttributeRequiredRule" ? steps[6].default : undefined,
     true,
+  );
+  assert.strictEqual(
+    steps[7].kind === "PageRule" ? steps[7].address : undefined,
+    "/dashboards/dashboard.aspx",
   );
 });
 

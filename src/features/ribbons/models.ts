@@ -31,6 +31,8 @@ export type RibbonRuleFormType =
 
 export type RibbonRelationshipType = "OneToMany" | "ManyToMany" | string;
 
+export type RibbonPageRuleAddress = string;
+
 export type RibbonEntityPropertyName =
   | "DuplicateDetectionEnabled"
   | "GridFiltersEnabled"
@@ -344,6 +346,13 @@ export type RuleStep =
     }
   | {
       kind: "ReferencingAttributeRequiredRule";
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "PageRule";
+      address?: RibbonPageRuleAddress;
       default?: boolean;
       invertResult?: boolean;
       range: TextRange;

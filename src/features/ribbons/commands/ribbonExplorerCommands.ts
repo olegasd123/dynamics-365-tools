@@ -56,6 +56,7 @@ import {
   RibbonEntityPropertyName,
   RibbonOrganizationSetting,
   RibbonPatch,
+  RibbonPageRuleAddress,
   RibbonRelationshipType,
   RibbonRuleAppliesTo,
   RibbonRuleFormType,
@@ -4491,6 +4492,7 @@ async function promptRuleStep(
       label: "ReferencingAttributeRequiredRule",
       description: "Check if the referencing attribute is required",
     },
+    { label: "PageRule", description: "Check page address" },
   ];
   const enableOnly = [
     { label: "SelectionCountRule", description: "Check selected rows" },
@@ -4536,6 +4538,8 @@ async function promptRuleStep(
       return promptRelationshipTypeRuleStep();
     case "ReferencingAttributeRequiredRule":
       return promptReferencingAttributeRequiredRuleStep();
+    case "PageRule":
+      return promptPageRuleStep();
     case "SelectionCountRule":
       return promptSelectionCountRuleStep();
     case "RecordPrivilegeRule":
@@ -4778,6 +4782,24 @@ async function promptReferencingAttributeRequiredRuleStep(): Promise<NewRuleStep
   }
 
   return { kind: "ReferencingAttributeRequiredRule", invertResult };
+}
+
+async function promptPageRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const address = await showRibbonInputBox({
+    prompt: "Page address",
+    placeHolder: "/dashboards/dashboard.aspx",
+    validateInput: (value) => (value.trim() ? undefined : "Page address is required."),
+  });
+  if (!address) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "PageRule", address: address.trim() as RibbonPageRuleAddress, invertResult };
 }
 
 async function promptSelectionCountRuleStep(): Promise<NewRuleStepInput | undefined> {

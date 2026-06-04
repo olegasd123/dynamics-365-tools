@@ -163,6 +163,7 @@ test("validates required flat display rule attributes", () => {
         <HideForTabletExperienceRule />
         <RelationshipTypeRule />
         <ReferencingAttributeRequiredRule />
+        <PageRule />
       </DisplayRule>
     </DisplayRules>
   </RuleDefinitions>
@@ -178,4 +179,5 @@ test("validates required flat display rule attributes", () => {
   assert.ok(messages.includes("MiscellaneousPrivilegeRule privilege name is required."));
   assert.ok(messages.includes("OrganizationSettingRule setting is required."));
   assert.ok(messages.includes("RelationshipTypeRule type is required."));
+  assert.ok(messages.includes("PageRule address is required."));
 });

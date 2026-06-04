@@ -87,7 +87,7 @@ Add rules that are useful for grid and subgrid commands:
 <ReferencingAttributeRequiredRule />
 ```
 
-## Milestone 3: Add Page Rule
+## Milestone 3: Add Page Rule [Done]
 
 Add `PageRule` after the main flat rules are stable.
 

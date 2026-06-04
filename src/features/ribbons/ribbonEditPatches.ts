@@ -9,6 +9,7 @@ import {
   RibbonDocument,
   RibbonPatch,
   RibbonOrganizationSetting,
+  RibbonPageRuleAddress,
   RibbonRelationshipType,
   RibbonRuleAppliesTo,
   RibbonRuleFormType,
@@ -133,6 +134,12 @@ export type NewRuleStepInput =
     }
   | {
       kind: "ReferencingAttributeRequiredRule";
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "PageRule";
+      address: RibbonPageRuleAddress;
       default?: boolean;
       invertResult?: boolean;
     }
@@ -997,6 +1004,12 @@ function renderRuleStep(step: NewRuleStepInput): string {
       ])} />`;
     case "ReferencingAttributeRequiredRule":
       return `<ReferencingAttributeRequiredRule ${renderAttributes([
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "PageRule":
+      return `<PageRule ${renderAttributes([
+        ["Address", step.address],
         ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;

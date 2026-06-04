@@ -998,6 +998,18 @@ test("creates flat display rules from prompts", async () => {
       ]),
       expectedKind: "ReferencingAttributeRequiredRule",
     },
+    {
+      inputByPrompt: new Map([
+        ["Display rule id", "new.Page"],
+        ["Page address", "/dashboards/dashboard.aspx"],
+      ]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "PageRule"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "PageRule",
+      expectedAddress: "/dashboards/dashboard.aspx",
+    },
   ];
 
   const originalShowQuickPick = vscode.window.showQuickPick;
@@ -1044,6 +1056,12 @@ test("creates flat display rules from prompts", async () => {
         assert.strictEqual(
           step.kind === "OrganizationSettingRule" ? step.setting : undefined,
           item.expectedSetting,
+        );
+      }
+      if (item.expectedAddress) {
+        assert.strictEqual(
+          step.kind === "PageRule" ? step.address : undefined,
+          item.expectedAddress,
         );
       }
     }
