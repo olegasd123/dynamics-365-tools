@@ -714,6 +714,19 @@ test("creates flat display rule step types", () => {
         kind: "HideForTabletExperienceRule" as const,
       },
     },
+    {
+      id: "new.RelationshipType",
+      step: {
+        kind: "RelationshipTypeRule" as const,
+        type: "OneToMany" as const,
+      },
+    },
+    {
+      id: "new.ReferencingRequired",
+      step: {
+        kind: "ReferencingAttributeRequiredRule" as const,
+      },
+    },
   ];
 
   for (const input of cases) {

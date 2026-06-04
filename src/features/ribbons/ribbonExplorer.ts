@@ -673,6 +673,10 @@ function ruleStepDescription(step: RuleStep): string | undefined {
       return step.setting;
     case "HideForTabletExperienceRule":
       return undefined;
+    case "RelationshipTypeRule":
+      return step.type;
+    case "ReferencingAttributeRequiredRule":
+      return undefined;
     case "SelectionCountRule":
       return selectionCountText(step.minimum, step.maximum);
     case "RecordPrivilegeRule":
@@ -763,6 +767,19 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
         ["Invert result", boolText(step.invertResult)],
       ];
     case "HideForTabletExperienceRule":
+      return [
+        ...base,
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "RelationshipTypeRule":
+      return [
+        ...base,
+        ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "ReferencingAttributeRequiredRule":
       return [
         ...base,
         ["Default", boolText(step.default)],

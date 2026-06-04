@@ -195,6 +195,8 @@ test("reads flat display rule step types", () => {
         <MiscellaneousPrivilegeRule PrivilegeName="ExportToExcel" PrivilegeDepth="Basic" />
         <OrganizationSettingRule Setting="IsSharepointEnabled" />
         <HideForTabletExperienceRule InvertResult="true" />
+        <RelationshipTypeRule Type="OneToMany" />
+        <ReferencingAttributeRequiredRule Default="true" />
       </DisplayRule>
     </DisplayRules>
   </RuleDefinitions>
@@ -212,6 +214,8 @@ test("reads flat display rule step types", () => {
       "MiscellaneousPrivilegeRule",
       "OrganizationSettingRule",
       "HideForTabletExperienceRule",
+      "RelationshipTypeRule",
+      "ReferencingAttributeRequiredRule",
     ],
   );
   assert.strictEqual(steps[0].kind === "FormTypeRule" ? steps[0].type : undefined, "Main");
@@ -233,6 +237,14 @@ test("reads flat display rule step types", () => {
   );
   assert.strictEqual(
     steps[4].kind === "HideForTabletExperienceRule" ? steps[4].invertResult : undefined,
+    true,
+  );
+  assert.strictEqual(
+    steps[5].kind === "RelationshipTypeRule" ? steps[5].type : undefined,
+    "OneToMany",
+  );
+  assert.strictEqual(
+    steps[6].kind === "ReferencingAttributeRequiredRule" ? steps[6].default : undefined,
     true,
   );
 });

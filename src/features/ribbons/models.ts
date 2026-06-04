@@ -29,6 +29,8 @@ export type RibbonRuleFormType =
   | "MainInteractionCentric"
   | string;
 
+export type RibbonRelationshipType = "OneToMany" | "ManyToMany" | string;
+
 export type RibbonEntityPropertyName =
   | "DuplicateDetectionEnabled"
   | "GridFiltersEnabled"
@@ -329,6 +331,19 @@ export type RuleStep =
     }
   | {
       kind: "HideForTabletExperienceRule";
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "RelationshipTypeRule";
+      type?: RibbonRelationshipType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "ReferencingAttributeRequiredRule";
       default?: boolean;
       invertResult?: boolean;
       range: TextRange;

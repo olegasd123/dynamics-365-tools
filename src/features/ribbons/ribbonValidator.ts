@@ -282,6 +282,10 @@ function validateRuleStep(step: RuleStep): RibbonValidationIssue[] {
       return required(step.setting, "OrganizationSettingRule setting", step.range);
     case "HideForTabletExperienceRule":
       return [];
+    case "RelationshipTypeRule":
+      return required(step.type, "RelationshipTypeRule type", step.range);
+    case "ReferencingAttributeRequiredRule":
+      return [];
     case "EntityPrivilegeRule":
       return [
         ...required(step.privilegeType, "EntityPrivilegeRule privilege type", step.range),

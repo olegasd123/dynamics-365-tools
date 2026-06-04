@@ -65,7 +65,7 @@ Add or update tests in:
 - `src/features/ribbons/__tests__/ribbonExplorerCommands.test.ts`
 - `src/features/ribbons/__tests__/ribbonValidator.test.ts`
 
-## Milestone 2: Add Relationship Display Rules
+## Milestone 2: Add Relationship Display Rules [Done]
 
 Add rules that are useful for grid and subgrid commands:
 

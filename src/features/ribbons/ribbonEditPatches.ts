@@ -9,6 +9,7 @@ import {
   RibbonDocument,
   RibbonPatch,
   RibbonOrganizationSetting,
+  RibbonRelationshipType,
   RibbonRuleAppliesTo,
   RibbonRuleFormType,
   RibbonRuleFormState,
@@ -121,6 +122,17 @@ export type NewRuleStepInput =
     }
   | {
       kind: "HideForTabletExperienceRule";
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "RelationshipTypeRule";
+      type: RibbonRelationshipType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "ReferencingAttributeRequiredRule";
       default?: boolean;
       invertResult?: boolean;
     }
@@ -974,6 +986,17 @@ function renderRuleStep(step: NewRuleStepInput): string {
       ])} />`;
     case "HideForTabletExperienceRule":
       return `<HideForTabletExperienceRule ${renderAttributes([
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "RelationshipTypeRule":
+      return `<RelationshipTypeRule ${renderAttributes([
+        ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "ReferencingAttributeRequiredRule":
+      return `<ReferencingAttributeRequiredRule ${renderAttributes([
         ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;

@@ -56,6 +56,7 @@ import {
   RibbonEntityPropertyName,
   RibbonOrganizationSetting,
   RibbonPatch,
+  RibbonRelationshipType,
   RibbonRuleAppliesTo,
   RibbonRuleFormType,
   RibbonRuleFormState,
@@ -313,6 +314,7 @@ const ORGANIZATION_SETTING_RULE_SETTINGS = [
   "IsReadFormModeDefined",
   "IsBPFEntityCustomizationFeatureEnabled",
 ];
+const RELATIONSHIP_TYPE_RULE_TYPES = ["OneToMany", "ManyToMany"];
 const RIBBON_LANGUAGE_CODES: RibbonLanguageCode[] = [
   { code: 1025, name: "Arabic", locale: "ar-SA" },
   { code: 1026, name: "Bulgarian", locale: "bg-BG" },
@@ -4484,6 +4486,11 @@ async function promptRuleStep(
     { label: "MiscellaneousPrivilegeRule", description: "Check global privilege" },
     { label: "OrganizationSettingRule", description: "Check organization setting" },
     { label: "HideForTabletExperienceRule", description: "Hide for tablet experience" },
+    { label: "RelationshipTypeRule", description: "Check relationship type" },
+    {
+      label: "ReferencingAttributeRequiredRule",
+      description: "Check if the referencing attribute is required",
+    },
   ];
   const enableOnly = [
     { label: "SelectionCountRule", description: "Check selected rows" },
@@ -4525,6 +4532,10 @@ async function promptRuleStep(
       return promptOrganizationSettingRuleStep();
     case "HideForTabletExperienceRule":
       return promptHideForTabletExperienceRuleStep();
+    case "RelationshipTypeRule":
+      return promptRelationshipTypeRuleStep();
+    case "ReferencingAttributeRequiredRule":
+      return promptReferencingAttributeRequiredRuleStep();
     case "SelectionCountRule":
       return promptSelectionCountRuleStep();
     case "RecordPrivilegeRule":
@@ -4740,6 +4751,33 @@ async function promptHideForTabletExperienceRuleStep(): Promise<NewRuleStepInput
   }
 
   return { kind: "HideForTabletExperienceRule", invertResult };
+}
+
+async function promptRelationshipTypeRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const type = await promptKnownOrCustomValue(
+    "Relationship type",
+    RELATIONSHIP_TYPE_RULE_TYPES,
+    "Type relationship type",
+  );
+  if (!type) {
+    return undefined;
+  }
+
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "RelationshipTypeRule", type: type as RibbonRelationshipType, invertResult };
+}
+
+async function promptReferencingAttributeRequiredRuleStep(): Promise<NewRuleStepInput | undefined> {
+  const invertResult = await promptOptionalBoolean("Invert result?");
+  if (invertResult === undefined) {
+    return undefined;
+  }
+
+  return { kind: "ReferencingAttributeRequiredRule", invertResult };
 }
 
 async function promptSelectionCountRuleStep(): Promise<NewRuleStepInput | undefined> {

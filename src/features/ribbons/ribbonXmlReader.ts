@@ -16,6 +16,7 @@ import {
   RibbonDocument,
   RibbonEntityPropertyName,
   RibbonOrganizationSetting,
+  RibbonRelationshipType,
   RibbonRuleAppliesTo,
   RibbonRuleFormType,
   RibbonRuleFormState,
@@ -870,6 +871,21 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
     case "HideForTabletExperienceRule":
       return {
         kind: "HideForTabletExperienceRule",
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "RelationshipTypeRule":
+      return {
+        kind: "RelationshipTypeRule",
+        type: optionalAttr(node, "Type") as RibbonRelationshipType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "ReferencingAttributeRequiredRule":
+      return {
+        kind: "ReferencingAttributeRequiredRule",
         default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,

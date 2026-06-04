@@ -981,6 +981,23 @@ test("creates flat display rules from prompts", async () => {
       ]),
       expectedKind: "HideForTabletExperienceRule",
     },
+    {
+      inputByPrompt: new Map([["Display rule id", "new.RelationshipType"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "RelationshipTypeRule"],
+        ["Relationship type", "OneToMany"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "RelationshipTypeRule",
+    },
+    {
+      inputByPrompt: new Map([["Display rule id", "new.ReferencingRequired"]]),
+      pickByPlaceHolder: new Map([
+        ["First rule step", "ReferencingAttributeRequiredRule"],
+        ["Invert result?", "No"],
+      ]),
+      expectedKind: "ReferencingAttributeRequiredRule",
+    },
   ];
 
   const originalShowQuickPick = vscode.window.showQuickPick;
