@@ -8,29 +8,35 @@ import JSZip from "jszip";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
+import { addCustomRibbonButton } from "../commands/ribbonButtonCommands";
+import { addRibbonCommandAction } from "../commands/ribbonCommandDefinitionCommands";
+import { addRibbonLocLabelTitle } from "../commands/ribbonLabelCommands";
 import {
-  addCustomRibbonButton,
-  addRibbonCommandAction,
+  addRibbonRuleChildStep,
+  deleteRibbonNode,
+  editRibbonNode,
+  moveRibbonNodeDown,
+  moveRibbonNodeUp,
+} from "../commands/ribbonNodeCommands";
+import {
+  extractJavaScriptFunctionSuggestions,
+  listBoundJavaScriptLibraries,
+  listEnvironmentImageWebResources,
+  normalizeWebResourceUniqueName,
+} from "../commands/ribbonResourcePrompts";
+import {
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
   addRibbonDisplayRule,
   addRibbonEnableRule,
-  addRibbonLocLabelTitle,
-  addRibbonRuleChildStep,
-  editRibbonNode,
-  extractJavaScriptFunctionSuggestions,
-  listRibbonLanguageCodePicks,
-  listBoundJavaScriptLibraries,
-  listEnvironmentImageWebResources,
-  moveRibbonNodeDown,
-  moveRibbonNodeUp,
-  normalizeWebResourceUniqueName,
+} from "../commands/ribbonRuleCommands";
+import {
   openRibbonSolutionLocation,
   openRibbonsFromSolution,
   publishRibbonToEnvironment,
   removeRibbonSolutionSource,
-  deleteRibbonNode,
-} from "../commands/ribbonExplorerCommands";
+} from "../commands/ribbonSourceCommands";
+import { listRibbonLanguageCodePicks } from "../commands/ribbonLanguagePrompts";
 import { createRibbonCascadeDeletePlan } from "../ribbonCascadeDelete";
 import { RibbonPatch, RibbonSource, XmlElementRange } from "../models";
 import { RibbonEditorState } from "../ribbonEditorState";

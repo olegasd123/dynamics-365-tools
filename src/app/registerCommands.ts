@@ -36,37 +36,47 @@ import {
 } from "../features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
 import {
+  addCustomRibbonButton,
+  hideAndStubOobRibbonButtons,
+  hideOobRibbonButton,
+  reorderOobRibbonButtons,
+} from "../features/ribbons/commands/ribbonButtonCommands";
+import {
   addRibbonCommandDefinition,
   addRibbonCommandAction,
+  overrideOobRibbonCommand,
+} from "../features/ribbons/commands/ribbonCommandDefinitionCommands";
+import {
+  addRibbonLocLabel,
+  addRibbonLocLabelTitle,
+} from "../features/ribbons/commands/ribbonLabelCommands";
+import {
+  addRibbonRuleChildStep,
+  deleteRibbonNode,
+  editRibbonNode,
+  moveRibbonNodeDown,
+  moveRibbonNodeUp,
+} from "../features/ribbons/commands/ribbonNodeCommands";
+import {
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
   addRibbonDisplayRule,
   addRibbonEnableRule,
-  addRibbonRuleChildStep,
-  addRibbonLocLabel,
-  addRibbonLocLabelTitle,
-  addCustomRibbonButton,
-  deleteRibbonNode,
-  editRibbonNode,
-  hideAndStubOobRibbonButtons,
-  hideOobRibbonButton,
-  openRibbonSolutionLocation,
-  moveRibbonNodeDown,
-  moveRibbonNodeUp,
-  openRibbonsFromSolution,
+} from "../features/ribbons/commands/ribbonRuleCommands";
+import {
+  cleanupGeneratedRibbonSolutions,
   openRibbonFile,
-  overrideOobRibbonCommand,
+  openRibbonSolutionLocation,
+  openRibbonsFromSolution,
   publishRibbonToEnvironment,
   pullRibbonsFromEnvironment,
+  redoRibbonEdit,
   refreshRibbonExplorer,
   removeRibbonSolutionSource,
-  reorderOobRibbonButtons,
   saveRibbonSolutionZip,
   saveRibbonSource,
-  cleanupGeneratedRibbonSolutions,
-  redoRibbonEdit,
   undoRibbonEdit,
-} from "../features/ribbons/commands/ribbonExplorerCommands";
+} from "../features/ribbons/commands/ribbonSourceCommands";
 import {
   buildPcfControl,
   newPcfControl,
