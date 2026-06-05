@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
-import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
+import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments } from "../ribbonXmlReader";
 import {
   createCommandDefinitionPatches,
@@ -953,7 +953,26 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
   });
   const view = document.views[0];
 
-  const updated = applyRibbonPatches(source, [
+  const updated = applyRibbonPatchSequence(source, [
+    createLocLabelTitleReplacePatch(document.sourceText, view.locLabels[0].titles[0], {
+      languageCode: 1033,
+      description: "New label",
+    }),
+    createRuleStepReplacePatch(document.sourceText, view.displayRules[0].steps[0], {
+      kind: "ValueRule",
+      field: "statecode",
+      value: "0",
+      invertResult: true,
+    }),
+    createCommandActionReplacePatch(document.sourceText, view.commandDefinitions[0].actions[0], {
+      kind: "JavaScriptFunction",
+      library: "new_/scripts/account.js",
+      functionName: "validateAndSave",
+    }),
+    createHideActionReplacePatch(document.sourceText, view.hideActions[0].range, {
+      hideActionId: "new.hide",
+      location: "new.location",
+    }),
     createCustomButtonReplacePatch(document.sourceText, view.customActions[0].range, {
       customActionId: "new.action",
       location: "new.location",
@@ -968,25 +987,6 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
       image32x32: "new_/icons/new32.png",
       modernImage: "new_/icons/new.svg",
       action: { kind: "Url", address: "" },
-    }),
-    createHideActionReplacePatch(document.sourceText, view.hideActions[0].range, {
-      hideActionId: "new.hide",
-      location: "new.location",
-    }),
-    createCommandActionReplacePatch(document.sourceText, view.commandDefinitions[0].actions[0], {
-      kind: "JavaScriptFunction",
-      library: "new_/scripts/account.js",
-      functionName: "validateAndSave",
-    }),
-    createRuleStepReplacePatch(document.sourceText, view.displayRules[0].steps[0], {
-      kind: "ValueRule",
-      field: "statecode",
-      value: "0",
-      invertResult: true,
-    }),
-    createLocLabelTitleReplacePatch(document.sourceText, view.locLabels[0].titles[0], {
-      languageCode: 1033,
-      description: "New label",
     }),
   ]);
   const [updatedDocument] = readRibbonDocuments(updated, {
@@ -1042,7 +1042,7 @@ test("replaces node ids without rebuilding child XML", () => {
   });
   const view = document.views[0];
 
-  const updated = applyRibbonPatches(source, [
+  const updated = applyRibbonPatchSequence(source, [
     createNodeAttributeValuePatch(
       document.sourceText,
       view.commandDefinitions[0].range,
@@ -1118,7 +1118,7 @@ test("swaps sibling XML nodes without changing their content", () => {
   });
   const [first, second] = document.views[0].commandDefinitions;
 
-  const updated = applyRibbonPatches(
+  const updated = applyRibbonPatchSequence(
     source,
     createSwapNodePatches(document.sourceText, first.range, second.range),
   );

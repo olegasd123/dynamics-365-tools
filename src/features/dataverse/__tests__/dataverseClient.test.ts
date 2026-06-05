@@ -286,34 +286,6 @@ test("request surfaces network fetch error details", async () => {
   }
 });
 
-test("getCreatedId returns ids from body or headers", async () => {
-  const connection: EnvironmentConnection = {
-    env: { name: "dev" } as any,
-    apiRoot: "https://example/api/data/v9.2",
-    token: "token",
-  };
-  const client = new DataverseClient(connection);
-
-  const fromId = await client.getCreatedId(
-    createResponse(JSON.stringify({ id: "abc" }), { status: 201 }),
-  );
-  const fromAssembly = await client.getCreatedId(
-    createResponse(JSON.stringify({ pluginassemblyid: "def" }), { status: 201 }),
-  );
-  const fromHeader = await client.getCreatedId(
-    new Response(null, {
-      status: 204,
-      headers: {
-        "OData-EntityId": "https://example/records/00000000-0000-0000-0000-000000000001",
-      },
-    }),
-  );
-
-  assert.strictEqual(fromId, "abc");
-  assert.strictEqual(fromAssembly, "def");
-  assert.strictEqual(fromHeader, "00000000-0000-0000-0000-000000000001");
-});
-
 test("isDefaultSolution matches default solution name case-insensitively", () => {
   assert.ok(isDefaultSolution("Default"));
   assert.ok(isDefaultSolution(" default "));

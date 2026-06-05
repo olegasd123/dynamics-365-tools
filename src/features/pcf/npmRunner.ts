@@ -43,29 +43,6 @@ export class NpmRunner {
     });
   }
 
-  runStart(
-    projectRoot: string,
-    args: string[] = [],
-    onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
-  ): Promise<ProcessRunResult> {
-    return this.runner.run("npm", ["start", ...args], { cwd: projectRoot, onLine, token });
-  }
-
-  startScript(
-    projectRoot: string,
-    script: string,
-    scriptArgs: string[] = [],
-    onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
-  ): RunningProcess {
-    return this.runner.start("npm", buildRunArgs(script, scriptArgs), {
-      cwd: projectRoot,
-      onLine,
-      token,
-    });
-  }
-
   startDefault(
     projectRoot: string,
     args: string[] = [],

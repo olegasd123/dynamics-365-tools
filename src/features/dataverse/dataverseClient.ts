@@ -58,14 +58,6 @@ export class DataverseClient {
     await this.request<void>("DELETE", path, undefined, options);
   }
 
-  get apiRoot(): string {
-    return this.connection.apiRoot;
-  }
-
-  get environmentName(): string {
-    return this.connection.env.name;
-  }
-
   private async request<T>(
     method: string,
     path: string,
@@ -121,28 +113,6 @@ export class DataverseClient {
     }
     const trimmed = path.startsWith("/") ? path.slice(1) : path;
     return `${this.connection.apiRoot}/${trimmed}`;
-  }
-
-  async getCreatedId(response: Response): Promise<string | undefined> {
-    const text = await response.clone().text();
-    if (text.trim()) {
-      try {
-        const parsed = JSON.parse(text) as { id?: string; pluginassemblyid?: string };
-        if (parsed.id) {
-          return parsed.id;
-        }
-        if (parsed.pluginassemblyid) {
-          return parsed.pluginassemblyid;
-        }
-      } catch {
-        // Ignore parse errors for headers.
-      }
-    }
-
-    return (
-      this.extractGuid(response.headers.get("OData-EntityId")) ||
-      this.extractGuid(response.headers.get("odata-entityid"))
-    );
   }
 
   private withUserAgent<T extends Record<string, string>>(
@@ -396,14 +366,6 @@ export class DataverseClient {
     } catch {
       return undefined;
     }
-  }
-
-  private extractGuid(entityIdHeader: string | null): string | undefined {
-    if (!entityIdHeader) {
-      return undefined;
-    }
-    const match = entityIdHeader.match(/[0-9a-fA-F-]{36}/);
-    return match?.[0];
   }
 }
 

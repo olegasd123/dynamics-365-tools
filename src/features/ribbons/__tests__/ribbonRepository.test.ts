@@ -69,7 +69,7 @@ test("loads flat customizations XML and infers entity ribbons", async () => {
   assert.strictEqual(documents[1].views[0].scope, "Application");
 });
 
-test("saves only files whose patches change text", async () => {
+test("saves only files whose patch sequence changes text", async () => {
   const workspaceRoot = await makeWorkspace();
   const filePath = await writeFile(
     workspaceRoot,
@@ -78,12 +78,12 @@ test("saves only files whose patches change text", async () => {
   );
   const repository = new RibbonRepository();
 
-  const noChange = await repository.savePatches({
+  const noChange = await repository.savePatchSequence({
     [filePath]: [{ kind: "replace", range: { start: 0, end: 0 }, text: "" }],
   });
   assert.deepStrictEqual(noChange.changedFileUris, []);
 
-  const changed = await repository.savePatches({
+  const changed = await repository.savePatchSequence({
     [filePath]: [
       {
         kind: "insert",

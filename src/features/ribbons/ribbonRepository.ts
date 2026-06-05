@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import { RibbonDocument, RibbonPatch, RibbonSource, RibbonSourceFile } from "./models";
-import { applyRibbonPatches, applyRibbonPatchSequence } from "./ribbonPatchWriter";
+import { applyRibbonPatchSequence } from "./ribbonPatchWriter";
 import { readRibbonDocuments } from "./ribbonXmlReader";
 
 export type RibbonPatchMap = Map<string, RibbonPatch[]> | Record<string, RibbonPatch[]>;
@@ -40,27 +40,6 @@ export class RibbonRepository {
           };
 
     return readRibbonDocuments(text, options);
-  }
-
-  async savePatches(patchesByFileUri: RibbonPatchMap): Promise<RibbonSaveResult> {
-    const changedFileUris: string[] = [];
-
-    for (const [fileUri, patches] of patchEntries(patchesByFileUri)) {
-      if (!patches.length) {
-        continue;
-      }
-
-      const sourceText = await fs.readFile(fileUri, "utf8");
-      const updatedText = applyRibbonPatches(sourceText, patches);
-      if (updatedText === sourceText) {
-        continue;
-      }
-
-      await fs.writeFile(fileUri, updatedText, "utf8");
-      changedFileUris.push(fileUri);
-    }
-
-    return { changedFileUris };
   }
 
   async savePatchSequence(patchesByFileUri: RibbonPatchMap): Promise<RibbonSaveResult> {

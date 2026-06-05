@@ -23,10 +23,6 @@ export class RibbonEditorState {
     return documents;
   }
 
-  getDocuments(sourceId: string): RibbonDocument[] | undefined {
-    return this.documentsBySourceId.get(sourceId);
-  }
-
   isSourceDirty(sourceId: string): boolean {
     const source = this.sourcesById.get(sourceId);
     return !!source?.files.some((file) => this.hasFilePatches(file.fileUri));
@@ -47,14 +43,6 @@ export class RibbonEditorState {
     const current = this.patchesByFileUri.get(document.fileUri) ?? [];
     this.patchesByFileUri.set(document.fileUri, [...current, ...patches]);
     this.documentsBySourceId.delete(document.sourceId);
-  }
-
-  canUndo(): boolean {
-    return this.undoStack.length > 0;
-  }
-
-  canRedo(): boolean {
-    return this.redoStack.length > 0;
   }
 
   undo(): boolean {
@@ -79,14 +67,6 @@ export class RibbonEditorState {
     this.rebuildFilePatches(edit.fileUri);
     this.documentsBySourceId.clear();
     return true;
-  }
-
-  clear(): void {
-    this.documentsBySourceId.clear();
-    this.sourcesById.clear();
-    this.patchesByFileUri.clear();
-    this.undoStack.length = 0;
-    this.redoStack.length = 0;
   }
 
   clearCachedDocuments(): void {

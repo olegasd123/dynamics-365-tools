@@ -179,21 +179,6 @@ test("listUnmanagedSolutions maps publisher data for publish choices", async () 
   ]);
 });
 
-test("deleteGeneratedSolutionByUniqueName resolves and deletes the generated solution", async () => {
-  const client = new FakeClient();
-
-  await new RibbonPublishService().deleteGeneratedSolutionByUniqueName(
-    client,
-    "d365tools_ribbon_account_20260101010101",
-  );
-
-  assert.strictEqual(
-    client.gets[0],
-    "/solutions?$select=solutionid,uniquename&$filter=uniquename eq 'd365tools_ribbon_account_20260101010101'&$top=1",
-  );
-  assert.deepStrictEqual(client.deletes, ["/solutions(solution-id)"]);
-});
-
 class FakeClient {
   readonly gets: string[] = [];
   readonly posts: Array<{ path: string; body: any }> = [];

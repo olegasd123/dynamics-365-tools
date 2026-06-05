@@ -107,24 +107,6 @@ export class RibbonPublishService {
     await client.delete(`/solutions(${id})`);
   }
 
-  async deleteGeneratedSolutionByUniqueName(
-    client: SolutionImportClient,
-    uniqueName: string,
-  ): Promise<void> {
-    const safeUniqueName = uniqueName.trim();
-    if (!safeUniqueName.startsWith("d365tools_ribbon_")) {
-      throw new Error("Only generated ribbon solutions can be deleted by this command.");
-    }
-
-    const response = await client.get<SolutionListResponse>(
-      `/solutions?$select=solutionid,uniquename&$filter=uniquename eq '${escapeODataString(safeUniqueName)}'&$top=1`,
-    );
-    const solutionId = normalizeGuid(response.value?.[0]?.solutionid ?? "");
-    if (solutionId) {
-      await this.deleteGeneratedSolution(client, solutionId);
-    }
-  }
-
   async publishDocuments(
     client: SolutionImportClient,
     documents: RibbonDocument[],

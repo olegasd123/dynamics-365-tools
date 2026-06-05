@@ -6,7 +6,7 @@ import test from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
 import { DataverseClient } from "../../dataverse/dataverseClient";
-import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
+import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   addCustomRibbonButton,
@@ -816,7 +816,7 @@ test("creates new enable rule and references it from command refs", async () => 
   assert.deepStrictEqual(offeredLabels.slice(0, 2), ["Add new enable rule", "Type enable rule id"]);
   assert.deepStrictEqual(inputValues, ["new.account.Form.Validate.EnableRule"]);
 
-  const [updatedDocument] = readRibbonDocuments(applyRibbonPatches(source, patches), {
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
     sourceId: "source",
     fileUri: "/tmp/RibbonDiffXml.xml",
     kind: "Application",

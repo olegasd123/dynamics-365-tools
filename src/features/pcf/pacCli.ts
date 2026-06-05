@@ -30,11 +30,6 @@ export class PacCli {
     return this.detection;
   }
 
-  async help(args: string[]): Promise<string> {
-    const result = await this.run([...args, "--help"]);
-    return result.stdout || result.stderr;
-  }
-
   async whoami(): Promise<PacAuthProfile | null> {
     const result = await this.run(["auth", "who", "--json"]);
     if (result.exitCode !== 0) {

@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
-import { applyRibbonPatches } from "../ribbonPatchWriter";
+import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
 
 const ribbonXml = `<RibbonDiffXml>
@@ -405,7 +405,7 @@ test("ranges can drive surgical patches while unknown XML stays byte-identical",
     .slice(action.range.start, action.range.end)
     .replace(`Sequence="10"`, `Sequence="20"`);
 
-  const patched = applyRibbonPatches(ribbonXml, [
+  const patched = applyRibbonPatchSequence(ribbonXml, [
     { kind: "replace", range: action.range, text: replacement },
   ]);
 
