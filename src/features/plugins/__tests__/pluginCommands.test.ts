@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
+import { VsCodeNotificationService } from "../../../platform/vscode/notificationService";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import {
   AssemblyIdentityValidationError,
@@ -17,6 +18,10 @@ function clearMessages(): void {
   messages.info.length = 0;
   messages.warn.length = 0;
   messages.error.length = 0;
+}
+
+function createNotifications(): VsCodeNotificationService {
+  return new VsCodeNotificationService();
 }
 
 test("validateAssemblyIdentity blocks a different assembly name", () => {
@@ -85,6 +90,7 @@ test("validateAssemblyUpdateTarget warns but allows version changes", async () =
     assemblyUri: vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
     pluginService: service as any,
     pluginRegistration: registration as any,
+    notifications: createNotifications(),
   });
 
   const messages = (vscode.window as any).__messages;
@@ -153,6 +159,7 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
       manageMissingComponents: true,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async (_envName: string, _assemblyId: string, path: string) => {
@@ -292,6 +299,7 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
       manageMissingComponents: true,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -360,6 +368,7 @@ test("updateAssemblyFromFileDialog cancels update when missing plugin removal is
       manageMissingComponents: true,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -434,6 +443,7 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
       manageMissingComponents: true,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -512,6 +522,7 @@ test("updateAssemblyFromFileDialog blocks deleted plugin types when missing mana
       manageMissingComponents: false,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -587,6 +598,7 @@ test("updateAssemblyFromFileDialog warns and skips new plugin creation when miss
       manageMissingComponents: false,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -659,6 +671,7 @@ test("updateAssemblyFromFileDialog asks before creating new plugin types when mi
       manageMissingComponents: true,
       pluginService: service as any,
       pluginRegistration: registration as any,
+      notifications: createNotifications(),
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -685,7 +698,7 @@ test("showPublicKeyTokenResult does not wait for notification selection", () => 
   };
 
   try {
-    showPublicKeyTokenResult("Strong name key created.", "abcdef1234567890");
+    showPublicKeyTokenResult(createNotifications(), "Strong name key created.", "abcdef1234567890");
   } finally {
     (vscode.window as any).showInformationMessage = originalShowInformationMessage;
   }
@@ -699,7 +712,7 @@ test("showPublicKeyTokenResult copies token when action is selected", async () =
   (vscode.env.clipboard as any).value = "";
 
   try {
-    showPublicKeyTokenResult("Strong name key created.", "abcdef1234567890");
+    showPublicKeyTokenResult(createNotifications(), "Strong name key created.", "abcdef1234567890");
     await new Promise((resolve) => setImmediate(resolve));
   } finally {
     (vscode.window as any).showInformationMessage = originalShowInformationMessage;

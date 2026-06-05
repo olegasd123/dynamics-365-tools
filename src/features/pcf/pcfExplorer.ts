@@ -14,6 +14,7 @@ import { PcfBuildService } from "./pcfBuildService";
 import { PcfEnvironmentService } from "./pcfEnvironmentService";
 import { PcfProjectLocator } from "./pcfProjectLocator";
 import { ProcessRunner } from "./processRunner";
+import type { NotificationPort } from "../../app/ports/notifications";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.pcf.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.pcf.filterConfiguredSolutions";
@@ -181,6 +182,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
     private readonly pacCli: PacCli,
     private readonly buildService: PcfBuildService,
     private readonly environmentService: PcfEnvironmentService,
+    private readonly notifications: NotificationPort,
   ) {
     this.locator.onDidChangeProjects(() => this.refresh());
     this.buildService.onDidChangeStatus(() => this.refresh());
@@ -350,7 +352,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       return controls.map((control) => new PcfDeployedControlNode(env, control));
     } catch (error) {
       const message = String(error);
-      void vscode.window.showErrorMessage(
+      void this.notifications.error(
         isUserNotMemberError(message)
           ? `Failed to load PCF controls from ${env.name}: account has no access. Run 'Dynamics 365 Tools: Sign In (Interactive)' and select the correct account for this environment.`
           : `Failed to load PCF controls from ${env.name}: ${message}`,

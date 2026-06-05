@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { createCommandActionPatch, createCommandDefinitionPatches } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
@@ -17,7 +16,7 @@ export async function addRibbonCommandDefinition(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -51,7 +50,7 @@ export async function overrideOobRibbonCommand(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -66,14 +65,14 @@ export async function overrideOobRibbonCommand(
   const commandId = getOobCommandId(command);
   const duplicate = validateUniqueId(target.document, commandId, "Command id is required.");
   if (duplicate) {
-    vscode.window.showWarningMessage(`Cannot override '${commandId}': ${duplicate}`);
+    await ctx.notifications.warning(`Cannot override '${commandId}': ${duplicate}`);
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Override OOB command '${commandId}'? This can replace default Dynamics behavior.`,
+    ["Override"],
     { modal: true },
-    "Override",
   );
   if (choice !== "Override") {
     return;
@@ -94,7 +93,7 @@ export async function addRibbonCommandAction(
 ): Promise<void> {
   const target = resolveCommandTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a command definition first.");
+    await ctx.notifications.warning("Select a command definition first.");
     return;
   }
 

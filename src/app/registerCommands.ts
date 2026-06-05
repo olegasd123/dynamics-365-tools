@@ -176,7 +176,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.redo", () => redoRibbonEdit(ctx), {
       validateConfiguration: false,
     }),
-    register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
+    register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(ctx, node), {
       validateConfiguration: false,
     }),
     register(
@@ -327,8 +327,12 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.plugins.disableStep", (node) => disablePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.deleteStep", (node) => deletePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.createImage", (node) => createPluginImage(ctx, node)),
-    register("dynamics365Tools.plugins.copyStepDescription", (node) => copyStepDescription(node)),
-    register("dynamics365Tools.plugins.copyImageDescription", (node) => copyImageDescription(node)),
+    register("dynamics365Tools.plugins.copyStepDescription", (node) =>
+      copyStepDescription(ctx, node),
+    ),
+    register("dynamics365Tools.plugins.copyImageDescription", (node) =>
+      copyImageDescription(ctx, node),
+    ),
     register("dynamics365Tools.plugins.editImage", (node) => editPluginImage(ctx, node)),
     register("dynamics365Tools.plugins.deleteImage", (node) => deletePluginImage(ctx, node)),
     register("dynamics365Tools.pcf.refreshExplorer", () => refreshPcfExplorer(ctx), {
@@ -398,7 +402,7 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ),
     register(
       "dynamics365Tools.pcf.copyDeployedControlId",
-      (node) => copyPcfDeployedControlId(node),
+      (node) => copyPcfDeployedControlId(ctx, node),
       {
         validateConfiguration: false,
       },

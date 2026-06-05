@@ -42,7 +42,7 @@ export async function addCustomRibbonButton(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -159,7 +159,7 @@ export async function hideOobRibbonButton(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -188,7 +188,7 @@ export async function hideAndStubOobRibbonButtons(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -202,10 +202,10 @@ export async function hideAndStubOobRibbonButtons(
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Hide ${commands.length} OOB button${commands.length === 1 ? "" : "s"} and create replacement stubs?`,
+    ["Create Stubs"],
     { modal: true },
-    "Create Stubs",
   );
   if (choice !== "Create Stubs") {
     return;
@@ -264,7 +264,7 @@ export async function reorderOobRibbonButtons(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -285,10 +285,10 @@ export async function reorderOobRibbonButtons(
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Hide ${orderedCommands.length} OOB button${orderedCommands.length === 1 ? "" : "s"} and re-add them in the selected order?`,
+    ["Reorder"],
     { modal: true },
-    "Reorder",
   );
   if (choice !== "Reorder") {
     return;

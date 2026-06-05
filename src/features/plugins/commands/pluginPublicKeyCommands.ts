@@ -4,11 +4,12 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 import * as fs from "fs/promises";
 import { CommandContext } from "../../../app/commandContext";
+import type { NotificationPort } from "../../../app/ports/notifications";
 
 const execFileAsync = promisify(execFile);
 
 export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
-  const { configuration } = ctx;
+  const { configuration, notifications } = ctx;
   const workspaceRoot =
     configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
@@ -41,7 +42,7 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
 
   const snTool = await resolveSnTool();
   if (!snTool) {
-    void vscode.window.showErrorMessage(
+    void notifications.error(
       "Strong Name tool (sn.exe/sn) not found. Install the .NET SDK and ensure the `sn` tool is on your PATH.",
     );
     return;
@@ -56,23 +57,27 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
     const message = token
       ? `Strong name key created and project updated. Public key token: ${token}`
       : "Strong name key created and project updated. Failed to read public key token from sn output.";
-    showPublicKeyTokenResult(message, token);
+    showPublicKeyTokenResult(notifications, message, token);
   } catch (error) {
-    void vscode.window.showErrorMessage(
+    void notifications.error(
       `Failed to generate strong name key: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
 
-export function showPublicKeyTokenResult(message: string, token?: string): void {
+export function showPublicKeyTokenResult(
+  notifications: NotificationPort,
+  message: string,
+  token?: string,
+): void {
   const copyAction = token ? "Copy token" : undefined;
-  void vscode.window.showInformationMessage(message, copyAction ?? "OK").then(
+  void notifications.askInfo(message, [copyAction ?? "OK"]).then(
     async (selection) => {
       if (selection === copyAction && token) {
         try {
           await vscode.env.clipboard.writeText(token);
         } catch (error) {
-          void vscode.window.showErrorMessage(
+          void notifications.error(
             `Failed to copy public key token: ${error instanceof Error ? error.message : String(error)}`,
           );
         }

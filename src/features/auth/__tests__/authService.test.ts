@@ -168,6 +168,9 @@ function createNotificationRecorder(): NotificationPort & {
     async error(message: string) {
       errors.push(message);
     },
+    async askInfo() {
+      return undefined;
+    },
     async askWarning() {
       return undefined;
     },

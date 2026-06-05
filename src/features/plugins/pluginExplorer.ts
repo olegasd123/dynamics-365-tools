@@ -6,6 +6,7 @@ import { SolutionComponentService } from "../dataverse/solutionComponentService"
 import { PluginService } from "./pluginService";
 import { PluginAssembly, PluginImage, PluginStep, PluginType } from "./models";
 import { EnvironmentConfig, SolutionConfig } from "../config/domain/models";
+import type { NotificationPort } from "../../app/ports/notifications";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.plugins.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.plugins.filterConfiguredSolutions";
@@ -123,6 +124,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
     private readonly configuration: ConfigurationService,
     private readonly connections: EnvironmentConnectionService,
     private readonly state: vscode.Memento,
+    private readonly notifications: NotificationPort,
   ) {}
 
   async initialize(): Promise<void> {
@@ -208,7 +210,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
       return assemblies.map((assembly) => new PluginAssemblyNode(env, assembly));
     } catch (error) {
       const message = String(error);
-      void vscode.window.showErrorMessage(
+      void this.notifications.error(
         isUserNotMemberError(message)
           ? `Failed to load plugin assemblies from ${env.name}: account has no access. Run 'Dynamics 365 Tools: Sign In (Interactive)' and select the correct account for this environment.`
           : `Failed to load plugin assemblies from ${env.name}: ${message}`,
@@ -233,7 +235,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
         .map((type) => new PluginTypeNode(env, type));
     } catch (error) {
-      void vscode.window.showErrorMessage(
+      void this.notifications.error(
         `Failed to load plugin types for ${assembly.name}: ${String(error)}`,
       );
       return [];
@@ -260,7 +262,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
         )
         .map((step) => new PluginStepNode(env, pluginType, step));
     } catch (error) {
-      void vscode.window.showErrorMessage(
+      void this.notifications.error(
         `Failed to load steps for ${pluginType.name}: ${String(error)}`,
       );
       return [];
@@ -281,9 +283,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
       const images = await service.listImages(step.id);
       return images.map((image) => new PluginImageNode(env, pluginType, step, image));
     } catch (error) {
-      void vscode.window.showErrorMessage(
-        `Failed to load images for ${step.name}: ${String(error)}`,
-      );
+      void this.notifications.error(`Failed to load images for ${step.name}: ${String(error)}`);
       return [];
     }
   }
@@ -314,9 +314,7 @@ export class PluginExplorerProvider implements vscode.TreeDataProvider<PluginExp
       const solutionComponents = new SolutionComponentService(client);
       return new PluginService(client, solutionComponents);
     } catch (error) {
-      void vscode.window.showErrorMessage(
-        `Authentication failed for ${env.name}: ${String(error)}`,
-      );
+      void this.notifications.error(`Authentication failed for ${env.name}: ${String(error)}`);
       return undefined;
     }
   }

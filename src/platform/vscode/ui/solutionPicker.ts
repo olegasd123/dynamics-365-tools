@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { DEFAULT_SOLUTION_NAME } from "../../../shared/solutions";
 import { EnvironmentConfig, SolutionConfig } from "../../../features/config/domain/models";
+import type { NotificationPort } from "../../../app/ports/notifications";
 
 type SolutionQuickPickItem = vscode.QuickPickItem & {
   solution?: SolutionConfig;
@@ -8,13 +9,15 @@ type SolutionQuickPickItem = vscode.QuickPickItem & {
 };
 
 export class SolutionPicker {
+  constructor(private readonly notifications: NotificationPort) {}
+
   async pickEnvironment(
     environments: EnvironmentConfig[],
     defaultEnvName?: string,
     options?: { placeHolder?: string },
   ): Promise<EnvironmentConfig | undefined> {
     if (!environments.length) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         "No environments configured. Run 'Dynamics 365 Tools: Add Environment' or 'Dynamics 365 Tools: Sign In (Interactive)' first.",
       );
       return undefined;

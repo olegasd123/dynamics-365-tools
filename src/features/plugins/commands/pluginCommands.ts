@@ -28,6 +28,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     pluginRegistration,
     pluginExplorer,
     assemblyStatusBar,
+    notifications,
   } = ctx;
   const config = await configuration.loadConfiguration();
   const selection = await pickEnvironmentAndAuth(
@@ -39,13 +40,14 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     config,
     undefined,
     { placeHolder: "Select environment to register plugin assembly" },
+    notifications,
   );
   if (!selection) {
     return;
   }
 
   if (selection.env.manageMissingComponents !== true) {
-    void vscode.window.showWarningMessage(
+    void notifications.warning(
       `Environment ${selection.env.name} is configured to block missing component management. Enable manageMissingComponents to register plugin assemblies.`,
     );
     return;
@@ -101,7 +103,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
       });
       pluginSummary = syncResult;
     } catch (syncError) {
-      void vscode.window.showErrorMessage(
+      void notifications.error(
         `Assembly registered, but plugins failed to sync: ${String(syncError)}`,
       );
       pluginSyncFailed = true;
@@ -115,13 +117,13 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
       environment: selection.env,
     });
     if (!pluginSyncFailed) {
-      vscode.window.showInformationMessage(
+      await notifications.info(
         buildAssemblySuccessMessage(name, selection.env.name, pluginSummary),
       );
     }
     pluginExplorer?.refresh();
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to register plugin assembly: ${String(error)}`);
+    void notifications.error(`Failed to register plugin assembly: ${String(error)}`);
   }
 }
 
@@ -139,6 +141,7 @@ export async function updatePluginAssembly(
     pluginRegistration,
     pluginExplorer,
     assemblyStatusBar,
+    notifications,
   } = ctx;
   const config = await configuration.loadConfiguration();
 
@@ -152,6 +155,7 @@ export async function updatePluginAssembly(
         config,
         targetNode.env.name,
         { placeHolder: "Select environment to update plugin assembly" },
+        notifications,
       )
     : await pickEnvironmentAndAuth(
         configuration,
@@ -162,6 +166,7 @@ export async function updatePluginAssembly(
         config,
         undefined,
         { placeHolder: "Select environment to update plugin assembly" },
+        notifications,
       );
 
   if (!selection) {
@@ -173,7 +178,7 @@ export async function updatePluginAssembly(
   try {
     service = await createPluginService(connections, selection.auth, env);
   } catch (error) {
-    void vscode.window.showErrorMessage(String(error));
+    void notifications.error(String(error));
     return;
   }
 
@@ -186,7 +191,7 @@ export async function updatePluginAssembly(
   } else {
     const assemblies = await service.listAssemblies();
     if (!assemblies.length) {
-      vscode.window.showInformationMessage(`No plugin assemblies found in ${env.name}.`);
+      await notifications.info(`No plugin assemblies found in ${env.name}.`);
       return;
     }
 
@@ -206,7 +211,7 @@ export async function updatePluginAssembly(
   }
 
   if (!assemblyId) {
-    vscode.window.showErrorMessage("No plugin assembly selected for update.");
+    await notifications.error("No plugin assembly selected for update.");
     return;
   }
 
@@ -230,6 +235,7 @@ export async function updatePluginAssembly(
     pluginExplorer,
     assemblyStatusBar,
     lastSelection,
+    notifications,
   });
 }
 
@@ -244,20 +250,19 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     pluginRegistration,
     pluginExplorer,
     assemblyStatusBar,
+    notifications,
   } = ctx;
 
   const last = assemblyStatusBar.getLastPublish();
   if (!last) {
-    vscode.window.showInformationMessage(
-      "Publish a plugin assembly first to enable quick publish.",
-    );
+    await notifications.info("Publish a plugin assembly first to enable quick publish.");
     return;
   }
 
   try {
     await vscode.workspace.fs.stat(last.assemblyUri);
   } catch {
-    vscode.window.showWarningMessage("Last published plugin assembly no longer exists.");
+    await notifications.warning("Last published plugin assembly no longer exists.");
     assemblyStatusBar.clear();
     return;
   }
@@ -272,12 +277,14 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     config,
     last.environment.name,
     { placeHolder: "Select environment to publish plugin assembly" },
+    notifications,
   );
   if (!selection) {
     return;
   }
 
   const confirmed = await confirmAssemblyPublish(
+    notifications,
     last.assemblyUri,
     selection.env,
     last.assemblyName,
@@ -290,7 +297,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
   try {
     service = await createPluginService(connections, selection.auth, selection.env);
   } catch (error) {
-    void vscode.window.showErrorMessage(String(error));
+    void notifications.error(String(error));
     return;
   }
 
@@ -306,9 +313,10 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
       pluginExplorer,
       assemblyStatusBar,
       lastSelection,
+      notifications,
     });
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to publish plugin assembly: ${String(error)}`);
+    void notifications.error(`Failed to publish plugin assembly: ${String(error)}`);
   }
 }
 

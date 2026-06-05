@@ -6,10 +6,14 @@ import { Dynamics365Configuration, EnvironmentConfig } from "../../features/conf
 import type { DataverseClient } from "../../features/dataverse/dataverseClient";
 import type { EnvironmentAuthContext } from "../../features/dataverse/environmentConnectionService";
 import type { CommandContext } from "../../app/commandContext";
+import type { NotificationPort } from "../../app/ports/notifications";
 import { LastSelectionService } from "./lastSelectionStore";
 import { SolutionPicker } from "./ui/solutionPicker";
 
-export async function resolveTargetUri(uri?: vscode.Uri): Promise<vscode.Uri | undefined> {
+export async function resolveTargetUri(
+  notifications: NotificationPort,
+  uri?: vscode.Uri,
+): Promise<vscode.Uri | undefined> {
   if (uri) {
     return uri;
   }
@@ -19,7 +23,7 @@ export async function resolveTargetUri(uri?: vscode.Uri): Promise<vscode.Uri | u
     return editorUri;
   }
 
-  vscode.window.showInformationMessage("Select a file or folder to proceed.");
+  await notifications.info("Select a file or folder to proceed.");
   return undefined;
 }
 
@@ -32,6 +36,7 @@ export async function pickEnvironmentAndAuth(
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
   pickOptions?: { placeHolder?: string },
+  notifications?: NotificationPort,
 ): Promise<
   | {
       env: EnvironmentConfig;
@@ -47,7 +52,7 @@ export async function pickEnvironmentAndAuth(
   if (preferredEnvName) {
     env = resolvedConfig.environments.find((candidate) => candidate.name === preferredEnvName);
     if (!env) {
-      vscode.window.showErrorMessage(`Environment ${preferredEnvName} is not configured.`);
+      await notifications?.error(`Environment ${preferredEnvName} is not configured.`);
       return undefined;
     }
   } else {
@@ -67,7 +72,7 @@ export async function pickEnvironmentAndAuth(
       : undefined;
 
   if (!accessToken && !credentials) {
-    vscode.window.showErrorMessage(
+    await notifications?.error(
       "No credentials available. Sign in interactively or set client credentials first.",
     );
     return undefined;
@@ -107,6 +112,7 @@ export async function pickDataverseClient(
     options.config,
     options.preferredEnvName,
     options.placeHolder ? { placeHolder: options.placeHolder } : undefined,
+    ctx.notifications,
   );
   if (!target) {
     return undefined;

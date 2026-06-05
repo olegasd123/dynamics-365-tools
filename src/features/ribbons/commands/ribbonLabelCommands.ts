@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { createLocLabelPatches, createLocLabelTitlePatch } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
@@ -16,7 +15,7 @@ export async function addRibbonLocLabel(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -60,7 +59,7 @@ export async function addRibbonLocLabelTitle(
 ): Promise<void> {
   const target = resolveLocLabelTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a LocLabel first.");
+    await ctx.notifications.warning("Select a LocLabel first.");
     return;
   }
 

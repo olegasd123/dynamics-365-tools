@@ -14,6 +14,14 @@ export class VsCodeNotificationService implements NotificationPort {
     await vscode.window.showErrorMessage(message);
   }
 
+  async askInfo<T extends string>(
+    message: string,
+    actions: readonly T[],
+    options?: NotificationOptions,
+  ): Promise<T | undefined> {
+    return vscode.window.showInformationMessage(message, options ?? {}, ...actions);
+  }
+
   async askWarning<T extends string>(
     message: string,
     actions: readonly T[],

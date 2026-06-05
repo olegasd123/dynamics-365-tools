@@ -30,7 +30,7 @@ type SolutionPickItem = vscode.QuickPickItem & {
 };
 
 export async function addEnvironment(ctx: CommandContext): Promise<void> {
-  const { configuration, pluginExplorer } = ctx;
+  const { configuration, pluginExplorer, notifications } = ctx;
   const current = await loadOrCreateEmptyConfig(configuration);
 
   const name = await vscode.window.showInputBox({
@@ -108,21 +108,21 @@ export async function addEnvironment(ctx: CommandContext): Promise<void> {
     environments: nextEnvironments,
   });
   pluginExplorer.refresh();
-  vscode.window.showInformationMessage(`Environment ${normalizedName} ${action} in config.`);
+  await notifications.info(`Environment ${normalizedName} ${action} in config.`);
 }
 
 export async function addSolution(ctx: CommandContext): Promise<void> {
-  const { configuration, ui, connections, lastSelection, pluginExplorer } = ctx;
+  const { configuration, ui, connections, lastSelection, pluginExplorer, notifications } = ctx;
   const config = await configuration.loadExistingConfiguration();
   if (!config) {
-    vscode.window.showErrorMessage(
+    await notifications.error(
       "No configuration found. Run 'Dynamics 365 Tools: Add Environment' first.",
     );
     return;
   }
 
   if (!config.environments.length) {
-    vscode.window.showErrorMessage(
+    await notifications.error(
       "No environments configured. Run 'Dynamics 365 Tools: Add Environment' first.",
     );
     return;
@@ -146,13 +146,13 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
   try {
     unmanaged = await listUnmanagedSolutions(client);
   } catch (error) {
-    vscode.window.showErrorMessage(
+    await notifications.error(
       `Failed to load unmanaged solutions from ${env.name}: ${String(error)}`,
     );
     return;
   }
   if (!unmanaged.length) {
-    vscode.window.showInformationMessage(`No unmanaged solutions found in ${env.name}.`);
+    await notifications.info(`No unmanaged solutions found in ${env.name}.`);
     return;
   }
 
@@ -218,7 +218,7 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
   }
 
   if (!added && !updated) {
-    vscode.window.showInformationMessage("All selected solutions are already up to date.");
+    await notifications.info("All selected solutions are already up to date.");
     return;
   }
 
@@ -233,7 +233,7 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
   if (usedFallbackPrefix) {
     summary.push(`fallback prefix used: ${usedFallbackPrefix}`);
   }
-  vscode.window.showInformationMessage(`Solutions saved (${summary.join(", ")}).`);
+  await notifications.info(`Solutions saved (${summary.join(", ")}).`);
 }
 
 async function listUnmanagedSolutions(client: DataverseClient): Promise<

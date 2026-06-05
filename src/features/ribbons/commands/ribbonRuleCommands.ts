@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { BUILT_IN_ENABLE_RULES } from "../enableRuleCatalog";
 import {
@@ -53,7 +52,7 @@ async function addRibbonRule(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon scope first.");
+    await ctx.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -93,7 +92,7 @@ async function addRibbonCommandRuleRef(
 ): Promise<void> {
   const target = resolveCommandTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a command definition first.");
+    await ctx.notifications.warning("Select a command definition first.");
     return;
   }
 

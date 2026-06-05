@@ -5,6 +5,7 @@ import * as path from "node:path";
 import test from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
+import { VsCodeNotificationService } from "../../../platform/vscode/notificationService";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
@@ -49,6 +50,10 @@ import {
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
 import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
+
+function createNotifications(): VsCodeNotificationService {
+  return new VsCodeNotificationService();
+}
 
 test("normalizes manually typed web resource names", () => {
   assert.strictEqual(
@@ -350,6 +355,7 @@ test("removes imported ribbon solution after confirmation", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       node,
     );
@@ -458,6 +464,7 @@ test("adds command action from actions group node", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       node,
     );
@@ -658,6 +665,7 @@ test("adds command enable rule reference from enable rules group node", async ()
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       node,
     );
@@ -1838,6 +1846,7 @@ test("deletes hide action after confirmation", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       new RibbonItemNode(
         hideAction.hideActionId,
@@ -1897,6 +1906,7 @@ test("keeps hide action when delete confirmation is canceled", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       new RibbonItemNode(
         hideAction.hideActionId,
@@ -1971,6 +1981,7 @@ test("deletes action parameters after confirmation", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       new RibbonItemNode(
         `1. ${urlParameter.value}`,
@@ -2024,6 +2035,7 @@ test("deletes action parameters after confirmation", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       new RibbonItemNode(
         `2. ${jsParameter.value}`,
@@ -2238,6 +2250,7 @@ test("deletes loc label title after confirmation", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       new RibbonItemNode(
         String(title.languageCode),
@@ -2300,6 +2313,7 @@ test("keeps loc label title when delete confirmation is canceled", async () => {
             refreshed = true;
           },
         },
+        notifications: createNotifications(),
       } as any,
       new RibbonItemNode(
         String(title.languageCode),
@@ -2498,6 +2512,7 @@ test("delete command can remove related items and undo restores them", async () 
         ribbonExplorer: {
           refresh: () => undefined,
         },
+        notifications: createNotifications(),
       } as any,
       node,
     );
@@ -3063,6 +3078,7 @@ test("offers to save a backup when opening an exported solution", async () => {
       ribbonExplorer: {
         refresh: () => undefined,
       },
+      notifications: createNotifications(),
     } as any);
   } finally {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
@@ -3190,6 +3206,7 @@ test("publishes saved ribbon XML to the selected unmanaged solution", async () =
         ribbonExplorer: {
           refresh: () => undefined,
         },
+        notifications: createNotifications(),
         ribbonPublishService: {
           listUnmanagedSolutions: async () => [
             {

@@ -24,6 +24,7 @@ import { RibbonSourceLocator } from "./ribbonSourceLocator";
 import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
 import { scanXmlElements } from "./ribbonXmlReader";
+import type { NotificationPort } from "../../app/ports/notifications";
 
 export type RibbonExplorerNode =
   | RibbonSourceNode
@@ -159,6 +160,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     private readonly locator: RibbonSourceLocator,
     private readonly editorState: RibbonEditorState,
     private readonly diagnostics?: RibbonDiagnosticsService,
+    private readonly notifications?: NotificationPort,
   ) {}
 
   refresh(node?: RibbonExplorerNode): void {
@@ -229,7 +231,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
           )
         : [new RibbonEmptyNode("No RibbonDiffXml blocks found", "Check the source files")];
     } catch (error) {
-      void vscode.window.showErrorMessage(`Failed to load ribbons: ${String(error)}`);
+      void this.notifications?.error(`Failed to load ribbons: ${String(error)}`);
       return [new RibbonEmptyNode("Failed to load ribbons", "See the error notification")];
     }
   }

@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
 import { CommandContext } from "../../../app/commandContext";
 import { ConfigurationService } from "../../config/configurationService";
@@ -13,18 +12,17 @@ import { PluginService } from "../pluginService";
 
 export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin in the Plugins explorer.");
     return;
   }
 
-  const confirmation = await vscode.window.showWarningMessage(
+  const confirmation = await notifications.askWarning(
     `Remove plugin '${node.pluginType.name}' from ${node.env.name}? All steps and images will also be removed.`,
+    ["Delete"],
     { modal: true },
-    "Delete",
   );
   if (confirmation !== "Delete") {
     return;
@@ -39,6 +37,7 @@ export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNod
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) {
     return;
@@ -47,11 +46,9 @@ export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNod
   try {
     await service.deletePluginTypeCascade(node.pluginType.id);
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin ${node.pluginType.name} removed.`);
+    void notifications.info(`Plugin ${node.pluginType.name} removed.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Failed to remove plugin ${node.pluginType.name}: ${String(error)}`,
-    );
+    void notifications.error(`Failed to remove plugin ${node.pluginType.name}: ${String(error)}`);
   }
 }
 
@@ -64,6 +61,7 @@ async function resolvePluginService(
   lastSelection: LastSelectionService,
   connections: EnvironmentConnectionService,
   preferredEnv: string,
+  notifications: CommandContext["notifications"],
 ): Promise<PluginService | undefined> {
   const config = await configuration.loadConfiguration();
   const selection = await pickEnvironmentAndAuth(
@@ -75,6 +73,7 @@ async function resolvePluginService(
     config,
     preferredEnv,
     { placeHolder },
+    notifications,
   );
   if (!selection) return undefined;
 

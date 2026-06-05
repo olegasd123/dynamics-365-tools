@@ -15,6 +15,7 @@ import {
   Dynamics365Configuration,
   EnvironmentConfig,
 } from "../../config/domain/models";
+import type { NotificationPort } from "../../../app/ports/notifications";
 import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
 import { addBinding } from "./bindingCommands";
 import {
@@ -37,17 +38,18 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
     statusBar,
     lastSelection,
     publishCache,
+    notifications,
   } = ctx;
   const last = statusBar.getLastPublish();
   if (!last) {
-    vscode.window.showInformationMessage("Publish a resource first to enable quick publish.");
+    await notifications.info("Publish a resource first to enable quick publish.");
     return;
   }
 
   try {
     await vscode.workspace.fs.stat(last.targetUri);
   } catch {
-    vscode.window.showWarningMessage("Last published resource no longer exists.");
+    await notifications.warning("Last published resource no longer exists.");
     statusBar.clear();
     return;
   }
@@ -59,7 +61,14 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
   const configuredEnvironment =
     config.environments.find((env) => env.name === preferredEnvName) ?? last.environment;
 
-  if (!(await confirmPublishTarget(last.targetUri, configuredEnvironment, last.isFolder))) {
+  if (
+    !(await confirmPublishTarget(
+      notifications,
+      last.targetUri,
+      configuredEnvironment,
+      last.isFolder,
+    ))
+  ) {
     return;
   }
 
@@ -78,6 +87,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
       statusBar,
       lastSelection,
       publishCache,
+      notifications,
       config,
       preferredEnvName,
     );
@@ -95,6 +105,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
     statusBar,
     lastSelection,
     publishCache,
+    notifications,
     config,
     preferredEnvName,
   );
@@ -112,8 +123,9 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
     statusBar,
     lastSelection,
     publishCache,
+    notifications,
   } = ctx;
-  const targetUri = await resolveTargetUri(uri);
+  const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;
   }
@@ -147,6 +159,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
       statusBar,
       lastSelection,
       publishCache,
+      notifications,
       config,
     );
     return;
@@ -163,6 +176,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
     statusBar,
     lastSelection,
     publishCache,
+    notifications,
     config,
   );
 }
@@ -182,8 +196,9 @@ export async function publishResource(
     statusBar,
     lastSelection,
     publishCache,
+    notifications,
   } = ctx;
-  const targetUri = await resolveTargetUri(uri);
+  const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;
   }
@@ -197,10 +212,9 @@ export async function publishResource(
 
   const binding = await bindings.getBinding(targetUri);
   if (!binding) {
-    const choice = await vscode.window.showInformationMessage(
+    const choice = await notifications.askInfo(
       "This resource is not bound yet. Add a binding to publish it.",
-      "Add Binding",
-      "Cancel",
+      ["Add Binding", "Cancel"],
     );
     if (choice === "Add Binding") {
       await addBinding(ctx, targetUri);
@@ -224,6 +238,7 @@ export async function publishResource(
       statusBar,
       lastSelection,
       publishCache,
+      notifications,
       config,
     );
     return;
@@ -240,6 +255,7 @@ export async function publishResource(
     statusBar,
     lastSelection,
     publishCache,
+    notifications,
     config,
   );
 }
@@ -255,6 +271,7 @@ async function publishFlow(
   statusBar: StatusBarService,
   lastSelection: LastSelectionService,
   publishCache: PublishCacheService,
+  notifications: NotificationPort,
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
 ) {
@@ -266,6 +283,8 @@ async function publishFlow(
     lastSelection,
     config,
     preferredEnvName,
+    undefined,
+    notifications,
   );
   if (!publishAuth) {
     return;
@@ -297,6 +316,7 @@ async function publishFolder(
   statusBar: StatusBarService,
   lastSelection: LastSelectionService,
   publishCache: PublishCacheService,
+  notifications: NotificationPort,
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
 ): Promise<void> {
@@ -308,6 +328,8 @@ async function publishFolder(
     lastSelection,
     config,
     preferredEnvName,
+    undefined,
+    notifications,
   );
   if (!publishAuth) {
     return;
@@ -332,15 +354,13 @@ async function publishFolder(
       progress.report({ message: "Scanning folder..." });
       const files = await collectSupportedFiles(folderUri, supportedExtensions, cancellationToken);
       if (cancellationToken.isCancellationRequested) {
-        vscode.window.showWarningMessage(
+        await notifications.warning(
           `Dynamics 365 Tools publish to ${publishAuth.env.name} cancelled: no files were processed.`,
         );
         return;
       }
       if (!files.length) {
-        vscode.window.showInformationMessage(
-          "No supported web resource files found in this folder.",
-        );
+        await notifications.info("No supported web resource files found in this folder.");
         return;
       }
 
@@ -395,7 +415,7 @@ async function publishFolder(
         const summary = processed
           ? `${processed} file(s) processed before cancellation`
           : "No files were processed";
-        vscode.window.showWarningMessage(
+        await notifications.warning(
           `Dynamics 365 Tools publish to ${publishAuth.env.name} cancelled: ${summary}.`,
         );
       }
@@ -404,6 +424,7 @@ async function publishFolder(
 }
 
 function confirmPublishTarget(
+  notifications: NotificationPort,
   targetUri: vscode.Uri,
   env: EnvironmentConfig,
   isFolder: boolean,
@@ -411,10 +432,10 @@ function confirmPublishTarget(
   const relative = vscode.workspace.asRelativePath(targetUri, false);
   const target = isFolder ? `${relative}/` : relative;
   return (async () => {
-    const result = await vscode.window.showWarningMessage(
+    const result = await notifications.askWarning(
       `Publish ${target} to ${env.name}?`,
+      ["Publish"],
       { modal: true },
-      "Publish",
     );
     return result === "Publish";
   })();

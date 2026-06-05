@@ -10,8 +10,8 @@ import { compareFolderBindingResources, normalizeRemotePath } from "../folderBin
 const bindingOutput = vscode.window.createOutputChannel("Dynamics 365 Tools Binding");
 
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const { configuration, bindings, ui } = ctx;
-  const targetUri = await resolveTargetUri(uri);
+  const { configuration, bindings, ui, notifications } = ctx;
+  const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;
   }
@@ -23,7 +23,7 @@ export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefine
   const solutionConfig = await ui.promptSolution(config.solutions);
 
   if (!solutionConfig) {
-    vscode.window.showWarningMessage("No solution selected. Binding was not created.");
+    await notifications.warning("No solution selected. Binding was not created.");
     return;
   }
 
@@ -48,7 +48,7 @@ export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefine
   };
 
   await bindings.addOrUpdateBinding(binding);
-  vscode.window.showInformationMessage(
+  await notifications.info(
     `Bound ${relative || targetUri.fsPath} to ${remotePath} (${solutionConfig.name}).`,
   );
 }
@@ -110,18 +110,16 @@ async function confirmFolderBinding(
       summary.onlyLocal,
       summary.onlyCrm,
     );
-    const decision = await vscode.window.showWarningMessage(
+    const decision = await ctx.notifications.askWarning(
       `Binding check for ${target.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
-      "Create Binding",
-      "Cancel",
+      ["Create Binding", "Cancel"],
     );
     return decision === "Create Binding";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const decision = await vscode.window.showWarningMessage(
+    const decision = await ctx.notifications.askWarning(
       `Could not compare local files with CRM resources: ${message}. Continue creating binding?`,
-      "Create Binding",
-      "Cancel",
+      ["Create Binding", "Cancel"],
     );
     return decision === "Create Binding";
   }

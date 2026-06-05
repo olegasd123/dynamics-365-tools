@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
+import { VsCodeNotificationService } from "../../platform/vscode/notificationService";
 import { CommandContext } from "../commandContext";
 import { runCommandWithHealthCheck } from "../commandRunner";
 
@@ -17,6 +18,7 @@ function createContext(overrides?: {
       saveConfiguration: overrides?.saveConfiguration ?? (async () => undefined),
       saveBindings: overrides?.saveBindings ?? (async () => undefined),
     },
+    notifications: new VsCodeNotificationService(),
   } as unknown as CommandContext;
 }
 

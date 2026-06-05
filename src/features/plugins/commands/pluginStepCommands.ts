@@ -20,16 +20,15 @@ import {
 
 export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   const config = await configuration.loadConfiguration();
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin type in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin type in the Plugins explorer.");
     return;
   }
   if (node.pluginType.isWorkflowActivity) {
-    void vscode.window.showInformationMessage("Workflow activities cannot have plugin steps.");
+    void notifications.info("Workflow activities cannot have plugin steps.");
     return;
   }
 
@@ -42,19 +41,21 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
     lastSelection,
     connections,
     node.env.name,
+    notifications,
     config,
   );
   if (!service) return;
 
-  const messageName = await pickMessageName(service);
+  const messageName = await pickMessageName(service, notifications);
   if (!messageName) return;
 
-  const primaryEntityPick = await pickPrimaryEntity(service);
+  const primaryEntityPick = await pickPrimaryEntity(service, notifications);
   if (primaryEntityPick.cancelled) return;
   const primaryEntity = primaryEntityPick.value;
 
   const filteringAttributesPick = await pickFilteringAttributes(
     service,
+    notifications,
     primaryEntity ?? undefined,
   );
   if (filteringAttributesPick.cancelled) return;
@@ -98,19 +99,18 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
       solutionName: solution.name,
     });
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin step ${name} created.`);
+    void notifications.info(`Plugin step ${name} created.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to create plugin step: ${String(error)}`);
+    void notifications.error(`Failed to create plugin step: ${String(error)}`);
   }
 }
 
 export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin step in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin step in the Plugins explorer.");
     return;
   }
 
@@ -123,18 +123,28 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) return;
 
-  const messageName = await pickMessageName(service, node.step.messageName ?? "Create");
+  const messageName = await pickMessageName(
+    service,
+    notifications,
+    node.step.messageName ?? "Create",
+  );
   if (!messageName) return;
 
-  const primaryEntityPick = await pickPrimaryEntity(service, node.step.primaryEntity);
+  const primaryEntityPick = await pickPrimaryEntity(
+    service,
+    notifications,
+    node.step.primaryEntity,
+  );
   if (primaryEntityPick.cancelled) return;
   const primaryEntity = primaryEntityPick.value;
 
   const filteringAttributesPick = await pickFilteringAttributes(
     service,
+    notifications,
     primaryEntity ?? undefined,
     node.step.filteringAttributes ?? "",
   );
@@ -174,9 +184,9 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
       filteringAttributes: filteringAttributes ?? "",
     });
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin step ${name} updated.`);
+    void notifications.info(`Plugin step ${name} updated.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to update plugin step: ${String(error)}`);
+    void notifications.error(`Failed to update plugin step: ${String(error)}`);
   }
 }
 
@@ -198,6 +208,7 @@ export async function enablePluginStep(ctx: CommandContext, node?: PluginStepNod
     pluginExplorer,
     node,
     true,
+    ctx.notifications,
   );
 }
 
@@ -219,23 +230,23 @@ export async function disablePluginStep(ctx: CommandContext, node?: PluginStepNo
     pluginExplorer,
     node,
     false,
+    ctx.notifications,
   );
 }
 
 export async function deletePluginStep(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin step in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin step in the Plugins explorer.");
     return;
   }
 
-  const confirmed = await vscode.window.showWarningMessage(
+  const confirmed = await notifications.askWarning(
     `Delete plugin '${node.step.name}' step from ${node.env.name}?`,
+    ["Delete"],
     { modal: true },
-    "Delete",
   );
   if (confirmed !== "Delete") return;
 
@@ -248,34 +259,36 @@ export async function deletePluginStep(ctx: CommandContext, node?: PluginStepNod
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) return;
 
   try {
     await service.deleteStep(node.step.id);
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin ${node.step.name} step deleted.`);
+    void notifications.info(`Plugin ${node.step.name} step deleted.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to delete plugin step: ${String(error)}`);
+    void notifications.error(`Failed to delete plugin step: ${String(error)}`);
   }
 }
 
-export async function copyStepDescription(node?: PluginStepNode): Promise<void> {
+export async function copyStepDescription(
+  ctx: CommandContext,
+  node?: PluginStepNode,
+): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin step in the Plugins explorer.",
-    );
+    void ctx.notifications.info("Run this command from a plugin step in the Plugins explorer.");
     return;
   }
 
   const tooltip = asTooltipString(node.tooltip);
   if (!tooltip) {
-    void vscode.window.showInformationMessage("No step info to copy.");
+    void ctx.notifications.info("No step info to copy.");
     return;
   }
 
   await vscode.env.clipboard.writeText(tooltip);
-  void vscode.window.showInformationMessage("Step info copied to clipboard.");
+  void ctx.notifications.info("Step info copied to clipboard.");
 }
 
 async function setPluginStepState(
@@ -294,9 +307,10 @@ async function setPluginStepState(
   explorer: PluginExplorerProvider,
   node: PluginStepNode | undefined,
   enabled: boolean,
+  notifications: CommandContext["notifications"],
 ): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage(
+    void notifications.info(
       `Run this command from a plugin step in the Plugins explorer to ${options.action} it.`,
     );
     return;
@@ -305,7 +319,7 @@ async function setPluginStepState(
   if (node.step.status !== undefined) {
     const isEnabled = node.step.status === 0;
     if (isEnabled === enabled) {
-      void vscode.window.showInformationMessage(
+      void notifications.info(
         `Plugin step ${node.step.name} is already ${enabled ? "enabled" : "disabled"}.`,
       );
       return;
@@ -313,10 +327,10 @@ async function setPluginStepState(
   }
 
   if (options.confirmation) {
-    const confirmation = await vscode.window.showWarningMessage(
+    const confirmation = await notifications.askWarning(
       `${options.confirmation} plugin step '${node.step.name}' in ${node.env.name}?`,
+      [options.confirmation],
       { modal: true },
-      options.confirmation,
     );
     if (confirmation !== options.confirmation) {
       return;
@@ -332,15 +346,16 @@ async function setPluginStepState(
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) return;
 
   try {
     await service.setStepState(node.step.id, enabled);
     explorer.refresh();
-    void vscode.window.showInformationMessage(options.successMessage(node.step.name));
+    void notifications.info(options.successMessage(node.step.name));
   } catch (error) {
-    void vscode.window.showErrorMessage(
+    void notifications.error(
       `Failed to ${options.action} plugin step ${node.step.name}: ${String(error)}`,
     );
   }

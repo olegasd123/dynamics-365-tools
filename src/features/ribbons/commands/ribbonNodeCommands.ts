@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import {
   createCommandActionReplacePatch,
@@ -52,32 +51,32 @@ const DELETE_HIDE_ACTION = "Delete Hide Action";
 const DELETE_LOC_LABEL_LANGUAGE = "Delete Language";
 export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
   if (!(node instanceof RibbonItemNode) || !node.editTarget) {
-    vscode.window.showWarningMessage("Select a ribbon item that can be deleted.");
+    await ctx.notifications.warning("Select a ribbon item that can be deleted.");
     return;
   }
 
   const { document, range } = node.editTarget;
   if (node.contextValue === "d365RibbonParameter") {
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ctx.notifications.askWarning(
       `Delete parameter ${node.label}?`,
+      [DELETE_PARAMETER],
       {
         modal: true,
         detail: "This removes the parameter XML from the ribbon action.",
       },
-      DELETE_PARAMETER,
     );
     if (choice !== DELETE_PARAMETER) {
       return;
     }
   }
   if (node.contextValue === "d365RibbonHideAction") {
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ctx.notifications.askWarning(
       `Delete hide action ${node.label}?`,
+      [DELETE_HIDE_ACTION],
       {
         modal: true,
         detail: "This removes the HideCustomAction XML from the ribbon.",
       },
-      DELETE_HIDE_ACTION,
     );
     if (choice !== DELETE_HIDE_ACTION) {
       return;
@@ -88,13 +87,13 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
     const labelText = target
       ? `Loc label language ${target.title.languageCode} from ${target.label.id}`
       : `Loc label language ${node.label}`;
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ctx.notifications.askWarning(
       `Delete ${labelText}?`,
+      [DELETE_LOC_LABEL_LANGUAGE],
       {
         modal: true,
         detail: "This removes this language title from the LocLabel.",
       },
-      DELETE_LOC_LABEL_LANGUAGE,
     );
     if (choice !== DELETE_LOC_LABEL_LANGUAGE) {
       return;
@@ -110,14 +109,13 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Delete ${plan.related.length} related ribbon item${plan.related.length === 1 ? "" : "s"}?`,
+    [DELETE_RELATED_ITEMS, DELETE_SELECTED_ONLY],
     {
       modal: true,
       detail: relatedDeleteMessage(plan.related),
     },
-    DELETE_RELATED_ITEMS,
-    DELETE_SELECTED_ONLY,
   );
   if (!choice) {
     return;
@@ -163,13 +161,13 @@ function relatedDeleteMessage(related: RibbonCascadeDeleteItem[]): string {
 
 export async function editRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
   if (!(node instanceof RibbonItemNode) || !node.editTarget) {
-    vscode.window.showWarningMessage("Select a ribbon item that can be edited.");
+    await ctx.notifications.warning("Select a ribbon item that can be edited.");
     return;
   }
 
   const target = resolveEditableTarget(node);
   if (!target) {
-    vscode.window.showWarningMessage("This ribbon item cannot be edited yet.");
+    await ctx.notifications.warning("This ribbon item cannot be edited yet.");
     return;
   }
 
@@ -215,7 +213,7 @@ export async function addRibbonRuleChildStep(
 ): Promise<void> {
   const target = resolveRuleStepTarget(node);
   if (!target || target.step.kind !== "OrRule") {
-    vscode.window.showWarningMessage("Select an OrRule first.");
+    await ctx.notifications.warning("Select an OrRule first.");
     return;
   }
 
@@ -298,13 +296,13 @@ async function moveRibbonNode(
 ): Promise<void> {
   const target = await resolveReorderTarget(ctx, node);
   if (!target) {
-    vscode.window.showWarningMessage("Select a ribbon item that can be moved.");
+    await ctx.notifications.warning("Select a ribbon item that can be moved.");
     return;
   }
 
   const nextIndex = target.index + direction;
   if (nextIndex < 0 || nextIndex >= target.ranges.length) {
-    vscode.window.showWarningMessage(
+    await ctx.notifications.warning(
       direction < 0 ? "Item is already first." : "Item is already last.",
     );
     return;
@@ -911,7 +909,7 @@ async function editCustomAction(
   action: CustomAction,
 ): Promise<void> {
   if (action.commandUI?.kind !== "Button") {
-    vscode.window.showWarningMessage("Only Button custom actions can be edited.");
+    await ctx.notifications.warning("Only Button custom actions can be edited.");
     return;
   }
 

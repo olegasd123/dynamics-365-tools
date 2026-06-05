@@ -41,9 +41,9 @@ import { CommandContext } from "./commandContext";
 export function createServices(extensionContext: vscode.ExtensionContext): CommandContext {
   const disposables: vscode.Disposable[] = [];
 
-  const configuration = lazy(() => new ConfigurationService());
-  const ui = lazy(() => new SolutionPicker());
   const notifications = lazy(() => new VsCodeNotificationService());
+  const configuration = lazy(() => new ConfigurationService());
+  const ui = lazy(() => new SolutionPicker(notifications()));
   const secrets = lazy(() => new SecretService(extensionContext.secrets));
   const auth = lazy(() => new AuthService(notifications()));
   const authorizations = lazy(() => new AuthorizationStore(extensionContext.globalState));
@@ -76,6 +76,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
       configuration(),
       connections(),
       extensionContext.workspaceState,
+      notifications(),
     );
   });
 
@@ -91,6 +92,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
       ribbonSourceLocator(),
       ribbonEditorState(),
       ribbonDiagnostics(),
+      notifications(),
     );
   });
   const ribbonFormPanel = lazyDisposable(() => new RibbonFormPanel(), disposables);
@@ -154,6 +156,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
       pacCli(),
       pcfBuildService(),
       pcfEnvironmentService(),
+      notifications(),
     );
   });
 

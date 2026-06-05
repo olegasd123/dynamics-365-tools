@@ -9,7 +9,7 @@ import {
 import { AuthorizationProfile } from "../authorizationStore";
 
 export async function setEnvironmentCredentials(ctx: CommandContext): Promise<void> {
-  const { secrets, lastSelection, authorizations } = ctx;
+  const { secrets, lastSelection, authorizations, notifications } = ctx;
   const env = await pickAuthorizationEnvironment(ctx, "clientSecret", {
     placeHolder: "Select authorization for client credentials",
     includeCreate: true,
@@ -49,11 +49,11 @@ export async function setEnvironmentCredentials(ctx: CommandContext): Promise<vo
     tenantId,
   });
   await authorizations.save(environmentToProfile(env, "clientSecret"));
-  vscode.window.showInformationMessage(`Credentials saved securely for environment ${env.name}.`);
+  await notifications.info(`Credentials saved securely for environment ${env.name}.`);
 }
 
 export async function signInInteractive(ctx: CommandContext): Promise<void> {
-  const { auth, lastSelection, authorizations } = ctx;
+  const { auth, lastSelection, authorizations, notifications } = ctx;
   const env = await pickAuthorizationEnvironment(ctx, "interactive", {
     placeHolder: "Select authorization for interactive sign-in",
     includeCreate: true,
@@ -69,12 +69,12 @@ export async function signInInteractive(ctx: CommandContext): Promise<void> {
   const token = await auth.getAccessToken(env, { clearSessionPreference: true });
   if (token) {
     await authorizations.save(environmentToProfile(env, "interactive"));
-    vscode.window.showInformationMessage(`Signed in interactively for ${env.name}.`);
+    await notifications.info(`Signed in interactively for ${env.name}.`);
   }
 }
 
 export async function signOut(ctx: CommandContext): Promise<void> {
-  const { auth, secrets, lastSelection } = ctx;
+  const { auth, secrets, lastSelection, notifications } = ctx;
   const env = await pickAuthorizationEnvironment(ctx, "interactive", {
     placeHolder: "Select authorization to sign out",
     includeCreate: false,
@@ -92,10 +92,9 @@ export async function signOut(ctx: CommandContext): Promise<void> {
   let clearedCredentials = false;
 
   if (storedCreds) {
-    const remove = await vscode.window.showInformationMessage(
+    const remove = await notifications.askInfo(
       `Remove stored client credentials for ${env.name} as well?`,
-      "Remove",
-      "Keep",
+      ["Remove", "Keep"],
     );
     if (remove === "Remove") {
       await secrets.clearCredentials(env.name);
@@ -105,7 +104,7 @@ export async function signOut(ctx: CommandContext): Promise<void> {
 
   if (signOutResult === "failed") {
     if (clearedCredentials) {
-      vscode.window.showInformationMessage(
+      await notifications.info(
         `Client credentials cleared for ${env.name}, but interactive sign-out failed (check errors).`,
       );
     }
@@ -117,11 +116,9 @@ export async function signOut(ctx: CommandContext): Promise<void> {
     const parts = [];
     if (signedOut) parts.push("signed out");
     if (clearedCredentials) parts.push("client credentials cleared");
-    vscode.window.showInformationMessage(`Dynamics 365 Tools: ${env.name} ${parts.join(" and ")}.`);
+    await notifications.info(`Dynamics 365 Tools: ${env.name} ${parts.join(" and ")}.`);
   } else if (!storedCreds && signOutResult === "notFound") {
-    vscode.window.showInformationMessage(
-      `No interactive session or stored credentials found for ${env.name}.`,
-    );
+    await notifications.info(`No interactive session or stored credentials found for ${env.name}.`);
   }
 }
 
@@ -181,7 +178,7 @@ async function pickAuthorizationEnvironment(
   }
 
   if (!candidates.length) {
-    vscode.window.showInformationMessage(
+    await ctx.notifications.info(
       "No authorizations found. Run 'Dynamics 365 Tools: Sign In (Interactive)' to create one.",
     );
     return undefined;
@@ -287,7 +284,7 @@ async function ensureEnvironmentInProjectConfig(
       solutions: [],
     });
     pluginExplorer.refresh();
-    vscode.window.showInformationMessage(
+    await ctx.notifications.info(
       "Created .vscode/dynamics365tools.config.json with the selected authorization.",
     );
     return;
@@ -300,7 +297,7 @@ async function ensureEnvironmentInProjectConfig(
       environments: [...current.environments, env],
     });
     pluginExplorer.refresh();
-    vscode.window.showInformationMessage(
+    await ctx.notifications.info(
       `Added environment ${env.name} to .vscode/dynamics365tools.config.json.`,
     );
     return;

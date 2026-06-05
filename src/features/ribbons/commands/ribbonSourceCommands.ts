@@ -78,7 +78,7 @@ export async function saveRibbonSolutionZip(
 ): Promise<void> {
   const source = await resolveSource(ctx, node);
   if (!source || source.kind !== "zip") {
-    vscode.window.showWarningMessage("Select an imported solution zip source first.");
+    await ctx.notifications.warning("Select an imported solution zip source first.");
     return;
   }
 
@@ -100,7 +100,7 @@ export async function saveRibbonSolutionZip(
 
   const savedPath = await ctx.solutionZipService.saveSourceToZip(source, target.fsPath);
   ctx.ribbonExplorer.refresh();
-  void vscode.window.showInformationMessage(`Saved solution zip to ${savedPath}.`);
+  void ctx.notifications.info(`Saved solution zip to ${savedPath}.`);
 }
 
 export async function openRibbonSolutionLocation(
@@ -109,7 +109,7 @@ export async function openRibbonSolutionLocation(
 ): Promise<void> {
   const source = await resolveSource(ctx, node);
   if (!source) {
-    vscode.window.showWarningMessage("Select a ribbon source first.");
+    await ctx.notifications.warning("Select a ribbon source first.");
     return;
   }
 
@@ -122,19 +122,19 @@ export async function removeRibbonSolutionSource(
 ): Promise<void> {
   const source = await resolveSource(ctx, node);
   if (!source || source.kind !== "zip") {
-    vscode.window.showWarningMessage("Select an imported solution zip source first.");
+    await ctx.notifications.warning("Select an imported solution zip source first.");
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Remove ${source.name} from the explorer?`,
+    [REMOVE_IMPORTED_SOLUTION],
     {
       modal: true,
       detail: ctx.ribbonEditorState.isSourceDirty(source.id)
         ? "Unsaved ribbon edits for this solution will be lost. Files on disk will not be deleted."
         : "Files on disk will not be deleted.",
     },
-    REMOVE_IMPORTED_SOLUTION,
   );
   if (choice !== REMOVE_IMPORTED_SOLUTION) {
     return;
@@ -160,14 +160,14 @@ export async function saveRibbonSource(
     : await ctx.ribbonEditorState.saveAllSources();
   ctx.ribbonExplorer.refresh();
   const count = result.changedFileUris.length;
-  void vscode.window.showInformationMessage(
+  void ctx.notifications.info(
     count ? `Saved ${count} ribbon file${count === 1 ? "" : "s"}.` : "No ribbon changes to save.",
   );
 }
 
 export function undoRibbonEdit(ctx: CommandContext): void {
   if (!ctx.ribbonEditorState.undo()) {
-    vscode.window.showWarningMessage("No ribbon edit to undo.");
+    void ctx.notifications.warning("No ribbon edit to undo.");
     return;
   }
 
@@ -176,7 +176,7 @@ export function undoRibbonEdit(ctx: CommandContext): void {
 
 export function redoRibbonEdit(ctx: CommandContext): void {
   if (!ctx.ribbonEditorState.redo()) {
-    vscode.window.showWarningMessage("No ribbon edit to redo.");
+    void ctx.notifications.warning("No ribbon edit to redo.");
     return;
   }
 
@@ -190,15 +190,15 @@ export async function publishRibbonToEnvironment(
   const sourceId = resolveSourceId(node);
   let documents = await resolvePublishDocuments(ctx, node);
   if (!documents.length) {
-    vscode.window.showWarningMessage("Select a ribbon source or ribbon document first.");
+    await ctx.notifications.warning("Select a ribbon source or ribbon document first.");
     return;
   }
 
   if (sourceId && ctx.ribbonEditorState.isSourceDirty(sourceId)) {
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ctx.notifications.askWarning(
       "Save ribbon changes before publishing?",
+      ["Save and Publish"],
       { modal: true },
-      "Save and Publish",
     );
     if (choice !== "Save and Publish") {
       return;
@@ -207,7 +207,7 @@ export async function publishRibbonToEnvironment(
     ctx.ribbonExplorer.refresh();
     documents = await resolveSavedPublishDocuments(ctx, node, documents);
     if (!documents.length) {
-      vscode.window.showWarningMessage("No saved ribbon documents were found to publish.");
+      await ctx.notifications.warning("No saved ribbon documents were found to publish.");
       return;
     }
   }
@@ -231,7 +231,7 @@ export async function publishRibbonToEnvironment(
     () => ctx.ribbonPublishService.listUnmanagedSolutions(client),
   );
   if (!solutions.length) {
-    vscode.window.showWarningMessage("No unmanaged solutions were found in this environment.");
+    await ctx.notifications.warning("No unmanaged solutions were found in this environment.");
     return;
   }
 
@@ -266,17 +266,16 @@ export async function publishRibbonToEnvironment(
     const error = publishError;
     const message = describeRibbonPublishError(error);
     if (error instanceof SolutionImportError && error.log) {
-      const action = await vscode.window.showErrorMessage(
-        `Ribbon publish failed: ${message}`,
+      const action = await ctx.notifications.askError(`Ribbon publish failed: ${message}`, [
         "Copy Error XML",
-      );
+      ]);
       if (action === "Copy Error XML") {
         await vscode.env.clipboard.writeText(error.log);
       }
       return;
     }
 
-    void vscode.window.showErrorMessage(`Ribbon publish failed: ${message}`);
+    void ctx.notifications.error(`Ribbon publish failed: ${message}`);
     return;
   }
 
@@ -290,7 +289,7 @@ export async function publishRibbonToEnvironment(
   ]
     .filter(Boolean)
     .join(", ");
-  void vscode.window.showInformationMessage(
+  void ctx.notifications.info(
     `Published ribbons to ${target.env.name} solution ${solution.uniqueName} (${summary}).`,
   );
 }
@@ -305,7 +304,7 @@ export async function pullRibbonsFromEnvironment(
   }
 
   if (ctx.ribbonEditorState.isSourceDirty(source.id)) {
-    vscode.window.showWarningMessage(
+    await ctx.notifications.warning(
       "Save or undo pending ribbon edits before pulling from the environment.",
     );
     return;
@@ -313,7 +312,7 @@ export async function pullRibbonsFromEnvironment(
 
   const targetDocuments = await resolvePullDocuments(ctx, source, node);
   if (!targetDocuments.length) {
-    vscode.window.showWarningMessage("No local ribbon documents were found to update.");
+    await ctx.notifications.warning("No local ribbon documents were found to update.");
     return;
   }
 
@@ -368,7 +367,7 @@ export async function pullRibbonsFromEnvironment(
   if (!plan.matchedDocuments.length) {
     const missing = plan.missingDocuments.length;
     const unchanged = plan.unchangedDocuments.length;
-    vscode.window.showInformationMessage(
+    await ctx.notifications.info(
       missing
         ? `No matching ribbon changes were found (${missing} missing, ${unchanged} unchanged).`
         : "Local ribbons already match the environment.",
@@ -376,10 +375,10 @@ export async function pullRibbonsFromEnvironment(
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Replace ${plan.matchedDocuments.length} local ribbon block${plan.matchedDocuments.length === 1 ? "" : "s"} from ${solutionPick.uniqueName}?`,
+    ["Pull"],
     { modal: true },
-    "Pull",
   );
   if (choice !== "Pull") {
     return;
@@ -388,7 +387,7 @@ export async function pullRibbonsFromEnvironment(
   const result = await ctx.ribbonRepository.savePatchSequence(plan.patchesByFileUri);
   ctx.ribbonExplorer.refresh();
 
-  void vscode.window.showInformationMessage(
+  void ctx.notifications.info(
     `Pulled ${plan.matchedDocuments.length} ribbon block${plan.matchedDocuments.length === 1 ? "" : "s"} into ${result.changedFileUris.length} file${result.changedFileUris.length === 1 ? "" : "s"}.`,
   );
 }
@@ -406,7 +405,7 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
   const client = target.client;
   const generated = await ctx.ribbonPublishService.listGeneratedSolutions(client);
   if (!generated.length) {
-    void vscode.window.showInformationMessage("No generated ribbon solutions were found.");
+    void ctx.notifications.info("No generated ribbon solutions were found.");
     return;
   }
 
@@ -425,10 +424,10 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
     return;
   }
 
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await ctx.notifications.askWarning(
     `Delete ${picks.length} generated ribbon solution${picks.length === 1 ? "" : "s"}?`,
+    ["Delete"],
     { modal: true },
-    "Delete",
   );
   if (choice !== "Delete") {
     return;
@@ -446,12 +445,13 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
       }
     },
   );
-  void vscode.window.showInformationMessage(
+  void ctx.notifications.info(
     `Deleted ${picks.length} generated ribbon solution${picks.length === 1 ? "" : "s"}.`,
   );
 }
 
 export async function openRibbonFile(
+  ctx: CommandContext,
   node?: RibbonDocumentNode | RibbonSourceNode | RibbonItemNode,
 ): Promise<void> {
   if (node instanceof RibbonSourceNode && node.source.kind === "flat") {
@@ -468,7 +468,7 @@ export async function openRibbonFile(
   }
 
   if (!(node instanceof RibbonDocumentNode)) {
-    vscode.window.showWarningMessage("Select a ribbon document first.");
+    await ctx.notifications.warning("Select a ribbon document first.");
     return;
   }
 
@@ -635,7 +635,7 @@ async function resolvePullSource(
 
   const sources = await ctx.ribbonSourceLocator.locate(ctx.configuration.workspaceRoot);
   if (!sources.length) {
-    vscode.window.showWarningMessage("No local ribbon source was found.");
+    await ctx.notifications.warning("No local ribbon source was found.");
     return undefined;
   }
 
@@ -707,7 +707,7 @@ function pickRibbonPublishSolution(
 function addImportedRibbonSource(ctx: CommandContext, source: RibbonSource): void {
   ctx.ribbonSourceLocator.addImportedSource(source);
   ctx.ribbonExplorer.refresh();
-  void vscode.window.showInformationMessage(
+  void ctx.notifications.info(
     `Opened ${source.name} with ${source.files.length} ribbon file${source.files.length === 1 ? "" : "s"}.`,
   );
 }
@@ -717,11 +717,10 @@ async function offerExportedSolutionBackup(
   buffer: Buffer,
   solutionUniqueName: string,
 ): Promise<void> {
-  const choice = await vscode.window.showInformationMessage(
+  const choice = await ctx.notifications.askInfo(
     `Save a backup copy of exported solution ${solutionUniqueName}?`,
+    [SAVE_EXPORT_BACKUP, "Skip"],
     { modal: true },
-    SAVE_EXPORT_BACKUP,
-    "Skip",
   );
   if (choice !== SAVE_EXPORT_BACKUP) {
     return;
@@ -737,7 +736,7 @@ async function offerExportedSolutionBackup(
   }
 
   const savedPath = await ctx.solutionZipService.saveBufferToZip(buffer, target.fsPath);
-  void vscode.window.showInformationMessage(`Saved solution backup to ${savedPath}.`);
+  void ctx.notifications.info(`Saved solution backup to ${savedPath}.`);
 }
 
 function defaultSolutionBackupUri(ctx: CommandContext, solutionUniqueName: string): vscode.Uri {

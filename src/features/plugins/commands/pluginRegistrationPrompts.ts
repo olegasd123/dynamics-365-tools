@@ -10,6 +10,7 @@ import { LastSelectionService } from "../../../platform/vscode/lastSelectionStor
 import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
 import { PluginStep } from "../models";
 import { PluginService } from "../pluginService";
+import type { NotificationPort } from "../../../app/ports/notifications";
 
 type MessagePickItem = vscode.QuickPickItem & { isCustom?: boolean };
 type PrimaryEntityPick = { value?: string; cancelled: boolean };
@@ -26,6 +27,7 @@ export async function resolveServiceForNode(
   lastSelection: LastSelectionService,
   connections: EnvironmentConnectionService,
   preferredEnv: string,
+  notifications: NotificationPort,
   config?: Dynamics365Configuration,
 ): Promise<PluginService | undefined> {
   const resolvedConfig = config ?? (await configuration.loadConfiguration());
@@ -38,6 +40,7 @@ export async function resolveServiceForNode(
     resolvedConfig,
     preferredEnv,
     { placeHolder },
+    notifications,
   );
   if (!selection) return undefined;
 
@@ -59,13 +62,14 @@ export function buildStepDefaultName(
 
 export async function pickMessageName(
   service: PluginService,
+  notifications: NotificationPort,
   defaultValue = "Create",
 ): Promise<string | undefined> {
   let messageNames: string[] = [];
   try {
     messageNames = await service.listSdkMessageNames();
   } catch (error) {
-    void vscode.window.showWarningMessage(
+    await notifications.warning(
       `Unable to load SDK messages. Enter a message name manually. ${String(error)}`,
     );
     return promptForMessageName(defaultValue);
@@ -119,13 +123,14 @@ async function promptForMessageName(defaultValue: string): Promise<string | unde
 
 export async function pickPrimaryEntity(
   service: PluginService,
+  notifications: NotificationPort,
   defaultValue?: string,
 ): Promise<PrimaryEntityPick> {
   let entities: string[] = [];
   try {
     entities = await service.listEntityLogicalNames();
   } catch (error) {
-    void vscode.window.showWarningMessage(
+    await notifications.warning(
       `Unable to load entities. Enter a logical name manually. ${String(error)}`,
     );
     return promptForPrimaryEntity(defaultValue);
@@ -196,6 +201,7 @@ async function promptForPrimaryEntity(defaultValue?: string): Promise<PrimaryEnt
 
 export async function pickFilteringAttributes(
   service: PluginService,
+  notifications: NotificationPort,
   primaryEntity?: string,
   defaultValue?: string,
 ): Promise<FilteringAttributesPick> {
@@ -207,9 +213,7 @@ export async function pickFilteringAttributes(
   try {
     attributes = await service.listEntityAttributeLogicalNames(primaryEntity);
   } catch (error) {
-    void vscode.window.showWarningMessage(
-      `Unable to load attributes. Enter them manually. ${String(error)}`,
-    );
+    await notifications.warning(`Unable to load attributes. Enter them manually. ${String(error)}`);
     return promptForFilteringAttributes(defaultValue);
   }
 

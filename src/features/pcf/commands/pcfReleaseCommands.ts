@@ -90,7 +90,7 @@ async function ensureDotnet(ctx: CommandContext): Promise<boolean> {
     return true;
   }
 
-  vscode.window.showErrorMessage(
+  await ctx.notifications.error(
     `.NET SDK is required to package PCF solutions: ${result.error ?? "dotnet not found"}.`,
   );
   return false;

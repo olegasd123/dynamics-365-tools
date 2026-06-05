@@ -12,6 +12,7 @@ import {
   AssemblyIdentityValidationError,
   validateAssemblyIdentity,
 } from "./pluginAssemblyIdentity";
+import type { NotificationPort } from "../../../app/ports/notifications";
 
 type PluginSyncContext = {
   registration: PluginRegistrationManager;
@@ -68,6 +69,7 @@ type AssemblyUpdateContext = {
   pluginExplorer?: PluginExplorerProvider;
   assemblyStatusBar: AssemblyStatusBarService;
   lastSelection: LastSelectionService;
+  notifications: NotificationPort;
 };
 
 type AssemblyUpdateFileDialogContext = Omit<AssemblyUpdateContext, "assemblyUri"> & {
@@ -79,6 +81,7 @@ type AssemblyUpdateValidationContext = {
   assemblyUri: vscode.Uri;
   pluginService: Pick<PluginService, "getAssembly" | "listPluginTypes">;
   pluginRegistration: Pick<PluginRegistrationManager, "inspectAssembly">;
+  notifications: NotificationPort;
 };
 
 type AssemblyUpdatePreflight = {
@@ -119,11 +122,11 @@ export async function updateAssemblyFromFileDialog(
       return;
     } catch (error) {
       if (error instanceof AssemblyIdentityValidationError) {
-        await vscode.window.showErrorMessage(error.message, { modal: true });
+        await context.notifications.askError(error.message, [], { modal: true });
         continue;
       }
 
-      void vscode.window.showErrorMessage(`Failed to update plugin assembly: ${String(error)}`);
+      void context.notifications.error(`Failed to update plugin assembly: ${String(error)}`);
       return;
     }
   }
@@ -135,6 +138,7 @@ export async function updateAssemblyFromUri(context: AssemblyUpdateContext): Pro
     assemblyUri: context.assemblyUri,
     pluginService: context.pluginService,
     pluginRegistration: context.pluginRegistration,
+    notifications: context.notifications,
   });
 
   const content = await vscode.workspace.fs.readFile(context.assemblyUri);
@@ -144,6 +148,7 @@ export async function updateAssemblyFromUri(context: AssemblyUpdateContext): Pro
     assemblyName: context.assemblyName ?? preflight.targetAssembly.name,
     diff: preflight.diff,
     manageMissingComponents: context.manageMissingComponents,
+    notifications: context.notifications,
   });
   if (!confirmed) {
     return;
@@ -175,7 +180,7 @@ export async function updateAssemblyFromUri(context: AssemblyUpdateContext): Pro
       mergePluginSyncResults(preUpdateSyncResult, postUpdateSyncResult),
     );
   } catch (syncError) {
-    void vscode.window.showErrorMessage(
+    void context.notifications.error(
       `Assembly updated, but plugins failed to sync: ${String(syncError)}`,
     );
     context.assemblyStatusBar.setLastPublish({
@@ -194,7 +199,7 @@ export async function updateAssemblyFromUri(context: AssemblyUpdateContext): Pro
     assemblyUri: context.assemblyUri,
     environment: context.env,
   });
-  vscode.window.showInformationMessage(
+  await context.notifications.info(
     buildAssemblySuccessMessage(context.assemblyName, context.env.name, pluginSummary, "updated"),
   );
   context.pluginExplorer?.refresh();
@@ -216,7 +221,7 @@ async function prepareAssemblyUpdate(
   ]);
 
   validateAssemblyIdentity(targetAssembly, localInspection.assembly);
-  showVersionChangeWarning(targetAssembly, localInspection.assembly);
+  await showVersionChangeWarning(context.notifications, targetAssembly, localInspection.assembly);
 
   const existingTypes = await context.pluginService.listPluginTypes(context.assemblyId);
 
@@ -227,16 +232,17 @@ async function prepareAssemblyUpdate(
 }
 
 function showVersionChangeWarning(
+  notifications: NotificationPort,
   targetAssembly: PluginAssembly,
   localAssembly: AssemblyIdentity,
-): void {
+): Promise<void> {
   const targetVersion = normalizeVersion(targetAssembly.version);
   const localVersion = normalizeVersion(localAssembly.version);
   if (targetVersion === localVersion) {
-    return;
+    return Promise.resolve();
   }
 
-  void vscode.window.showWarningMessage(
+  return notifications.warning(
     `Plugin assembly version will change from ${targetVersion ?? "unknown"} to ${localVersion ?? "unknown"}.`,
   );
 }
@@ -245,6 +251,7 @@ async function confirmPluginComponentChanges(context: {
   assemblyName: string;
   diff: PluginComponentDiff;
   manageMissingComponents: boolean;
+  notifications: NotificationPort;
 }): Promise<boolean> {
   const deletedCount = context.diff.deletedTypes.length;
   const newCount = context.diff.newTypes.length;
@@ -253,8 +260,9 @@ async function confirmPluginComponentChanges(context: {
   }
 
   if (!context.manageMissingComponents && deletedCount) {
-    await vscode.window.showErrorMessage(
+    await context.notifications.askError(
       `Plugin assembly ${context.assemblyName} cannot be updated because ${deletedCount} plugin type(s) were removed from the DLL and manageMissingComponents is false.`,
+      [],
       {
         modal: true,
         detail: formatPluginComponentDiffDetail(context.diff, {
@@ -269,29 +277,29 @@ async function confirmPluginComponentChanges(context: {
 
   if (!context.manageMissingComponents) {
     const updateAssembly = "Update Assembly";
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await context.notifications.askWarning(
       `Update plugin assembly ${context.assemblyName} without creating ${newCount} new plugin type(s)?`,
+      [updateAssembly],
       {
         modal: true,
         detail: formatPluginComponentDiffDetail(context.diff, {
           includeSkippedCreationNote: true,
         }),
       },
-      updateAssembly,
     );
     return choice === updateAssembly;
   }
 
   const action = deletedCount ? "Remove and Update" : "Update Assembly";
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await context.notifications.askWarning(
     `Update plugin assembly ${context.assemblyName} and sync ${deletedCount + newCount} plugin type change(s)?`,
+    [action],
     {
       modal: true,
       detail: formatPluginComponentDiffDetail(context.diff, {
         includeDeleteWarning: deletedCount > 0,
       }),
     },
-    action,
   );
   return choice === action;
 }
@@ -399,16 +407,17 @@ function normalizeTypeName(value: string | undefined): string | undefined {
 }
 
 export async function confirmAssemblyPublish(
+  notifications: NotificationPort,
   assemblyUri: vscode.Uri,
   env: EnvironmentConfig,
   assemblyName?: string,
 ): Promise<boolean> {
   const relative = vscode.workspace.asRelativePath(assemblyUri, false);
   const displayName = assemblyName ?? path.basename(assemblyUri.fsPath);
-  const choice = await vscode.window.showWarningMessage(
+  const choice = await notifications.askWarning(
     `Publish ${displayName} (${relative}) to ${env.name}?`,
+    ["Publish"],
     { modal: true },
-    "Publish",
   );
   return choice === "Publish";
 }

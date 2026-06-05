@@ -36,7 +36,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const parentFolder = await pickParentFolder();
+  const parentFolder = await pickParentFolder(ctx);
   if (!parentFolder) {
     return;
   }
@@ -100,7 +100,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
 
   const targetRoot = path.join(parentFolder.uri.fsPath, name.trim());
   if (await isNonEmptyDirectory(targetRoot)) {
-    vscode.window.showErrorMessage(`Folder ${targetRoot} already exists and is not empty.`);
+    await ctx.notifications.error(`Folder ${targetRoot} already exists and is not empty.`);
     return;
   }
 
@@ -133,7 +133,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
   if (result.exitCode !== 0) {
     output.appendLine(`pac exited with code ${result.exitCode}.`);
     await removeEmptyDirectory(targetRoot);
-    vscode.window.showErrorMessage(
+    await ctx.notifications.error(
       `Failed to create PCF control ${name.trim()}. See PCF: New Control output.`,
     );
     return;
@@ -167,7 +167,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
 
     if (installResult.exitCode !== 0) {
       output.appendLine(`npm install exited with code ${installResult.exitCode}.`);
-      vscode.window.showWarningMessage(
+      await ctx.notifications.warning(
         `PCF control ${namespace.trim()}.${name.trim()} was created, but npm install failed. See PCF: New Control output.`,
       );
     }
@@ -178,11 +178,11 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
   if (sourceFile) {
     await vscode.window.showTextDocument(vscode.Uri.file(sourceFile));
   } else {
-    vscode.window.showWarningMessage(
+    await ctx.notifications.warning(
       `PCF control ${namespace.trim()}.${name.trim()} was created, but no source file was found.`,
     );
   }
-  vscode.window.showInformationMessage(`PCF control ${namespace.trim()}.${name.trim()} created.`);
+  await ctx.notifications.info(`PCF control ${namespace.trim()}.${name.trim()} created.`);
 }
 
 export async function buildPcfControl(
@@ -424,7 +424,7 @@ export async function resolvePcfProject(
   );
   if (!pick) {
     if (!projects.length) {
-      vscode.window.showWarningMessage("No PCF controls found in this workspace.");
+      await ctx.notifications.warning("No PCF controls found in this workspace.");
     }
     return undefined;
   }
@@ -434,10 +434,10 @@ export async function resolvePcfProject(
 
 const resolveProject = resolvePcfProject;
 
-async function pickParentFolder(): Promise<vscode.WorkspaceFolder | undefined> {
+async function pickParentFolder(ctx: CommandContext): Promise<vscode.WorkspaceFolder | undefined> {
   const folders = vscode.workspace.workspaceFolders ?? [];
   if (!folders.length) {
-    vscode.window.showErrorMessage("Open a workspace folder before creating a PCF control.");
+    await ctx.notifications.error("Open a workspace folder before creating a PCF control.");
     return undefined;
   }
 
@@ -462,9 +462,9 @@ async function ensurePac(ctx: CommandContext): Promise<boolean> {
     return true;
   }
 
-  const action = await vscode.window.showErrorMessage(
+  const action = await ctx.notifications.askError(
     `Power Platform CLI is required for PCF commands: ${result.error ?? "pac not found"}.`,
-    "Install pac CLI",
+    ["Install pac CLI"],
   );
   if (action === "Install pac CLI") {
     await vscode.env.openExternal(
@@ -480,7 +480,7 @@ async function ensureNpm(ctx: CommandContext): Promise<boolean> {
     return true;
   }
 
-  vscode.window.showErrorMessage(
+  await ctx.notifications.error(
     `npm is required for this PCF command: ${result.error ?? "npm not found"}.`,
   );
   return false;

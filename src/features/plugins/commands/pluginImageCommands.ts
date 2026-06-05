@@ -11,11 +11,10 @@ import {
 
 export async function createPluginImage(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin step in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin step in the Plugins explorer.");
     return;
   }
 
@@ -28,6 +27,7 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) return;
 
@@ -50,6 +50,7 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
 
   const attributesPick = await pickFilteringAttributes(
     service,
+    notifications,
     node.step.primaryEntity ?? undefined,
   );
   if (attributesPick.cancelled) return;
@@ -71,19 +72,18 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
       attributes: attributes ?? "",
     });
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin image ${name} created.`);
+    void notifications.info(`Plugin image ${name} created.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to create plugin image: ${String(error)}`);
+    void notifications.error(`Failed to create plugin image: ${String(error)}`);
   }
 }
 
 export async function editPluginImage(ctx: CommandContext, node?: PluginImageNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin image in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin image in the Plugins explorer.");
     return;
   }
 
@@ -96,6 +96,7 @@ export async function editPluginImage(ctx: CommandContext, node?: PluginImageNod
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) return;
 
@@ -118,6 +119,7 @@ export async function editPluginImage(ctx: CommandContext, node?: PluginImageNod
 
   const attributesPick = await pickFilteringAttributes(
     service,
+    notifications,
     node.step.primaryEntity ?? undefined,
     node.image.attributes ?? "",
   );
@@ -140,9 +142,9 @@ export async function editPluginImage(ctx: CommandContext, node?: PluginImageNod
       attributes: attributes ?? "",
     });
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin image ${name} updated.`);
+    void notifications.info(`Plugin image ${name} updated.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to update plugin image: ${String(error)}`);
+    void notifications.error(`Failed to update plugin image: ${String(error)}`);
   }
 }
 
@@ -151,18 +153,17 @@ export async function deletePluginImage(
   node?: PluginImageNode,
 ): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
+  const { notifications } = ctx;
   const explorer = pluginExplorer;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin image in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin image in the Plugins explorer.");
     return;
   }
 
-  const confirmed = await vscode.window.showWarningMessage(
+  const confirmed = await notifications.askWarning(
     `Delete plugin '${node.image.name}' image from ${node.env.name}?`,
+    ["Delete"],
     { modal: true },
-    "Delete",
   );
   if (confirmed !== "Delete") return;
 
@@ -175,32 +176,34 @@ export async function deletePluginImage(
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) return;
 
   try {
     await service.deleteImage(node.image.id);
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin ${node.image.name} image deleted.`);
+    void notifications.info(`Plugin ${node.image.name} image deleted.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to delete plugin image: ${String(error)}`);
+    void notifications.error(`Failed to delete plugin image: ${String(error)}`);
   }
 }
 
-export async function copyImageDescription(node?: PluginImageNode): Promise<void> {
+export async function copyImageDescription(
+  ctx: CommandContext,
+  node?: PluginImageNode,
+): Promise<void> {
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin image in the Plugins explorer.",
-    );
+    void ctx.notifications.info("Run this command from a plugin image in the Plugins explorer.");
     return;
   }
 
   const tooltip = asTooltipString(node.tooltip);
   if (!tooltip) {
-    void vscode.window.showInformationMessage("No image info to copy.");
+    void ctx.notifications.info("No image info to copy.");
     return;
   }
 
   await vscode.env.clipboard.writeText(tooltip);
-  void vscode.window.showInformationMessage("Image info copied to clipboard.");
+  void ctx.notifications.info("Image info copied to clipboard.");
 }
