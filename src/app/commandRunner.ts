@@ -25,6 +25,7 @@ const OPEN_BINDINGS_ACTION = "Open Bindings";
 const RESET_CONFIG_ACTION = "Reset Config";
 const RESET_BINDINGS_ACTION = "Reset Bindings";
 const RESET_CONFIRM_ACTION = "Reset";
+const SHOW_DETAILS_ACTION = "Show Details";
 
 export async function runCommandWithHealthCheck(
   ctx: CommandContext,
@@ -73,12 +74,17 @@ export async function runCommandWithHealthCheck(
   try {
     return await execution;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    ctx.core.logger.error(`${commandLabel} failed`, error, { commandId });
     void ctx.core.notifications
-      .askError(`${commandLabel} failed. ${message}`, [RELOAD_WINDOW_ACTION])
+      .askError(`${commandLabel} failed. See the Dynamics 365 Tools output for details.`, [
+        SHOW_DETAILS_ACTION,
+        RELOAD_WINDOW_ACTION,
+      ])
       .then(
         async (action) => {
-          if (action === RELOAD_WINDOW_ACTION) {
+          if (action === SHOW_DETAILS_ACTION) {
+            ctx.core.logger.show();
+          } else if (action === RELOAD_WINDOW_ACTION) {
             await vscode.commands.executeCommand("workbench.action.reloadWindow");
           }
         },

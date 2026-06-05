@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
+import { LoggerPort } from "../ports/logger";
 import { VsCodeNotificationService } from "../../platform/vscode/notificationService";
 import { CommandContext } from "../commandContext";
 import { runCommandWithHealthCheck } from "../commandRunner";
@@ -10,6 +11,7 @@ function createContext(overrides?: {
   loadExistingBindings?: () => Promise<unknown>;
   saveConfiguration?: (value: unknown) => Promise<void>;
   saveBindings?: (value: unknown) => Promise<void>;
+  logger?: LoggerPort;
 }): CommandContext {
   return {
     core: {
@@ -19,9 +21,26 @@ function createContext(overrides?: {
         saveConfiguration: overrides?.saveConfiguration ?? (async () => undefined),
         saveBindings: overrides?.saveBindings ?? (async () => undefined),
       },
+      logger: overrides?.logger ?? new TestLogger(),
       notifications: new VsCodeNotificationService(),
     },
   } as unknown as CommandContext;
+}
+
+class TestLogger implements LoggerPort {
+  readonly errors: Array<{ message: string; error?: unknown; metadata?: Record<string, unknown> }> =
+    [];
+  shown = false;
+
+  info(): void {}
+
+  error(message: string, error?: unknown, metadata?: Record<string, unknown>): void {
+    this.errors.push({ message, error, metadata });
+  }
+
+  show(): void {
+    this.shown = true;
+  }
 }
 
 function clearMessages(): void {
@@ -103,6 +122,44 @@ test("runCommandWithHealthCheck does not block on unresolved error notification"
     }
     (vscode.window as any).showErrorMessage = originalShowErrorMessage;
   }
+});
+
+test("runCommandWithHealthCheck logs command errors and shows details on request", async () => {
+  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
+  clearMessages();
+  const logger = new TestLogger();
+  const ctx = createContext({ logger });
+  const error = new Error("Dataverse POST accounts failed");
+  (error as any).correlationId = "corr-123";
+  (error as any).rawBody = '{"error":{"message":"boom"}}';
+
+  const originalShowErrorMessage = vscode.window.showErrorMessage;
+  (vscode.window as any).showErrorMessage = async (message: string) => {
+    (vscode.window as any).__messages.error.push(message);
+    return "Show Details";
+  };
+
+  try {
+    await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
+      throw error;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  } finally {
+    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
+  }
+
+  const messages = (vscode.window as any).__messages;
+  assert.strictEqual(logger.errors.length, 1);
+  assert.strictEqual(logger.errors[0].error, error);
+  assert.deepStrictEqual(logger.errors[0].metadata, {
+    commandId: "dynamics365Tools.publishResource",
+  });
+  assert.strictEqual(logger.shown, true);
+  assert.ok(
+    messages.error.some((msg: string) => msg.includes("See the Dynamics 365 Tools output")),
+  );
+  assert.ok(!messages.error.some((msg: string) => msg.includes("corr-123")));
+  assert.ok(!messages.error.some((msg: string) => msg.includes("rawBody")));
 });
 
 test("runCommandWithHealthCheck can reset invalid configuration", async () => {

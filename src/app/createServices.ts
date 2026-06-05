@@ -34,6 +34,7 @@ import { WebResourcePublisher } from "../features/webResources/webResourcePublis
 import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
+import { VsCodeOutputLogger } from "../platform/vscode/outputLogger";
 import { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
 import { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
 import { CommandContext } from "./commandContext";
@@ -42,6 +43,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   const disposables: vscode.Disposable[] = [];
 
   const notifications = lazy(() => new VsCodeNotificationService());
+  const logger = lazyDisposable(() => new VsCodeOutputLogger(), disposables);
   const configuration = lazy(() => new ConfigurationService());
   const ui = lazy(() => new SolutionPicker(notifications()));
   const secrets = lazy(() => new SecretService(extensionContext.secrets));
@@ -175,6 +177,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get secrets() {
       return secrets();
+    },
+    get logger() {
+      return logger();
     },
     get notifications() {
       return notifications();

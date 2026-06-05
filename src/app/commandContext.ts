@@ -31,6 +31,7 @@ import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import type { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
+import type { LoggerPort } from "./ports/logger";
 import type { NotificationPort } from "./ports/notifications";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import type { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
@@ -54,6 +55,7 @@ export interface CoreServices {
   auth: AuthService;
   authorizations: AuthorizationStore;
   secrets: SecretService;
+  logger: LoggerPort;
   notifications: NotificationPort;
   lastSelection: LastSelectionService;
   connections: EnvironmentConnectionService;
