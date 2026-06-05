@@ -45,51 +45,6 @@ export interface CommandContext {
   ribbon: RibbonServices;
   pcf: PcfServices;
 
-  configuration: ConfigurationService;
-  ui: SolutionPicker;
-
-  auth: AuthService;
-  authorizations: AuthorizationStore;
-  secrets: SecretService;
-  notifications: NotificationPort;
-  lastSelection: LastSelectionService;
-
-  bindings: BindingService;
-  publishCache: PublishCacheService;
-  publisher: WebResourcePublisher;
-  webResources: WebResourceUrlService;
-
-  connections: EnvironmentConnectionService;
-
-  pluginExplorer: PluginExplorerProvider;
-  pluginRegistration: PluginRegistrationManager;
-
-  ribbonSourceLocator: RibbonSourceLocator;
-  ribbonRepository: RibbonRepository;
-  ribbonPublishService: RibbonPublishService;
-  solutionZipService: SolutionZipService;
-  ribbonEditorState: RibbonEditorState;
-  ribbonDiagnostics: RibbonDiagnosticsService;
-  ribbonExplorer: RibbonExplorerProvider;
-  ribbonFormPanel: RibbonFormPanel;
-
-  pcfProcessRunner: ProcessRunner;
-  pacCli: PacCli;
-  npmRunner: NpmRunner;
-  pcfBuildService: PcfBuildService;
-  pcfDeployService: PcfDeployService;
-  pcfEnvironmentService: PcfEnvironmentService;
-  pcfPackageService: PcfPackageService;
-  pcfPushService: PcfPushService;
-  pcfWorkspaceSettings: PcfWorkspaceSettingsService;
-  pcfProjectLocator: PcfProjectLocator;
-  pcfExplorer: PcfExplorerProvider;
-  pcfStatusBar: PcfStatusBarService;
-  pcfTelemetry: PcfTelemetryService;
-
-  statusBar: StatusBarService;
-  assemblyStatusBar: AssemblyStatusBarService;
-
   dispose(): void;
 }
 

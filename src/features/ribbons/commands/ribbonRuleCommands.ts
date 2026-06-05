@@ -52,7 +52,7 @@ async function addRibbonRule(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -75,14 +75,14 @@ async function addRibbonRule(
   }
 
   const createPatches = kind === "Enable" ? createEnableRulePatches : createDisplayRulePatches;
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createPatches(target.document, {
       id: id.trim(),
       step: step ?? undefined,
     }),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 async function addRibbonCommandRuleRef(
@@ -92,7 +92,7 @@ async function addRibbonCommandRuleRef(
 ): Promise<void> {
   const target = resolveCommandTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a command definition first.");
+    await ctx.core.notifications.warning("Select a command definition first.");
     return;
   }
 
@@ -123,11 +123,11 @@ async function addRibbonCommandRuleRef(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(target.document, [
+  ctx.ribbon.editorState.queuePatches(target.document, [
     ...selection.patches,
     createCommandRuleRefPatch(target.document, target.command, kind, selection.id),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 interface RuleRefSelection {

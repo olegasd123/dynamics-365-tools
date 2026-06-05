@@ -27,17 +27,17 @@ export async function deployLastPcfSolution(
     return;
   }
 
-  const config = await ctx.configuration.loadConfiguration();
-  const env = await ctx.ui.pickEnvironment(
+  const config = await ctx.core.configuration.loadConfiguration();
+  const env = await ctx.core.ui.pickEnvironment(
     config.environments,
-    ctx.lastSelection.getLastEnvironment(),
+    ctx.core.lastSelection.getLastEnvironment(),
     { placeHolder: "Select environment for PCF solution deploy" },
   );
   if (!env) {
     return;
   }
 
-  await ctx.lastSelection.setLastEnvironment(env.name);
+  await ctx.core.lastSelection.setLastEnvironment(env.name);
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -45,10 +45,10 @@ export async function deployLastPcfSolution(
       cancellable: true,
     },
     async (_progress, token) => {
-      const result = await ctx.pcfDeployService.deployLastPackage(project, env, { token });
+      const result = await ctx.pcf.deployService.deployLastPackage(project, env, { token });
       if (result) {
-        await ctx.pcfProjectLocator.refresh();
-        ctx.pcfExplorer.refresh();
+        await ctx.pcf.projectLocator.refresh();
+        ctx.pcf.explorer.refresh();
       }
     },
   );
@@ -75,22 +75,22 @@ async function packagePcfControl(
       cancellable: true,
     },
     async (_progress, token) => {
-      const result = await ctx.pcfPackageService.packageControl(project, { managed, token });
+      const result = await ctx.pcf.packageService.packageControl(project, { managed, token });
       if (result) {
-        await ctx.pcfProjectLocator.refresh();
-        ctx.pcfExplorer.refresh();
+        await ctx.pcf.projectLocator.refresh();
+        ctx.pcf.explorer.refresh();
       }
     },
   );
 }
 
 async function ensureDotnet(ctx: CommandContext): Promise<boolean> {
-  const result = await detectTool(ctx.pcfProcessRunner, "dotnet", ["--version"]);
+  const result = await detectTool(ctx.pcf.processRunner, "dotnet", ["--version"]);
   if (result.available) {
     return true;
   }
 
-  await ctx.notifications.error(
+  await ctx.core.notifications.error(
     `.NET SDK is required to package PCF solutions: ${result.error ?? "dotnet not found"}.`,
   );
   return false;

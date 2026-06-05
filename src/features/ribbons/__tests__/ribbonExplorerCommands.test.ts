@@ -55,6 +55,64 @@ function createNotifications(): VsCodeNotificationService {
   return new VsCodeNotificationService();
 }
 
+function legacyContext<T extends Record<string, any>>(ctx: T): T {
+  return {
+    ...ctx,
+    core: {
+      ...(ctx.core ?? {}),
+      configuration: ctx.configuration,
+      ui: ctx.ui,
+      auth: ctx.auth,
+      authorizations: ctx.authorizations,
+      secrets: ctx.secrets,
+      notifications: ctx.notifications,
+      lastSelection: ctx.lastSelection,
+      connections: ctx.connections,
+      statusBar: ctx.statusBar,
+      assemblyStatusBar: ctx.assemblyStatusBar,
+    },
+    webResource: {
+      ...(ctx.webResource ?? {}),
+      bindings: ctx.bindings,
+      publishCache: ctx.publishCache,
+      publisher: ctx.publisher,
+      urls: ctx.webResources,
+    },
+    plugins: {
+      ...(ctx.plugins ?? {}),
+      explorer: ctx.pluginExplorer,
+      registration: ctx.pluginRegistration,
+    },
+    ribbon: {
+      ...(ctx.ribbon ?? {}),
+      sourceLocator: ctx.ribbonSourceLocator,
+      repository: ctx.ribbonRepository,
+      publishService: ctx.ribbonPublishService,
+      solutionZipService: ctx.solutionZipService,
+      editorState: ctx.ribbonEditorState,
+      diagnostics: ctx.ribbonDiagnostics,
+      explorer: ctx.ribbonExplorer,
+      formPanel: ctx.ribbonFormPanel,
+    },
+    pcf: {
+      ...(ctx.pcf ?? {}),
+      processRunner: ctx.pcfProcessRunner,
+      pacCli: ctx.pacCli,
+      npmRunner: ctx.npmRunner,
+      buildService: ctx.pcfBuildService,
+      deployService: ctx.pcfDeployService,
+      environmentService: ctx.pcfEnvironmentService,
+      packageService: ctx.pcfPackageService,
+      pushService: ctx.pcfPushService,
+      workspaceSettings: ctx.pcfWorkspaceSettings,
+      projectLocator: ctx.pcfProjectLocator,
+      explorer: ctx.pcfExplorer,
+      statusBar: ctx.pcfStatusBar,
+      telemetry: ctx.pcfTelemetry,
+    },
+  };
+}
+
 test("normalizes manually typed web resource names", () => {
   assert.strictEqual(
     normalizeWebResourceUniqueName("  $webresource:new_\\scripts\\account.js  "),
@@ -155,7 +213,7 @@ test("prefills custom button text metadata from the label", async () => {
 
   try {
     await addCustomRibbonButton(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -164,7 +222,7 @@ test("prefills custom button text metadata from the label", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       new RibbonDocumentNode(document),
     );
   } finally {
@@ -245,7 +303,7 @@ test("prefills empty custom button text metadata from loc label while editing", 
 
   try {
     await editRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -254,7 +312,7 @@ test("prefills empty custom button text metadata from loc label while editing", 
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -337,7 +395,7 @@ test("removes imported ribbon solution after confirmation", async () => {
 
   try {
     await removeRibbonSolutionSource(
-      {
+      legacyContext({
         ribbonSourceLocator: {
           removeImportedSource: (sourceId: string) => {
             removedSourceId = sourceId;
@@ -356,7 +414,7 @@ test("removes imported ribbon solution after confirmation", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -437,7 +495,7 @@ test("adds command action from actions group node", async () => {
 
   try {
     await addRibbonCommandAction(
-      {
+      legacyContext({
         bindings: {
           listBindings: async () => ({
             bindings: [
@@ -465,7 +523,7 @@ test("adds command action from actions group node", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -575,7 +633,7 @@ test("adds URL command action parameters from a list flow", async () => {
 
   try {
     await addRibbonCommandAction(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -584,7 +642,7 @@ test("adds URL command action parameters from a list flow", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -654,7 +712,7 @@ test("adds command enable rule reference from enable rules group node", async ()
 
   try {
     await addRibbonCommandEnableRuleRef(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -666,7 +724,7 @@ test("adds command enable rule reference from enable rules group node", async ()
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -724,7 +782,7 @@ test("adds built-in command enable rule references", async () => {
 
   try {
     await addRibbonCommandEnableRuleRef(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -733,7 +791,7 @@ test("adds built-in command enable rule references", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -810,7 +868,7 @@ test("creates new enable rule and references it from command refs", async () => 
 
   try {
     await addRibbonCommandEnableRuleRef(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -819,7 +877,7 @@ test("creates new enable rule and references it from command refs", async () => 
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -911,7 +969,7 @@ test("creates common enable rules from prompts", async () => {
         item.inputByPrompt.get(options.prompt ?? "");
 
       await addRibbonEnableRule(
-        {
+        legacyContext({
           ribbonEditorState: {
             queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
               patches = queuedPatches;
@@ -920,7 +978,7 @@ test("creates common enable rules from prompts", async () => {
           ribbonExplorer: {
             refresh: () => undefined,
           },
-        } as any,
+        } as any),
         new RibbonDocumentNode(document),
       );
 
@@ -1052,7 +1110,7 @@ test("creates flat display rules from prompts", async () => {
         item.inputByPrompt.get(options.prompt ?? "");
 
       await addRibbonDisplayRule(
-        {
+        legacyContext({
           ribbonEditorState: {
             queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
               patches = queuedPatches;
@@ -1061,7 +1119,7 @@ test("creates flat display rules from prompts", async () => {
           ribbonExplorer: {
             refresh: () => undefined,
           },
-        } as any,
+        } as any),
         new RibbonDocumentNode(document),
       );
 
@@ -1127,7 +1185,7 @@ test("adds a nested child rule step from prompts", async () => {
 
   try {
     await addRibbonRuleChildStep(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -1136,7 +1194,7 @@ test("adds a nested child rule step from prompts", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       new RibbonItemNode(
         "1. OrRule",
         undefined,
@@ -1209,7 +1267,7 @@ test("edits a nested child rule step", async () => {
 
   try {
     await editRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -1218,7 +1276,7 @@ test("edits a nested child rule step", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       new RibbonItemNode(
         "1. FormStateRule",
         "Create",
@@ -1271,7 +1329,7 @@ test("deletes a nested child rule step", async () => {
   let patches: RibbonPatch[] = [];
 
   await deleteRibbonNode(
-    {
+    legacyContext({
       ribbonEditorState: {
         queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
           patches = queuedPatches;
@@ -1280,7 +1338,7 @@ test("deletes a nested child rule step", async () => {
       ribbonExplorer: {
         refresh: () => undefined,
       },
-    } as any,
+    } as any),
     new RibbonItemNode(
       "1. FormStateRule",
       "Create",
@@ -1332,7 +1390,7 @@ test("moves nested child rule steps", async () => {
   let patches: RibbonPatch[] = [];
 
   await moveRibbonNodeUp(
-    {
+    legacyContext({
       configuration: {
         workspaceRoot: "/tmp",
       },
@@ -1356,7 +1414,7 @@ test("moves nested child rule steps", async () => {
       ribbonExplorer: {
         refresh: () => undefined,
       },
-    } as any,
+    } as any),
     new RibbonItemNode(
       "2. FormStateRule",
       "Existing",
@@ -1477,7 +1535,7 @@ test("creates selection count enable rule conditions from prompts", async () => 
         item.inputs.get(options.prompt ?? "");
 
       await addRibbonEnableRule(
-        {
+        legacyContext({
           ribbonEditorState: {
             queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
               patches = queuedPatches;
@@ -1486,7 +1544,7 @@ test("creates selection count enable rule conditions from prompts", async () => 
           ribbonExplorer: {
             refresh: () => undefined,
           },
-        } as any,
+        } as any),
         new RibbonDocumentNode(document),
       );
 
@@ -1530,7 +1588,7 @@ test("does not queue patches when enable rule creation is cancelled", async () =
 
   try {
     await addRibbonEnableRule(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: () => {
             queued = true;
@@ -1539,7 +1597,7 @@ test("does not queue patches when enable rule creation is cancelled", async () =
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       new RibbonDocumentNode(document),
     );
   } finally {
@@ -1583,7 +1641,7 @@ test("prefills enable rule ids from the ribbon scope", async () => {
 
   try {
     await addRibbonEnableRule(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -1592,7 +1650,7 @@ test("prefills enable rule ids from the ribbon scope", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       new RibbonSectionNode(
         document,
         document.views.find((view) => view.scope === "Form") ?? document.views[0],
@@ -1657,28 +1715,28 @@ test("prefills manual command rule reference ids from the command id", async () 
 
   try {
     await addRibbonCommandEnableRuleRef(
-      {
+      legacyContext({
         ...baseContext,
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patchesByKind.push(queuedPatches);
           },
         },
-      } as any,
+      } as any),
       new RibbonItemNode("EnableRules", "0", "d365RibbonEnableRuleRefs", "references", [], [], {
         document,
         range: command.range,
       }),
     );
     await addRibbonCommandDisplayRuleRef(
-      {
+      legacyContext({
         ...baseContext,
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patchesByKind.push(queuedPatches);
           },
         },
-      } as any,
+      } as any),
       new RibbonItemNode("DisplayRules", "0", "d365RibbonDisplayRuleRefs", "references", [], [], {
         document,
         range: command.range,
@@ -1738,7 +1796,7 @@ test("deletes command rule references", async () => {
   let refreshed = false;
 
   await deleteRibbonNode(
-    {
+    legacyContext({
       ribbonEditorState: {
         queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
           patches = queuedPatches;
@@ -1749,7 +1807,7 @@ test("deletes command rule references", async () => {
           refreshed = true;
         },
       },
-    } as any,
+    } as any),
     new RibbonItemNode("new.Enabled", "EnableRule", "d365RibbonRuleRef", "symbol-key", [], [], {
       document,
       range: enableRuleRef.range,
@@ -1773,7 +1831,7 @@ test("deletes command rule references", async () => {
   ]);
 
   await deleteRibbonNode(
-    {
+    legacyContext({
       ribbonEditorState: {
         queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
           patches = queuedPatches;
@@ -1782,7 +1840,7 @@ test("deletes command rule references", async () => {
       ribbonExplorer: {
         refresh: () => undefined,
       },
-    } as any,
+    } as any),
     new RibbonItemNode("new.Visible", "DisplayRule", "d365RibbonRuleRef", "symbol-key", [], [], {
       document,
       range: displayRuleRef.range,
@@ -1835,7 +1893,7 @@ test("deletes hide action after confirmation", async () => {
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -1847,7 +1905,7 @@ test("deletes hide action after confirmation", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       new RibbonItemNode(
         hideAction.hideActionId,
         undefined,
@@ -1895,7 +1953,7 @@ test("keeps hide action when delete confirmation is canceled", async () => {
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: () => {
             queued = true;
@@ -1907,7 +1965,7 @@ test("keeps hide action when delete confirmation is canceled", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       new RibbonItemNode(
         hideAction.hideActionId,
         undefined,
@@ -1970,7 +2028,7 @@ test("deletes action parameters after confirmation", async () => {
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -1982,7 +2040,7 @@ test("deletes action parameters after confirmation", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       new RibbonItemNode(
         `1. ${urlParameter.value}`,
         urlParameter.kind,
@@ -2024,7 +2082,7 @@ test("deletes action parameters after confirmation", async () => {
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -2036,7 +2094,7 @@ test("deletes action parameters after confirmation", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       new RibbonItemNode(
         `2. ${jsParameter.value}`,
         jsParameter.kind,
@@ -2112,7 +2170,7 @@ test("adds loc label title from language list", async () => {
 
   try {
     await addRibbonLocLabelTitle(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -2121,7 +2179,7 @@ test("adds loc label title from language list", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -2183,7 +2241,7 @@ test("adds loc label title from selected language title", async () => {
 
   try {
     await addRibbonLocLabelTitle(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -2192,7 +2250,7 @@ test("adds loc label title from selected language title", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -2239,7 +2297,7 @@ test("deletes loc label title after confirmation", async () => {
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -2251,7 +2309,7 @@ test("deletes loc label title after confirmation", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       new RibbonItemNode(
         String(title.languageCode),
         title.description,
@@ -2302,7 +2360,7 @@ test("keeps loc label title when delete confirmation is canceled", async () => {
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: {
           queuePatches: () => {
             queued = true;
@@ -2314,7 +2372,7 @@ test("keeps loc label title when delete confirmation is canceled", async () => {
           },
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       new RibbonItemNode(
         String(title.languageCode),
         title.description,
@@ -2507,13 +2565,13 @@ test("delete command can remove related items and undo restores them", async () 
 
   try {
     await deleteRibbonNode(
-      {
+      legacyContext({
         ribbonEditorState: state,
         ribbonExplorer: {
           refresh: () => undefined,
         },
         notifications: createNotifications(),
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -2548,36 +2606,38 @@ test("delete command can remove related items and undo restores them", async () 
 test("lists each bound JavaScript web resource once", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-js-pick-"));
 
-  const picks = await listBoundJavaScriptLibraries({
-    bindings: {
-      listBindings: async () => ({
-        bindings: [
-          {
-            kind: "file",
-            relativeLocalPath: "src/account/form.js",
-            remotePath: "new_/account/form.js",
-            solutionName: "core",
-          },
-          {
-            kind: "file",
-            relativeLocalPath: "src/account/form-copy.js",
-            remotePath: "new_\\account\\form.js",
-            solutionName: "core",
-          },
-          {
-            kind: "file",
-            relativeLocalPath: "src/account/form-copy.js",
-            remotePath: "new_/account/form-copy.js",
-            solutionName: "core",
-          },
-        ],
-      }),
-    },
-    configuration: {
-      resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
-      getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
-    },
-  } as any);
+  const picks = await listBoundJavaScriptLibraries(
+    legacyContext({
+      bindings: {
+        listBindings: async () => ({
+          bindings: [
+            {
+              kind: "file",
+              relativeLocalPath: "src/account/form.js",
+              remotePath: "new_/account/form.js",
+              solutionName: "core",
+            },
+            {
+              kind: "file",
+              relativeLocalPath: "src/account/form-copy.js",
+              remotePath: "new_\\account\\form.js",
+              solutionName: "core",
+            },
+            {
+              kind: "file",
+              relativeLocalPath: "src/account/form-copy.js",
+              remotePath: "new_/account/form-copy.js",
+              solutionName: "core",
+            },
+          ],
+        }),
+      },
+      configuration: {
+        resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
+        getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
+      },
+    } as any),
+  );
 
   assert.deepStrictEqual(
     picks.map((pick) => pick.uniqueName),
@@ -2783,7 +2843,7 @@ test("prefills saved JavaScript action values while editing", async () => {
 
   try {
     await editRibbonNode(
-      {
+      legacyContext({
         bindings: {
           listBindings: async () => ({
             bindings: [
@@ -2808,7 +2868,7 @@ test("prefills saved JavaScript action values while editing", async () => {
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -2930,7 +2990,7 @@ var Hjk;
 
   try {
     await editRibbonNode(
-      {
+      legacyContext({
         bindings: {
           listBindings: async () => ({
             bindings: [
@@ -2955,7 +3015,7 @@ var Hjk;
         ribbonExplorer: {
           refresh: () => undefined,
         },
-      } as any,
+      } as any),
       node,
     );
   } finally {
@@ -3024,62 +3084,64 @@ test("offers to save a backup when opening an exported solution", async () => {
   };
 
   try {
-    await openRibbonsFromSolution({
-      extensionContext: { globalStorageUri: vscode.Uri.file(storageRoot) },
-      configuration: {
-        workspaceRoot: storageRoot,
-        loadConfiguration: async () => ({
-          environments: [{ name: "Dev", url: "https://org.crm.dynamics.com" }],
-          solutions: [],
-        }),
-      },
-      ui: {
-        pickEnvironment: async (environments: unknown[]) => environments[0],
-      },
-      auth: {
-        getAccessToken: async () => "token",
-      },
-      secrets: {
-        getCredentials: async () => undefined,
-      },
-      lastSelection: {
-        getLastEnvironment: () => undefined,
-        setLastEnvironment: async () => undefined,
-      },
-      connections: {
-        createConnection: async (env: unknown) => ({
-          env,
-          apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
-          token: "token",
-        }),
-        createClient: async (env: any) =>
-          new DataverseClient({
+    await openRibbonsFromSolution(
+      legacyContext({
+        extensionContext: { globalStorageUri: vscode.Uri.file(storageRoot) },
+        configuration: {
+          workspaceRoot: storageRoot,
+          loadConfiguration: async () => ({
+            environments: [{ name: "Dev", url: "https://org.crm.dynamics.com" }],
+            solutions: [],
+          }),
+        },
+        ui: {
+          pickEnvironment: async (environments: unknown[]) => environments[0],
+        },
+        auth: {
+          getAccessToken: async () => "token",
+        },
+        secrets: {
+          getCredentials: async () => undefined,
+        },
+        lastSelection: {
+          getLastEnvironment: () => undefined,
+          setLastEnvironment: async () => undefined,
+        },
+        connections: {
+          createConnection: async (env: unknown) => ({
             env,
             apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
             token: "token",
           }),
-      },
-      solutionZipService: {
-        listUnmanagedSolutions: async () => [
-          { uniqueName: "core", friendlyName: "Core", version: "1.0.0" },
-        ],
-        downloadSolutionZip: async (_client: unknown, _uniqueName: string, token: unknown) => {
-          exportTokenPassed = Boolean(token);
-          return buffer;
+          createClient: async (env: any) =>
+            new DataverseClient({
+              env,
+              apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+              token: "token",
+            }),
         },
-        saveBufferToZip: service.saveBufferToZip.bind(service),
-        openZipBuffer: service.openZipBuffer.bind(service),
-      },
-      ribbonSourceLocator: {
-        addImportedSource: (source: RibbonSource) => {
-          importedSource = source;
+        solutionZipService: {
+          listUnmanagedSolutions: async () => [
+            { uniqueName: "core", friendlyName: "Core", version: "1.0.0" },
+          ],
+          downloadSolutionZip: async (_client: unknown, _uniqueName: string, token: unknown) => {
+            exportTokenPassed = Boolean(token);
+            return buffer;
+          },
+          saveBufferToZip: service.saveBufferToZip.bind(service),
+          openZipBuffer: service.openZipBuffer.bind(service),
         },
-      },
-      ribbonExplorer: {
-        refresh: () => undefined,
-      },
-      notifications: createNotifications(),
-    } as any);
+        ribbonSourceLocator: {
+          addImportedSource: (source: RibbonSource) => {
+            importedSource = source;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+        notifications: createNotifications(),
+      } as any),
+    );
   } finally {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInformationMessage = originalShowInformationMessage;
@@ -3165,7 +3227,7 @@ test("publishes saved ribbon XML to the selected unmanaged solution", async () =
 
   try {
     await publishRibbonToEnvironment(
-      {
+      legacyContext({
         configuration: {
           workspaceRoot,
           loadConfiguration: async () => ({
@@ -3227,7 +3289,7 @@ test("publishes saved ribbon XML to the selected unmanaged solution", async () =
             };
           },
         },
-      } as any,
+      } as any),
       new RibbonDocumentNode(originalDocument, true),
     );
   } finally {
@@ -3273,7 +3335,7 @@ test("moves ribbon nodes down without losing unequal sibling XML", async () => {
   let refreshed = false;
 
   await moveRibbonNodeDown(
-    {
+    legacyContext({
       configuration: {
         workspaceRoot: "/tmp",
       },
@@ -3299,7 +3361,7 @@ test("moves ribbon nodes down without losing unequal sibling XML", async () => {
           refreshed = true;
         },
       },
-    } as any,
+    } as any),
     node,
   );
 
@@ -3354,7 +3416,7 @@ test("moves JavaScript parameters with ribbon move commands", async () => {
   let patches: RibbonPatch[] = [];
 
   await moveRibbonNodeUp(
-    {
+    legacyContext({
       configuration: {
         workspaceRoot: "/tmp",
       },
@@ -3378,7 +3440,7 @@ test("moves JavaScript parameters with ribbon move commands", async () => {
       ribbonExplorer: {
         refresh: () => undefined,
       },
-    } as any,
+    } as any),
     node,
   );
 
@@ -3437,12 +3499,12 @@ test("moves the same stale details-panel node down after moving it up", async ()
     [],
     { document, range: middle.range },
   );
-  const ctx = {
+  const ctx = legacyContext({
     configuration: { workspaceRoot },
     ribbonSourceLocator: { locate: async () => [source] },
     ribbonEditorState: state,
     ribbonExplorer: { refresh: () => undefined },
-  } as any;
+  } as any);
 
   await moveRibbonNodeUp(ctx, staleNode);
   assert.deepStrictEqual(
@@ -3500,12 +3562,12 @@ test("moves the same stale JavaScript parameter node down after moving it up", a
     [],
     { document, range: parameter.range },
   );
-  const ctx = {
+  const ctx = legacyContext({
     configuration: { workspaceRoot },
     ribbonSourceLocator: { locate: async () => [source] },
     ribbonEditorState: state,
     ribbonExplorer: { refresh: () => undefined },
-  } as any;
+  } as any);
 
   await moveRibbonNodeUp(ctx, staleNode);
   const movedUpAction = (await state.loadSource(source))[0].views[0].commandDefinitions[0]

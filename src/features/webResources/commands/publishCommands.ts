@@ -27,19 +27,9 @@ import {
 const FOLDER_PUBLISH_CONCURRENCY = 4;
 
 export async function publishLastResource(ctx: CommandContext): Promise<void> {
-  const {
-    configuration,
-    bindings,
-    ui,
-    publisher,
-    secrets,
-    auth,
-    connections,
-    statusBar,
-    lastSelection,
-    publishCache,
-    notifications,
-  } = ctx;
+  const { configuration, ui, secrets, auth, connections, statusBar, lastSelection, notifications } =
+    ctx.core;
+  const { bindings, publisher, publishCache } = ctx.webResource;
   const last = statusBar.getLastPublish();
   if (!last) {
     await notifications.info("Publish a resource first to enable quick publish.");
@@ -112,19 +102,9 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
 }
 
 export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | undefined) {
-  const {
-    configuration,
-    bindings,
-    ui,
-    publisher,
-    secrets,
-    auth,
-    connections,
-    statusBar,
-    lastSelection,
-    publishCache,
-    notifications,
-  } = ctx;
+  const { configuration, ui, secrets, auth, connections, statusBar, lastSelection, notifications } =
+    ctx.core;
+  const { bindings, publisher, publishCache } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;
@@ -185,19 +165,9 @@ export async function publishResource(
   ctx: CommandContext,
   uri: vscode.Uri | undefined,
 ): Promise<void> {
-  const {
-    configuration,
-    bindings,
-    ui,
-    publisher,
-    secrets,
-    auth,
-    connections,
-    statusBar,
-    lastSelection,
-    publishCache,
-    notifications,
-  } = ctx;
+  const { configuration, ui, secrets, auth, connections, statusBar, lastSelection, notifications } =
+    ctx.core;
+  const { bindings, publisher, publishCache } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;

@@ -25,11 +25,10 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     auth,
     lastSelection,
     connections,
-    pluginRegistration,
-    pluginExplorer,
     assemblyStatusBar,
     notifications,
-  } = ctx;
+  } = ctx.core;
+  const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
   const selection = await pickEnvironmentAndAuth(
     configuration,
@@ -138,11 +137,10 @@ export async function updatePluginAssembly(
     auth,
     lastSelection,
     connections,
-    pluginRegistration,
-    pluginExplorer,
     assemblyStatusBar,
     notifications,
-  } = ctx;
+  } = ctx.core;
+  const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
 
   const selection = targetNode
@@ -247,11 +245,10 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     auth,
     lastSelection,
     connections,
-    pluginRegistration,
-    pluginExplorer,
     assemblyStatusBar,
     notifications,
-  } = ctx;
+  } = ctx.core;
+  const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
 
   const last = assemblyStatusBar.getLastPublish();
   if (!last) {

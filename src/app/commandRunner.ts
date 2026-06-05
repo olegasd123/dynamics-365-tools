@@ -44,7 +44,7 @@ export async function runCommandWithHealthCheck(
   }
 
   if (!normalizedOptions.allowConcurrent && RUNNING_COMMANDS.has(commandId)) {
-    void ctx.notifications
+    void ctx.core.notifications
       .askWarning(
         `${commandLabel} is already running. Wait for completion, or reload VS Code if it looks stuck.`,
         [RELOAD_WINDOW_ACTION],
@@ -74,7 +74,7 @@ export async function runCommandWithHealthCheck(
     return await execution;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    void ctx.notifications
+    void ctx.core.notifications
       .askError(`${commandLabel} failed. ${message}`, [RELOAD_WINDOW_ACTION])
       .then(
         async (action) => {
@@ -95,7 +95,7 @@ async function runPreCommandHealthChecks(
   options: RequiredCommandRunOptions,
 ): Promise<boolean> {
   if (options.requiresWorkspace && !vscode.workspace.workspaceFolders?.length) {
-    const action = await ctx.notifications.askError(
+    const action = await ctx.core.notifications.askError(
       "Open a project folder first, then run the command again.",
       [OPEN_FOLDER_ACTION, RELOAD_WINDOW_ACTION],
     );
@@ -126,11 +126,11 @@ async function runPreCommandHealthChecks(
 
 async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
   try {
-    await ctx.configuration.loadExistingConfiguration();
+    await ctx.core.configuration.loadExistingConfiguration();
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const action = await ctx.notifications.askError(
+    const action = await ctx.core.notifications.askError(
       `Configuration check failed. Fix .vscode/dynamics365tools.config.json and run the command again. ${message}`,
       [OPEN_CONFIG_ACTION, RESET_CONFIG_ACTION, RELOAD_WINDOW_ACTION],
     );
@@ -138,17 +138,17 @@ async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
     if (action === OPEN_CONFIG_ACTION) {
       await openWorkspaceFile("dynamics365tools.config.json");
     } else if (action === RESET_CONFIG_ACTION) {
-      const confirmed = await ctx.notifications.askWarning(
+      const confirmed = await ctx.core.notifications.askWarning(
         "Reset config file to an empty template? This overwrites the current file.",
         [RESET_CONFIRM_ACTION],
         { modal: true },
       );
       if (confirmed === RESET_CONFIRM_ACTION) {
-        await ctx.configuration.saveConfiguration({
+        await ctx.core.configuration.saveConfiguration({
           environments: [],
           solutions: [],
         });
-        await ctx.notifications.info(
+        await ctx.core.notifications.info(
           "Configuration file was reset. Add environments and solutions again if needed.",
         );
       }
@@ -162,11 +162,11 @@ async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
 
 async function validateBindings(ctx: CommandContext): Promise<boolean> {
   try {
-    await ctx.configuration.loadExistingBindings();
+    await ctx.core.configuration.loadExistingBindings();
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const action = await ctx.notifications.askError(
+    const action = await ctx.core.notifications.askError(
       `Bindings check failed. Fix .vscode/dynamics365tools.bindings.json and run the command again. ${message}`,
       [OPEN_BINDINGS_ACTION, RESET_BINDINGS_ACTION, RELOAD_WINDOW_ACTION],
     );
@@ -174,14 +174,14 @@ async function validateBindings(ctx: CommandContext): Promise<boolean> {
     if (action === OPEN_BINDINGS_ACTION) {
       await openWorkspaceFile("dynamics365tools.bindings.json");
     } else if (action === RESET_BINDINGS_ACTION) {
-      const confirmed = await ctx.notifications.askWarning(
+      const confirmed = await ctx.core.notifications.askWarning(
         "Reset bindings file to an empty template? This overwrites the current file.",
         [RESET_CONFIRM_ACTION],
         { modal: true },
       );
       if (confirmed === RESET_CONFIRM_ACTION) {
-        await ctx.configuration.saveBindings({ bindings: [] });
-        await ctx.notifications.info(
+        await ctx.core.configuration.saveBindings({ bindings: [] });
+        await ctx.core.notifications.info(
           "Bindings file was reset. Create bindings again before publishing.",
         );
       }

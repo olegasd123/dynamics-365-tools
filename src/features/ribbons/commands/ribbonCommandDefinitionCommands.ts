@@ -16,7 +16,7 @@ export async function addRibbonCommandDefinition(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -34,14 +34,14 @@ export async function addRibbonCommandDefinition(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createCommandDefinitionPatches(target.document, {
       id: id.trim(),
       action: action ?? undefined,
     }),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function overrideOobRibbonCommand(
@@ -50,7 +50,7 @@ export async function overrideOobRibbonCommand(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -65,11 +65,11 @@ export async function overrideOobRibbonCommand(
   const commandId = getOobCommandId(command);
   const duplicate = validateUniqueId(target.document, commandId, "Command id is required.");
   if (duplicate) {
-    await ctx.notifications.warning(`Cannot override '${commandId}': ${duplicate}`);
+    await ctx.core.notifications.warning(`Cannot override '${commandId}': ${duplicate}`);
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Override OOB command '${commandId}'? This can replace default Dynamics behavior.`,
     ["Override"],
     { modal: true },
@@ -78,13 +78,13 @@ export async function overrideOobRibbonCommand(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createCommandDefinitionPatches(target.document, {
       id: commandId,
     }),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function addRibbonCommandAction(
@@ -93,7 +93,7 @@ export async function addRibbonCommandAction(
 ): Promise<void> {
   const target = resolveCommandTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a command definition first.");
+    await ctx.core.notifications.warning("Select a command definition first.");
     return;
   }
 
@@ -102,8 +102,8 @@ export async function addRibbonCommandAction(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(target.document, [
+  ctx.ribbon.editorState.queuePatches(target.document, [
     createCommandActionPatch(target.document, target.command, action),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext, CoreServices } from "../../../app/commandContext";
 import { buildDefaultEnvironmentUrl } from "../../../shared/environmentUrl";
 import { isDefaultSolution, type DataverseClient } from "../../dataverse/dataverseClient";
 import {
@@ -9,7 +9,7 @@ import {
 } from "../domain/models";
 
 export async function editConfiguration(ctx: CommandContext): Promise<void> {
-  const { configuration } = ctx;
+  const { configuration } = ctx.core;
   const config = await configuration.loadConfiguration();
   await configuration.saveConfiguration(config);
   const uri = vscode.Uri.joinPath(
@@ -18,7 +18,7 @@ export async function editConfiguration(ctx: CommandContext): Promise<void> {
     "dynamics365tools.config.json",
   );
   await vscode.window.showTextDocument(uri);
-  ctx.pluginExplorer.refresh();
+  ctx.plugins.explorer.refresh();
 }
 
 type SolutionPickItem = vscode.QuickPickItem & {
@@ -30,7 +30,8 @@ type SolutionPickItem = vscode.QuickPickItem & {
 };
 
 export async function addEnvironment(ctx: CommandContext): Promise<void> {
-  const { configuration, pluginExplorer, notifications } = ctx;
+  const { configuration, notifications } = ctx.core;
+  const { explorer: pluginExplorer } = ctx.plugins;
   const current = await loadOrCreateEmptyConfig(configuration);
 
   const name = await vscode.window.showInputBox({
@@ -112,7 +113,8 @@ export async function addEnvironment(ctx: CommandContext): Promise<void> {
 }
 
 export async function addSolution(ctx: CommandContext): Promise<void> {
-  const { configuration, ui, connections, lastSelection, pluginExplorer, notifications } = ctx;
+  const { configuration, ui, connections, lastSelection, notifications } = ctx.core;
+  const { explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadExistingConfiguration();
   if (!config) {
     await notifications.error(
@@ -286,7 +288,7 @@ async function listUnmanagedSolutions(client: DataverseClient): Promise<
 }
 
 function loadOrCreateEmptyConfig(
-  configuration: CommandContext["configuration"],
+  configuration: CoreServices["configuration"],
 ): Promise<Dynamics365Configuration> {
   return configuration
     .loadExistingConfiguration()

@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext, RibbonServices } from "../../../app/commandContext";
 import { pickDataverseClient } from "../../../platform/vscode/commandUtils";
 import { SolutionImportError } from "../../dataverse/solutionImportService";
 import {
@@ -41,7 +41,7 @@ const SAVE_EXPORT_BACKUP = "Save Backup";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void> {
@@ -78,12 +78,12 @@ export async function saveRibbonSolutionZip(
 ): Promise<void> {
   const source = await resolveSource(ctx, node);
   if (!source || source.kind !== "zip") {
-    await ctx.notifications.warning("Select an imported solution zip source first.");
+    await ctx.core.notifications.warning("Select an imported solution zip source first.");
     return;
   }
 
-  if (ctx.ribbonEditorState.isSourceDirty(source.id)) {
-    await ctx.ribbonEditorState.saveSource(source.id);
+  if (ctx.ribbon.editorState.isSourceDirty(source.id)) {
+    await ctx.ribbon.editorState.saveSource(source.id);
   }
 
   const defaultUri = source.zip?.originalZipUri
@@ -98,9 +98,9 @@ export async function saveRibbonSolutionZip(
     return;
   }
 
-  const savedPath = await ctx.solutionZipService.saveSourceToZip(source, target.fsPath);
-  ctx.ribbonExplorer.refresh();
-  void ctx.notifications.info(`Saved solution zip to ${savedPath}.`);
+  const savedPath = await ctx.ribbon.solutionZipService.saveSourceToZip(source, target.fsPath);
+  ctx.ribbon.explorer.refresh();
+  void ctx.core.notifications.info(`Saved solution zip to ${savedPath}.`);
 }
 
 export async function openRibbonSolutionLocation(
@@ -109,7 +109,7 @@ export async function openRibbonSolutionLocation(
 ): Promise<void> {
   const source = await resolveSource(ctx, node);
   if (!source) {
-    await ctx.notifications.warning("Select a ribbon source first.");
+    await ctx.core.notifications.warning("Select a ribbon source first.");
     return;
   }
 
@@ -122,16 +122,16 @@ export async function removeRibbonSolutionSource(
 ): Promise<void> {
   const source = await resolveSource(ctx, node);
   if (!source || source.kind !== "zip") {
-    await ctx.notifications.warning("Select an imported solution zip source first.");
+    await ctx.core.notifications.warning("Select an imported solution zip source first.");
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Remove ${source.name} from the explorer?`,
     [REMOVE_IMPORTED_SOLUTION],
     {
       modal: true,
-      detail: ctx.ribbonEditorState.isSourceDirty(source.id)
+      detail: ctx.ribbon.editorState.isSourceDirty(source.id)
         ? "Unsaved ribbon edits for this solution will be lost. Files on disk will not be deleted."
         : "Files on disk will not be deleted.",
     },
@@ -140,9 +140,9 @@ export async function removeRibbonSolutionSource(
     return;
   }
 
-  ctx.ribbonSourceLocator.removeImportedSource(source.id);
-  ctx.ribbonEditorState.removeSource(source.id);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.sourceLocator.removeImportedSource(source.id);
+  ctx.ribbon.editorState.removeSource(source.id);
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function saveRibbonSource(
@@ -156,31 +156,31 @@ export async function saveRibbonSource(
 ): Promise<void> {
   const sourceId = resolveSourceId(node);
   const result = sourceId
-    ? await ctx.ribbonEditorState.saveSource(sourceId)
-    : await ctx.ribbonEditorState.saveAllSources();
-  ctx.ribbonExplorer.refresh();
+    ? await ctx.ribbon.editorState.saveSource(sourceId)
+    : await ctx.ribbon.editorState.saveAllSources();
+  ctx.ribbon.explorer.refresh();
   const count = result.changedFileUris.length;
-  void ctx.notifications.info(
+  void ctx.core.notifications.info(
     count ? `Saved ${count} ribbon file${count === 1 ? "" : "s"}.` : "No ribbon changes to save.",
   );
 }
 
 export function undoRibbonEdit(ctx: CommandContext): void {
-  if (!ctx.ribbonEditorState.undo()) {
-    void ctx.notifications.warning("No ribbon edit to undo.");
+  if (!ctx.ribbon.editorState.undo()) {
+    void ctx.core.notifications.warning("No ribbon edit to undo.");
     return;
   }
 
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export function redoRibbonEdit(ctx: CommandContext): void {
-  if (!ctx.ribbonEditorState.redo()) {
-    void ctx.notifications.warning("No ribbon edit to redo.");
+  if (!ctx.ribbon.editorState.redo()) {
+    void ctx.core.notifications.warning("No ribbon edit to redo.");
     return;
   }
 
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function publishRibbonToEnvironment(
@@ -190,12 +190,12 @@ export async function publishRibbonToEnvironment(
   const sourceId = resolveSourceId(node);
   let documents = await resolvePublishDocuments(ctx, node);
   if (!documents.length) {
-    await ctx.notifications.warning("Select a ribbon source or ribbon document first.");
+    await ctx.core.notifications.warning("Select a ribbon source or ribbon document first.");
     return;
   }
 
-  if (sourceId && ctx.ribbonEditorState.isSourceDirty(sourceId)) {
-    const choice = await ctx.notifications.askWarning(
+  if (sourceId && ctx.ribbon.editorState.isSourceDirty(sourceId)) {
+    const choice = await ctx.core.notifications.askWarning(
       "Save ribbon changes before publishing?",
       ["Save and Publish"],
       { modal: true },
@@ -203,16 +203,16 @@ export async function publishRibbonToEnvironment(
     if (choice !== "Save and Publish") {
       return;
     }
-    await ctx.ribbonEditorState.saveSource(sourceId);
-    ctx.ribbonExplorer.refresh();
+    await ctx.ribbon.editorState.saveSource(sourceId);
+    ctx.ribbon.explorer.refresh();
     documents = await resolveSavedPublishDocuments(ctx, node, documents);
     if (!documents.length) {
-      await ctx.notifications.warning("No saved ribbon documents were found to publish.");
+      await ctx.core.notifications.warning("No saved ribbon documents were found to publish.");
       return;
     }
   }
 
-  const config = await ctx.configuration.loadConfiguration();
+  const config = await ctx.core.configuration.loadConfiguration();
   const target = await pickDataverseClient(ctx, {
     config,
     placeHolder: "Select environment for ribbon publish",
@@ -228,10 +228,10 @@ export async function publishRibbonToEnvironment(
       title: "Loading unmanaged solutions",
       cancellable: false,
     },
-    () => ctx.ribbonPublishService.listUnmanagedSolutions(client),
+    () => ctx.ribbon.publishService.listUnmanagedSolutions(client),
   );
   if (!solutions.length) {
-    await ctx.notifications.warning("No unmanaged solutions were found in this environment.");
+    await ctx.core.notifications.warning("No unmanaged solutions were found in this environment.");
     return;
   }
 
@@ -240,9 +240,7 @@ export async function publishRibbonToEnvironment(
     return;
   }
 
-  let result:
-    | Awaited<ReturnType<CommandContext["ribbonPublishService"]["publishDocuments"]>>
-    | undefined;
+  let result: Awaited<ReturnType<RibbonServices["publishService"]["publishDocuments"]>> | undefined;
   let publishError: unknown;
 
   try {
@@ -253,7 +251,7 @@ export async function publishRibbonToEnvironment(
         cancellable: true,
       },
       (progress, token) =>
-        ctx.ribbonPublishService.publishDocuments(client, documents, solution, {
+        ctx.ribbon.publishService.publishDocuments(client, documents, solution, {
           token,
           onStatus: (message) => progress.report({ message }),
         }),
@@ -266,7 +264,7 @@ export async function publishRibbonToEnvironment(
     const error = publishError;
     const message = describeRibbonPublishError(error);
     if (error instanceof SolutionImportError && error.log) {
-      const action = await ctx.notifications.askError(`Ribbon publish failed: ${message}`, [
+      const action = await ctx.core.notifications.askError(`Ribbon publish failed: ${message}`, [
         "Copy Error XML",
       ]);
       if (action === "Copy Error XML") {
@@ -275,7 +273,7 @@ export async function publishRibbonToEnvironment(
       return;
     }
 
-    void ctx.notifications.error(`Ribbon publish failed: ${message}`);
+    void ctx.core.notifications.error(`Ribbon publish failed: ${message}`);
     return;
   }
 
@@ -289,7 +287,7 @@ export async function publishRibbonToEnvironment(
   ]
     .filter(Boolean)
     .join(", ");
-  void ctx.notifications.info(
+  void ctx.core.notifications.info(
     `Published ribbons to ${target.env.name} solution ${solution.uniqueName} (${summary}).`,
   );
 }
@@ -303,8 +301,8 @@ export async function pullRibbonsFromEnvironment(
     return;
   }
 
-  if (ctx.ribbonEditorState.isSourceDirty(source.id)) {
-    await ctx.notifications.warning(
+  if (ctx.ribbon.editorState.isSourceDirty(source.id)) {
+    await ctx.core.notifications.warning(
       "Save or undo pending ribbon edits before pulling from the environment.",
     );
     return;
@@ -312,11 +310,11 @@ export async function pullRibbonsFromEnvironment(
 
   const targetDocuments = await resolvePullDocuments(ctx, source, node);
   if (!targetDocuments.length) {
-    await ctx.notifications.warning("No local ribbon documents were found to update.");
+    await ctx.core.notifications.warning("No local ribbon documents were found to update.");
     return;
   }
 
-  const config = await ctx.configuration.loadConfiguration();
+  const config = await ctx.core.configuration.loadConfiguration();
   const target = await pickDataverseClient(ctx, {
     config,
     placeHolder: "Select environment to pull ribbons from",
@@ -332,7 +330,7 @@ export async function pullRibbonsFromEnvironment(
       title: "Loading unmanaged solutions",
       cancellable: false,
     },
-    () => ctx.solutionZipService.listUnmanagedSolutions(client),
+    () => ctx.ribbon.solutionZipService.listUnmanagedSolutions(client),
   );
   const solutionPick = await pickDataverseSolution(solutions, "Select solution to pull ribbons");
   if (!solutionPick) {
@@ -348,7 +346,7 @@ export async function pullRibbonsFromEnvironment(
         cancellable: true,
       },
       (_progress, token) =>
-        ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName, token),
+        ctx.ribbon.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName, token),
     );
   } catch (error) {
     if (isSolutionExportCancelledError(error)) {
@@ -357,17 +355,17 @@ export async function pullRibbonsFromEnvironment(
     throw error;
   }
   await offerExportedSolutionBackup(ctx, buffer, solutionPick.uniqueName);
-  const incomingSource = await ctx.solutionZipService.openZipBuffer(buffer, {
+  const incomingSource = await ctx.ribbon.solutionZipService.openZipBuffer(buffer, {
     storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
     sourceName: `${solutionPick.uniqueName}-pull.zip`,
   });
-  const incomingDocuments = await ctx.ribbonRepository.loadSource(incomingSource);
+  const incomingDocuments = await ctx.ribbon.repository.loadSource(incomingSource);
   const plan = createRibbonPullPlan(targetDocuments, incomingDocuments);
 
   if (!plan.matchedDocuments.length) {
     const missing = plan.missingDocuments.length;
     const unchanged = plan.unchangedDocuments.length;
-    await ctx.notifications.info(
+    await ctx.core.notifications.info(
       missing
         ? `No matching ribbon changes were found (${missing} missing, ${unchanged} unchanged).`
         : "Local ribbons already match the environment.",
@@ -375,7 +373,7 @@ export async function pullRibbonsFromEnvironment(
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Replace ${plan.matchedDocuments.length} local ribbon block${plan.matchedDocuments.length === 1 ? "" : "s"} from ${solutionPick.uniqueName}?`,
     ["Pull"],
     { modal: true },
@@ -384,16 +382,16 @@ export async function pullRibbonsFromEnvironment(
     return;
   }
 
-  const result = await ctx.ribbonRepository.savePatchSequence(plan.patchesByFileUri);
-  ctx.ribbonExplorer.refresh();
+  const result = await ctx.ribbon.repository.savePatchSequence(plan.patchesByFileUri);
+  ctx.ribbon.explorer.refresh();
 
-  void ctx.notifications.info(
+  void ctx.core.notifications.info(
     `Pulled ${plan.matchedDocuments.length} ribbon block${plan.matchedDocuments.length === 1 ? "" : "s"} into ${result.changedFileUris.length} file${result.changedFileUris.length === 1 ? "" : "s"}.`,
   );
 }
 
 export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Promise<void> {
-  const config = await ctx.configuration.loadConfiguration();
+  const config = await ctx.core.configuration.loadConfiguration();
   const target = await pickDataverseClient(ctx, {
     config,
     placeHolder: "Select environment for generated solution cleanup",
@@ -403,9 +401,9 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
   }
 
   const client = target.client;
-  const generated = await ctx.ribbonPublishService.listGeneratedSolutions(client);
+  const generated = await ctx.ribbon.publishService.listGeneratedSolutions(client);
   if (!generated.length) {
-    void ctx.notifications.info("No generated ribbon solutions were found.");
+    void ctx.core.notifications.info("No generated ribbon solutions were found.");
     return;
   }
 
@@ -424,7 +422,7 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Delete ${picks.length} generated ribbon solution${picks.length === 1 ? "" : "s"}?`,
     ["Delete"],
     { modal: true },
@@ -441,11 +439,11 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
     },
     async () => {
       for (const pick of picks) {
-        await ctx.ribbonPublishService.deleteGeneratedSolution(client, pick.solutionId);
+        await ctx.ribbon.publishService.deleteGeneratedSolution(client, pick.solutionId);
       }
     },
   );
-  void ctx.notifications.info(
+  void ctx.core.notifications.info(
     `Deleted ${picks.length} generated ribbon solution${picks.length === 1 ? "" : "s"}.`,
   );
 }
@@ -468,7 +466,7 @@ export async function openRibbonFile(
   }
 
   if (!(node instanceof RibbonDocumentNode)) {
-    await ctx.notifications.warning("Select a ribbon document first.");
+    await ctx.core.notifications.warning("Select a ribbon document first.");
     return;
   }
 
@@ -497,7 +495,7 @@ async function openRibbonsFromDisk(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const source = await ctx.solutionZipService.openZipFile(
+  const source = await ctx.ribbon.solutionZipService.openZipFile(
     zipUri.fsPath,
     ctx.extensionContext.globalStorageUri.fsPath,
   );
@@ -525,7 +523,7 @@ async function resolvePublishDocuments(
     return [];
   }
 
-  return ctx.ribbonEditorState.loadSource(source);
+  return ctx.ribbon.editorState.loadSource(source);
 }
 
 async function resolveSavedPublishDocuments(
@@ -538,7 +536,7 @@ async function resolveSavedPublishDocuments(
     return previousDocuments;
   }
 
-  const currentDocuments = await ctx.ribbonEditorState.loadSource(source);
+  const currentDocuments = await ctx.ribbon.editorState.loadSource(source);
   if (node instanceof RibbonSourceNode) {
     return currentDocuments;
   }
@@ -576,7 +574,7 @@ function describeRibbonPublishError(error: unknown): string {
 }
 
 async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
-  const config = await ctx.configuration.loadConfiguration();
+  const config = await ctx.core.configuration.loadConfiguration();
   const target = await pickDataverseClient(ctx, {
     config,
     placeHolder: "Select environment for solution export",
@@ -592,7 +590,7 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
       title: "Loading unmanaged solutions",
       cancellable: false,
     },
-    () => ctx.solutionZipService.listUnmanagedSolutions(client),
+    () => ctx.ribbon.solutionZipService.listUnmanagedSolutions(client),
   );
   const solutionPick = await pickDataverseSolution(solutions, "Select unmanaged solution");
   if (!solutionPick) {
@@ -608,7 +606,7 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
         cancellable: true,
       },
       (_progress, token) =>
-        ctx.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName, token),
+        ctx.ribbon.solutionZipService.downloadSolutionZip(client, solutionPick.uniqueName, token),
     );
   } catch (error) {
     if (isSolutionExportCancelledError(error)) {
@@ -617,7 +615,7 @@ async function openRibbonsFromEnvironment(ctx: CommandContext): Promise<void> {
     throw error;
   }
   await offerExportedSolutionBackup(ctx, buffer, solutionPick.uniqueName);
-  const source = await ctx.solutionZipService.openZipBuffer(buffer, {
+  const source = await ctx.ribbon.solutionZipService.openZipBuffer(buffer, {
     storageRoot: ctx.extensionContext.globalStorageUri.fsPath,
     sourceName: `${solutionPick.uniqueName}.zip`,
   });
@@ -633,9 +631,9 @@ async function resolvePullSource(
     return selected;
   }
 
-  const sources = await ctx.ribbonSourceLocator.locate(ctx.configuration.workspaceRoot);
+  const sources = await ctx.ribbon.sourceLocator.locate(ctx.core.configuration.workspaceRoot);
   if (!sources.length) {
-    await ctx.notifications.warning("No local ribbon source was found.");
+    await ctx.core.notifications.warning("No local ribbon source was found.");
     return undefined;
   }
 
@@ -672,11 +670,11 @@ async function resolvePullDocuments(
     return [node.editTarget.document];
   }
 
-  return ctx.ribbonEditorState.loadSource(source);
+  return ctx.ribbon.editorState.loadSource(source);
 }
 
 function pickDataverseSolution(
-  solutions: Awaited<ReturnType<CommandContext["solutionZipService"]["listUnmanagedSolutions"]>>,
+  solutions: Awaited<ReturnType<RibbonServices["solutionZipService"]["listUnmanagedSolutions"]>>,
   placeHolder: string,
 ): Thenable<DataverseSolutionPick | undefined> {
   return showRibbonQuickPick<DataverseSolutionPick>(
@@ -705,9 +703,9 @@ function pickRibbonPublishSolution(
 }
 
 function addImportedRibbonSource(ctx: CommandContext, source: RibbonSource): void {
-  ctx.ribbonSourceLocator.addImportedSource(source);
-  ctx.ribbonExplorer.refresh();
-  void ctx.notifications.info(
+  ctx.ribbon.sourceLocator.addImportedSource(source);
+  ctx.ribbon.explorer.refresh();
+  void ctx.core.notifications.info(
     `Opened ${source.name} with ${source.files.length} ribbon file${source.files.length === 1 ? "" : "s"}.`,
   );
 }
@@ -717,7 +715,7 @@ async function offerExportedSolutionBackup(
   buffer: Buffer,
   solutionUniqueName: string,
 ): Promise<void> {
-  const choice = await ctx.notifications.askInfo(
+  const choice = await ctx.core.notifications.askInfo(
     `Save a backup copy of exported solution ${solutionUniqueName}?`,
     [SAVE_EXPORT_BACKUP, "Skip"],
     { modal: true },
@@ -735,12 +733,12 @@ async function offerExportedSolutionBackup(
     return;
   }
 
-  const savedPath = await ctx.solutionZipService.saveBufferToZip(buffer, target.fsPath);
-  void ctx.notifications.info(`Saved solution backup to ${savedPath}.`);
+  const savedPath = await ctx.ribbon.solutionZipService.saveBufferToZip(buffer, target.fsPath);
+  void ctx.core.notifications.info(`Saved solution backup to ${savedPath}.`);
 }
 
 function defaultSolutionBackupUri(ctx: CommandContext, solutionUniqueName: string): vscode.Uri {
-  const root = ctx.configuration.workspaceRoot ?? ctx.extensionContext.globalStorageUri.fsPath;
+  const root = ctx.core.configuration.workspaceRoot ?? ctx.extensionContext.globalStorageUri.fsPath;
   return vscode.Uri.file(path.join(root, solutionBackupFileName(solutionUniqueName)));
 }
 
@@ -786,6 +784,6 @@ export async function resolveSource(
     return undefined;
   }
 
-  const sources = await ctx.ribbonSourceLocator.locate(ctx.configuration.workspaceRoot);
+  const sources = await ctx.ribbon.sourceLocator.locate(ctx.core.configuration.workspaceRoot);
   return sources.find((source) => source.id === sourceId);
 }

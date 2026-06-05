@@ -42,7 +42,7 @@ export async function addCustomRibbonButton(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -128,7 +128,7 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createCustomButtonPatches(target.document, {
       ...ids,
@@ -150,7 +150,7 @@ export async function addCustomRibbonButton(
       },
     }),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function hideOobRibbonButton(
@@ -159,7 +159,7 @@ export async function hideOobRibbonButton(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -175,11 +175,11 @@ export async function hideOobRibbonButton(
 
   const baseId = makeHideActionId(target.document, target.view.scope, getOobControlId(command));
   const hideActionId = nextHideActionId(target.document, { hideActionId: baseId });
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createHideActionPatches(target.document, { hideActionId, location }),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function hideAndStubOobRibbonButtons(
@@ -188,7 +188,7 @@ export async function hideAndStubOobRibbonButtons(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -202,7 +202,7 @@ export async function hideAndStubOobRibbonButtons(
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Hide ${commands.length} OOB button${commands.length === 1 ? "" : "s"} and create replacement stubs?`,
     ["Create Stubs"],
     { modal: true },
@@ -251,11 +251,11 @@ export async function hideAndStubOobRibbonButtons(
     };
   });
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createOobStubReplacementPatches(target.document, inputs),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function reorderOobRibbonButtons(
@@ -264,7 +264,7 @@ export async function reorderOobRibbonButtons(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -285,7 +285,7 @@ export async function reorderOobRibbonButtons(
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Hide ${orderedCommands.length} OOB button${orderedCommands.length === 1 ? "" : "s"} and re-add them in the selected order?`,
     ["Reorder"],
     { modal: true },
@@ -336,11 +336,11 @@ export async function reorderOobRibbonButtons(
     };
   });
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createOobButtonReorderPatches(target.document, inputs),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function pickOobCommand(

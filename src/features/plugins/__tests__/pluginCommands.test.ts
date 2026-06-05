@@ -24,6 +24,28 @@ function createNotifications(): VsCodeNotificationService {
   return new VsCodeNotificationService();
 }
 
+function legacyContext<T extends Record<string, any>>(ctx: T): T {
+  return {
+    ...ctx,
+    core: {
+      ...(ctx.core ?? {}),
+      configuration: ctx.configuration,
+      ui: ctx.ui,
+      auth: ctx.auth,
+      secrets: ctx.secrets,
+      notifications: ctx.notifications,
+      lastSelection: ctx.lastSelection,
+      connections: ctx.connections,
+      assemblyStatusBar: ctx.assemblyStatusBar,
+    },
+    plugins: {
+      ...(ctx.plugins ?? {}),
+      explorer: ctx.pluginExplorer,
+      registration: ctx.pluginRegistration,
+    },
+  };
+}
+
 test("validateAssemblyIdentity blocks a different assembly name", () => {
   assert.throws(
     () =>
@@ -195,7 +217,7 @@ test("updatePluginAssembly opens file dialog in the last DLL folder", async () =
 
   try {
     await updatePluginAssembly(
-      {
+      legacyContext({
         configuration: {
           loadConfiguration: async () => ({ environments: [env] }),
           workspaceRoot: "/workspace",
@@ -227,7 +249,7 @@ test("updatePluginAssembly opens file dialog in the last DLL folder", async () =
         pluginRegistration: {},
         pluginExplorer: {},
         assemblyStatusBar: {},
-      } as any,
+      } as any),
       {
         env,
         assembly: { id: "assembly-id", name: "Contoso.Plugins" },

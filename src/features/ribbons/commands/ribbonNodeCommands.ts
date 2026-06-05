@@ -51,13 +51,13 @@ const DELETE_HIDE_ACTION = "Delete Hide Action";
 const DELETE_LOC_LABEL_LANGUAGE = "Delete Language";
 export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
   if (!(node instanceof RibbonItemNode) || !node.editTarget) {
-    await ctx.notifications.warning("Select a ribbon item that can be deleted.");
+    await ctx.core.notifications.warning("Select a ribbon item that can be deleted.");
     return;
   }
 
   const { document, range } = node.editTarget;
   if (node.contextValue === "d365RibbonParameter") {
-    const choice = await ctx.notifications.askWarning(
+    const choice = await ctx.core.notifications.askWarning(
       `Delete parameter ${node.label}?`,
       [DELETE_PARAMETER],
       {
@@ -70,7 +70,7 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
     }
   }
   if (node.contextValue === "d365RibbonHideAction") {
-    const choice = await ctx.notifications.askWarning(
+    const choice = await ctx.core.notifications.askWarning(
       `Delete hide action ${node.label}?`,
       [DELETE_HIDE_ACTION],
       {
@@ -87,7 +87,7 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
     const labelText = target
       ? `Loc label language ${target.title.languageCode} from ${target.label.id}`
       : `Loc label language ${node.label}`;
-    const choice = await ctx.notifications.askWarning(
+    const choice = await ctx.core.notifications.askWarning(
       `Delete ${labelText}?`,
       [DELETE_LOC_LABEL_LANGUAGE],
       {
@@ -102,14 +102,14 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
 
   const plan = createRibbonCascadeDeletePlan(document, node.contextValue, range);
   if (!plan?.related.length) {
-    ctx.ribbonEditorState.queuePatches(document, [
+    ctx.ribbon.editorState.queuePatches(document, [
       createDeleteNodePatch(document.sourceText, range),
     ]);
-    ctx.ribbonExplorer.refresh();
+    ctx.ribbon.explorer.refresh();
     return;
   }
 
-  const choice = await ctx.notifications.askWarning(
+  const choice = await ctx.core.notifications.askWarning(
     `Delete ${plan.related.length} related ribbon item${plan.related.length === 1 ? "" : "s"}?`,
     [DELETE_RELATED_ITEMS, DELETE_SELECTED_ONLY],
     {
@@ -121,13 +121,13 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     document,
     choice === DELETE_RELATED_ITEMS
       ? plan.patches
       : [createDeleteNodePatch(document.sourceText, range)],
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 function findLocLabelTitleDeleteTarget(
@@ -161,13 +161,13 @@ function relatedDeleteMessage(related: RibbonCascadeDeleteItem[]): string {
 
 export async function editRibbonNode(ctx: CommandContext, node?: RibbonItemNode): Promise<void> {
   if (!(node instanceof RibbonItemNode) || !node.editTarget) {
-    await ctx.notifications.warning("Select a ribbon item that can be edited.");
+    await ctx.core.notifications.warning("Select a ribbon item that can be edited.");
     return;
   }
 
   const target = resolveEditableTarget(node);
   if (!target) {
-    await ctx.notifications.warning("This ribbon item cannot be edited yet.");
+    await ctx.core.notifications.warning("This ribbon item cannot be edited yet.");
     return;
   }
 
@@ -213,7 +213,7 @@ export async function addRibbonRuleChildStep(
 ): Promise<void> {
   const target = resolveRuleStepTarget(node);
   if (!target || target.step.kind !== "OrRule") {
-    await ctx.notifications.warning("Select an OrRule first.");
+    await ctx.core.notifications.warning("Select an OrRule first.");
     return;
   }
 
@@ -222,10 +222,10 @@ export async function addRibbonRuleChildStep(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(target.document, [
+  ctx.ribbon.editorState.queuePatches(target.document, [
     createRuleChildStepPatch(target.document.sourceText, target.step, step),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function moveRibbonNodeUp(
@@ -296,19 +296,19 @@ async function moveRibbonNode(
 ): Promise<void> {
   const target = await resolveReorderTarget(ctx, node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon item that can be moved.");
+    await ctx.core.notifications.warning("Select a ribbon item that can be moved.");
     return;
   }
 
   const nextIndex = target.index + direction;
   if (nextIndex < 0 || nextIndex >= target.ranges.length) {
-    await ctx.notifications.warning(
+    await ctx.core.notifications.warning(
       direction < 0 ? "Item is already first." : "Item is already last.",
     );
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createSwapNodePatches(
       target.document.sourceText,
@@ -316,7 +316,7 @@ async function moveRibbonNode(
       target.ranges[nextIndex],
     ),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 async function resolveReorderTarget(
@@ -348,7 +348,7 @@ async function resolveCurrentRibbonDocument(
     return undefined;
   }
 
-  const documents = await ctx.ribbonEditorState.loadSource(source);
+  const documents = await ctx.ribbon.editorState.loadSource(source);
   return (
     documents.find((item) => item.id === document.id) ??
     documents.find(
@@ -909,7 +909,7 @@ async function editCustomAction(
   action: CustomAction,
 ): Promise<void> {
   if (action.commandUI?.kind !== "Button") {
-    await ctx.notifications.warning("Only Button custom actions can be edited.");
+    await ctx.core.notifications.warning("Only Button custom actions can be edited.");
     return;
   }
 
@@ -1033,10 +1033,10 @@ async function editCustomAction(
     templateAlias: templateAlias.trim() || undefined,
   };
 
-  ctx.ribbonEditorState.queuePatches(document, [
+  ctx.ribbon.editorState.queuePatches(document, [
     createCustomButtonReplacePatch(document.sourceText, action.range, input),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 function getButtonLabelDefault(
@@ -1100,13 +1100,13 @@ async function editHideAction(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(document, [
+  ctx.ribbon.editorState.queuePatches(document, [
     createHideActionReplacePatch(document.sourceText, action.range, {
       hideActionId: hideActionId.trim(),
       location: location.trim(),
     }),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 async function editNodeId(
@@ -1126,10 +1126,10 @@ async function editNodeId(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(document, [
+  ctx.ribbon.editorState.queuePatches(document, [
     createNodeAttributeValuePatch(document.sourceText, range, "Id", id.trim()),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 async function editCommandAction(
@@ -1142,10 +1142,10 @@ async function editCommandAction(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(document, [
+  ctx.ribbon.editorState.queuePatches(document, [
     createCommandActionReplacePatch(document.sourceText, action, input),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 async function editRuleStep(
@@ -1159,10 +1159,10 @@ async function editRuleStep(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(document, [
+  ctx.ribbon.editorState.queuePatches(document, [
     createRuleStepReplacePatch(document.sourceText, step, input),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 async function editLocLabelTitle(
@@ -1182,11 +1182,11 @@ async function editLocLabelTitle(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(document, [
+  ctx.ribbon.editorState.queuePatches(document, [
     createLocLabelTitleReplacePatch(document.sourceText, title, {
       languageCode,
       description: description.trim(),
     }),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }

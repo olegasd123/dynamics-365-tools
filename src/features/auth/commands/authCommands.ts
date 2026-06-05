@@ -9,7 +9,7 @@ import {
 import { AuthorizationProfile } from "../authorizationStore";
 
 export async function setEnvironmentCredentials(ctx: CommandContext): Promise<void> {
-  const { secrets, lastSelection, authorizations, notifications } = ctx;
+  const { secrets, lastSelection, authorizations, notifications } = ctx.core;
   const env = await pickAuthorizationEnvironment(ctx, "clientSecret", {
     placeHolder: "Select authorization for client credentials",
     includeCreate: true,
@@ -53,7 +53,7 @@ export async function setEnvironmentCredentials(ctx: CommandContext): Promise<vo
 }
 
 export async function signInInteractive(ctx: CommandContext): Promise<void> {
-  const { auth, lastSelection, authorizations, notifications } = ctx;
+  const { auth, lastSelection, authorizations, notifications } = ctx.core;
   const env = await pickAuthorizationEnvironment(ctx, "interactive", {
     placeHolder: "Select authorization for interactive sign-in",
     includeCreate: true,
@@ -74,7 +74,7 @@ export async function signInInteractive(ctx: CommandContext): Promise<void> {
 }
 
 export async function signOut(ctx: CommandContext): Promise<void> {
-  const { auth, secrets, lastSelection, notifications } = ctx;
+  const { auth, secrets, lastSelection, notifications } = ctx.core;
   const env = await pickAuthorizationEnvironment(ctx, "interactive", {
     placeHolder: "Select authorization to sign out",
     includeCreate: false,
@@ -141,7 +141,7 @@ async function pickAuthorizationEnvironment(
   mode: AuthorizationMode,
   options: PickAuthorizationOptions,
 ): Promise<NormalizedEnvironmentConfig | undefined> {
-  const { configuration, authorizations } = ctx;
+  const { configuration, authorizations } = ctx.core;
   const config = await configuration.loadExistingConfiguration();
   const configEnvs = config?.environments ?? [];
   const savedEnvs = authorizations
@@ -178,7 +178,7 @@ async function pickAuthorizationEnvironment(
   }
 
   if (!candidates.length) {
-    await ctx.notifications.info(
+    await ctx.core.notifications.info(
       "No authorizations found. Run 'Dynamics 365 Tools: Sign In (Interactive)' to create one.",
     );
     return undefined;
@@ -226,7 +226,7 @@ async function finalizeAuthorizationSelection(
   mode: AuthorizationMode,
   ensureProjectConfig: boolean,
 ): Promise<NormalizedEnvironmentConfig> {
-  await ctx.authorizations.save(environmentToProfile(env, mode));
+  await ctx.core.authorizations.save(environmentToProfile(env, mode));
   if (ensureProjectConfig) {
     await ensureEnvironmentInProjectConfig(ctx, env);
   }
@@ -276,7 +276,8 @@ async function ensureEnvironmentInProjectConfig(
   ctx: CommandContext,
   env: NormalizedEnvironmentConfig,
 ): Promise<void> {
-  const { configuration, pluginExplorer } = ctx;
+  const { configuration } = ctx.core;
+  const { explorer: pluginExplorer } = ctx.plugins;
   const current = await configuration.loadExistingConfiguration();
   if (!current) {
     await configuration.saveConfiguration({
@@ -284,7 +285,7 @@ async function ensureEnvironmentInProjectConfig(
       solutions: [],
     });
     pluginExplorer.refresh();
-    await ctx.notifications.info(
+    await ctx.core.notifications.info(
       "Created .vscode/dynamics365tools.config.json with the selected authorization.",
     );
     return;
@@ -297,7 +298,7 @@ async function ensureEnvironmentInProjectConfig(
       environments: [...current.environments, env],
     });
     pluginExplorer.refresh();
-    await ctx.notifications.info(
+    await ctx.core.notifications.info(
       `Added environment ${env.name} to .vscode/dynamics365tools.config.json.`,
     );
     return;

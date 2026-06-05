@@ -9,11 +9,11 @@ import { EnvironmentConnectionService } from "../../dataverse/environmentConnect
 import { PluginTypeNode } from "../pluginExplorer";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
+import type { NotificationPort } from "../../../app/ports/notifications";
 
 export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
-  const { notifications } = ctx;
-  const explorer = pluginExplorer;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin in the Plugins explorer.");
     return;
@@ -61,7 +61,7 @@ async function resolvePluginService(
   lastSelection: LastSelectionService,
   connections: EnvironmentConnectionService,
   preferredEnv: string,
-  notifications: CommandContext["notifications"],
+  notifications: NotificationPort,
 ): Promise<PluginService | undefined> {
   const config = await configuration.loadConfiguration();
   const selection = await pickEnvironmentAndAuth(

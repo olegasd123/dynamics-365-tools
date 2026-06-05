@@ -12,13 +12,15 @@ function createContext(overrides?: {
   saveBindings?: (value: unknown) => Promise<void>;
 }): CommandContext {
   return {
-    configuration: {
-      loadExistingConfiguration: overrides?.loadExistingConfiguration ?? (async () => undefined),
-      loadExistingBindings: overrides?.loadExistingBindings ?? (async () => undefined),
-      saveConfiguration: overrides?.saveConfiguration ?? (async () => undefined),
-      saveBindings: overrides?.saveBindings ?? (async () => undefined),
+    core: {
+      configuration: {
+        loadExistingConfiguration: overrides?.loadExistingConfiguration ?? (async () => undefined),
+        loadExistingBindings: overrides?.loadExistingBindings ?? (async () => undefined),
+        saveConfiguration: overrides?.saveConfiguration ?? (async () => undefined),
+        saveBindings: overrides?.saveBindings ?? (async () => undefined),
+      },
+      notifications: new VsCodeNotificationService(),
     },
-    notifications: new VsCodeNotificationService(),
   } as unknown as CommandContext;
 }
 

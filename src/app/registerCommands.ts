@@ -153,15 +153,15 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.plugins.publishLastAssembly", () => publishLastPluginAssembly(ctx)),
     register("dynamics365Tools.plugins.updateAssembly", (node) => updatePluginAssembly(ctx, node)),
     register("dynamics365Tools.plugins.deletePluginType", (node) => deletePluginType(ctx, node)),
-    register("dynamics365Tools.plugins.refreshExplorer", () => ctx.pluginExplorer.refresh()),
+    register("dynamics365Tools.plugins.refreshExplorer", () => ctx.plugins.explorer.refresh()),
     register("dynamics365Tools.plugins.toggleSolutionFilter", () =>
-      ctx.pluginExplorer.toggleSolutionFilter(),
+      ctx.plugins.explorer.toggleSolutionFilter(),
     ),
     register("dynamics365Tools.plugins.enableSolutionFilter", () =>
-      ctx.pluginExplorer.setSolutionFilter(true),
+      ctx.plugins.explorer.setSolutionFilter(true),
     ),
     register("dynamics365Tools.plugins.disableSolutionFilter", () =>
-      ctx.pluginExplorer.setSolutionFilter(false),
+      ctx.plugins.explorer.setSolutionFilter(false),
     ),
     register("dynamics365Tools.plugins.generatePublicKeyToken", () => generatePublicKeyToken(ctx)),
     register("dynamics365Tools.ribbons.refreshExplorer", () => refreshRibbonExplorer(ctx), {

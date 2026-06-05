@@ -104,21 +104,21 @@ export async function pickDataverseClient(
   options: PickDataverseClientOptions = {},
 ): Promise<PickedDataverseClient | undefined> {
   const target = await pickEnvironmentAndAuth(
-    ctx.configuration,
-    ctx.ui,
-    ctx.secrets,
-    ctx.auth,
-    ctx.lastSelection,
+    ctx.core.configuration,
+    ctx.core.ui,
+    ctx.core.secrets,
+    ctx.core.auth,
+    ctx.core.lastSelection,
     options.config,
     options.preferredEnvName,
     options.placeHolder ? { placeHolder: options.placeHolder } : undefined,
-    ctx.notifications,
+    ctx.core.notifications,
   );
   if (!target) {
     return undefined;
   }
 
-  const client = await ctx.connections.createClient(target.env, target.auth);
+  const client = await ctx.core.connections.createClient(target.env, target.auth);
   if (!client) {
     return undefined;
   }

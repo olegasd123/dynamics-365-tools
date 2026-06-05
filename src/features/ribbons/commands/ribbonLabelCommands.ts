@@ -15,7 +15,7 @@ export async function addRibbonLocLabel(
 ): Promise<void> {
   const target = resolveRibbonTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a ribbon scope first.");
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
   }
 
@@ -42,7 +42,7 @@ export async function addRibbonLocLabel(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(
+  ctx.ribbon.editorState.queuePatches(
     target.document,
     createLocLabelPatches(target.document, {
       id: id.trim(),
@@ -50,7 +50,7 @@ export async function addRibbonLocLabel(
       description: description.trim(),
     }),
   );
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }
 
 export async function addRibbonLocLabelTitle(
@@ -59,7 +59,7 @@ export async function addRibbonLocLabelTitle(
 ): Promise<void> {
   const target = resolveLocLabelTarget(node);
   if (!target) {
-    await ctx.notifications.warning("Select a LocLabel first.");
+    await ctx.core.notifications.warning("Select a LocLabel first.");
     return;
   }
 
@@ -79,11 +79,11 @@ export async function addRibbonLocLabelTitle(
     return;
   }
 
-  ctx.ribbonEditorState.queuePatches(target.document, [
+  ctx.ribbon.editorState.queuePatches(target.document, [
     createLocLabelTitlePatch(target.document, target.label.range, {
       languageCode,
       description: description.trim(),
     }),
   ]);
-  ctx.ribbonExplorer.refresh();
+  ctx.ribbon.explorer.refresh();
 }

@@ -10,9 +10,8 @@ import {
 } from "./pluginRegistrationPrompts";
 
 export async function createPluginImage(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
-  const { notifications } = ctx;
-  const explorer = pluginExplorer;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin step in the Plugins explorer.");
     return;
@@ -79,9 +78,8 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
 }
 
 export async function editPluginImage(ctx: CommandContext, node?: PluginImageNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
-  const { notifications } = ctx;
-  const explorer = pluginExplorer;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin image in the Plugins explorer.");
     return;
@@ -152,9 +150,8 @@ export async function deletePluginImage(
   ctx: CommandContext,
   node?: PluginImageNode,
 ): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
-  const { notifications } = ctx;
-  const explorer = pluginExplorer;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin image in the Plugins explorer.");
     return;
@@ -194,16 +191,18 @@ export async function copyImageDescription(
   node?: PluginImageNode,
 ): Promise<void> {
   if (!node) {
-    void ctx.notifications.info("Run this command from a plugin image in the Plugins explorer.");
+    void ctx.core.notifications.info(
+      "Run this command from a plugin image in the Plugins explorer.",
+    );
     return;
   }
 
   const tooltip = asTooltipString(node.tooltip);
   if (!tooltip) {
-    void ctx.notifications.info("No image info to copy.");
+    void ctx.core.notifications.info("No image info to copy.");
     return;
   }
 
   await vscode.env.clipboard.writeText(tooltip);
-  void ctx.notifications.info("Image info copied to clipboard.");
+  void ctx.core.notifications.info("Image info copied to clipboard.");
 }

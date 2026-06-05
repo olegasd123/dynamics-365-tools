@@ -7,17 +7,8 @@ import { buildSupportedSet, ensureSupportedResource } from "../core/webResourceH
 import { addBinding } from "./bindingCommands";
 
 export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const {
-    configuration,
-    bindings,
-    ui,
-    secrets,
-    auth,
-    lastSelection,
-    webResources,
-    connections,
-    notifications,
-  } = ctx;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { bindings, urls: webResources } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;
@@ -96,13 +87,13 @@ async function resolveRemotePath(
   binding: BindingEntry,
   targetUri: vscode.Uri,
 ): Promise<string | undefined> {
-  const bindingRoot = ctx.configuration.resolveLocalPath(binding.relativeLocalPath);
+  const bindingRoot = ctx.core.configuration.resolveLocalPath(binding.relativeLocalPath);
   const targetPath = path.normalize(targetUri.fsPath);
 
   if (binding.kind === "folder") {
     const relative = path.relative(bindingRoot, targetPath);
     if (!relative || relative.startsWith("..")) {
-      await ctx.notifications.error("Selected file is outside the bound folder mapping.");
+      await ctx.core.notifications.error("Selected file is outside the bound folder mapping.");
       return undefined;
     }
     return joinRemote(binding.remotePath, relative);

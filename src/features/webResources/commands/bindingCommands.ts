@@ -10,7 +10,8 @@ import { compareFolderBindingResources, normalizeRemotePath } from "../folderBin
 const bindingOutput = vscode.window.createOutputChannel("Dynamics 365 Tools Binding");
 
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const { configuration, bindings, ui, notifications } = ctx;
+  const { configuration, ui, notifications } = ctx.core;
+  const { bindings } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
     return;
@@ -110,14 +111,14 @@ async function confirmFolderBinding(
       summary.onlyLocal,
       summary.onlyCrm,
     );
-    const decision = await ctx.notifications.askWarning(
+    const decision = await ctx.core.notifications.askWarning(
       `Binding check for ${target.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
       ["Create Binding", "Cancel"],
     );
     return decision === "Create Binding";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const decision = await ctx.notifications.askWarning(
+    const decision = await ctx.core.notifications.askWarning(
       `Could not compare local files with CRM resources: ${message}. Continue creating binding?`,
       ["Create Binding", "Cancel"],
     );

@@ -9,7 +9,7 @@ import type { NotificationPort } from "../../../app/ports/notifications";
 const execFileAsync = promisify(execFile);
 
 export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
-  const { configuration, notifications } = ctx;
+  const { configuration, notifications } = ctx.core;
   const workspaceRoot =
     configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 

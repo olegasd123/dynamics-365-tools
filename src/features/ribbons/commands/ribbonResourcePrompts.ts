@@ -78,7 +78,7 @@ async function pickImageWebResourceFromEnvironment(
   prompt: ImageWebResourcePrompt,
   currentUniqueName?: string,
 ): Promise<WebResourceLibraryPick | undefined> {
-  const config = await ctx.configuration.loadConfiguration();
+  const config = await ctx.core.configuration.loadConfiguration();
   const target = await pickDataverseClient(ctx, {
     config,
     placeHolder: "Select environment for image resources",
@@ -234,7 +234,7 @@ export async function pickWebResourceLibrary(
 export async function listBoundJavaScriptLibraries(
   ctx: CommandContext,
 ): Promise<WebResourceLibraryPick[]> {
-  const snapshot = await ctx.bindings.listBindings();
+  const snapshot = await ctx.webResource.bindings.listBindings();
   const picks: WebResourceLibraryPick[] = [];
 
   for (const binding of snapshot.bindings) {
@@ -243,11 +243,11 @@ export async function listBoundJavaScriptLibraries(
       if (uniqueName.toLowerCase().endsWith(".js")) {
         picks.push({
           label: uniqueName,
-          description: ctx.configuration.getRelativeToWorkspace(
-            ctx.configuration.resolveLocalPath(binding.relativeLocalPath),
+          description: ctx.core.configuration.getRelativeToWorkspace(
+            ctx.core.configuration.resolveLocalPath(binding.relativeLocalPath),
           ),
           uniqueName,
-          localPath: ctx.configuration.resolveLocalPath(binding.relativeLocalPath),
+          localPath: ctx.core.configuration.resolveLocalPath(binding.relativeLocalPath),
         });
       }
       continue;
@@ -323,7 +323,7 @@ async function listFolderJavaScriptLibraries(
   ctx: CommandContext,
   binding: BindingEntry,
 ): Promise<WebResourceLibraryPick[]> {
-  const root = ctx.configuration.resolveLocalPath(binding.relativeLocalPath);
+  const root = ctx.core.configuration.resolveLocalPath(binding.relativeLocalPath);
   const files = await vscode.workspace.findFiles(
     new vscode.RelativePattern(root, "**/*.js"),
     "**/node_modules/**",
@@ -334,7 +334,7 @@ async function listFolderJavaScriptLibraries(
     const uniqueName = joinRemotePath(binding.remotePath, relative);
     return {
       label: uniqueName,
-      description: ctx.configuration.getRelativeToWorkspace(file.fsPath),
+      description: ctx.core.configuration.getRelativeToWorkspace(file.fsPath),
       uniqueName,
       localPath: file.fsPath,
     };
