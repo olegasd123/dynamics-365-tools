@@ -1,8 +1,10 @@
-import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { DataverseClient } from "../dataverse/dataverseClient";
 import { EnvironmentConnection } from "../dataverse/environmentConnectionService";
 
 export class WebResourceUrlService {
+  constructor(private readonly notifications: NotificationPort = new NoopNotificationService()) {}
+
   async buildClassicWebResourceUrl(
     connection: EnvironmentConnection,
     solutionName: string,
@@ -19,12 +21,12 @@ export class WebResourceUrlService {
       ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(`Could not resolve CRM ids: ${message}`);
+      await this.notifications.error(`Could not resolve CRM ids: ${message}`);
       return undefined;
     }
 
     if (!webResourceId) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `Web resource ${remotePath} not found in ${connection.env.name}; publish it first.`,
       );
       return undefined;

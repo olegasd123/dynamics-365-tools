@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { EnvironmentConfig } from "../config/domain/models";
 
 export interface InteractiveSignInOptions {
@@ -7,6 +8,8 @@ export interface InteractiveSignInOptions {
 }
 
 export class AuthService {
+  constructor(private readonly notifications: NotificationPort = new NoopNotificationService()) {}
+
   async getAccessToken(
     env: EnvironmentConfig,
     options: InteractiveSignInOptions = {},
@@ -24,7 +27,7 @@ export class AuthService {
       });
       return session?.accessToken;
     } catch (error) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `Interactive sign-in failed for ${env.name}: ${String(error)}`,
       );
       return undefined;
@@ -45,7 +48,7 @@ export class AuthService {
 
       const authApi = vscode.authentication as any;
       if (typeof authApi.removeSession !== "function") {
-        vscode.window.showWarningMessage(
+        await this.notifications.warning(
           `Sign-out is not supported in this version of VS Code. Remove the Microsoft account from Accounts to sign out.`,
         );
         return "failed";
@@ -54,7 +57,7 @@ export class AuthService {
       await authApi.removeSession("microsoft", session.id);
       return "removed";
     } catch (error) {
-      vscode.window.showErrorMessage(`Sign-out failed for ${env.name}: ${String(error)}`);
+      await this.notifications.error(`Sign-out failed for ${env.name}: ${String(error)}`);
       return "failed";
     }
   }

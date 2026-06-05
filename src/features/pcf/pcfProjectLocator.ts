@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { PcfControlProject, PcfTemplateKind } from "./models";
 import { PcfManifestReader } from "./pcfManifestReader";
 
@@ -22,7 +23,10 @@ export class PcfProjectLocator implements vscode.Disposable {
   private readonly onDidChangeProjectsEmitter = new vscode.EventEmitter<void>();
   readonly onDidChangeProjects = this.onDidChangeProjectsEmitter.event;
 
-  constructor(private readonly manifestReader = new PcfManifestReader()) {}
+  constructor(
+    private readonly manifestReader = new PcfManifestReader(),
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
+  ) {}
 
   async initialize(): Promise<void> {
     this.initializePromise ??= this.doInitialize();
@@ -46,7 +50,7 @@ export class PcfProjectLocator implements vscode.Disposable {
       try {
         projects.push(await this.createProject(manifestUri));
       } catch (error) {
-        void vscode.window.showWarningMessage(
+        void this.notifications.warning(
           `Failed to read PCF manifest ${manifestUri.fsPath}: ${String(error)}`,
         );
       }

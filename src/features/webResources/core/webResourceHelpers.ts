@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { NoopNotificationService, NotificationPort } from "../../../app/ports/notifications";
 import { WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "../../config/configurationService";
 
 export function buildSupportedSet(): Set<string> {
@@ -9,6 +10,7 @@ export function buildSupportedSet(): Set<string> {
 export async function ensureSupportedResource(
   uri: vscode.Uri,
   supportedExtensions: Set<string>,
+  notifications: NotificationPort = new NoopNotificationService(),
 ): Promise<boolean> {
   const stat = await vscode.workspace.fs.stat(uri);
   if (stat.type === vscode.FileType.Directory) {
@@ -17,7 +19,7 @@ export async function ensureSupportedResource(
 
   const ext = path.extname(uri.fsPath).toLowerCase();
   if (!isSupportedExtension(ext, supportedExtensions)) {
-    vscode.window.showInformationMessage(
+    await notifications.info(
       "Dynamics 365 Tools actions are available only for supported web resource types.",
     );
     return false;

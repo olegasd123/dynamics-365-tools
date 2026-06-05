@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { XMLParser } from "fast-xml-parser";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { ConfigurationService } from "../config/configurationService";
 import { CdsSolutionProject, PcfControlProject, PcfPackageResult } from "./models";
 import { PacCli } from "./pacCli";
@@ -25,6 +26,7 @@ export class PcfPackageService implements vscode.Disposable {
     private readonly runner: ProcessRunner,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
   ) {}
 
@@ -34,7 +36,7 @@ export class PcfPackageService implements vscode.Disposable {
   ): Promise<PcfPackageResult | undefined> {
     const pcfProjectPath = await findPcfProjectPath(project.rootUri);
     if (!pcfProjectPath) {
-      vscode.window.showErrorMessage(`No .pcfproj file was found for ${project.fullName}.`);
+      await this.notifications.error(`No .pcfproj file was found for ${project.fullName}.`);
       return undefined;
     }
 
@@ -70,7 +72,7 @@ export class PcfPackageService implements vscode.Disposable {
 
     if (result.exitCode !== 0) {
       this.telemetry?.package(project, false, options.managed, result.durationMs);
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `PCF solution package failed for ${project.fullName} with exit code ${result.exitCode}.`,
       );
       return undefined;
@@ -80,7 +82,7 @@ export class PcfPackageService implements vscode.Disposable {
       parseSolutionZipPath(`${result.stdout}\n${result.stderr}`, solution.rootUri) ??
       (await findNewestSolutionZip(solution.rootUri, buildConfiguration));
     if (!zipPath) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `PCF solution package built, but no solution .zip path could be found for ${project.fullName}.`,
       );
       return undefined;
@@ -93,7 +95,7 @@ export class PcfPackageService implements vscode.Disposable {
     });
     this.telemetry?.package(project, true, options.managed, result.durationMs);
     this.output.appendLine(`Packaged solution: ${zipPath}`);
-    vscode.window.showInformationMessage(
+    await this.notifications.info(
       `PCF solution package created for ${project.fullName}: ${storedZipPath}`,
     );
 
@@ -131,10 +133,9 @@ export class PcfPackageService implements vscode.Disposable {
       );
     }
 
-    const action = await vscode.window.showWarningMessage(
+    const action = await this.notifications.askWarning(
       `No .cdsproj solution wrapper references ${project.fullName}. Create one at ${defaultSolutionRoot}?`,
-      "Create",
-      "Cancel",
+      ["Create", "Cancel"],
     );
     if (action !== "Create") {
       return undefined;
@@ -185,7 +186,7 @@ export class PcfPackageService implements vscode.Disposable {
       token,
     );
     if (result.exitCode !== 0) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `Failed to add PCF project reference to ${path.basename(solution.cdsProjectUri)}.`,
       );
       return undefined;
@@ -230,13 +231,13 @@ export class PcfPackageService implements vscode.Disposable {
       token,
     );
     if (initResult.exitCode !== 0) {
-      vscode.window.showErrorMessage("Failed to create the PCF solution wrapper.");
+      await this.notifications.error("Failed to create the PCF solution wrapper.");
       return undefined;
     }
 
     const cdsProjectUri = await findFirstCdsProject(solutionRoot);
     if (!cdsProjectUri) {
-      vscode.window.showErrorMessage("pac solution init completed, but no .cdsproj was found.");
+      await this.notifications.error("pac solution init completed, but no .cdsproj was found.");
       return undefined;
     }
 
@@ -276,9 +277,9 @@ export class PcfPackageService implements vscode.Disposable {
       return true;
     }
 
-    const action = await vscode.window.showErrorMessage(
+    const action = await this.notifications.askError(
       `Power Platform CLI is required to create or update PCF solution wrappers: ${result.error ?? "pac not found"}.`,
-      "Install pac CLI",
+      ["Install pac CLI"],
     );
     if (action === "Install pac CLI") {
       await vscode.env.openExternal(

@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { ConfigurationService } from "../config/configurationService";
 import { EnvironmentConfig } from "../config/domain/models";
 import type { DataverseClient } from "../dataverse/dataverseClient";
@@ -41,6 +42,7 @@ export class PcfDeployService implements vscode.Disposable {
     private readonly connections: EnvironmentConnectionService,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
   ) {}
 
@@ -51,7 +53,7 @@ export class PcfDeployService implements vscode.Disposable {
   ): Promise<PcfDeployResult | undefined> {
     const stored = (await this.settings.getProjectSettings(project)).lastPackagedZip;
     if (!stored) {
-      vscode.window.showWarningMessage(
+      await this.notifications.warning(
         `No packaged solution is saved for ${project.fullName}. Package it first.`,
       );
       return undefined;
@@ -62,7 +64,7 @@ export class PcfDeployService implements vscode.Disposable {
     try {
       zipBytes = await fs.readFile(zipPath);
     } catch {
-      vscode.window.showErrorMessage(`Packaged solution was not found: ${zipPath}.`);
+      await this.notifications.error(`Packaged solution was not found: ${zipPath}.`);
       return undefined;
     }
 
@@ -103,7 +105,7 @@ export class PcfDeployService implements vscode.Disposable {
 
       await this.settings.updateProjectSettings(project, { lastDeployedEnv: env.name });
       this.telemetry?.deploy(project, true, importResult.durationMs);
-      vscode.window.showInformationMessage(
+      await this.notifications.info(
         `PCF solution ${path.basename(zipPath)} deployed to ${env.name}.`,
       );
 
@@ -118,7 +120,7 @@ export class PcfDeployService implements vscode.Disposable {
       const message = describeDeployError(error);
       this.output.appendLine(`Deploy failed: ${message}`);
       this.telemetry?.deploy(project, false);
-      vscode.window.showErrorMessage(`PCF deploy failed for ${project.fullName}: ${message}`);
+      await this.notifications.error(`PCF deploy failed for ${project.fullName}: ${message}`);
       return undefined;
     }
   }

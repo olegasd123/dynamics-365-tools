@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { PcfBuildStatus, PcfControlProject } from "./models";
 import { NpmRunner } from "./npmRunner";
 import { PcfStatusBarService } from "./pcfStatusBar";
@@ -29,6 +30,7 @@ export class PcfBuildService implements vscode.Disposable {
   constructor(
     private readonly npmRunner: NpmRunner,
     private readonly statusBar: PcfStatusBarService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
   ) {}
 
@@ -52,7 +54,7 @@ export class PcfBuildService implements vscode.Disposable {
 
     const packageInfo = await this.readPackageInfo(project);
     if (!packageInfo.scripts.build) {
-      vscode.window.showErrorMessage(`PCF project ${project.fullName} has no build script.`);
+      await this.notifications.error(`PCF project ${project.fullName} has no build script.`);
       return false;
     }
 
@@ -93,13 +95,13 @@ export class PcfBuildService implements vscode.Disposable {
 
   async startWatch(project: PcfControlProject): Promise<boolean> {
     if (this.watches.has(project.rootUri)) {
-      vscode.window.showInformationMessage(`PCF watch is already running for ${project.fullName}.`);
+      await this.notifications.info(`PCF watch is already running for ${project.fullName}.`);
       return true;
     }
 
     const packageInfo = await this.readPackageInfo(project);
     if (!isPcfStartScript(packageInfo.scripts.start)) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `PCF project ${project.fullName} needs a start script like "pcf-scripts start".`,
       );
       return false;
@@ -169,10 +171,9 @@ export class PcfBuildService implements vscode.Disposable {
       return true;
     }
 
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await this.notifications.askWarning(
       `Dependencies are missing for ${project.fullName}. Run npm install now?`,
-      "Install",
-      "Skip",
+      ["Install", "Skip"],
     );
     if (choice !== "Install") {
       output.appendLine("Build cancelled because dependencies are missing.");
@@ -188,7 +189,7 @@ export class PcfBuildService implements vscode.Disposable {
 
     if (result.exitCode !== 0) {
       output.appendLine(`npm install failed with exit code ${result.exitCode}.`);
-      vscode.window.showErrorMessage(`npm install failed for ${project.fullName}.`);
+      await this.notifications.error(`npm install failed for ${project.fullName}.`);
       return false;
     }
 

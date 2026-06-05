@@ -31,6 +31,7 @@ import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import type { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
+import type { NotificationPort } from "./ports/notifications";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import type { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
 import type { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
@@ -50,6 +51,7 @@ export interface CommandContext {
   auth: AuthService;
   authorizations: AuthorizationStore;
   secrets: SecretService;
+  notifications: NotificationPort;
   lastSelection: LastSelectionService;
 
   bindings: BindingService;
@@ -97,6 +99,7 @@ export interface CoreServices {
   auth: AuthService;
   authorizations: AuthorizationStore;
   secrets: SecretService;
+  notifications: NotificationPort;
   lastSelection: LastSelectionService;
   connections: EnvironmentConnectionService;
   statusBar: StatusBarService;

@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { XMLParser } from "fast-xml-parser";
 import { EnvironmentConfig } from "../config/domain/models";
 import { PacCli } from "./pacCli";
@@ -14,6 +15,7 @@ export class PcfPushService implements vscode.Disposable {
   constructor(
     private readonly pacCli: PacCli,
     private readonly settings: PcfWorkspaceSettingsService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
   ) {}
 
@@ -64,11 +66,11 @@ export class PcfPushService implements vscode.Disposable {
     );
 
     if (result.exitCode !== 0) {
-      vscode.window.showErrorMessage(`pac auth create failed with exit code ${result.exitCode}.`);
+      await this.notifications.error(`pac auth create failed with exit code ${result.exitCode}.`);
       return false;
     }
 
-    vscode.window.showInformationMessage(`pac auth profile synced to ${env.name}.`);
+    await this.notifications.info(`pac auth profile synced to ${env.name}.`);
     return true;
   }
 
@@ -98,7 +100,7 @@ export class PcfPushService implements vscode.Disposable {
     this.telemetry?.push(project, result.exitCode === 0, result.durationMs);
 
     if (result.exitCode !== 0) {
-      vscode.window.showErrorMessage(`PCF push failed for ${project.fullName}.`);
+      await this.notifications.error(`PCF push failed for ${project.fullName}.`);
       return false;
     }
 
@@ -106,7 +108,7 @@ export class PcfPushService implements vscode.Disposable {
       publisherPrefix,
       lastDeployedEnv: env.name,
     });
-    vscode.window.showInformationMessage(`PCF control ${project.fullName} pushed to ${env.name}.`);
+    await this.notifications.info(`PCF control ${project.fullName} pushed to ${env.name}.`);
     return true;
   }
 

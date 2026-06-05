@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { EnvironmentConfig } from "../config/domain/models";
 import { AuthService } from "../auth/authService";
 import { EnvironmentCredentials, SecretService } from "../auth/secretService";
@@ -20,6 +21,7 @@ export class EnvironmentConnectionService {
   constructor(
     private readonly auth: AuthService,
     private readonly secrets: SecretService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
   ) {}
 
   async createConnection(
@@ -29,7 +31,7 @@ export class EnvironmentConnectionService {
     const userAgent = this.buildUserAgent(env);
     const token = await this.resolveToken(env, authContext, userAgent);
     if (!token) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `No credentials available for ${env.name}. Sign in interactively or set client credentials first.`,
       );
       return undefined;

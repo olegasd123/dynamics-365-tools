@@ -33,6 +33,7 @@ import { PublishCacheService } from "../features/webResources/publishCacheServic
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
+import { VsCodeNotificationService } from "../platform/vscode/notificationService";
 import { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
 import { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
 import { CommandContext } from "./commandContext";
@@ -42,11 +43,14 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
 
   const configuration = lazy(() => new ConfigurationService());
   const ui = lazy(() => new SolutionPicker());
+  const notifications = lazy(() => new VsCodeNotificationService());
   const secrets = lazy(() => new SecretService(extensionContext.secrets));
-  const auth = lazy(() => new AuthService());
+  const auth = lazy(() => new AuthService(notifications()));
   const authorizations = lazy(() => new AuthorizationStore(extensionContext.globalState));
   const lastSelection = lazy(() => new LastSelectionService(extensionContext.workspaceState));
-  const connections = lazy(() => new EnvironmentConnectionService(auth(), secrets()));
+  const connections = lazy(
+    () => new EnvironmentConnectionService(auth(), secrets(), notifications()),
+  );
   const statusBar = lazyDisposable(
     () => new StatusBarService("dynamics365Tools.publishLastResource"),
     disposables,
@@ -58,8 +62,8 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
 
   const bindings = lazy(() => new BindingService(configuration()));
   const publishCache = lazy(() => new PublishCacheService(configuration()));
-  const publisher = lazy(() => new WebResourcePublisher(connections()));
-  const webResources = lazy(() => new WebResourceUrlService());
+  const publisher = lazy(() => new WebResourcePublisher(connections(), notifications()));
+  const webResources = lazy(() => new WebResourceUrlService(notifications()));
 
   const pluginAssemblyIntrospector = lazy(
     () => new PluginAssemblyIntrospector(extensionContext.extensionPath),
@@ -105,18 +109,24 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   );
   const pcfTelemetry = lazyDisposable(() => new PcfTelemetryService(), disposables);
   const pcfBuildService = lazyDisposable(
-    () => new PcfBuildService(npmRunner(), pcfStatusBar(), pcfTelemetry()),
+    () => new PcfBuildService(npmRunner(), pcfStatusBar(), notifications(), pcfTelemetry()),
     disposables,
   );
   const pcfEnvironmentService = lazy(() => new PcfEnvironmentService(connections()));
   const pcfWorkspaceSettings = lazy(() => new PcfWorkspaceSettingsService(configuration()));
   const pcfPushService = lazyDisposable(
-    () => new PcfPushService(pacCli(), pcfWorkspaceSettings(), pcfTelemetry()),
+    () => new PcfPushService(pacCli(), pcfWorkspaceSettings(), notifications(), pcfTelemetry()),
     disposables,
   );
   const pcfDeployService = lazyDisposable(
     () =>
-      new PcfDeployService(connections(), pcfWorkspaceSettings(), configuration(), pcfTelemetry()),
+      new PcfDeployService(
+        connections(),
+        pcfWorkspaceSettings(),
+        configuration(),
+        notifications(),
+        pcfTelemetry(),
+      ),
     disposables,
   );
   const pcfPackageService = lazyDisposable(
@@ -126,11 +136,15 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
         pcfProcessRunner(),
         pcfWorkspaceSettings(),
         configuration(),
+        notifications(),
         pcfTelemetry(),
       ),
     disposables,
   );
-  const pcfProjectLocator = lazyDisposable(() => new PcfProjectLocator(), disposables);
+  const pcfProjectLocator = lazyDisposable(
+    () => new PcfProjectLocator(undefined, notifications()),
+    disposables,
+  );
   const pcfExplorer = lazy(() => {
     return new PcfExplorerProvider(
       configuration(),
@@ -158,6 +172,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get secrets() {
       return secrets();
+    },
+    get notifications() {
+      return notifications();
     },
     get lastSelection() {
       return lastSelection();
@@ -281,6 +298,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get secrets() {
       return core.secrets;
+    },
+    get notifications() {
+      return core.notifications;
     },
     get auth() {
       return core.auth;

@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 import { DataverseClient, isDefaultSolution } from "../dataverse/dataverseClient";
 import {
@@ -46,7 +47,10 @@ export class WebResourcePublisher {
   // CRM backend rejects concurrent PublishXml calls; serialize them with a queue.
   private publishQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly connections: EnvironmentConnectionService) {
+  constructor(
+    private readonly connections: EnvironmentConnectionService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
+  ) {
     this.output = vscode.window.createOutputChannel("Dynamics 365 Tools Publisher");
   }
 
@@ -176,13 +180,11 @@ export class WebResourcePublisher {
       if (envName) {
         const summary = parts.join(", ");
         if (result.failed || cancelled) {
-          vscode.window.showWarningMessage(
+          void this.notifications.warning(
             `Dynamics 365 Tools publish to ${envName}: ${cancelled ? "cancelled, " : ""}${summary} (check output for errors)`,
           );
         } else {
-          vscode.window.showInformationMessage(
-            `Dynamics 365 Tools publish to ${envName}: ${summary}`,
-          );
+          void this.notifications.info(`Dynamics 365 Tools publish to ${envName}: ${summary}`);
         }
       }
     }
@@ -416,9 +418,9 @@ export class WebResourcePublisher {
 
   private async notifyError(message: string, error?: unknown): Promise<void> {
     const copyAction = "Copy error details";
-    const selection = await vscode.window.showErrorMessage(
+    const selection = await this.notifications.askError(
       `Dynamics 365 Tools publish failed: ${message}`,
-      copyAction,
+      [copyAction],
     );
     if (selection !== copyAction) {
       return;
