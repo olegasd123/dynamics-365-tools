@@ -36,6 +36,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Package
+        run: npm run package
+
   publish:
     needs: build
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && github.actor != 'github-actions[bot]'
