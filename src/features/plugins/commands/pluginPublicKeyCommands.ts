@@ -1,0 +1,173 @@
+import * as path from "path";
+import * as vscode from "vscode";
+import { promisify } from "util";
+import { execFile } from "child_process";
+import * as fs from "fs/promises";
+import { CommandContext } from "../../../app/commandContext";
+
+const execFileAsync = promisify(execFile);
+
+export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
+  const { configuration } = ctx;
+  const workspaceRoot =
+    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+  const projectPick = await vscode.window.showOpenDialog({
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined,
+    filters: { "C# Project": ["csproj"], "All Files": ["*"] },
+    openLabel: "Select .csproj to strong-name",
+  });
+  if (!projectPick || !projectPick[0]) {
+    return;
+  }
+
+  const csprojUri = projectPick[0];
+  const projectDir = path.dirname(csprojUri.fsPath);
+
+  const filename = await vscode.window.showInputBox({
+    prompt: "Enter file name for the strong name key (.snk)",
+    value: "plugin.snk",
+    ignoreFocusOut: true,
+  });
+  if (!filename) {
+    return;
+  }
+
+  const resolvedPath = path.join(projectDir, filename);
+  const relativeKeyPath = path.relative(projectDir, resolvedPath).replace(/\\/g, "/");
+
+  const snTool = await resolveSnTool();
+  if (!snTool) {
+    void vscode.window.showErrorMessage(
+      "Strong Name tool (sn.exe/sn) not found. Install the .NET SDK and ensure the `sn` tool is on your PATH.",
+    );
+    return;
+  }
+
+  try {
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(resolvedPath)));
+    await execFileAsync(snTool.command, [...snTool.generateArgs, resolvedPath]);
+    const token = await generatePublicKeyTokenValue(snTool, resolvedPath);
+    await ensureCsprojStrongName(csprojUri, relativeKeyPath);
+
+    const message = token
+      ? `Strong name key created and project updated. Public key token: ${token}`
+      : "Strong name key created and project updated. Failed to read public key token from sn output.";
+    showPublicKeyTokenResult(message, token);
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Failed to generate strong name key: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+export function showPublicKeyTokenResult(message: string, token?: string): void {
+  const copyAction = token ? "Copy token" : undefined;
+  void vscode.window.showInformationMessage(message, copyAction ?? "OK").then(
+    async (selection) => {
+      if (selection === copyAction && token) {
+        try {
+          await vscode.env.clipboard.writeText(token);
+        } catch (error) {
+          void vscode.window.showErrorMessage(
+            `Failed to copy public key token: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    },
+    () => undefined,
+  );
+}
+
+export function extractToken(output?: string): string | undefined {
+  if (!output) {
+    return undefined;
+  }
+  const match =
+    output.match(/Public key token is\s+([0-9a-fA-F]+)/i) ||
+    output.match(/Public key token=(\w+)/i) ||
+    output.match(/Public key token:\s*([0-9a-fA-F]+)/i);
+  return match?.[1];
+}
+
+async function generatePublicKeyTokenValue(
+  snTool: SnTool,
+  keyPath: string,
+): Promise<string | undefined> {
+  const publicKeyPath = path.join(
+    path.dirname(keyPath),
+    `.tmp-${path.basename(keyPath)}.public.snk`,
+  );
+
+  try {
+    await execFileAsync(snTool.command, [...snTool.publicArgs, keyPath, publicKeyPath]);
+    const tokenOutput = await execFileAsync(snTool.command, [...snTool.tokenArgs, publicKeyPath]);
+    return extractToken(tokenOutput.stdout) || extractToken(tokenOutput.stderr);
+  } catch (error) {
+    const stderr = (error as any)?.stderr || (error as any)?.message;
+    throw new Error(`sn failed to produce public key token: ${stderr ?? error}`);
+  } finally {
+    try {
+      await fs.unlink(publicKeyPath);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
+async function ensureCsprojStrongName(
+  csprojUri: vscode.Uri,
+  keyFileRelative: string,
+): Promise<void> {
+  const content = (await vscode.workspace.fs.readFile(csprojUri)).toString();
+  if (content.includes("<AssemblyOriginatorKeyFile")) {
+    return;
+  }
+
+  const insertion = [
+    "  <PropertyGroup>",
+    "    <SignAssembly>true</SignAssembly>",
+    `    <AssemblyOriginatorKeyFile>${keyFileRelative}</AssemblyOriginatorKeyFile>`,
+    "  </PropertyGroup>",
+    "  <ItemGroup>",
+    `    <None Include="${keyFileRelative}" />`,
+    "  </ItemGroup>",
+  ].join("\n");
+
+  const closingTag = "</Project>";
+  const index = content.lastIndexOf(closingTag);
+  const updated =
+    index >= 0
+      ? `${content.slice(0, index)}${insertion}\n${closingTag}\n`
+      : `${content.trimEnd()}\n${insertion}\n${closingTag}\n`;
+
+  await vscode.workspace.fs.writeFile(csprojUri, Buffer.from(updated, "utf8"));
+}
+
+type SnTool = {
+  command: string;
+  generateArgs: string[];
+  publicArgs: string[];
+  tokenArgs: string[];
+};
+
+async function resolveSnTool(): Promise<SnTool | undefined> {
+  const candidates: SnTool[] = [
+    { command: "sn", generateArgs: ["-k"], publicArgs: ["-p"], tokenArgs: ["-t"] },
+    { command: "sn.exe", generateArgs: ["-k"], publicArgs: ["-p"], tokenArgs: ["-t"] },
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await execFileAsync(candidate.command, ["-?"]);
+      return candidate;
+    } catch {
+      // Continue to next candidate
+    }
+  }
+
+  return undefined;
+}
