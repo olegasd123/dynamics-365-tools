@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
-import { pickDataverseClient } from "../../../platform/vscode/commandUtils";
+import { pickDataverseClient } from "../../../app/commandUtils";
 import { BindingEntry } from "../../config/domain/models";
 import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";

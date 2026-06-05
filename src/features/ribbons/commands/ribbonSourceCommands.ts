@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { CommandContext, RibbonServices } from "../../../app/commandContext";
-import { pickDataverseClient } from "../../../platform/vscode/commandUtils";
+import { pickDataverseClient } from "../../../app/commandUtils";
 import { SolutionImportError } from "../../dataverse/solutionImportService";
 import {
   RibbonDocumentNode,

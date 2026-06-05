@@ -2,12 +2,12 @@ import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { ConfigurationService } from "../../config/configurationService";
 import { BindingService } from "../bindingService";
-import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
+import { SolutionPicker } from "../../../app/solutionPicker";
 import { WebResourcePublisher } from "../webResourcePublisher";
 import { SecretService } from "../../auth/secretService";
 import { AuthService } from "../../auth/authService";
 import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
-import { StatusBarService } from "../../../platform/vscode/statusBar";
+import { WebResourceStatusBarService } from "../webResourceStatusBar";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
 import { PublishCacheService } from "../publishCacheService";
 import {
@@ -16,7 +16,7 @@ import {
   EnvironmentConfig,
 } from "../../config/domain/models";
 import type { NotificationPort } from "../../../app/ports/notifications";
-import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
+import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { addBinding } from "./bindingCommands";
 import {
   buildSupportedSet,
@@ -238,7 +238,7 @@ async function publishFlow(
   publisher: WebResourcePublisher,
   secrets: SecretService,
   auth: AuthService,
-  statusBar: StatusBarService,
+  statusBar: WebResourceStatusBarService,
   lastSelection: LastSelectionService,
   publishCache: PublishCacheService,
   notifications: NotificationPort,
@@ -283,7 +283,7 @@ async function publishFolder(
   connections: EnvironmentConnectionService,
   secrets: SecretService,
   auth: AuthService,
-  statusBar: StatusBarService,
+  statusBar: WebResourceStatusBarService,
   lastSelection: LastSelectionService,
   publishCache: PublishCacheService,
   notifications: NotificationPort,

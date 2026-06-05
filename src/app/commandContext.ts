@@ -17,6 +17,7 @@ import type { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
 import type { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
 import type { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
 import type { ProcessRunner } from "../features/pcf/processRunner";
+import type { PluginAssemblyStatusBarService } from "../features/plugins/pluginAssemblyStatusBar";
 import type { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
 import type { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import type { RibbonDiagnosticsService } from "../features/ribbons/ribbonDiagnostics";
@@ -29,13 +30,13 @@ import type { SolutionZipService } from "../features/ribbons/solutionZipService"
 import type { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import type { BindingService } from "../features/webResources/bindingService";
 import type { PublishCacheService } from "../features/webResources/publishCacheService";
+import type { WebResourceStatusBarService } from "../features/webResources/webResourceStatusBar";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import type { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import type { LoggerPort } from "./ports/logger";
 import type { NotificationPort } from "./ports/notifications";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
-import type { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
-import type { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
+import type { SolutionPicker } from "./solutionPicker";
 
 export interface CommandContext {
   extensionContext: vscode.ExtensionContext;
@@ -59,8 +60,8 @@ export interface CoreServices {
   notifications: NotificationPort;
   lastSelection: LastSelectionService;
   connections: EnvironmentConnectionService;
-  statusBar: StatusBarService;
-  assemblyStatusBar: AssemblyStatusBarService;
+  statusBar: WebResourceStatusBarService;
+  assemblyStatusBar: PluginAssemblyStatusBarService;
 }
 
 export interface WebResourceServices {

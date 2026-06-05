@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
+import { SolutionPicker } from "../../../app/solutionPicker";
 import { VsCodeNotificationService } from "../../../platform/vscode/notificationService";
-import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
 
 function createUi(): SolutionPicker {
   return new SolutionPicker(new VsCodeNotificationService());

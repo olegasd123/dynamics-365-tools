@@ -17,6 +17,7 @@ import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
 import { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
 import { ProcessRunner } from "../features/pcf/processRunner";
+import { PluginAssemblyStatusBarService } from "../features/plugins/pluginAssemblyStatusBar";
 import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
 import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
 import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
@@ -30,14 +31,14 @@ import { SolutionZipService } from "../features/ribbons/solutionZipService";
 import { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
 import { BindingService } from "../features/webResources/bindingService";
 import { PublishCacheService } from "../features/webResources/publishCacheService";
+import { WebResourceStatusBarService } from "../features/webResources/webResourceStatusBar";
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
 import { VsCodeOutputLogger } from "../platform/vscode/outputLogger";
-import { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
-import { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
 import { CommandContext } from "./commandContext";
+import { SolutionPicker } from "./solutionPicker";
 
 export function createServices(extensionContext: vscode.ExtensionContext): CommandContext {
   const disposables: vscode.Disposable[] = [];
@@ -54,11 +55,11 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     () => new EnvironmentConnectionService(auth(), secrets(), notifications()),
   );
   const statusBar = lazyDisposable(
-    () => new StatusBarService("dynamics365Tools.publishLastResource"),
+    () => new WebResourceStatusBarService("dynamics365Tools.publishLastResource"),
     disposables,
   );
   const assemblyStatusBar = lazyDisposable(
-    () => new AssemblyStatusBarService("dynamics365Tools.plugins.publishLastAssembly"),
+    () => new PluginAssemblyStatusBarService("dynamics365Tools.plugins.publishLastAssembly"),
     disposables,
   );
 

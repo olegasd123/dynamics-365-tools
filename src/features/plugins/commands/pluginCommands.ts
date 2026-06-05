@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
+import { pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { CommandContext } from "../../../app/commandContext";
 import {
   EnvironmentAuthContext,

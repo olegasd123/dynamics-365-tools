@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
+import { pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { AuthService } from "../../auth/authService";
 import { SecretService } from "../../auth/secretService";
 import { ConfigurationService } from "../../config/configurationService";
@@ -7,7 +7,7 @@ import { Dynamics365Configuration } from "../../config/domain/models";
 import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
 import { SolutionComponentService } from "../../dataverse/solutionComponentService";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
+import { SolutionPicker } from "../../../app/solutionPicker";
 import { PluginStep } from "../models";
 import { PluginService } from "../pluginService";
 import type { NotificationPort } from "../../../app/ports/notifications";

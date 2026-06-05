@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
 import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
-import { pickDataverseClient, resolveTargetUri } from "../../../platform/vscode/commandUtils";
+import { pickDataverseClient, resolveTargetUri } from "../../../app/commandUtils";
 import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";

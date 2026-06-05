@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
-import { AuthService } from "../../features/auth/authService";
-import { SecretService } from "../../features/auth/secretService";
-import { ConfigurationService } from "../../features/config/configurationService";
-import { Dynamics365Configuration, EnvironmentConfig } from "../../features/config/domain/models";
-import type { DataverseClient } from "../../features/dataverse/dataverseClient";
-import type { EnvironmentAuthContext } from "../../features/dataverse/environmentConnectionService";
-import type { CommandContext } from "../../app/commandContext";
-import type { NotificationPort } from "../../app/ports/notifications";
-import { LastSelectionService } from "./lastSelectionStore";
-import { SolutionPicker } from "./ui/solutionPicker";
+import type { AuthService } from "../features/auth/authService";
+import type { SecretService } from "../features/auth/secretService";
+import type { ConfigurationService } from "../features/config/configurationService";
+import type { Dynamics365Configuration, EnvironmentConfig } from "../features/config/domain/models";
+import type { DataverseClient } from "../features/dataverse/dataverseClient";
+import type { EnvironmentAuthContext } from "../features/dataverse/environmentConnectionService";
+import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
+import type { CommandContext } from "./commandContext";
+import type { NotificationPort } from "./ports/notifications";
+import type { SolutionPicker } from "./solutionPicker";
 
 export async function resolveTargetUri(
   notifications: NotificationPort,

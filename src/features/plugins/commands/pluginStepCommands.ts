@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { ConfigurationService } from "../../config/configurationService";
-import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
+import { SolutionPicker } from "../../../app/solutionPicker";
 import { SecretService } from "../../auth/secretService";
 import { AuthService } from "../../auth/authService";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";

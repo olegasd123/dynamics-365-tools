@@ -6,8 +6,8 @@ import { PluginExplorerProvider } from "../pluginExplorer";
 import { AssemblyIdentity, DiscoveredPluginType } from "../pluginAssemblyIntrospector";
 import { PluginRegistrationManager, PluginSyncResult } from "../pluginRegistrationManager";
 import { PluginService } from "../pluginService";
+import { PluginAssemblyStatusBarService } from "../pluginAssemblyStatusBar";
 import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { AssemblyStatusBarService } from "../../../platform/vscode/statusBar";
 import {
   AssemblyIdentityValidationError,
   validateAssemblyIdentity,
@@ -67,7 +67,7 @@ type AssemblyUpdateContext = {
   pluginService: PluginService;
   pluginRegistration: PluginRegistrationManager;
   pluginExplorer?: PluginExplorerProvider;
-  assemblyStatusBar: AssemblyStatusBarService;
+  assemblyStatusBar: PluginAssemblyStatusBarService;
   lastSelection: LastSelectionService;
   notifications: NotificationPort;
 };
