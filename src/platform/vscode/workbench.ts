@@ -1,0 +1,26 @@
+import * as vscode from "vscode";
+import type { WorkbenchPort } from "../../app/ports/workbench";
+
+export class VsCodeWorkbench implements WorkbenchPort {
+  get hasWorkspace(): boolean {
+    return Boolean(vscode.workspace.workspaceFolders?.length);
+  }
+
+  async executeCommand(commandId: string, ...args: unknown[]): Promise<unknown> {
+    return vscode.commands.executeCommand(commandId, ...args);
+  }
+
+  async openWorkspaceFile(relativePath: string): Promise<void> {
+    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (!workspaceUri) {
+      return;
+    }
+
+    const fileUri = vscode.Uri.joinPath(workspaceUri, ...relativePath.split("/"));
+    await vscode.window.showTextDocument(fileUri);
+  }
+
+  setStatusBarMessage(message: string, hideWhenDone: Promise<unknown>): void {
+    vscode.window.setStatusBarMessage(message, hideWhenDone);
+  }
+}

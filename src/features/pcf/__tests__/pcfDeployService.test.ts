@@ -3,7 +3,7 @@ import test from "node:test";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import * as vscode from "vscode";
+import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
 import { ConfigurationService } from "../../config/configurationService";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { PcfControlProject } from "../models";
@@ -12,9 +12,8 @@ import { PcfWorkspaceSettingsService } from "../pcfWorkspaceSettings";
 
 test("PcfDeployService imports last packaged zip and publishes deployed custom control", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-pcf-deploy-"));
-  const previousFolders = vscode.workspace.workspaceFolders;
   const originalFetch = globalThis.fetch;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const files = new NodeWorkspaceFiles(workspaceRoot);
 
   const zipPath = path.join(workspaceRoot, "solution", "bin", "Release", "Contoso.zip");
   await fs.mkdir(path.dirname(zipPath), { recursive: true });
@@ -47,8 +46,8 @@ test("PcfDeployService imports last packaged zip and publishes deployed custom c
   };
 
   try {
-    const configuration = new ConfigurationService();
-    const settings = new PcfWorkspaceSettingsService(configuration);
+    const configuration = new ConfigurationService(files);
+    const settings = new PcfWorkspaceSettingsService(configuration, files);
     const project = createProject(path.join(workspaceRoot, "controls", "LinearInput"));
     await settings.updateProjectSettings(project, {
       lastPackagedZip: "solution/bin/Release/Contoso.zip",
@@ -87,7 +86,6 @@ test("PcfDeployService imports last packaged zip and publishes deployed custom c
     assert.strictEqual(stored.lastDeployedEnv, "test");
     service.dispose();
   } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
     globalThis.fetch = originalFetch;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }

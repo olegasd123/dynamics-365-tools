@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
-import * as vscode from "vscode";
+import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
 import { ConfigurationService } from "../../config/configurationService";
 import {
   RibbonDocumentNode,
@@ -18,7 +18,6 @@ import { RibbonSourceLocator } from "../ribbonSourceLocator";
 
 test("renders located ribbon documents as a read-only tree", async () => {
   const workspaceRoot = await makeWorkspace();
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   await writeFile(
     workspaceRoot,
     "Entities/account/RibbonDiffXml.xml",
@@ -57,7 +56,7 @@ test("renders located ribbon documents as a read-only tree", async () => {
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
-    new ConfigurationService(),
+    createConfiguration(workspaceRoot),
     new RibbonSourceLocator(),
     new RibbonEditorState(new RibbonRepository()),
   );
@@ -150,7 +149,6 @@ test("renders located ribbon documents as a read-only tree", async () => {
 
 test("shows empty button metadata details", async () => {
   const workspaceRoot = await makeWorkspace();
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   await writeFile(
     workspaceRoot,
     "Entities/account/RibbonDiffXml.xml",
@@ -165,7 +163,7 @@ test("shows empty button metadata details", async () => {
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
-    new ConfigurationService(),
+    createConfiguration(workspaceRoot),
     new RibbonSourceLocator(),
     new RibbonEditorState(new RibbonRepository()),
   );
@@ -202,7 +200,6 @@ test("shows empty button metadata details", async () => {
 
 test("labels OOB command overrides in the tree", async () => {
   const workspaceRoot = await makeWorkspace();
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   await writeFile(
     workspaceRoot,
     "Entities/account/RibbonDiffXml.xml",
@@ -217,7 +214,7 @@ test("labels OOB command overrides in the tree", async () => {
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
-    new ConfigurationService(),
+    createConfiguration(workspaceRoot),
     new RibbonSourceLocator(),
     new RibbonEditorState(new RibbonRepository()),
   );
@@ -237,7 +234,6 @@ test("labels OOB command overrides in the tree", async () => {
 
 test("shows details for built-in refs and common enable rule steps", async () => {
   const workspaceRoot = await makeWorkspace();
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   await writeFile(
     workspaceRoot,
     "AppRibbon/RibbonDiffXml.xml",
@@ -259,7 +255,7 @@ test("shows details for built-in refs and common enable rule steps", async () =>
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
-    new ConfigurationService(),
+    createConfiguration(workspaceRoot),
     new RibbonSourceLocator(),
     new RibbonEditorState(new RibbonRepository()),
   );
@@ -288,7 +284,6 @@ test("shows details for built-in refs and common enable rule steps", async () =>
 
 test("scopes known OOB command overrides to matching entity views", async () => {
   const workspaceRoot = await makeWorkspace();
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
   await writeFile(
     workspaceRoot,
     "Entities/account/RibbonDiffXml.xml",
@@ -299,7 +294,7 @@ test("scopes known OOB command overrides to matching entity views", async () => 
 </RibbonDiffXml>`,
   );
   const explorer = new RibbonExplorerProvider(
-    new ConfigurationService(),
+    createConfiguration(workspaceRoot),
     new RibbonSourceLocator(),
     new RibbonEditorState(new RibbonRepository()),
   );
@@ -319,6 +314,10 @@ test("scopes known OOB command overrides to matching entity views", async () => 
 
 async function makeWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-explorer-"));
+}
+
+function createConfiguration(workspaceRoot: string): ConfigurationService {
+  return new ConfigurationService(new NodeWorkspaceFiles(workspaceRoot));
 }
 
 async function writeFile(

@@ -1,12 +1,15 @@
 import * as path from "path";
-import * as vscode from "vscode";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { ConfigurationService } from "../config/configurationService";
 import { PcfControlProject, PcfWorkspaceProjectSettings, PcfWorkspaceSettings } from "./models";
 
 const SETTINGS_FILENAME = "dynamics365tools.pcf.json";
 
 export class PcfWorkspaceSettingsService {
-  constructor(private readonly configuration: ConfigurationService) {}
+  constructor(
+    private readonly configuration: ConfigurationService,
+    private readonly files: WorkspaceFilesPort,
+  ) {}
 
   async getProjectSettings(project: PcfControlProject): Promise<PcfWorkspaceProjectSettings> {
     const settings = await this.load();
@@ -27,21 +30,21 @@ export class PcfWorkspaceSettingsService {
   }
 
   async load(): Promise<PcfWorkspaceSettings> {
-    const uri = this.getSettingsUri();
-    if (!(await exists(uri))) {
+    const settingsPath = this.getSettingsPath();
+    if (!(await this.files.exists(settingsPath))) {
       return emptySettings();
     }
 
-    const content = await vscode.workspace.fs.readFile(uri);
-    const parsed = JSON.parse(content.toString()) as unknown;
+    const content = await this.files.readFile(settingsPath);
+    const parsed = JSON.parse(Buffer.from(content).toString("utf8")) as unknown;
     return normalizeSettings(parsed);
   }
 
   async save(settings: PcfWorkspaceSettings): Promise<void> {
-    const uri = this.getSettingsUri();
-    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(uri.fsPath)));
-    await vscode.workspace.fs.writeFile(
-      uri,
+    const settingsPath = this.getSettingsPath();
+    await this.files.createDirectory(path.dirname(settingsPath));
+    await this.files.writeFile(
+      settingsPath,
       Buffer.from(JSON.stringify(settings, null, 2), "utf8"),
     );
   }
@@ -50,16 +53,12 @@ export class PcfWorkspaceSettingsService {
     return normalizeSlashes(this.configuration.getRelativeToWorkspace(project.rootUri));
   }
 
-  private getSettingsUri(): vscode.Uri {
+  private getSettingsPath(): string {
     if (!this.configuration.workspaceRoot) {
       throw new Error("This extension requires an opened workspace folder.");
     }
 
-    return vscode.Uri.joinPath(
-      vscode.Uri.file(this.configuration.workspaceRoot),
-      ".vscode",
-      SETTINGS_FILENAME,
-    );
+    return path.join(this.configuration.workspaceRoot, ".vscode", SETTINGS_FILENAME);
   }
 }
 
@@ -87,15 +86,6 @@ function emptySettings(): PcfWorkspaceSettings {
     projects: {},
     watchProjects: [],
   };
-}
-
-async function exists(uri: vscode.Uri): Promise<boolean> {
-  try {
-    await vscode.workspace.fs.stat(uri);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function normalizeSlashes(value: string): string {

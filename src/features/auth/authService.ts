@@ -1,4 +1,7 @@
-import * as vscode from "vscode";
+import type {
+  AuthenticationPort,
+  AuthenticationSessionOptions,
+} from "../../app/ports/authentication";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { EnvironmentConfig } from "../config/domain/models";
 
@@ -8,7 +11,10 @@ export interface InteractiveSignInOptions {
 }
 
 export class AuthService {
-  constructor(private readonly notifications: NotificationPort = new NoopNotificationService()) {}
+  constructor(
+    private readonly authentication: AuthenticationPort,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
+  ) {}
 
   async getAccessToken(
     env: EnvironmentConfig,
@@ -16,13 +22,13 @@ export class AuthService {
   ): Promise<string | undefined> {
     const scope = this.buildScope(env);
     try {
-      const sessionOptions: vscode.AuthenticationGetSessionOptions = options.forceNewSession
+      const sessionOptions: AuthenticationSessionOptions = options.forceNewSession
         ? { forceNewSession: true }
         : { createIfNone: true };
       if (options.clearSessionPreference) {
         sessionOptions.clearSessionPreference = true;
       }
-      const session = await vscode.authentication.getSession("microsoft", [scope], {
+      const session = await this.authentication.getSession("microsoft", [scope], {
         ...sessionOptions,
       });
       return session?.accessToken;
@@ -37,7 +43,7 @@ export class AuthService {
   async signOut(env: EnvironmentConfig): Promise<"removed" | "notFound" | "failed"> {
     const scope = this.buildScope(env);
     try {
-      const session = await vscode.authentication.getSession("microsoft", [scope], {
+      const session = await this.authentication.getSession("microsoft", [scope], {
         createIfNone: false,
         silent: true,
         clearSessionPreference: true,
@@ -46,15 +52,14 @@ export class AuthService {
         return "notFound";
       }
 
-      const authApi = vscode.authentication as any;
-      if (typeof authApi.removeSession !== "function") {
+      if (!this.authentication.removeSession) {
         await this.notifications.warning(
           `Sign-out is not supported in this version of VS Code. Remove the Microsoft account from Accounts to sign out.`,
         );
         return "failed";
       }
 
-      await authApi.removeSession("microsoft", session.id);
+      await this.authentication.removeSession("microsoft", session.id);
       return "removed";
     } catch (error) {
       await this.notifications.error(`Sign-out failed for ${env.name}: ${String(error)}`);

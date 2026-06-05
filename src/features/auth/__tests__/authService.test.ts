@@ -1,22 +1,17 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as vscode from "vscode";
+import type {
+  AuthenticationPort,
+  AuthenticationSession,
+  AuthenticationSessionOptions,
+} from "../../../app/ports/authentication";
 import type { NotificationPort } from "../../../app/ports/notifications";
 import { AuthService } from "../authService";
 
 test("getAccessToken requests scope built from resource when provided", async () => {
-  const auth = new AuthService();
-  let capturedScopes: string[] = [];
-  let capturedOptions: any;
-  (vscode.authentication as any).getSession = async (
-    _providerId: string,
-    scopes: string[],
-    options: any,
-  ) => {
-    capturedScopes = scopes;
-    capturedOptions = options;
-    return { accessToken: "token-from-session" };
-  };
+  const authentication = new FakeAuthentication();
+  authentication.session = { id: "session-id", accessToken: "token-from-session" };
+  const auth = new AuthService(authentication);
 
   const token = await auth.getAccessToken({
     name: "dev",
@@ -25,21 +20,14 @@ test("getAccessToken requests scope built from resource when provided", async ()
   });
 
   assert.strictEqual(token, "token-from-session");
-  assert.deepStrictEqual(capturedScopes, ["https://alt.resource/.default"]);
-  assert.deepStrictEqual(capturedOptions, { createIfNone: true });
+  assert.deepStrictEqual(authentication.scopes, ["https://alt.resource/.default"]);
+  assert.deepStrictEqual(authentication.options, { createIfNone: true });
 });
 
 test("getAccessToken can force a new interactive session", async () => {
-  const auth = new AuthService();
-  let capturedOptions: any;
-  (vscode.authentication as any).getSession = async (
-    _providerId: string,
-    _scopes: string[],
-    options: any,
-  ) => {
-    capturedOptions = options;
-    return { accessToken: "token-from-session" };
-  };
+  const authentication = new FakeAuthentication();
+  authentication.session = { id: "session-id", accessToken: "token-from-session" };
+  const auth = new AuthService(authentication);
 
   const token = await auth.getAccessToken(
     {
@@ -50,17 +38,16 @@ test("getAccessToken can force a new interactive session", async () => {
   );
 
   assert.strictEqual(token, "token-from-session");
-  assert.deepStrictEqual(capturedOptions, {
+  assert.deepStrictEqual(authentication.options, {
     forceNewSession: true,
   });
 });
 
 test("getAccessToken surfaces errors through notifications and returns undefined", async () => {
   const notifications = createNotificationRecorder();
-  const auth = new AuthService(notifications);
-  (vscode.authentication as any).getSession = async () => {
-    throw new Error("boom");
-  };
+  const authentication = new FakeAuthentication();
+  authentication.getSessionError = new Error("boom");
+  const auth = new AuthService(authentication, notifications);
 
   const token = await auth.getAccessToken({
     name: "prod",
@@ -72,23 +59,12 @@ test("getAccessToken surfaces errors through notifications and returns undefined
 });
 
 test("signOut removes matching session without prompting", async () => {
-  const auth = new AuthService();
-  let capturedScopes: string[] = [];
-  let capturedOptions: any;
-  let removedSessionId: string | undefined;
-
-  (vscode.authentication as any).getSession = async (
-    _providerId: string,
-    scopes: string[],
-    options: any,
-  ) => {
-    capturedScopes = scopes;
-    capturedOptions = options;
-    return { id: "session-id", accessToken: "token" };
+  const authentication = new FakeAuthentication();
+  authentication.session = { id: "session-id", accessToken: "token" };
+  authentication.removeSession = async (_providerId: string, sessionId: string) => {
+    authentication.removedSessionId = sessionId;
   };
-  (vscode.authentication as any).removeSession = async (_providerId: string, sessionId: string) => {
-    removedSessionId = sessionId;
-  };
+  const auth = new AuthService(authentication);
 
   const removed = await auth.signOut({
     name: "dev",
@@ -97,22 +73,20 @@ test("signOut removes matching session without prompting", async () => {
   });
 
   assert.strictEqual(removed, "removed");
-  assert.deepStrictEqual(capturedScopes, ["https://alt.resource/.default"]);
-  assert.deepStrictEqual(capturedOptions, {
+  assert.deepStrictEqual(authentication.scopes, ["https://alt.resource/.default"]);
+  assert.deepStrictEqual(authentication.options, {
     createIfNone: false,
     silent: true,
     clearSessionPreference: true,
   });
-  assert.strictEqual(removedSessionId, "session-id");
+  assert.strictEqual(authentication.removedSessionId, "session-id");
 });
 
 test("signOut returns failed and logs error when removal fails", async () => {
   const notifications = createNotificationRecorder();
-  const auth = new AuthService(notifications);
-
-  (vscode.authentication as any).getSession = async () => {
-    throw new Error("cannot fetch session");
-  };
+  const authentication = new FakeAuthentication();
+  authentication.getSessionError = new Error("cannot fetch session");
+  const auth = new AuthService(authentication, notifications);
 
   const removed = await auth.signOut({
     name: "prod",
@@ -124,9 +98,7 @@ test("signOut returns failed and logs error when removal fails", async () => {
 });
 
 test("signOut returns notFound when no session is available", async () => {
-  const auth = new AuthService();
-  (vscode.authentication as any).getSession = async () => undefined;
-  (vscode.authentication as any).removeSession = undefined;
+  const auth = new AuthService(new FakeAuthentication());
 
   const removed = await auth.signOut({
     name: "qa",
@@ -138,10 +110,9 @@ test("signOut returns notFound when no session is available", async () => {
 
 test("signOut warns when the current VS Code version cannot remove sessions", async () => {
   const notifications = createNotificationRecorder();
-  const auth = new AuthService(notifications);
-
-  (vscode.authentication as any).getSession = async () => ({ id: "abc", accessToken: "token" });
-  (vscode.authentication as any).removeSession = undefined;
+  const authentication = new FakeAuthentication();
+  authentication.session = { id: "abc", accessToken: "token" };
+  const auth = new AuthService(authentication, notifications);
 
   const removed = await auth.signOut({
     name: "old",
@@ -151,6 +122,28 @@ test("signOut warns when the current VS Code version cannot remove sessions", as
   assert.strictEqual(removed, "failed");
   assert.ok(notifications.warnings[0].includes("Sign-out is not supported"));
 });
+
+class FakeAuthentication implements AuthenticationPort {
+  session: AuthenticationSession | undefined;
+  getSessionError: unknown;
+  scopes: readonly string[] = [];
+  options: AuthenticationSessionOptions | undefined;
+  removedSessionId: string | undefined;
+  removeSession?: (providerId: string, sessionId: string) => Promise<void>;
+
+  async getSession(
+    _providerId: string,
+    scopes: readonly string[],
+    options: AuthenticationSessionOptions,
+  ): Promise<AuthenticationSession | undefined> {
+    if (this.getSessionError) {
+      throw this.getSessionError;
+    }
+    this.scopes = scopes;
+    this.options = options;
+    return this.session;
+  }
+}
 
 function createNotificationRecorder(): NotificationPort & {
   errors: string[];

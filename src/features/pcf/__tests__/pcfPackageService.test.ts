@@ -3,7 +3,7 @@ import test from "node:test";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import * as vscode from "vscode";
+import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
 import { ConfigurationService } from "../../config/configurationService";
 import { PcfControlProject } from "../models";
 import { PcfPackageService, parseSolutionZipPath } from "../pcfPackageService";
@@ -24,8 +24,7 @@ test("parseSolutionZipPath resolves the last zip mentioned in build output", () 
 
 test("PcfPackageService reuses an existing cdsproj and persists the packaged zip", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-pcf-package-"));
-  const previousFolders = vscode.workspace.workspaceFolders;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const files = new NodeWorkspaceFiles(workspaceRoot);
 
   const controlRoot = path.join(workspaceRoot, "controls", "LinearInput");
   const solutionRoot = path.join(workspaceRoot, "solution");
@@ -62,8 +61,8 @@ test("PcfPackageService reuses an existing cdsproj and persists the packaged zip
   };
 
   try {
-    const configuration = new ConfigurationService();
-    const settings = new PcfWorkspaceSettingsService(configuration);
+    const configuration = new ConfigurationService(files);
+    const settings = new PcfWorkspaceSettingsService(configuration, files);
     const service = new PcfPackageService(pac as any, runner as any, settings, configuration);
     const project = createProject(controlRoot, cdsProject);
 
@@ -85,7 +84,6 @@ test("PcfPackageService reuses an existing cdsproj and persists the packaged zip
     assert.strictEqual(stored.publisherPrefix, "contoso");
     service.dispose();
   } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });

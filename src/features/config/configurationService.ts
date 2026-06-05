@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 import * as path from "path";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { BindingSnapshot, Dynamics365Configuration, BindingEntry } from "./domain/models";
 import { configurationSchema, bindingsSchema } from "./schema";
 
@@ -25,14 +25,10 @@ const CONFIG_FILENAME = "dynamics365tools.config.json";
 const BINDINGS_FILENAME = "dynamics365tools.bindings.json";
 
 export class ConfigurationService {
-  private readonly workspaceFolder: vscode.WorkspaceFolder | undefined;
-
-  constructor() {
-    this.workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  }
+  constructor(private readonly files: WorkspaceFilesPort) {}
 
   get workspaceRoot(): string | undefined {
-    return this.workspaceFolder?.uri.fsPath;
+    return this.files.workspaceRoot;
   }
 
   async loadConfiguration(): Promise<Dynamics365Configuration> {
@@ -47,51 +43,51 @@ export class ConfigurationService {
   }
 
   async loadExistingConfiguration(): Promise<Dynamics365Configuration | undefined> {
-    const uri = this.getConfigUri();
-    const exists = await this.exists(uri);
+    const configPath = this.getConfigPath();
+    const exists = await this.files.exists(configPath);
     if (!exists) {
       return undefined;
     }
 
-    const content = await vscode.workspace.fs.readFile(uri);
+    const content = await this.files.readFile(configPath);
     return configurationSchema.parse(this.parseJson(content, CONFIG_FILENAME));
   }
 
   async saveConfiguration(config: Dynamics365Configuration): Promise<void> {
-    const uri = this.getConfigUri();
+    const configPath = this.getConfigPath();
     await this.ensureVscodeFolder();
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(config, null, 2), "utf8"));
+    await this.files.writeFile(configPath, Buffer.from(JSON.stringify(config, null, 2), "utf8"));
   }
 
   async loadBindings(): Promise<BindingSnapshot> {
-    const uri = this.getBindingsUri();
-    const exists = await this.exists(uri);
+    const bindingsPath = this.getBindingsPath();
+    const exists = await this.files.exists(bindingsPath);
     if (!exists) {
       const empty: BindingSnapshot = { bindings: [] };
       await this.saveBindings(empty);
       return empty;
     }
 
-    const content = await vscode.workspace.fs.readFile(uri);
+    const content = await this.files.readFile(bindingsPath);
     return bindingsSchema.parse(this.parseJson(content, "dynamics365tools.bindings.json"));
   }
 
   async loadExistingBindings(): Promise<BindingSnapshot | undefined> {
-    const uri = this.getBindingsUri();
-    const exists = await this.exists(uri);
+    const bindingsPath = this.getBindingsPath();
+    const exists = await this.files.exists(bindingsPath);
     if (!exists) {
       return undefined;
     }
 
-    const content = await vscode.workspace.fs.readFile(uri);
+    const content = await this.files.readFile(bindingsPath);
     return bindingsSchema.parse(this.parseJson(content, "dynamics365tools.bindings.json"));
   }
 
   async saveBindings(snapshot: BindingSnapshot): Promise<void> {
-    const uri = this.getBindingsUri();
+    const bindingsPath = this.getBindingsPath();
     await this.ensureVscodeFolder();
-    await vscode.workspace.fs.writeFile(
-      uri,
+    await this.files.writeFile(
+      bindingsPath,
       Buffer.from(JSON.stringify(snapshot, null, 2), "utf8"),
     );
   }
@@ -145,46 +141,37 @@ export class ConfigurationService {
     return path.normalize(path.join(this.workspaceRoot, ...segments));
   }
 
-  private getConfigUri(): vscode.Uri {
-    return this.ensureWorkspaceUri(CONFIG_FILENAME);
+  private getConfigPath(): string {
+    return this.ensureWorkspacePath(CONFIG_FILENAME);
   }
 
-  private getBindingsUri(): vscode.Uri {
-    return this.ensureWorkspaceUri(BINDINGS_FILENAME);
+  private getBindingsPath(): string {
+    return this.ensureWorkspacePath(BINDINGS_FILENAME);
   }
 
-  private ensureWorkspaceUri(filename: string): vscode.Uri {
-    if (!this.workspaceFolder) {
+  private ensureWorkspacePath(filename: string): string {
+    if (!this.workspaceRoot) {
       throw new Error("This extension requires an opened workspace folder.");
     }
 
-    return vscode.Uri.joinPath(this.workspaceFolder.uri, ".vscode", filename);
+    return path.join(this.workspaceRoot, ".vscode", filename);
   }
 
   private async ensureVscodeFolder(): Promise<void> {
-    if (!this.workspaceFolder) {
+    if (!this.workspaceRoot) {
       return;
     }
 
-    const vscodeDir = vscode.Uri.joinPath(this.workspaceFolder.uri, ".vscode");
-    const exists = await this.exists(vscodeDir);
+    const vscodeDir = path.join(this.workspaceRoot, ".vscode");
+    const exists = await this.files.exists(vscodeDir);
     if (!exists) {
-      await vscode.workspace.fs.createDirectory(vscodeDir);
-    }
-  }
-
-  private async exists(uri: vscode.Uri): Promise<boolean> {
-    try {
-      await vscode.workspace.fs.stat(uri);
-      return true;
-    } catch {
-      return false;
+      await this.files.createDirectory(vscodeDir);
     }
   }
 
   private parseJson(content: Uint8Array, filename: string): unknown {
     try {
-      return JSON.parse(content.toString());
+      return JSON.parse(Buffer.from(content).toString("utf8"));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`${filename} contains invalid JSON: ${message}`);

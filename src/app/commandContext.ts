@@ -35,6 +35,7 @@ import type { WebResourcePublisher } from "../features/webResources/webResourceP
 import type { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import type { LoggerPort } from "./ports/logger";
 import type { NotificationPort } from "./ports/notifications";
+import type { WorkbenchPort } from "./ports/workbench";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import type { SolutionPicker } from "./solutionPicker";
 
@@ -58,6 +59,7 @@ export interface CoreServices {
   secrets: SecretService;
   logger: LoggerPort;
   notifications: NotificationPort;
+  workbench: WorkbenchPort;
   lastSelection: LastSelectionService;
   connections: EnvironmentConnectionService;
   statusBar: WebResourceStatusBarService;

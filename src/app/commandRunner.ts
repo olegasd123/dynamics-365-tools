@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "./commandContext";
 
 export interface CommandRunOptions {
@@ -53,7 +52,7 @@ export async function runCommandWithHealthCheck(
       .then(
         async (action) => {
           if (action === RELOAD_WINDOW_ACTION) {
-            await vscode.commands.executeCommand("workbench.action.reloadWindow");
+            await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
           }
         },
         () => undefined,
@@ -63,7 +62,7 @@ export async function runCommandWithHealthCheck(
 
   RUNNING_COMMANDS.add(commandId);
   const execution = (async () => handler())();
-  vscode.window.setStatusBarMessage(
+  ctx.core.workbench.setStatusBarMessage(
     `$(sync~spin) Dynamics 365 Tools: ${commandLabel}`,
     execution.then(
       () => undefined,
@@ -85,7 +84,7 @@ export async function runCommandWithHealthCheck(
           if (action === SHOW_DETAILS_ACTION) {
             ctx.core.logger.show();
           } else if (action === RELOAD_WINDOW_ACTION) {
-            await vscode.commands.executeCommand("workbench.action.reloadWindow");
+            await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
           }
         },
         () => undefined,
@@ -100,15 +99,15 @@ async function runPreCommandHealthChecks(
   ctx: CommandContext,
   options: RequiredCommandRunOptions,
 ): Promise<boolean> {
-  if (options.requiresWorkspace && !vscode.workspace.workspaceFolders?.length) {
+  if (options.requiresWorkspace && !ctx.core.workbench.hasWorkspace) {
     const action = await ctx.core.notifications.askError(
       "Open a project folder first, then run the command again.",
       [OPEN_FOLDER_ACTION, RELOAD_WINDOW_ACTION],
     );
     if (action === OPEN_FOLDER_ACTION) {
-      await vscode.commands.executeCommand("vscode.openFolder");
+      await ctx.core.workbench.executeCommand("vscode.openFolder");
     } else if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
     }
     return false;
   }
@@ -142,7 +141,7 @@ async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
     );
 
     if (action === OPEN_CONFIG_ACTION) {
-      await openWorkspaceFile("dynamics365tools.config.json");
+      await ctx.core.workbench.openWorkspaceFile(".vscode/dynamics365tools.config.json");
     } else if (action === RESET_CONFIG_ACTION) {
       const confirmed = await ctx.core.notifications.askWarning(
         "Reset config file to an empty template? This overwrites the current file.",
@@ -159,7 +158,7 @@ async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
         );
       }
     } else if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
     }
 
     return false;
@@ -178,7 +177,7 @@ async function validateBindings(ctx: CommandContext): Promise<boolean> {
     );
 
     if (action === OPEN_BINDINGS_ACTION) {
-      await openWorkspaceFile("dynamics365tools.bindings.json");
+      await ctx.core.workbench.openWorkspaceFile(".vscode/dynamics365tools.bindings.json");
     } else if (action === RESET_BINDINGS_ACTION) {
       const confirmed = await ctx.core.notifications.askWarning(
         "Reset bindings file to an empty template? This overwrites the current file.",
@@ -192,21 +191,11 @@ async function validateBindings(ctx: CommandContext): Promise<boolean> {
         );
       }
     } else if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
     }
 
     return false;
   }
-}
-
-async function openWorkspaceFile(filename: string): Promise<void> {
-  const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-  if (!workspaceUri) {
-    return;
-  }
-
-  const fileUri = vscode.Uri.joinPath(workspaceUri, ".vscode", filename);
-  await vscode.window.showTextDocument(fileUri);
 }
 
 function toCommandLabel(commandId: string): string {

@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import type { StateStorePort } from "../../app/ports/storage";
 
 const LAST_ENV_KEY = "dynamics365tools.lastEnvironment";
 const LAST_ASSEMBLY_PATHS_KEY = "dynamics365tools.lastAssemblyDllPaths";
@@ -7,7 +7,7 @@ const LAST_ASSEMBLY_PATHS_KEY = "dynamics365tools.lastAssemblyDllPaths";
  * Stores user choices per workspace so we can preselect them later.
  */
 export class LastSelectionService {
-  constructor(private readonly state: vscode.Memento) {}
+  constructor(private readonly state: StateStorePort) {}
 
   async setLastEnvironment(envName: string): Promise<void> {
     await this.state.update(LAST_ENV_KEY, envName);

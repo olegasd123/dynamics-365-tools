@@ -34,9 +34,13 @@ import { PublishCacheService } from "../features/webResources/publishCacheServic
 import { WebResourceStatusBarService } from "../features/webResources/webResourceStatusBar";
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
+import { VsCodeAuthenticationService } from "../platform/vscode/authenticationService";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
 import { VsCodeOutputLogger } from "../platform/vscode/outputLogger";
+import { VsCodeSecretStore, VsCodeStateStore } from "../platform/vscode/storage";
+import { VsCodeWorkbench } from "../platform/vscode/workbench";
+import { VsCodeWorkspaceFiles } from "../platform/vscode/workspaceFiles";
 import { CommandContext } from "./commandContext";
 import { SolutionPicker } from "./solutionPicker";
 
@@ -45,12 +49,17 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
 
   const notifications = lazy(() => new VsCodeNotificationService());
   const logger = lazyDisposable(() => new VsCodeOutputLogger(), disposables);
-  const configuration = lazy(() => new ConfigurationService());
+  const files = lazy(() => new VsCodeWorkspaceFiles());
+  const authentication = lazy(() => new VsCodeAuthenticationService());
+  const workbench = lazy(() => new VsCodeWorkbench());
+  const globalState = lazy(() => new VsCodeStateStore(extensionContext.globalState));
+  const workspaceState = lazy(() => new VsCodeStateStore(extensionContext.workspaceState));
+  const configuration = lazy(() => new ConfigurationService(files()));
   const ui = lazy(() => new SolutionPicker(notifications()));
-  const secrets = lazy(() => new SecretService(extensionContext.secrets));
-  const auth = lazy(() => new AuthService(notifications()));
-  const authorizations = lazy(() => new AuthorizationStore(extensionContext.globalState));
-  const lastSelection = lazy(() => new LastSelectionService(extensionContext.workspaceState));
+  const secrets = lazy(() => new SecretService(new VsCodeSecretStore(extensionContext.secrets)));
+  const auth = lazy(() => new AuthService(authentication(), notifications()));
+  const authorizations = lazy(() => new AuthorizationStore(globalState()));
+  const lastSelection = lazy(() => new LastSelectionService(workspaceState()));
   const connections = lazy(
     () => new EnvironmentConnectionService(auth(), secrets(), notifications()),
   );
@@ -118,7 +127,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     disposables,
   );
   const pcfEnvironmentService = lazy(() => new PcfEnvironmentService(connections()));
-  const pcfWorkspaceSettings = lazy(() => new PcfWorkspaceSettingsService(configuration()));
+  const pcfWorkspaceSettings = lazy(
+    () => new PcfWorkspaceSettingsService(configuration(), files()),
+  );
   const pcfPushService = lazyDisposable(
     () => new PcfPushService(pacCli(), pcfWorkspaceSettings(), notifications(), pcfTelemetry()),
     disposables,
@@ -184,6 +195,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get notifications() {
       return notifications();
+    },
+    get workbench() {
+      return workbench();
     },
     get lastSelection() {
       return lastSelection();

@@ -1,10 +1,10 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as vscode from "vscode";
+import { MemorySecretStore } from "../../../testSupport/fakes";
 import { SecretService } from "../secretService";
 
 test("setCredentials and getCredentials round-trip credentials", async () => {
-  const secrets = new (vscode as any).InMemorySecretStorage();
+  const secrets = new MemorySecretStore();
   const service = new SecretService(secrets);
 
   await service.setCredentials("dev", {
@@ -22,7 +22,7 @@ test("setCredentials and getCredentials round-trip credentials", async () => {
 });
 
 test("getCredentials returns undefined when stored value is invalid JSON", async () => {
-  const secrets = new (vscode as any).InMemorySecretStorage();
+  const secrets = new MemorySecretStore();
   const service = new SecretService(secrets);
 
   await secrets.store("dynamics365tools.env.dev.credentials", "{not json");
@@ -32,7 +32,7 @@ test("getCredentials returns undefined when stored value is invalid JSON", async
 });
 
 test("clearCredentials removes stored secret", async () => {
-  const secrets = new (vscode as any).InMemorySecretStorage();
+  const secrets = new MemorySecretStore();
   const service = new SecretService(secrets);
 
   await service.setCredentials("dev", {

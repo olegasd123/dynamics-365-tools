@@ -1,8 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as vscode from "vscode";
-import { LoggerPort } from "../ports/logger";
-import { VsCodeNotificationService } from "../../platform/vscode/notificationService";
+import { RecordingNotifications, RecordingWorkbench, TestLogger } from "../../testSupport/fakes";
 import { CommandContext } from "../commandContext";
 import { runCommandWithHealthCheck } from "../commandRunner";
 
@@ -11,8 +9,14 @@ function createContext(overrides?: {
   loadExistingBindings?: () => Promise<unknown>;
   saveConfiguration?: (value: unknown) => Promise<void>;
   saveBindings?: (value: unknown) => Promise<void>;
-  logger?: LoggerPort;
+  logger?: TestLogger;
+  notifications?: RecordingNotifications;
+  workbench?: RecordingWorkbench;
+  hasWorkspace?: boolean;
 }): CommandContext {
+  const notifications = overrides?.notifications ?? new RecordingNotifications();
+  const workbench = overrides?.workbench ?? new RecordingWorkbench(overrides?.hasWorkspace ?? true);
+
   return {
     core: {
       configuration: {
@@ -22,81 +26,41 @@ function createContext(overrides?: {
         saveBindings: overrides?.saveBindings ?? (async () => undefined),
       },
       logger: overrides?.logger ?? new TestLogger(),
-      notifications: new VsCodeNotificationService(),
+      notifications,
+      workbench,
     },
   } as unknown as CommandContext;
 }
 
-class TestLogger implements LoggerPort {
-  readonly errors: Array<{ message: string; error?: unknown; metadata?: Record<string, unknown> }> =
-    [];
-  shown = false;
-
-  info(): void {}
-
-  error(message: string, error?: unknown, metadata?: Record<string, unknown>): void {
-    this.errors.push({ message, error, metadata });
-  }
-
-  show(): void {
-    this.shown = true;
-  }
-}
-
-function clearMessages(): void {
-  const messages = (vscode.window as any).__messages;
-  messages.info.length = 0;
-  messages.warn.length = 0;
-  messages.error.length = 0;
-}
-
 test("runCommandWithHealthCheck blocks command when workspace is missing", async () => {
-  (vscode.workspace as any).workspaceFolders = undefined;
-  clearMessages();
-  const ctx = createContext();
+  const notifications = new RecordingNotifications();
+  const ctx = createContext({ hasWorkspace: false, notifications });
   let called = false;
 
   await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
     called = true;
   });
 
-  const messages = (vscode.window as any).__messages;
   assert.strictEqual(called, false);
-  assert.ok(messages.error.some((msg: string) => msg.includes("Open a project folder first")));
+  assert.ok(notifications.errors.some((msg) => msg.includes("Open a project folder first")));
 });
 
 test("runCommandWithHealthCheck runs command when checks pass", async () => {
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
-  clearMessages();
-  const ctx = createContext();
+  const workbench = new RecordingWorkbench(true);
+  const ctx = createContext({ workbench });
   let called = false;
-  let statusMessage = "";
 
-  const originalSetStatusBarMessage = (vscode.window as any).setStatusBarMessage;
-  (vscode.window as any).setStatusBarMessage = (message: string) => {
-    statusMessage = message;
-    return { dispose: () => {} };
-  };
-
-  try {
-    await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
-      called = true;
-    });
-  } finally {
-    (vscode.window as any).setStatusBarMessage = originalSetStatusBarMessage;
-  }
+  await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
+    called = true;
+  });
 
   assert.strictEqual(called, true);
-  assert.ok(statusMessage.includes("Publish Resource"));
+  assert.ok(workbench.statusMessages[0].includes("Publish Resource"));
 });
 
 test("runCommandWithHealthCheck does not block on unresolved error notification", async () => {
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
-  clearMessages();
-  const ctx = createContext();
-
-  const originalShowErrorMessage = vscode.window.showErrorMessage;
-  (vscode.window as any).showErrorMessage = () => new Promise(() => {});
+  const notifications = new BlockingErrorNotifications();
+  const ctx = createContext({ notifications });
 
   let timeoutHandle: NodeJS.Timeout | undefined;
 
@@ -120,54 +84,42 @@ test("runCommandWithHealthCheck does not block on unresolved error notification"
     if (timeoutHandle) {
       clearTimeout(timeoutHandle);
     }
-    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
   }
 });
 
 test("runCommandWithHealthCheck logs command errors and shows details on request", async () => {
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
-  clearMessages();
   const logger = new TestLogger();
-  const ctx = createContext({ logger });
+  const notifications = new RecordingNotifications();
+  notifications.nextErrorAction = "Show Details";
+  const ctx = createContext({ logger, notifications });
   const error = new Error("Dataverse POST accounts failed");
   (error as any).correlationId = "corr-123";
   (error as any).rawBody = '{"error":{"message":"boom"}}';
 
-  const originalShowErrorMessage = vscode.window.showErrorMessage;
-  (vscode.window as any).showErrorMessage = async (message: string) => {
-    (vscode.window as any).__messages.error.push(message);
-    return "Show Details";
-  };
+  await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
+    throw error;
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
 
-  try {
-    await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
-      throw error;
-    });
-    await new Promise<void>((resolve) => setImmediate(resolve));
-  } finally {
-    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-  }
-
-  const messages = (vscode.window as any).__messages;
   assert.strictEqual(logger.errors.length, 1);
   assert.strictEqual(logger.errors[0].error, error);
   assert.deepStrictEqual(logger.errors[0].metadata, {
     commandId: "dynamics365Tools.publishResource",
   });
   assert.strictEqual(logger.shown, true);
-  assert.ok(
-    messages.error.some((msg: string) => msg.includes("See the Dynamics 365 Tools output")),
-  );
-  assert.ok(!messages.error.some((msg: string) => msg.includes("corr-123")));
-  assert.ok(!messages.error.some((msg: string) => msg.includes("rawBody")));
+  assert.ok(notifications.errors.some((msg) => msg.includes("See the Dynamics 365 Tools output")));
+  assert.ok(!notifications.errors.some((msg) => msg.includes("corr-123")));
+  assert.ok(!notifications.errors.some((msg) => msg.includes("rawBody")));
 });
 
 test("runCommandWithHealthCheck can reset invalid configuration", async () => {
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file("/workspace") }];
-  clearMessages();
   let saved: unknown;
   let called = false;
+  const notifications = new RecordingNotifications();
+  notifications.nextErrorAction = "Reset Config";
+  notifications.nextWarningAction = "Reset";
   const ctx = createContext({
+    notifications,
     loadExistingConfiguration: async () => {
       throw new Error("Invalid JSON");
     },
@@ -176,21 +128,16 @@ test("runCommandWithHealthCheck can reset invalid configuration", async () => {
     },
   });
 
-  const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalShowWarningMessage = vscode.window.showWarningMessage;
-
-  (vscode.window as any).showErrorMessage = async () => "Reset Config";
-  (vscode.window as any).showWarningMessage = async () => "Reset";
-
-  try {
-    await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
-      called = true;
-    });
-  } finally {
-    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-  }
+  await runCommandWithHealthCheck(ctx, "dynamics365Tools.publishResource", async () => {
+    called = true;
+  });
 
   assert.strictEqual(called, false);
   assert.deepStrictEqual(saved, { environments: [], solutions: [] });
 });
+
+class BlockingErrorNotifications extends RecordingNotifications {
+  async askError<T extends string>(): Promise<T | undefined> {
+    return new Promise<T | undefined>(() => undefined);
+  }
+}
