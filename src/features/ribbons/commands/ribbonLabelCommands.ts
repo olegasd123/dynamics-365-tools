@@ -1,4 +1,4 @@
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import { createLocLabelPatches, createLocLabelTitlePatch } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
 import {

@@ -14,8 +14,8 @@ import { PcfBuildService } from "./pcfBuildService";
 import { PcfEnvironmentService } from "./pcfEnvironmentService";
 import { PcfProjectLocator } from "./pcfProjectLocator";
 import { ProcessRunner } from "./processRunner";
-import type { NotificationPort } from "../../app/ports/notifications";
-import type { WorkspaceFilesPort } from "../../app/ports/files";
+import type { NotificationPort } from "@app/ports/notifications";
+import type { WorkspaceFilesPort } from "@app/ports/files";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.pcf.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.pcf.filterConfiguredSolutions";

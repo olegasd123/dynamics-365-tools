@@ -1,4 +1,4 @@
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
 import { DataverseClient } from "../dataverse/dataverseClient";
 import { EnvironmentConnection } from "../dataverse/environmentConnectionService";
 

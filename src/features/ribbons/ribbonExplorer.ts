@@ -24,7 +24,7 @@ import { RibbonSourceLocator } from "./ribbonSourceLocator";
 import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
 import { scanXmlElements } from "./ribbonXmlReader";
-import type { NotificationPort } from "../../app/ports/notifications";
+import type { NotificationPort } from "@app/ports/notifications";
 
 export type RibbonExplorerNode =
   | RibbonSourceNode

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { ProgressOptions, ProgressPort, ProgressReporter } from "../../app/ports/progress";
+import type { ProgressOptions, ProgressPort, ProgressReporter } from "@app/ports/progress";
 
 export class VsCodeProgress implements ProgressPort {
   async withProgress<T>(

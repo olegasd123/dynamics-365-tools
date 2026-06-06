@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import { WorkspaceFileType } from "../../app/ports/files";
+import { WorkspaceFileType } from "@app/ports/files";
 import type {
   WorkspaceDirectoryEntry,
   WorkspaceFileStat,
   WorkspaceFilesPort,
-} from "../../app/ports/files";
+} from "@app/ports/files";
 
 export class VsCodeWorkspaceFiles implements WorkspaceFilesPort {
   get workspaceRoot(): string | undefined {

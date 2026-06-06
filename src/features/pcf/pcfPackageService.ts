@@ -1,11 +1,11 @@
 import * as path from "path";
 import { XMLParser } from "fast-xml-parser";
-import { WorkspaceFileType, type WorkspaceFilesPort } from "../../app/ports/files";
-import { NoopTextInput, TextInputPort } from "../../app/ports/input";
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
-import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
-import type { CancellationTokenLike } from "../../app/ports/progress";
-import { NoopWorkbench, WorkbenchPort } from "../../app/ports/workbench";
+import { WorkspaceFileType, type WorkspaceFilesPort } from "@app/ports/files";
+import { NoopTextInput, TextInputPort } from "@app/ports/input";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
+import { NoopWorkbench, WorkbenchPort } from "@app/ports/workbench";
 import { ConfigurationService } from "../config/configurationService";
 import { CdsSolutionProject, PcfControlProject, PcfPackageResult } from "./models";
 import { PacCli } from "./pacCli";

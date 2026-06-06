@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
-import { ConfigurationService } from "../../config/configurationService";
+import { ConfigurationService } from "@features/config/configurationService";
 import {
   RibbonDocumentNode,
   RibbonExplorerProvider,

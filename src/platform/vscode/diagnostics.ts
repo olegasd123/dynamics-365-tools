@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import type { DiagnosticEntry, DiagnosticPort } from "../../app/ports/diagnostics";
-import { DiagnosticSeverity } from "../../app/ports/diagnostics";
+import type { DiagnosticEntry, DiagnosticPort } from "@app/ports/diagnostics";
+import { DiagnosticSeverity } from "@app/ports/diagnostics";
 
 export class VsCodeDiagnostics implements DiagnosticPort {
   private readonly collection: vscode.DiagnosticCollection;

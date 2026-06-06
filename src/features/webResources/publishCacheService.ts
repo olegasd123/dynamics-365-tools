@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { WorkspaceFilesPort, WorkspaceFileStat } from "../../app/ports/files";
+import type { WorkspaceFilesPort, WorkspaceFileStat } from "@app/ports/files";
 import { ConfigurationService } from "../config/configurationService";
 import { publishCacheSchema } from "../config/schema";
 

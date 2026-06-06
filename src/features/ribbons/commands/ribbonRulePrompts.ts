@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import {
   RibbonCommandClientType,
   RibbonEntityPropertyName,

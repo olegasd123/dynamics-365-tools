@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { WorkspaceFilesPort } from "../../app/ports/files";
+import type { WorkspaceFilesPort } from "@app/ports/files";
 import { BindingSnapshot, Dynamics365Configuration, BindingEntry } from "./domain/models";
 import { configurationSchema, bindingsSchema } from "./schema";
 

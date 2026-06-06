@@ -2,10 +2,10 @@ import * as path from "path";
 import { promisify } from "util";
 import { execFile } from "child_process";
 import * as fs from "fs/promises";
-import { CommandContext } from "../../../app/commandContext";
-import type { ClipboardPort } from "../../../app/ports/clipboard";
-import type { WorkspaceFilesPort } from "../../../app/ports/files";
-import type { NotificationPort } from "../../../app/ports/notifications";
+import { CommandContext } from "@app/commandContext";
+import type { ClipboardPort } from "@app/ports/clipboard";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import type { NotificationPort } from "@app/ports/notifications";
 
 const execFileAsync = promisify(execFile);
 

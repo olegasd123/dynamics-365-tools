@@ -1,12 +1,8 @@
 import * as path from "path";
-import {
-  WorkspaceFileType,
-  type FsPathTarget,
-  type WorkspaceFilesPort,
-} from "../../../app/ports/files";
-import { NoopNotificationService, NotificationPort } from "../../../app/ports/notifications";
-import type { CancellationTokenLike } from "../../../app/ports/progress";
-import { WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "../../config/configurationService";
+import { WorkspaceFileType, type FsPathTarget, type WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import type { CancellationTokenLike } from "@app/ports/progress";
+import { WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "@features/config/configurationService";
 
 export function buildSupportedSet(): Set<string> {
   return new Set(WEB_RESOURCE_SUPPORTED_EXTENSIONS.map((ext) => ext.toLowerCase()));

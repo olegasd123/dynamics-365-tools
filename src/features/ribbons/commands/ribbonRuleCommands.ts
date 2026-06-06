@@ -1,4 +1,4 @@
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import { BUILT_IN_ENABLE_RULES } from "../enableRuleCatalog";
 import {
   createCommandRuleRefPatch,

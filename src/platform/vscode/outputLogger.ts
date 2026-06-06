@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import type { LoggerPort, LogMetadata } from "../../app/ports/logger";
-import { formatErrorDetails } from "../../shared/errorDetails";
+import type { LoggerPort, LogMetadata } from "@app/ports/logger";
+import { formatErrorDetails } from "@shared/errorDetails";
 
 const CHANNEL_NAME = "Dynamics 365 Tools";
 

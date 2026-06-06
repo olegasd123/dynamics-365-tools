@@ -1,4 +1,5 @@
 const esbuild = require("esbuild");
+const path = require("path");
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
@@ -40,6 +41,12 @@ const buildOptions = {
   external: ["vscode"],
   logLevel: "warning",
   plugins: [esbuildProblemMatcherPlugin],
+  alias: {
+    "@app": path.resolve(__dirname, "src/app"),
+    "@features": path.resolve(__dirname, "src/features"),
+    "@platform": path.resolve(__dirname, "src/platform"),
+    "@shared": path.resolve(__dirname, "src/shared"),
+  },
 };
 
 async function main() {

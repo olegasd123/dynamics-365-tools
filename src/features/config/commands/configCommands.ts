@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { CommandContext, CoreServices } from "../../../app/commandContext";
-import { buildDefaultEnvironmentUrl } from "../../../shared/environmentUrl";
-import { isDefaultSolution, type DataverseClient } from "../../dataverse/dataverseClient";
+import { CommandContext, CoreServices } from "@app/commandContext";
+import { buildDefaultEnvironmentUrl } from "@shared/environmentUrl";
+import { isDefaultSolution, type DataverseClient } from "@features/dataverse/dataverseClient";
 import {
   Dynamics365Configuration,
   NormalizedEnvironmentConfig,

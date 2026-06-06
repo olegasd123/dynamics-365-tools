@@ -1,20 +1,20 @@
 import * as path from "path";
-import { EnvironmentConfig } from "../../config/domain/models";
+import { EnvironmentConfig } from "@features/config/domain/models";
 import { PluginAssembly, PluginType } from "../models";
 import { PluginExplorerProvider } from "../pluginExplorer";
 import { AssemblyIdentity, DiscoveredPluginType } from "../pluginAssemblyIntrospector";
 import { PluginRegistrationManager, PluginSyncResult } from "../pluginRegistrationManager";
 import { PluginService } from "../pluginService";
 import { PluginAssemblyStatusBarService } from "../pluginAssemblyStatusBar";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
+import { LastSelectionService } from "@app/lastSelectionService";
 import {
   AssemblyIdentityValidationError,
   validateAssemblyIdentity,
 } from "./pluginAssemblyIdentity";
-import type { NotificationPort } from "../../../app/ports/notifications";
-import type { FsPathTarget, WorkspaceFilesPort } from "../../../app/ports/files";
-import { NoopFileDialogs, type FileDialogPort } from "../../../app/ports/fileDialogs";
-import { NoopProgress, type ProgressPort } from "../../../app/ports/progress";
+import type { NotificationPort } from "@app/ports/notifications";
+import type { FsPathTarget, WorkspaceFilesPort } from "@app/ports/files";
+import { NoopFileDialogs, type FileDialogPort } from "@app/ports/fileDialogs";
+import { NoopProgress, type ProgressPort } from "@app/ports/progress";
 
 type PluginSyncContext = {
   registration: PluginRegistrationManager;

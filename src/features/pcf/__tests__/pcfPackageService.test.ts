@@ -2,7 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
 import { MemoryWorkspaceFiles, RecordingOutput } from "../../../testSupport/fakes";
-import { ConfigurationService } from "../../config/configurationService";
+import { ConfigurationService } from "@features/config/configurationService";
 import { PcfControlProject } from "../models";
 import { PcfPackageService, parseSolutionZipPath } from "../pcfPackageService";
 import { PcfWorkspaceSettingsService } from "../pcfWorkspaceSettings";

@@ -6,7 +6,7 @@ import { SolutionComponentService } from "../dataverse/solutionComponentService"
 import { PluginService } from "./pluginService";
 import { PluginAssembly, PluginImage, PluginStep, PluginType } from "./models";
 import { EnvironmentConfig, SolutionConfig } from "../config/domain/models";
-import type { NotificationPort } from "../../app/ports/notifications";
+import type { NotificationPort } from "@app/ports/notifications";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.plugins.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.plugins.filterConfiguredSolutions";

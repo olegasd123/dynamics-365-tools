@@ -7,7 +7,7 @@ import {
   RecordingNotifications,
   RecordingOutput,
 } from "../../../testSupport/fakes";
-import { DataverseClient } from "../../dataverse/dataverseClient";
+import { DataverseClient } from "@features/dataverse/dataverseClient";
 import { WebResourcePublisher } from "../webResourcePublisher";
 
 class FakeConnections {

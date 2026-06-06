@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { WorkbenchPort } from "../../app/ports/workbench";
+import type { WorkbenchPort } from "@app/ports/workbench";
 
 export class VsCodeWorkbench implements WorkbenchPort {
   get hasWorkspace(): boolean {

@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { WorkspaceFilesPort } from "../../app/ports/files";
+import type { WorkspaceFilesPort } from "@app/ports/files";
 import { ConfigurationService } from "../config/configurationService";
 import { PcfControlProject, PcfWorkspaceProjectSettings, PcfWorkspaceSettings } from "./models";
 

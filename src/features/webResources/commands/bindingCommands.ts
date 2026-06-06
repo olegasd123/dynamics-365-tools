@@ -1,10 +1,10 @@
 import * as path from "path";
-import { CommandContext } from "../../../app/commandContext";
-import type { OutputPort } from "../../../app/ports/output";
-import { WorkspaceFileType, type FsPathTarget } from "../../../app/ports/files";
-import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
-import { pickDataverseClient, resolveTargetUri } from "../../../app/commandUtils";
-import type { DataverseClient } from "../../dataverse/dataverseClient";
+import { CommandContext } from "@app/commandContext";
+import type { OutputPort } from "@app/ports/output";
+import { WorkspaceFileType, type FsPathTarget } from "@app/ports/files";
+import { BindingEntry, Dynamics365Configuration } from "@features/config/domain/models";
+import { pickDataverseClient, resolveTargetUri } from "@app/commandUtils";
+import type { DataverseClient } from "@features/dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 

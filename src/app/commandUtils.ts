@@ -1,10 +1,10 @@
-import type { AuthService } from "../features/auth/authService";
-import type { SecretService } from "../features/auth/secretService";
-import type { ConfigurationService } from "../features/config/configurationService";
-import type { Dynamics365Configuration, EnvironmentConfig } from "../features/config/domain/models";
-import type { DataverseClient } from "../features/dataverse/dataverseClient";
-import type { EnvironmentAuthContext } from "../features/dataverse/environmentConnectionService";
-import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
+import type { AuthService } from "@features/auth/authService";
+import type { SecretService } from "@features/auth/secretService";
+import type { ConfigurationService } from "@features/config/configurationService";
+import type { Dynamics365Configuration, EnvironmentConfig } from "@features/config/domain/models";
+import type { DataverseClient } from "@features/dataverse/dataverseClient";
+import type { EnvironmentAuthContext } from "@features/dataverse/environmentConnectionService";
+import type { LastSelectionService } from "./lastSelectionService";
 import type { CommandContext } from "./commandContext";
 import type { FsPathTarget } from "./ports/files";
 import type { NotificationPort } from "./ports/notifications";

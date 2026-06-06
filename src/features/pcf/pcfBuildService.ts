@@ -4,11 +4,11 @@ import {
   DiagnosticSeverity,
   NoopDiagnosticPort,
   type DiagnosticPort,
-} from "../../app/ports/diagnostics";
-import type { WorkspaceFilesPort } from "../../app/ports/files";
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
-import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+} from "@app/ports/diagnostics";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { PcfBuildStatus, PcfControlProject } from "./models";
 import { NpmRunner } from "./npmRunner";
 import { PcfStatusBarService } from "./pcfStatusBar";

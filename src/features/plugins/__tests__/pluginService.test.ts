@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
-import { SolutionComponentType } from "../../dataverse/solutionComponentService";
+import { SolutionComponentType } from "@features/dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
 
 class FakeDataverseClient {

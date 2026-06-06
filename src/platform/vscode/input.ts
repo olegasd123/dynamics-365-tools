@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { QuickPickOptions, TextInputOptions, TextInputPort } from "../../app/ports/input";
+import type { QuickPickOptions, TextInputOptions, TextInputPort } from "@app/ports/input";
 
 export class VsCodeTextInput implements TextInputPort {
   async showInputBox(options: TextInputOptions): Promise<string | undefined> {

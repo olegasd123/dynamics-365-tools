@@ -1,4 +1,4 @@
-import type { StateStorePort } from "../../app/ports/storage";
+import type { StateStorePort } from "@app/ports/storage";
 import { NormalizedEnvironmentConfig } from "../config/domain/models";
 
 export interface AuthorizationProfile {

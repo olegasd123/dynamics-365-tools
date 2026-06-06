@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import { PcfDeployedControlNode } from "../pcfExplorer";
 
 export async function togglePcfSolutionFilter(ctx: CommandContext): Promise<void> {

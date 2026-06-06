@@ -1,11 +1,11 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
-import { WorkspaceFileType } from "../../../app/ports/files";
-import type { WorkspaceFileStat } from "../../../app/ports/files";
+import { WorkspaceFileType } from "@app/ports/files";
+import type { WorkspaceFileStat } from "@app/ports/files";
 import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { PublishCacheService } from "../publishCacheService";
-import { ConfigurationService } from "../../config/configurationService";
+import { ConfigurationService } from "@features/config/configurationService";
 
 test("publish cache tracks unchanged files per environment", async () => {
   const workspaceRoot = path.join("/workspace", "project");

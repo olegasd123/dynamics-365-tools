@@ -1,10 +1,10 @@
 import * as path from "path";
-import { ClipboardPort, NoopClipboard } from "../../app/ports/clipboard";
-import { WorkspaceFilesPort, WorkspaceFileType, type FsPathTarget } from "../../app/ports/files";
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
-import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
-import type { CancellationTokenLike } from "../../app/ports/progress";
-import { formatErrorDetails } from "../../shared/errorDetails";
+import { ClipboardPort, NoopClipboard } from "@app/ports/clipboard";
+import { WorkspaceFilesPort, WorkspaceFileType, type FsPathTarget } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
+import { formatErrorDetails } from "@shared/errorDetails";
 import { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 import { DataverseClient, isDefaultSolution } from "../dataverse/dataverseClient";
 import {

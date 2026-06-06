@@ -4,7 +4,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
-import { ConfigurationService } from "../../config/configurationService";
+import { ConfigurationService } from "@features/config/configurationService";
 import { PcfControlProject } from "../models";
 import { PcfWorkspaceSettingsService } from "../pcfWorkspaceSettings";
 

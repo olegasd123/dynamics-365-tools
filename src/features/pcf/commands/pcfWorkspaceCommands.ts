@@ -2,7 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { XMLParser } from "fast-xml-parser";
-import type { CommandContext } from "../../../app/commandContext";
+import type { CommandContext } from "@app/commandContext";
 import type { PcfControlProject } from "../models";
 import { detectTool } from "../pacCli";
 import { PcfControlProjectNode } from "../pcfExplorer";

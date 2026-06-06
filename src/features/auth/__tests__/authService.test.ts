@@ -4,8 +4,8 @@ import type {
   AuthenticationPort,
   AuthenticationSession,
   AuthenticationSessionOptions,
-} from "../../../app/ports/authentication";
-import type { NotificationPort } from "../../../app/ports/notifications";
+} from "@app/ports/authentication";
+import type { NotificationPort } from "@app/ports/notifications";
 import { AuthService } from "../authService";
 
 test("getAccessToken requests scope built from resource when provided", async () => {

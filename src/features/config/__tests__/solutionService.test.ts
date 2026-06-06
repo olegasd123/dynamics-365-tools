@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
-import { SolutionPicker } from "../../../app/solutionPicker";
+import { SolutionPicker } from "@app/solutionPicker";
 import { RecordingNotifications } from "../../../testSupport/fakes";
 
 function createUi(notifications = new RecordingNotifications()): SolutionPicker {

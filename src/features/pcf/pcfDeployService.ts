@@ -1,8 +1,8 @@
 import * as path from "path";
-import type { WorkspaceFilesPort } from "../../app/ports/files";
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
-import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { ConfigurationService } from "../config/configurationService";
 import { EnvironmentConfig } from "../config/domain/models";
 import type { DataverseClient } from "../dataverse/dataverseClient";

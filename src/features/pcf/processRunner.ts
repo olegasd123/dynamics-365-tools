@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { ProcessRunResult } from "./models";
 
 export interface ProcessRunOptions {

@@ -1,9 +1,9 @@
 import * as path from "path";
-import type { WorkspaceFilesPort } from "../../app/ports/files";
-import { NoopTextInput, TextInputPort } from "../../app/ports/input";
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
-import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import { NoopTextInput, TextInputPort } from "@app/ports/input";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { XMLParser } from "fast-xml-parser";
 import { EnvironmentConfig } from "../config/domain/models";
 import { PacCli } from "./pacCli";

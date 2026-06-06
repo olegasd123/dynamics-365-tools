@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { FileDialogPort, OpenFileDialogOptions } from "../../app/ports/fileDialogs";
+import type { FileDialogPort, OpenFileDialogOptions } from "@app/ports/fileDialogs";
 
 export class VsCodeFileDialogs implements FileDialogPort {
   async showOpenDialog(options: OpenFileDialogOptions): Promise<string[] | undefined> {

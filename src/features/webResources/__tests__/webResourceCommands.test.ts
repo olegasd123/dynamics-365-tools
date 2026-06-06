@@ -1,15 +1,15 @@
 import assert from "node:assert";
 import * as path from "node:path";
 import test from "node:test";
-import type { CommandContext } from "../../../app/commandContext";
-import type { FsPathTarget } from "../../../app/ports/files";
+import type { CommandContext } from "@app/commandContext";
+import type { FsPathTarget } from "@app/ports/files";
 import {
   ImmediateProgress,
   MemoryWorkspaceFiles,
   RecordingNotifications,
   RecordingWorkbench,
 } from "../../../testSupport/fakes";
-import type { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
+import type { BindingEntry, Dynamics365Configuration } from "@features/config/domain/models";
 import { addBinding } from "../commands/bindingCommands";
 import { openInCrm } from "../commands/openCommands";
 import { publishResource } from "../commands/publishCommands";

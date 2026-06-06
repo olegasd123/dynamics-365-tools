@@ -1,4 +1,4 @@
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import {
   createCommandActionReplacePatch,
   createCustomButtonReplacePatch,

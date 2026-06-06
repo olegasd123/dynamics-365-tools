@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
-import { SolutionComponentType } from "../../dataverse/solutionComponentService";
+import { SolutionComponentType } from "@features/dataverse/solutionComponentService";
 import { PcfControlProject } from "../models";
 import { listDeployedPcfControls } from "../pcfEnvironmentService";
 

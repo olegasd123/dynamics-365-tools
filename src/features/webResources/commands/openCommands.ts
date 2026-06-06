@@ -1,8 +1,8 @@
 import * as path from "path";
-import { CommandContext } from "../../../app/commandContext";
-import { WorkspaceFileType, type FsPathTarget } from "../../../app/ports/files";
-import { BindingEntry } from "../../config/domain/models";
-import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
+import { CommandContext } from "@app/commandContext";
+import { WorkspaceFileType, type FsPathTarget } from "@app/ports/files";
+import { BindingEntry } from "@features/config/domain/models";
+import { resolveTargetUri, pickEnvironmentAndAuth } from "@app/commandUtils";
 import { buildSupportedSet, ensureSupportedResource } from "../core/webResourceHelpers";
 import { addBinding } from "./bindingCommands";
 

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { AuthenticationPort } from "../../app/ports/authentication";
+import type { AuthenticationPort } from "@app/ports/authentication";
 
 export class VsCodeAuthenticationService implements AuthenticationPort {
   readonly removeSession?: (providerId: string, sessionId: string) => Promise<void>;

@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
-import { buildDefaultEnvironmentUrl } from "../../../shared/environmentUrl";
+import { CommandContext } from "@app/commandContext";
+import { buildDefaultEnvironmentUrl } from "@shared/environmentUrl";
 import {
   EnvironmentConfig,
   Dynamics365Configuration,
   NormalizedEnvironmentConfig,
-} from "../../config/domain/models";
+} from "@features/config/domain/models";
 import { AuthorizationProfile } from "../authorizationStore";
 
 export async function setEnvironmentCredentials(ctx: CommandContext): Promise<void> {

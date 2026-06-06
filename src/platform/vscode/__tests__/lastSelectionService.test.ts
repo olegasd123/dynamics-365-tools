@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import { MemoryStateStore } from "../../../testSupport/fakes";
-import { LastSelectionService } from "../lastSelectionStore";
+import { LastSelectionService } from "@app/lastSelectionService";
 
 test("setLastEnvironment stores value that getLastEnvironment returns", async () => {
   const memento = new MemoryStateStore();

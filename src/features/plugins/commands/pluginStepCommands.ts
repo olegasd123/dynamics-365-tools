@@ -1,12 +1,12 @@
-import { CommandContext } from "../../../app/commandContext";
-import { ConfigurationService } from "../../config/configurationService";
-import { SolutionPicker } from "../../../app/solutionPicker";
-import { SecretService } from "../../auth/secretService";
-import { AuthService } from "../../auth/authService";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
+import { CommandContext } from "@app/commandContext";
+import { ConfigurationService } from "@features/config/configurationService";
+import { SolutionPicker } from "@app/solutionPicker";
+import { SecretService } from "@features/auth/secretService";
+import { AuthService } from "@features/auth/authService";
+import { LastSelectionService } from "@app/lastSelectionService";
+import { EnvironmentConnectionService } from "@features/dataverse/environmentConnectionService";
 import { PluginExplorerProvider, PluginStepNode, PluginTypeNode } from "../pluginExplorer";
-import type { NotificationPort } from "../../../app/ports/notifications";
+import type { NotificationPort } from "@app/ports/notifications";
 import {
   asTooltipString,
   buildStepDefaultName,

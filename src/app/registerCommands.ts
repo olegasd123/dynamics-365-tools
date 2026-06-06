@@ -1,27 +1,27 @@
 import * as vscode from "vscode";
-import { openInCrm } from "../features/webResources/commands/openCommands";
+import { openInCrm } from "@features/webResources/commands/openCommands";
 import {
   openResourceMenu,
   publishLastResource,
   publishResource,
-} from "../features/webResources/commands/publishCommands";
-import { addBinding } from "../features/webResources/commands/bindingCommands";
+} from "@features/webResources/commands/publishCommands";
+import { addBinding } from "@features/webResources/commands/bindingCommands";
 import {
   addEnvironment,
   addSolution,
   editConfiguration,
-} from "../features/config/commands/configCommands";
+} from "@features/config/commands/configCommands";
 import {
   setEnvironmentCredentials,
   signInInteractive,
   signOut,
-} from "../features/auth/commands/authCommands";
+} from "@features/auth/commands/authCommands";
 import {
   generatePublicKeyToken,
   registerPluginAssembly,
   publishLastPluginAssembly,
   updatePluginAssembly,
-} from "../features/plugins/commands/pluginCommands";
+} from "@features/plugins/commands/pluginCommands";
 import {
   createPluginImage,
   createPluginStep,
@@ -33,36 +33,36 @@ import {
   editPluginImage,
   editPluginStep,
   enablePluginStep,
-} from "../features/plugins/commands/pluginStepCommands";
-import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
+} from "@features/plugins/commands/pluginStepCommands";
+import { deletePluginType } from "@features/plugins/commands/pluginTypeCommands";
 import {
   addCustomRibbonButton,
   hideAndStubOobRibbonButtons,
   hideOobRibbonButton,
   reorderOobRibbonButtons,
-} from "../features/ribbons/commands/ribbonButtonCommands";
+} from "@features/ribbons/commands/ribbonButtonCommands";
 import {
   addRibbonCommandDefinition,
   addRibbonCommandAction,
   overrideOobRibbonCommand,
-} from "../features/ribbons/commands/ribbonCommandDefinitionCommands";
+} from "@features/ribbons/commands/ribbonCommandDefinitionCommands";
 import {
   addRibbonLocLabel,
   addRibbonLocLabelTitle,
-} from "../features/ribbons/commands/ribbonLabelCommands";
+} from "@features/ribbons/commands/ribbonLabelCommands";
 import {
   addRibbonRuleChildStep,
   deleteRibbonNode,
   editRibbonNode,
   moveRibbonNodeDown,
   moveRibbonNodeUp,
-} from "../features/ribbons/commands/ribbonNodeCommands";
+} from "@features/ribbons/commands/ribbonNodeCommands";
 import {
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
   addRibbonDisplayRule,
   addRibbonEnableRule,
-} from "../features/ribbons/commands/ribbonRuleCommands";
+} from "@features/ribbons/commands/ribbonRuleCommands";
 import {
   cleanupGeneratedRibbonSolutions,
   openRibbonFile,
@@ -76,7 +76,7 @@ import {
   saveRibbonSolutionZip,
   saveRibbonSource,
   undoRibbonEdit,
-} from "../features/ribbons/commands/ribbonSourceCommands";
+} from "@features/ribbons/commands/ribbonSourceCommands";
 import {
   buildPcfControl,
   newPcfControl,
@@ -84,7 +84,7 @@ import {
   refreshPcfExplorer,
   stopPcfWatch,
   watchPcfControl,
-} from "../features/pcf/commands/pcfWorkspaceCommands";
+} from "@features/pcf/commands/pcfWorkspaceCommands";
 import {
   copyPcfDeployedControlId,
   setPcfWorkspaceFolderFilter,
@@ -92,12 +92,12 @@ import {
   setPcfSolutionFilter,
   togglePcfSolutionFilter,
   updatePcfFromLocal,
-} from "../features/pcf/commands/pcfExplorerCommands";
+} from "@features/pcf/commands/pcfExplorerCommands";
 import {
   deployLastPcfSolution,
   packageManagedPcfControl,
   packageUnmanagedPcfControl,
-} from "../features/pcf/commands/pcfReleaseCommands";
+} from "@features/pcf/commands/pcfReleaseCommands";
 import { CommandContext } from "./commandContext";
 import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 

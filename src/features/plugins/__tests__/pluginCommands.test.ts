@@ -8,8 +8,8 @@ import {
   RecordingNotifications,
   RecordingTextInput,
 } from "../../../testSupport/fakes";
-import type { NotificationPort } from "../../../app/ports/notifications";
-import { DataverseClient } from "../../dataverse/dataverseClient";
+import type { NotificationPort } from "@app/ports/notifications";
+import { DataverseClient } from "@features/dataverse/dataverseClient";
 import {
   AssemblyIdentityValidationError,
   extractToken,

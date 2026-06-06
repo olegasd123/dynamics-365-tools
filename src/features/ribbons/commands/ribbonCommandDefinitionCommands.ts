@@ -1,4 +1,4 @@
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import { createCommandActionPatch, createCommandDefinitionPatches } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
 import { promptCommandAction, promptOptionalCommandAction } from "./ribbonActionPrompts";

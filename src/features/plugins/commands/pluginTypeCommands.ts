@@ -1,15 +1,15 @@
-import { pickEnvironmentAndAuth } from "../../../app/commandUtils";
-import { CommandContext } from "../../../app/commandContext";
-import { ConfigurationService } from "../../config/configurationService";
-import { SolutionPicker } from "../../../app/solutionPicker";
-import { SecretService } from "../../auth/secretService";
-import { AuthService } from "../../auth/authService";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
+import { pickEnvironmentAndAuth } from "@app/commandUtils";
+import { CommandContext } from "@app/commandContext";
+import { ConfigurationService } from "@features/config/configurationService";
+import { SolutionPicker } from "@app/solutionPicker";
+import { SecretService } from "@features/auth/secretService";
+import { AuthService } from "@features/auth/authService";
+import { LastSelectionService } from "@app/lastSelectionService";
+import { EnvironmentConnectionService } from "@features/dataverse/environmentConnectionService";
 import { PluginTypeNode } from "../pluginExplorer";
-import { SolutionComponentService } from "../../dataverse/solutionComponentService";
+import { SolutionComponentService } from "@features/dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
-import type { NotificationPort } from "../../../app/ports/notifications";
+import type { NotificationPort } from "@app/ports/notifications";
 
 export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;

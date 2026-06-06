@@ -1081,7 +1081,7 @@
     "clean": "node ./scripts/clean.js",
     "check-types": "tsc --noEmit -p ./",
     "compile": "npm run clean && npm run check-types && node ./esbuild.js",
-    "compile:tests": "npm run clean && tsc -p ./",
+    "compile:tests": "npm run clean && tsc -p ./ && tsc-alias -p ./tsconfig.json",
     "watch": "node ./scripts/watch.js",
     "package": "npm run clean && npm run check-types && node ./esbuild.js --production",
     "test": "npm run compile:tests && node ./tests/run-tests.js",
@@ -1099,6 +1099,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "prettier": "^3.3.3",
+    "tsc-alias": "^1.8.17",
     "typescript": "^5.3.3"
   },
   "dependencies": {

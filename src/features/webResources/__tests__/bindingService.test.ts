@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { BindingService } from "../bindingService";
-import { BindingEntry, BindingSnapshot } from "../../config/domain/models";
+import { BindingEntry, BindingSnapshot } from "@features/config/domain/models";
 
 class FakeConfigurationService {
   snapshot: BindingSnapshot;

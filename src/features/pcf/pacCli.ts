@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import {
   PacAuthCreateOptions,
   PacAuthProfile,

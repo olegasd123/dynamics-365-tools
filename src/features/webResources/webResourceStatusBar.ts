@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { FsPathTarget } from "../../app/ports/files";
+import type { FsPathTarget } from "@app/ports/files";
 import type { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 
 export interface LastPublishContext {

@@ -1,16 +1,16 @@
 import * as vscode from "vscode";
-import { pickEnvironmentAndAuth } from "../../../app/commandUtils";
-import { AuthService } from "../../auth/authService";
-import { SecretService } from "../../auth/secretService";
-import { ConfigurationService } from "../../config/configurationService";
-import { Dynamics365Configuration } from "../../config/domain/models";
-import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
-import { SolutionComponentService } from "../../dataverse/solutionComponentService";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { SolutionPicker } from "../../../app/solutionPicker";
+import { pickEnvironmentAndAuth } from "@app/commandUtils";
+import { AuthService } from "@features/auth/authService";
+import { SecretService } from "@features/auth/secretService";
+import { ConfigurationService } from "@features/config/configurationService";
+import { Dynamics365Configuration } from "@features/config/domain/models";
+import { EnvironmentConnectionService } from "@features/dataverse/environmentConnectionService";
+import { SolutionComponentService } from "@features/dataverse/solutionComponentService";
+import { LastSelectionService } from "@app/lastSelectionService";
+import { SolutionPicker } from "@app/solutionPicker";
 import { PluginStep } from "../models";
 import { PluginService } from "../pluginService";
-import type { NotificationPort } from "../../../app/ports/notifications";
+import type { NotificationPort } from "@app/ports/notifications";
 import {
   asTooltipString,
   buildFilteringAttributePickItems,

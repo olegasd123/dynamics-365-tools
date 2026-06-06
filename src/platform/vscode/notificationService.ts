@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { NotificationOptions, NotificationPort } from "../../app/ports/notifications";
+import type { NotificationOptions, NotificationPort } from "@app/ports/notifications";
 
 export class VsCodeNotificationService implements NotificationPort {
   async info(message: string): Promise<void> {

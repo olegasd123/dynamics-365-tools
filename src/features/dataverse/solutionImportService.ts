@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { XMLParser } from "fast-xml-parser";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+import type { CancellationTokenLike } from "@app/ports/progress";
 
 export interface SolutionImportClient {
   get<T>(path: string): Promise<T>;

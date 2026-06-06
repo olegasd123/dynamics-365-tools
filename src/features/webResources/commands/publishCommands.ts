@@ -1,26 +1,22 @@
-import { CommandContext } from "../../../app/commandContext";
-import { ConfigurationService } from "../../config/configurationService";
+import { CommandContext } from "@app/commandContext";
+import { ConfigurationService } from "@features/config/configurationService";
 import { BindingService } from "../bindingService";
-import { SolutionPicker } from "../../../app/solutionPicker";
+import { SolutionPicker } from "@app/solutionPicker";
 import { WebResourcePublisher } from "../webResourcePublisher";
-import { SecretService } from "../../auth/secretService";
-import { AuthService } from "../../auth/authService";
-import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
+import { SecretService } from "@features/auth/secretService";
+import { AuthService } from "@features/auth/authService";
+import { EnvironmentConnectionService } from "@features/dataverse/environmentConnectionService";
 import { WebResourceStatusBarService } from "../webResourceStatusBar";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
+import { LastSelectionService } from "@app/lastSelectionService";
 import { PublishCacheService } from "../publishCacheService";
 import {
   BindingEntry,
   Dynamics365Configuration,
   EnvironmentConfig,
-} from "../../config/domain/models";
-import {
-  WorkspaceFileType,
-  type FsPathTarget,
-  type WorkspaceFilesPort,
-} from "../../../app/ports/files";
-import type { NotificationPort } from "../../../app/ports/notifications";
-import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
+} from "@features/config/domain/models";
+import { WorkspaceFileType, type FsPathTarget, type WorkspaceFilesPort } from "@app/ports/files";
+import type { NotificationPort } from "@app/ports/notifications";
+import { resolveTargetUri, pickEnvironmentAndAuth } from "@app/commandUtils";
 import { addBinding } from "./bindingCommands";
 import {
   buildSupportedSet,

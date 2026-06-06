@@ -1,11 +1,11 @@
 import * as path from "path";
-import { pickEnvironmentAndAuth } from "../../../app/commandUtils";
-import { CommandContext } from "../../../app/commandContext";
+import { pickEnvironmentAndAuth } from "@app/commandUtils";
+import { CommandContext } from "@app/commandContext";
 import {
   EnvironmentAuthContext,
   EnvironmentConnectionService,
-} from "../../dataverse/environmentConnectionService";
-import { SolutionComponentService } from "../../dataverse/solutionComponentService";
+} from "@features/dataverse/environmentConnectionService";
+import { SolutionComponentService } from "@features/dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
 import { PluginAssemblyNode } from "../pluginExplorer";
 import {

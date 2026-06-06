@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { FsPathTarget } from "../../app/ports/files";
+import type { FsPathTarget } from "@app/ports/files";
 import { BindingEntry, BindingSnapshot } from "../config/domain/models";
 import { ConfigurationService } from "../config/configurationService";
 

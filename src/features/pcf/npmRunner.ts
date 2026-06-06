@@ -1,6 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import type { CancellationTokenLike } from "../../app/ports/progress";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { ProcessRunResult } from "./models";
 import { ProcessRunner, RunningProcess } from "./processRunner";
 

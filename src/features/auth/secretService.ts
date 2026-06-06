@@ -1,4 +1,4 @@
-import type { SecretStorePort } from "../../app/ports/storage";
+import type { SecretStorePort } from "@app/ports/storage";
 
 export interface EnvironmentCredentials {
   clientId: string;

@@ -1,5 +1,5 @@
 import type * as vscode from "vscode";
-import type { SecretStorePort, StateStorePort } from "../../app/ports/storage";
+import type { SecretStorePort, StateStorePort } from "@app/ports/storage";
 
 export class VsCodeSecretStore implements SecretStorePort {
   constructor(private readonly secrets: vscode.SecretStorage) {}

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { DEFAULT_SOLUTION_NAME } from "../shared/solutions";
-import type { EnvironmentConfig, SolutionConfig } from "../features/config/domain/models";
+import { DEFAULT_SOLUTION_NAME } from "@shared/solutions";
+import type { EnvironmentConfig, SolutionConfig } from "@features/config/domain/models";
 import type { NotificationPort } from "./ports/notifications";
 
 type SolutionQuickPickItem = vscode.QuickPickItem & {

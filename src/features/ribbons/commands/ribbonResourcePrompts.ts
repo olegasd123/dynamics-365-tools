@@ -1,10 +1,10 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
-import { pickDataverseClient } from "../../../app/commandUtils";
-import { WorkspaceFileType, type WorkspaceFilesPort } from "../../../app/ports/files";
-import { BindingEntry } from "../../config/domain/models";
-import type { DataverseClient } from "../../dataverse/dataverseClient";
+import { CommandContext } from "@app/commandContext";
+import { pickDataverseClient } from "@app/commandUtils";
+import { WorkspaceFileType, type WorkspaceFilesPort } from "@app/ports/files";
+import { BindingEntry } from "@features/config/domain/models";
+import type { DataverseClient } from "@features/dataverse/dataverseClient";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
 import {
   buildImageWebResourceQueryUrl,

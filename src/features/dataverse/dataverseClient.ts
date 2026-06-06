@@ -1,4 +1,4 @@
-import { DEFAULT_SOLUTION_NAME } from "../../shared/solutions";
+import { DEFAULT_SOLUTION_NAME } from "@shared/solutions";
 import type { EnvironmentConnection } from "./environmentConnectionService";
 
 export interface DataverseRequestOptions {

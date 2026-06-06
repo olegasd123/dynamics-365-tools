@@ -1,7 +1,7 @@
 import * as path from "path";
-import { WorkspaceFileType } from "../../app/ports/files";
-import type { WorkspaceDirectoryEntry, WorkspaceFilesPort } from "../../app/ports/files";
-import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
+import { WorkspaceFileType } from "@app/ports/files";
+import type { WorkspaceDirectoryEntry, WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
 import { PcfControlProject, PcfTemplateKind } from "./models";
 import { PcfManifestReader } from "./pcfManifestReader";
 
