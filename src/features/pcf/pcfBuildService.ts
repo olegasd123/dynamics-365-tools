@@ -1,6 +1,12 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
+import {
+  DiagnosticEntry,
+  DiagnosticSeverity,
+  NoopDiagnosticPort,
+  type DiagnosticPort,
+} from "../../app/ports/diagnostics";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { PcfBuildStatus, PcfControlProject } from "./models";
@@ -24,13 +30,14 @@ export class PcfBuildService implements vscode.Disposable {
   private readonly outputChannels = new Map<string, OutputChannelPort>();
   private readonly watches = new Map<string, WatchEntry>();
   private readonly diagnosticFilesByProject = new Map<string, string[]>();
-  private readonly diagnostics = vscode.languages.createDiagnosticCollection("d365-pcf");
-  private readonly onDidChangeStatusEmitter = new vscode.EventEmitter<void>();
+  private readonly onDidChangeStatusEmitter = new SimpleEventEmitter<void>();
   readonly onDidChangeStatus = this.onDidChangeStatusEmitter.event;
 
   constructor(
     private readonly npmRunner: NpmRunner,
     private readonly statusBar: PcfStatusBarService,
+    private readonly files: WorkspaceFilesPort,
+    private readonly diagnostics: DiagnosticPort = new NoopDiagnosticPort(),
     private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
     private readonly output: OutputPort = new NoopOutputPort(),
@@ -169,7 +176,7 @@ export class PcfBuildService implements vscode.Disposable {
     output: OutputChannelPort,
     token?: vscode.CancellationToken,
   ): Promise<boolean> {
-    if (await exists(path.join(project.rootUri, "node_modules"))) {
+    if (await this.files.exists(path.join(project.rootUri, "node_modules"))) {
       return true;
     }
 
@@ -223,7 +230,7 @@ export class PcfBuildService implements vscode.Disposable {
   }
 
   private updateDiagnostics(project: PcfControlProject, output: string): void {
-    const byFile = new Map<string, vscode.Diagnostic[]>();
+    const byFile = new Map<string, DiagnosticEntry[]>();
 
     for (const line of output.split(/\r?\n/)) {
       const parsed = parseTypeScriptDiagnostic(project.rootUri, line);
@@ -232,31 +239,52 @@ export class PcfBuildService implements vscode.Disposable {
       }
 
       const diagnostics = byFile.get(parsed.filePath) ?? [];
-      diagnostics.push(
-        new vscode.Diagnostic(
-          new vscode.Range(
-            new vscode.Position(parsed.line - 1, parsed.character - 1),
-            new vscode.Position(parsed.line - 1, parsed.character),
-          ),
-          `${parsed.code}: ${parsed.message}`,
-          vscode.DiagnosticSeverity.Error,
-        ),
-      );
+      diagnostics.push({
+        range: {
+          start: { line: parsed.line - 1, character: parsed.character - 1 },
+          end: { line: parsed.line - 1, character: parsed.character },
+        },
+        message: `${parsed.code}: ${parsed.message}`,
+        severity: DiagnosticSeverity.Error,
+      });
       byFile.set(parsed.filePath, diagnostics);
     }
 
     this.clearProjectDiagnostics(project);
     this.diagnosticFilesByProject.set(project.rootUri, [...byFile.keys()]);
     for (const [filePath, diagnostics] of byFile.entries()) {
-      this.diagnostics.set(vscode.Uri.file(filePath), diagnostics);
+      this.diagnostics.set(filePath, diagnostics);
     }
   }
 
   private clearProjectDiagnostics(project: PcfControlProject): void {
     for (const filePath of this.diagnosticFilesByProject.get(project.rootUri) ?? []) {
-      this.diagnostics.delete(vscode.Uri.file(filePath));
+      this.diagnostics.delete(filePath);
     }
     this.diagnosticFilesByProject.delete(project.rootUri);
+  }
+}
+
+type EventListener<T> = (event: T) => void;
+
+class SimpleEventEmitter<T> {
+  private readonly listeners = new Set<EventListener<T>>();
+
+  readonly event = (listener: EventListener<T>) => {
+    this.listeners.add(listener);
+    return {
+      dispose: () => this.listeners.delete(listener),
+    };
+  };
+
+  fire(value: T): void {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+
+  dispose(): void {
+    this.listeners.clear();
   }
 }
 
@@ -277,13 +305,4 @@ function parseTypeScriptDiagnostic(projectRoot: string, line: string) {
     code: match[4],
     message: match[5],
   };
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await fs.stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }

@@ -70,7 +70,7 @@ Validation:
 - Existing command tests should no longer monkey-patch `vscode.workspace.fs` for migrated paths.
 - Full validation suite passes.
 
-## Milestone 4: PCF Service Isolation
+## Milestone 4: PCF Service Isolation [Done]
 
 Port the PCF services that combine long-running process orchestration with VS Code output, prompts, and external links.
 

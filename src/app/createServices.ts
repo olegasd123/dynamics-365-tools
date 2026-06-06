@@ -36,6 +36,8 @@ import { WebResourcePublisher } from "../features/webResources/webResourcePublis
 import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import { VsCodeAuthenticationService } from "../platform/vscode/authenticationService";
 import { VsCodeClipboard } from "../platform/vscode/clipboard";
+import { VsCodeDiagnostics } from "../platform/vscode/diagnostics";
+import { VsCodeTextInput } from "../platform/vscode/input";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
 import { VsCodeOutputPort } from "../platform/vscode/output";
@@ -53,6 +55,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   const logger = lazyDisposable(() => new VsCodeOutputLogger(), disposables);
   const output = lazy(() => new VsCodeOutputPort());
   const clipboard = lazy(() => new VsCodeClipboard());
+  const input = lazy(() => new VsCodeTextInput());
   const files = lazy(() => new VsCodeWorkspaceFiles());
   const authentication = lazy(() => new VsCodeAuthenticationService());
   const workbench = lazy(() => new VsCodeWorkbench());
@@ -130,7 +133,15 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   const pcfTelemetry = lazyDisposable(() => new PcfTelemetryService(), disposables);
   const pcfBuildService = lazyDisposable(
     () =>
-      new PcfBuildService(npmRunner(), pcfStatusBar(), notifications(), pcfTelemetry(), output()),
+      new PcfBuildService(
+        npmRunner(),
+        pcfStatusBar(),
+        files(),
+        new VsCodeDiagnostics("d365-pcf"),
+        notifications(),
+        pcfTelemetry(),
+        output(),
+      ),
     disposables,
   );
   const pcfEnvironmentService = lazy(() => new PcfEnvironmentService(connections()));
@@ -142,9 +153,11 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
       new PcfPushService(
         pacCli(),
         pcfWorkspaceSettings(),
+        files(),
         notifications(),
         pcfTelemetry(),
         output(),
+        input(),
       ),
     disposables,
   );
@@ -154,6 +167,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
         connections(),
         pcfWorkspaceSettings(),
         configuration(),
+        files(),
         notifications(),
         pcfTelemetry(),
         output(),
@@ -167,9 +181,12 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
         pcfProcessRunner(),
         pcfWorkspaceSettings(),
         configuration(),
+        files(),
         notifications(),
         pcfTelemetry(),
         output(),
+        input(),
+        workbench(),
       ),
     disposables,
   );
@@ -217,6 +234,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get files() {
       return files();
+    },
+    get input() {
+      return input();
     },
     get lastSelection() {
       return lastSelection();

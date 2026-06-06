@@ -1,6 +1,7 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
+import { NoopTextInput, TextInputPort } from "../../app/ports/input";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { XMLParser } from "fast-xml-parser";
@@ -16,15 +17,17 @@ export class PcfPushService implements vscode.Disposable {
   constructor(
     private readonly pacCli: PacCli,
     private readonly settings: PcfWorkspaceSettingsService,
+    private readonly files: WorkspaceFilesPort,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
     output: OutputPort = new NoopOutputPort(),
+    private readonly input: TextInputPort = new NoopTextInput(),
   ) {
     this.output = output.createChannel("PCF Push");
   }
 
   async resolvePublisherPrefix(project: PcfControlProject): Promise<string | undefined> {
-    const cdsPrefix = await readPublisherPrefixFromCdsProject(project.cdsProjectUri);
+    const cdsPrefix = await readPublisherPrefixFromCdsProject(this.files, project.cdsProjectUri);
     if (cdsPrefix) {
       await this.settings.updateProjectSettings(project, { publisherPrefix: cdsPrefix });
       return cdsPrefix;
@@ -35,7 +38,7 @@ export class PcfPushService implements vscode.Disposable {
       return stored;
     }
 
-    const entered = await vscode.window.showInputBox({
+    const entered = await this.input.showInputBox({
       prompt: `Publisher prefix for ${project.fullName}`,
       placeHolder: "new",
       value: stored,
@@ -136,6 +139,7 @@ export function validatePublisherPrefix(value: string): string | undefined {
 }
 
 async function readPublisherPrefixFromCdsProject(
+  files: WorkspaceFilesPort,
   cdsProjectUri?: string,
 ): Promise<string | undefined> {
   if (!cdsProjectUri) {
@@ -150,7 +154,7 @@ async function readPublisherPrefixFromCdsProject(
   ];
 
   for (const candidate of candidates) {
-    const prefix = await readPublisherPrefix(candidate);
+    const prefix = await readPublisherPrefix(files, candidate);
     if (prefix) {
       return prefix;
     }
@@ -159,9 +163,12 @@ async function readPublisherPrefixFromCdsProject(
   return undefined;
 }
 
-async function readPublisherPrefix(filePath: string): Promise<string | undefined> {
+async function readPublisherPrefix(
+  files: WorkspaceFilesPort,
+  filePath: string,
+): Promise<string | undefined> {
   try {
-    const content = await fs.readFile(filePath, "utf8");
+    const content = Buffer.from(await files.readFile(filePath)).toString("utf8");
     const parsed = new XMLParser({ ignoreAttributes: false }).parse(content) as unknown;
     const found = findKey(parsed, "CustomizationPrefix");
     return typeof found === "string" && found.trim() ? found.trim() : undefined;

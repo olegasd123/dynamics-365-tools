@@ -1,12 +1,14 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { ClipboardPort } from "../app/ports/clipboard";
+import type { DiagnosticEntry, DiagnosticPort } from "../app/ports/diagnostics";
 import { WorkspaceFileType } from "../app/ports/files";
 import type {
   WorkspaceDirectoryEntry,
   WorkspaceFileStat,
   WorkspaceFilesPort,
 } from "../app/ports/files";
+import type { TextInputOptions, TextInputPort } from "../app/ports/input";
 import type { LoggerPort, LogMetadata } from "../app/ports/logger";
 import type { NotificationPort } from "../app/ports/notifications";
 import type { OutputChannelPort, OutputPort } from "../app/ports/output";
@@ -296,6 +298,34 @@ export class RecordingClipboard implements ClipboardPort {
       throw new Error("Clipboard write failed");
     }
     this.values.push(value);
+  }
+}
+
+export class RecordingDiagnostics implements DiagnosticPort {
+  readonly entries = new Map<string, DiagnosticEntry[]>();
+  disposed = false;
+
+  set(filePath: string, diagnostics: DiagnosticEntry[]): void {
+    this.entries.set(filePath, diagnostics);
+  }
+
+  delete(filePath: string): void {
+    this.entries.delete(filePath);
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.entries.clear();
+  }
+}
+
+export class RecordingTextInput implements TextInputPort {
+  readonly prompts: TextInputOptions[] = [];
+  nextValues: Array<string | undefined> = [];
+
+  async showInputBox(options: TextInputOptions): Promise<string | undefined> {
+    this.prompts.push(options);
+    return this.nextValues.shift();
   }
 }
 

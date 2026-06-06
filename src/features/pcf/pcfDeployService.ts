@@ -1,6 +1,6 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { ConfigurationService } from "../config/configurationService";
@@ -43,6 +43,7 @@ export class PcfDeployService implements vscode.Disposable {
     private readonly connections: EnvironmentConnectionService,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly files: WorkspaceFilesPort,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
     output: OutputPort = new NoopOutputPort(),
@@ -64,9 +65,9 @@ export class PcfDeployService implements vscode.Disposable {
     }
 
     const zipPath = this.configuration.resolveLocalPath(stored);
-    let zipBytes: Buffer;
+    let zipBytes: Uint8Array;
     try {
-      zipBytes = await fs.readFile(zipPath);
+      zipBytes = await this.files.readFile(zipPath);
     } catch {
       await this.notifications.error(`Packaged solution was not found: ${zipPath}.`);
       return undefined;
