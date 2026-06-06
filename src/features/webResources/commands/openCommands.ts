@@ -1,13 +1,24 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
+import { WorkspaceFileType } from "../../../app/ports/files";
 import { BindingEntry } from "../../config/domain/models";
 import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { buildSupportedSet, ensureSupportedResource } from "../core/webResourceHelpers";
 import { addBinding } from "./bindingCommands";
 
 export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const {
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    connections,
+    notifications,
+    files,
+    workbench,
+  } = ctx.core;
   const { bindings, urls: webResources } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
@@ -17,7 +28,7 @@ export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined
   const config = await configuration.loadConfiguration();
   const supportedExtensions = buildSupportedSet();
 
-  if (!(await ensureSupportedResource(targetUri, supportedExtensions))) {
+  if (!(await ensureSupportedResource(targetUri, supportedExtensions, files, notifications))) {
     return;
   }
 
@@ -33,8 +44,8 @@ export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined
     return;
   }
 
-  const stat = await vscode.workspace.fs.stat(targetUri);
-  if (stat.type !== vscode.FileType.File) {
+  const stat = await files.stat(targetUri.fsPath);
+  if (stat.type !== WorkspaceFileType.File) {
     await notifications.info("Select a file to open its web resource in CRM.");
     return;
   }
@@ -76,7 +87,7 @@ export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined
     return;
   }
 
-  const opened = await vscode.env.openExternal(vscode.Uri.parse(classicUrl));
+  const opened = await workbench.openExternal(classicUrl);
   if (!opened) {
     await notifications.error(`Could not open web resource in ${env.name}.`);
   }

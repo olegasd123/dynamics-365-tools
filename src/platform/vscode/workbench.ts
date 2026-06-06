@@ -20,6 +20,10 @@ export class VsCodeWorkbench implements WorkbenchPort {
     await vscode.window.showTextDocument(fileUri);
   }
 
+  async openExternal(url: string): Promise<boolean> {
+    return vscode.env.openExternal(vscode.Uri.parse(url));
+  }
+
   setStatusBarMessage(message: string, hideWhenDone: Promise<unknown>): void {
     vscode.window.setStatusBarMessage(message, hideWhenDone);
   }

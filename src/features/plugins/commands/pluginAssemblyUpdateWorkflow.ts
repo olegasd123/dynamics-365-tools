@@ -13,6 +13,7 @@ import {
   validateAssemblyIdentity,
 } from "./pluginAssemblyIdentity";
 import type { NotificationPort } from "../../../app/ports/notifications";
+import type { WorkspaceFilesPort } from "../../../app/ports/files";
 
 type PluginSyncContext = {
   registration: PluginRegistrationManager;
@@ -70,6 +71,7 @@ type AssemblyUpdateContext = {
   assemblyStatusBar: PluginAssemblyStatusBarService;
   lastSelection: LastSelectionService;
   notifications: NotificationPort;
+  files: WorkspaceFilesPort;
 };
 
 type AssemblyUpdateFileDialogContext = Omit<AssemblyUpdateContext, "assemblyUri"> & {
@@ -141,7 +143,7 @@ export async function updateAssemblyFromUri(context: AssemblyUpdateContext): Pro
     notifications: context.notifications,
   });
 
-  const content = await vscode.workspace.fs.readFile(context.assemblyUri);
+  const content = await context.files.readFile(context.assemblyUri.fsPath);
   const contentBase64 = Buffer.from(content).toString("base64");
 
   const confirmed = await confirmPluginComponentChanges({

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
+import { WorkspaceFileType } from "../../../app/ports/files";
 import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
 import { pickDataverseClient, resolveTargetUri } from "../../../app/commandUtils";
 import type { DataverseClient } from "../../dataverse/dataverseClient";
@@ -10,7 +11,7 @@ import { compareFolderBindingResources, normalizeRemotePath } from "../folderBin
 const bindingOutput = vscode.window.createOutputChannel("Dynamics 365 Tools Binding");
 
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const { configuration, ui, notifications } = ctx.core;
+  const { configuration, ui, notifications, files } = ctx.core;
   const { bindings } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
@@ -18,8 +19,8 @@ export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefine
   }
 
   const config = await configuration.loadConfiguration();
-  const stat = await vscode.workspace.fs.stat(targetUri);
-  const kind = stat.type === vscode.FileType.Directory ? "folder" : "file";
+  const stat = await files.stat(targetUri.fsPath);
+  const kind = stat.type === WorkspaceFileType.Directory ? "folder" : "file";
   const relative = configuration.getRelativeToWorkspace(targetUri.fsPath);
   const solutionConfig = await ui.promptSolution(config.solutions);
 
@@ -78,7 +79,11 @@ async function confirmFolderBinding(
   remotePath: string,
   config: Dynamics365Configuration,
 ): Promise<boolean> {
-  const supportedFiles = await collectSupportedFiles(folderUri, buildSupportedSet());
+  const supportedFiles = await collectSupportedFiles(
+    folderUri,
+    buildSupportedSet(),
+    ctx.core.files,
+  );
   if (!supportedFiles.length) {
     return true;
   }

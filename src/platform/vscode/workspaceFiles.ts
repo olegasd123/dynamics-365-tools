@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import { WorkspaceFileType } from "../../app/ports/files";
-import type { WorkspaceFileStat, WorkspaceFilesPort } from "../../app/ports/files";
+import type {
+  WorkspaceDirectoryEntry,
+  WorkspaceFileStat,
+  WorkspaceFilesPort,
+} from "../../app/ports/files";
 
 export class VsCodeWorkspaceFiles implements WorkspaceFilesPort {
   get workspaceRoot(): string | undefined {
@@ -24,6 +28,11 @@ export class VsCodeWorkspaceFiles implements WorkspaceFilesPort {
     } catch {
       return false;
     }
+  }
+
+  async readDirectory(fsPath: string): Promise<WorkspaceDirectoryEntry[]> {
+    const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(fsPath));
+    return entries.map(([name, type]) => ({ name, type: toWorkspaceFileType(type) }));
   }
 
   async readFile(fsPath: string): Promise<Uint8Array> {

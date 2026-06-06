@@ -2,6 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
 import { VsCodeNotificationService } from "../../../platform/vscode/notificationService";
+import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import {
   AssemblyIdentityValidationError,
@@ -22,6 +23,14 @@ function clearMessages(): void {
 
 function createNotifications(): VsCodeNotificationService {
   return new VsCodeNotificationService();
+}
+
+function createPluginFiles(fsPaths = ["/workspace/Contoso.Plugins.dll"]): MemoryWorkspaceFiles {
+  const files = new MemoryWorkspaceFiles("/workspace");
+  for (const fsPath of fsPaths) {
+    files.addFile(fsPath, "dll");
+  }
+  return files;
 }
 
 function legacyContext<T extends Record<string, any>>(ctx: T): T {
@@ -127,12 +136,15 @@ test("validateAssemblyUpdateTarget warns but allows version changes", async () =
 test("updateAssemblyFromFileDialog shows a modal error and asks for the file again on assembly mismatch", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
 
   const selectedFiles = [
     vscode.Uri.file("/workspace/Fabrikam.Plugins.dll"),
     vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
   ];
+  const files = createPluginFiles([
+    "/workspace/Fabrikam.Plugins.dll",
+    "/workspace/Contoso.Plugins.dll",
+  ]);
   const modalErrors: Array<{ message: string; modal?: boolean }> = [];
   let updateCount = 0;
   let lastPath = "";
@@ -148,7 +160,6 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
     modalErrors.push({ message, modal: options?.modal });
     return undefined;
   };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -182,6 +193,7 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async (_envName: string, _assemblyId: string, path: string) => {
@@ -192,7 +204,6 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.strictEqual(selectedFiles.length, 0);
@@ -265,7 +276,7 @@ test("updatePluginAssembly opens file dialog in the last DLL folder", async () =
 test("updateAssemblyFromFileDialog removes missing plugin types before patching assembly", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const files = createPluginFiles();
   const calls: string[] = [];
   let warning = "";
   let warningDetail = "";
@@ -281,7 +292,6 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
     warningDetail = options?.detail ?? "";
     return "Remove and Update";
   };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -322,6 +332,7 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -330,7 +341,6 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.match(warning, /sync 1 plugin type change/);
@@ -343,14 +353,13 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
 test("updateAssemblyFromFileDialog cancels update when missing plugin removal is rejected", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const files = createPluginFiles();
   const calls: string[] = [];
 
   (vscode.window as any).showOpenDialog = async () => [
     vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
   ];
   (vscode.window as any).showWarningMessage = async () => undefined;
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -391,6 +400,7 @@ test("updateAssemblyFromFileDialog cancels update when missing plugin removal is
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -399,7 +409,6 @@ test("updateAssemblyFromFileDialog cancels update when missing plugin removal is
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.deepStrictEqual(calls, []);
@@ -409,7 +418,7 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowWarningMessage = vscode.window.showWarningMessage;
   const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const files = createPluginFiles();
   const calls: string[] = [];
   let error = "";
 
@@ -421,7 +430,6 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
     error = message;
     return undefined;
   };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -466,6 +474,7 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -475,7 +484,6 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
     (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.deepStrictEqual(calls, ["delete:blocked-type", "delete:old-type"]);
@@ -488,7 +496,7 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
 test("updateAssemblyFromFileDialog blocks deleted plugin types when missing management is disabled", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const files = createPluginFiles();
   const calls: string[] = [];
   let error = "";
   let errorDetail = "";
@@ -504,7 +512,6 @@ test("updateAssemblyFromFileDialog blocks deleted plugin types when missing mana
     errorDetail = options?.detail ?? "";
     return undefined;
   };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -545,6 +552,7 @@ test("updateAssemblyFromFileDialog blocks deleted plugin types when missing mana
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -553,7 +561,6 @@ test("updateAssemblyFromFileDialog blocks deleted plugin types when missing mana
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.match(error, /cannot be updated/);
@@ -568,7 +575,7 @@ test("updateAssemblyFromFileDialog blocks deleted plugin types when missing mana
 test("updateAssemblyFromFileDialog warns and skips new plugin creation when missing management is disabled", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const files = createPluginFiles();
   const calls: string[] = [];
   let warning = "";
   let warningDetail = "";
@@ -584,7 +591,6 @@ test("updateAssemblyFromFileDialog warns and skips new plugin creation when miss
     warningDetail = options?.detail ?? "";
     return "Update Assembly";
   };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -621,6 +627,7 @@ test("updateAssemblyFromFileDialog warns and skips new plugin creation when miss
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -629,7 +636,6 @@ test("updateAssemblyFromFileDialog warns and skips new plugin creation when miss
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.match(warning, /without creating 1 new plugin type/);
@@ -641,7 +647,7 @@ test("updateAssemblyFromFileDialog warns and skips new plugin creation when miss
 test("updateAssemblyFromFileDialog asks before creating new plugin types when missing management is enabled", async () => {
   const originalShowOpenDialog = vscode.window.showOpenDialog;
   const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const files = createPluginFiles();
   const calls: string[] = [];
   let warning = "";
   let warningDetail = "";
@@ -657,7 +663,6 @@ test("updateAssemblyFromFileDialog asks before creating new plugin types when mi
     warningDetail = options?.detail ?? "";
     return "Update Assembly";
   };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -694,6 +699,7 @@ test("updateAssemblyFromFileDialog asks before creating new plugin types when mi
       pluginService: service as any,
       pluginRegistration: registration as any,
       notifications: createNotifications(),
+      files,
       assemblyStatusBar: { setLastPublish: () => undefined } as any,
       lastSelection: {
         setLastAssemblyDllPath: async () => undefined,
@@ -702,7 +708,6 @@ test("updateAssemblyFromFileDialog asks before creating new plugin types when mi
   } finally {
     (vscode.window as any).showOpenDialog = originalShowOpenDialog;
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
   }
 
   assert.match(warning, /sync 1 plugin type change/);

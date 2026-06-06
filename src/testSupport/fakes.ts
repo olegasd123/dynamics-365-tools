@@ -2,7 +2,11 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import type { ClipboardPort } from "../app/ports/clipboard";
 import { WorkspaceFileType } from "../app/ports/files";
-import type { WorkspaceFileStat, WorkspaceFilesPort } from "../app/ports/files";
+import type {
+  WorkspaceDirectoryEntry,
+  WorkspaceFileStat,
+  WorkspaceFilesPort,
+} from "../app/ports/files";
 import type { LoggerPort, LogMetadata } from "../app/ports/logger";
 import type { NotificationPort } from "../app/ports/notifications";
 import type { OutputChannelPort, OutputPort } from "../app/ports/output";
@@ -26,6 +30,18 @@ export class NodeWorkspaceFiles implements WorkspaceFilesPort {
     return this.stat(fsPath)
       .then(() => true)
       .catch(() => false);
+  }
+
+  async readDirectory(fsPath: string): Promise<WorkspaceDirectoryEntry[]> {
+    const entries = await fs.readdir(fsPath, { withFileTypes: true });
+    return entries.map((entry) => ({
+      name: entry.name,
+      type: entry.isDirectory()
+        ? WorkspaceFileType.Directory
+        : entry.isFile()
+          ? WorkspaceFileType.File
+          : WorkspaceFileType.Unknown,
+    }));
   }
 
   async readFile(fsPath: string): Promise<Uint8Array> {
@@ -92,6 +108,22 @@ export class MemoryWorkspaceFiles implements WorkspaceFilesPort {
 
   async exists(fsPath: string): Promise<boolean> {
     return this.entries.has(this.normalize(fsPath));
+  }
+
+  async readDirectory(fsPath: string): Promise<WorkspaceDirectoryEntry[]> {
+    const normalized = this.normalize(fsPath);
+    const entry = this.getEntry(normalized);
+    if (entry.type !== WorkspaceFileType.Directory) {
+      throw Object.assign(new Error(`Path is not a directory: ${fsPath}`), { code: "ENOTDIR" });
+    }
+
+    const children: WorkspaceDirectoryEntry[] = [];
+    for (const [entryPath, child] of this.entries) {
+      if (entryPath !== normalized && path.dirname(entryPath) === normalized) {
+        children.push({ name: path.basename(entryPath), type: child.type });
+      }
+    }
+    return children;
   }
 
   async readFile(fsPath: string): Promise<Uint8Array> {
@@ -200,7 +232,9 @@ export class RecordingNotifications implements NotificationPort {
 export class RecordingWorkbench implements WorkbenchPort {
   readonly commands: string[] = [];
   readonly openedFiles: string[] = [];
+  readonly externalUrls: string[] = [];
   readonly statusMessages: string[] = [];
+  openExternalResult = true;
 
   constructor(public hasWorkspace: boolean) {}
 
@@ -211,6 +245,11 @@ export class RecordingWorkbench implements WorkbenchPort {
 
   async openWorkspaceFile(relativePath: string): Promise<void> {
     this.openedFiles.push(relativePath);
+  }
+
+  async openExternal(url: string): Promise<boolean> {
+    this.externalUrls.push(url);
+    return this.openExternalResult;
   }
 
   setStatusBarMessage(message: string): void {

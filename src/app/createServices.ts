@@ -77,7 +77,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   );
 
   const bindings = lazy(() => new BindingService(configuration()));
-  const publishCache = lazy(() => new PublishCacheService(configuration()));
+  const publishCache = lazy(() => new PublishCacheService(configuration(), files()));
   const publisher = lazy(
     () => new WebResourcePublisher(connections(), files(), notifications(), output(), clipboard()),
   );
@@ -214,6 +214,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get workbench() {
       return workbench();
+    },
+    get files() {
+      return files();
     },
     get lastSelection() {
       return lastSelection();

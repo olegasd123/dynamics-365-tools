@@ -15,6 +15,7 @@ import {
   Dynamics365Configuration,
   EnvironmentConfig,
 } from "../../config/domain/models";
+import { WorkspaceFileType, type WorkspaceFilesPort } from "../../../app/ports/files";
 import type { NotificationPort } from "../../../app/ports/notifications";
 import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { addBinding } from "./bindingCommands";
@@ -27,8 +28,17 @@ import {
 const FOLDER_PUBLISH_CONCURRENCY = 4;
 
 export async function publishLastResource(ctx: CommandContext): Promise<void> {
-  const { configuration, ui, secrets, auth, connections, statusBar, lastSelection, notifications } =
-    ctx.core;
+  const {
+    configuration,
+    ui,
+    secrets,
+    auth,
+    connections,
+    statusBar,
+    lastSelection,
+    notifications,
+    files,
+  } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
   const last = statusBar.getLastPublish();
   if (!last) {
@@ -37,7 +47,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
   }
 
   try {
-    await vscode.workspace.fs.stat(last.targetUri);
+    await files.stat(last.targetUri.fsPath);
   } catch {
     await notifications.warning("Last published resource no longer exists.");
     statusBar.clear();
@@ -78,6 +88,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
       lastSelection,
       publishCache,
       notifications,
+      files,
       config,
       preferredEnvName,
     );
@@ -102,8 +113,17 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
 }
 
 export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | undefined) {
-  const { configuration, ui, secrets, auth, connections, statusBar, lastSelection, notifications } =
-    ctx.core;
+  const {
+    configuration,
+    ui,
+    secrets,
+    auth,
+    connections,
+    statusBar,
+    lastSelection,
+    notifications,
+    files,
+  } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
@@ -113,7 +133,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
   const config = await configuration.loadConfiguration();
   const supportedExtensions = buildSupportedSet();
 
-  if (!(await ensureSupportedResource(targetUri, supportedExtensions))) {
+  if (!(await ensureSupportedResource(targetUri, supportedExtensions, files, notifications))) {
     return;
   }
 
@@ -123,8 +143,8 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
     return;
   }
 
-  const stat = await vscode.workspace.fs.stat(targetUri);
-  if (binding.kind === "folder" && stat.type === vscode.FileType.Directory) {
+  const stat = await files.stat(targetUri.fsPath);
+  if (binding.kind === "folder" && stat.type === WorkspaceFileType.Directory) {
     await publishFolder(
       binding,
       targetUri,
@@ -140,6 +160,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
       lastSelection,
       publishCache,
       notifications,
+      files,
       config,
     );
     return;
@@ -165,8 +186,17 @@ export async function publishResource(
   ctx: CommandContext,
   uri: vscode.Uri | undefined,
 ): Promise<void> {
-  const { configuration, ui, secrets, auth, connections, statusBar, lastSelection, notifications } =
-    ctx.core;
+  const {
+    configuration,
+    ui,
+    secrets,
+    auth,
+    connections,
+    statusBar,
+    lastSelection,
+    notifications,
+    files,
+  } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri);
   if (!targetUri) {
@@ -176,7 +206,7 @@ export async function publishResource(
   const config = await configuration.loadConfiguration();
   const supportedExtensions = buildSupportedSet();
 
-  if (!(await ensureSupportedResource(targetUri, supportedExtensions))) {
+  if (!(await ensureSupportedResource(targetUri, supportedExtensions, files, notifications))) {
     return;
   }
 
@@ -192,8 +222,8 @@ export async function publishResource(
     return;
   }
 
-  const stat = await vscode.workspace.fs.stat(targetUri);
-  if (binding.kind === "folder" && stat.type === vscode.FileType.Directory) {
+  const stat = await files.stat(targetUri.fsPath);
+  if (binding.kind === "folder" && stat.type === WorkspaceFileType.Directory) {
     await publishFolder(
       binding,
       targetUri,
@@ -209,6 +239,7 @@ export async function publishResource(
       lastSelection,
       publishCache,
       notifications,
+      files,
       config,
     );
     return;
@@ -287,6 +318,7 @@ async function publishFolder(
   lastSelection: LastSelectionService,
   publishCache: PublishCacheService,
   notifications: NotificationPort,
+  files: WorkspaceFilesPort,
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
 ): Promise<void> {
@@ -322,24 +354,29 @@ async function publishFolder(
     },
     async (progress, cancellationToken) => {
       progress.report({ message: "Scanning folder..." });
-      const files = await collectSupportedFiles(folderUri, supportedExtensions, cancellationToken);
+      const supportedFiles = await collectSupportedFiles(
+        folderUri,
+        supportedExtensions,
+        files,
+        cancellationToken,
+      );
       if (cancellationToken.isCancellationRequested) {
         await notifications.warning(
           `Dynamics 365 Tools publish to ${publishAuth.env.name} cancelled: no files were processed.`,
         );
         return;
       }
-      if (!files.length) {
+      if (!supportedFiles.length) {
         await notifications.info("No supported web resource files found in this folder.");
         return;
       }
 
-      progress.report({ message: `Publishing ${files.length} file(s)...` });
-      files.sort((a, b) => a.fsPath.localeCompare(b.fsPath));
+      progress.report({ message: `Publishing ${supportedFiles.length} file(s)...` });
+      supportedFiles.sort((a, b) => a.fsPath.localeCompare(b.fsPath));
       const totals = { created: 0, updated: 0, skipped: 0, failed: 0 };
       let nextIndex = 0;
       let cancelled = false;
-      const poolSize = Math.min(FOLDER_PUBLISH_CONCURRENCY, files.length);
+      const poolSize = Math.min(FOLDER_PUBLISH_CONCURRENCY, supportedFiles.length);
       const workers = Array.from({ length: poolSize }, () =>
         (async (): Promise<void> => {
           while (true) {
@@ -348,10 +385,10 @@ async function publishFolder(
               break;
             }
             const currentIndex = nextIndex++;
-            if (currentIndex >= files.length) {
+            if (currentIndex >= supportedFiles.length) {
               break;
             }
-            const file = files[currentIndex];
+            const file = supportedFiles[currentIndex];
             const isFirst = currentIndex === 0;
             // Use most specific binding for this file (file binding > folder binding)
             const fileBinding = (await bindings.getBinding(file)) ?? folderBinding;

@@ -47,7 +47,7 @@ Validation:
 - Tests should assert emitted output/copy behavior through fakes, not `vscode.window.__messages` or shim output internals.
 - Full validation with `npm run check-types`, `npm run lint`, and `npm test`.
 
-## Milestone 3: Command Workflow File Access
+## Milestone 3: Command Workflow File Access [Done]
 
 Refactor command workflows that perform file reads/stats while also orchestrating publish/register behavior.
 

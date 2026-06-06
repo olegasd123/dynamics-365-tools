@@ -12,11 +12,17 @@ export interface WorkspaceFileStat {
   size: number;
 }
 
+export interface WorkspaceDirectoryEntry {
+  name: string;
+  type: WorkspaceFileType;
+}
+
 export interface WorkspaceFilesPort {
   readonly workspaceRoot: string | undefined;
 
   stat(fsPath: string): Promise<WorkspaceFileStat>;
   exists(fsPath: string): Promise<boolean>;
+  readDirectory(fsPath: string): Promise<WorkspaceDirectoryEntry[]>;
   readFile(fsPath: string): Promise<Uint8Array>;
   writeFile(fsPath: string, content: Uint8Array): Promise<void>;
   createDirectory(fsPath: string): Promise<void>;

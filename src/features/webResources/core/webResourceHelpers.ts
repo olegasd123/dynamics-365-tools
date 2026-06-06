@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { WorkspaceFileType, type WorkspaceFilesPort } from "../../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../../app/ports/notifications";
 import { WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "../../config/configurationService";
 
@@ -10,10 +11,11 @@ export function buildSupportedSet(): Set<string> {
 export async function ensureSupportedResource(
   uri: vscode.Uri,
   supportedExtensions: Set<string>,
+  files: WorkspaceFilesPort,
   notifications: NotificationPort = new NoopNotificationService(),
 ): Promise<boolean> {
-  const stat = await vscode.workspace.fs.stat(uri);
-  if (stat.type === vscode.FileType.Directory) {
+  const stat = await files.stat(uri.fsPath);
+  if (stat.type === WorkspaceFileType.Directory) {
     return true;
   }
 
@@ -31,10 +33,11 @@ export async function ensureSupportedResource(
 export async function collectSupportedFiles(
   folder: vscode.Uri,
   supportedExtensions: Set<string>,
+  workspaceFiles: WorkspaceFilesPort,
   cancellationToken?: vscode.CancellationToken,
 ): Promise<vscode.Uri[]> {
   const files: vscode.Uri[] = [];
-  const pendingFolders: vscode.Uri[] = [folder];
+  const pendingFolders: string[] = [folder.fsPath];
 
   while (pendingFolders.length) {
     if (cancellationToken?.isCancellationRequested) {
@@ -46,20 +49,20 @@ export async function collectSupportedFiles(
       break;
     }
 
-    const entries = await vscode.workspace.fs.readDirectory(currentFolder);
-    for (const [name, type] of entries) {
+    const entries = await workspaceFiles.readDirectory(currentFolder);
+    for (const { name, type } of entries) {
       if (cancellationToken?.isCancellationRequested) {
         break;
       }
 
-      const child = vscode.Uri.joinPath(currentFolder, name);
-      if (type === vscode.FileType.Directory) {
+      const child = path.join(currentFolder, name);
+      if (type === WorkspaceFileType.Directory) {
         pendingFolders.push(child);
       } else if (
-        type === vscode.FileType.File &&
+        type === WorkspaceFileType.File &&
         isSupportedExtension(path.extname(name).toLowerCase(), supportedExtensions)
       ) {
-        files.push(child);
+        files.push(vscode.Uri.file(child));
       }
     }
   }

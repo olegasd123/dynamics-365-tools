@@ -27,6 +27,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     connections,
     assemblyStatusBar,
     notifications,
+    files,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
@@ -78,7 +79,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
   }
 
   const assemblyPath = assemblyFile[0].fsPath;
-  const content = await vscode.workspace.fs.readFile(assemblyFile[0]);
+  const content = await files.readFile(assemblyPath);
   const contentBase64 = Buffer.from(content).toString("base64");
 
   try {
@@ -139,6 +140,7 @@ export async function updatePluginAssembly(
     connections,
     assemblyStatusBar,
     notifications,
+    files,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
@@ -234,6 +236,7 @@ export async function updatePluginAssembly(
     assemblyStatusBar,
     lastSelection,
     notifications,
+    files,
   });
 }
 
@@ -247,6 +250,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     connections,
     assemblyStatusBar,
     notifications,
+    files,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
 
@@ -257,7 +261,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
   }
 
   try {
-    await vscode.workspace.fs.stat(last.assemblyUri);
+    await files.stat(last.assemblyUri.fsPath);
   } catch {
     await notifications.warning("Last published plugin assembly no longer exists.");
     assemblyStatusBar.clear();
@@ -311,6 +315,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
       assemblyStatusBar,
       lastSelection,
       notifications,
+      files,
     });
   } catch (error) {
     void notifications.error(`Failed to publish plugin assembly: ${String(error)}`);
