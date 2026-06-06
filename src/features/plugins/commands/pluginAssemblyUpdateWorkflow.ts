@@ -1,5 +1,4 @@
 import * as path from "path";
-import * as vscode from "vscode";
 import { EnvironmentConfig } from "../../config/domain/models";
 import { PluginAssembly, PluginType } from "../models";
 import { PluginExplorerProvider } from "../pluginExplorer";
@@ -13,7 +12,7 @@ import {
   validateAssemblyIdentity,
 } from "./pluginAssemblyIdentity";
 import type { NotificationPort } from "../../../app/ports/notifications";
-import type { WorkspaceFilesPort } from "../../../app/ports/files";
+import type { FsPathTarget, WorkspaceFilesPort } from "../../../app/ports/files";
 import { NoopFileDialogs, type FileDialogPort } from "../../../app/ports/fileDialogs";
 import { NoopProgress, type ProgressPort } from "../../../app/ports/progress";
 
@@ -61,7 +60,7 @@ async function runPluginSyncForAssembly(context: PluginSyncContext): Promise<Plu
 type AssemblyUpdateContext = {
   assemblyId: string;
   assemblyName?: string;
-  assemblyUri: vscode.Uri;
+  assemblyUri: FsPathTarget;
   env: EnvironmentConfig;
   manageMissingComponents: boolean;
   pluginService: PluginService;
@@ -81,7 +80,7 @@ type AssemblyUpdateFileDialogContext = Omit<AssemblyUpdateContext, "assemblyUri"
 
 type AssemblyUpdateValidationContext = {
   assemblyId: string;
-  assemblyUri: vscode.Uri;
+  assemblyUri: FsPathTarget;
   pluginService: Pick<PluginService, "getAssembly" | "listPluginTypes">;
   pluginRegistration: Pick<PluginRegistrationManager, "inspectAssembly">;
   notifications: NotificationPort;
@@ -122,7 +121,7 @@ export async function updateAssemblyFromFileDialog(
     try {
       await updateAssemblyFromUri({
         ...context,
-        assemblyUri: vscode.Uri.file(assemblyPath),
+        assemblyUri: { fsPath: assemblyPath },
       });
       return;
     } catch (error) {
@@ -412,7 +411,7 @@ function normalizeTypeName(value: string | undefined): string | undefined {
 
 export async function confirmAssemblyPublish(
   notifications: NotificationPort,
-  assemblyUri: vscode.Uri,
+  assemblyUri: FsPathTarget,
   env: EnvironmentConfig,
   relativePath: string,
   assemblyName?: string,

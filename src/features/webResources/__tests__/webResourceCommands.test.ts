@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import * as path from "node:path";
 import test from "node:test";
-import * as vscode from "vscode";
 import type { CommandContext } from "../../../app/commandContext";
+import type { FsPathTarget } from "../../../app/ports/files";
 import {
   ImmediateProgress,
   MemoryWorkspaceFiles,
@@ -108,7 +108,7 @@ function createCommandContext(overrides: {
     },
     webResource: {
       bindings: {
-        getBinding: async (uri: vscode.Uri) =>
+        getBinding: async (uri: FsPathTarget) =>
           entries.find((entry) =>
             entry.kind === "file"
               ? entry.relativeLocalPath === uri.fsPath
@@ -126,7 +126,7 @@ function createCommandContext(overrides: {
           binding: BindingEntry,
           selectedEnv: typeof env,
           _auth: unknown,
-          targetUri?: vscode.Uri,
+          targetUri?: FsPathTarget,
         ) => {
           publisher.calls.push({
             binding,
@@ -170,7 +170,7 @@ test("addBinding uses files port metadata when creating a file binding", async (
       notifications,
       bindings: { added },
     }),
-    vscode.Uri.file(targetPath),
+    { fsPath: targetPath },
   );
 
   assert.deepStrictEqual(added, [
@@ -206,7 +206,7 @@ test("publishResource publishes a bound file through fake ports", async () => {
       bindings: { entries: [binding] },
       publisher,
     }),
-    vscode.Uri.file(targetPath),
+    { fsPath: targetPath },
   );
 
   assert.deepStrictEqual(publisher.calls, [
@@ -241,7 +241,7 @@ test("openInCrm resolves folder binding remote path and opens through workbench 
       bindings: { entries: [binding] },
       urls,
     }),
-    vscode.Uri.file(targetPath),
+    { fsPath: targetPath },
   );
 
   assert.deepStrictEqual(urls.calls, [

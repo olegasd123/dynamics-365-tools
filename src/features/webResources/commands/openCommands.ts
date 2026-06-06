@@ -1,13 +1,12 @@
-import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
-import { WorkspaceFileType } from "../../../app/ports/files";
+import { WorkspaceFileType, type FsPathTarget } from "../../../app/ports/files";
 import { BindingEntry } from "../../config/domain/models";
 import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { buildSupportedSet, ensureSupportedResource } from "../core/webResourceHelpers";
 import { addBinding } from "./bindingCommands";
 
-export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
+export async function openInCrm(ctx: CommandContext, uri: FsPathTarget | undefined): Promise<void> {
   const {
     configuration,
     ui,
@@ -96,7 +95,7 @@ export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined
 async function resolveRemotePath(
   ctx: CommandContext,
   binding: BindingEntry,
-  targetUri: vscode.Uri,
+  targetUri: FsPathTarget,
 ): Promise<string | undefined> {
   const bindingRoot = ctx.core.configuration.resolveLocalPath(binding.relativeLocalPath);
   const targetPath = path.normalize(targetUri.fsPath);

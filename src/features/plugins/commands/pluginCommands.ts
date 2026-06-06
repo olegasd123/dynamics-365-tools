@@ -1,5 +1,4 @@
 import * as path from "path";
-import * as vscode from "vscode";
 import { pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { CommandContext } from "../../../app/commandContext";
 import {
@@ -117,7 +116,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     assemblyStatusBar.setLastPublish({
       assemblyId,
       assemblyName: name,
-      assemblyUri: vscode.Uri.file(assemblyPath),
+      assemblyUri: { fsPath: assemblyPath },
       environment: selection.env,
     });
     if (!pluginSyncFailed) {
@@ -146,6 +145,7 @@ export async function updatePluginAssembly(
     notifications,
     files,
     fileDialogs,
+    input,
     progress,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
@@ -201,7 +201,7 @@ export async function updatePluginAssembly(
       return;
     }
 
-    const pick = await vscode.window.showQuickPick(
+    const pick = await input.showQuickPick(
       assemblies.map((assembly) => ({
         label: assembly.name,
         description: assembly.version,

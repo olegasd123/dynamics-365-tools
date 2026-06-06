@@ -1,15 +1,17 @@
-import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
 import type { OutputPort } from "../../../app/ports/output";
-import { WorkspaceFileType } from "../../../app/ports/files";
+import { WorkspaceFileType, type FsPathTarget } from "../../../app/ports/files";
 import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
 import { pickDataverseClient, resolveTargetUri } from "../../../app/commandUtils";
 import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
-export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
+export async function addBinding(
+  ctx: CommandContext,
+  uri: FsPathTarget | undefined,
+): Promise<void> {
   const { configuration, ui, notifications, files, workbench } = ctx.core;
   const { bindings } = ctx.webResource;
   const targetUri = await resolveTargetUri(notifications, uri, workbench.activeFilePath);
@@ -74,7 +76,7 @@ function buildDefaultRemotePath(relativePath: string, defaultPrefix?: string): s
 
 async function confirmFolderBinding(
   ctx: CommandContext,
-  folderUri: vscode.Uri,
+  folderUri: FsPathTarget,
   remotePath: string,
   config: Dynamics365Configuration,
 ): Promise<boolean> {

@@ -9,7 +9,7 @@ import type {
   WorkspaceFileStat,
   WorkspaceFilesPort,
 } from "../app/ports/files";
-import type { TextInputOptions, TextInputPort } from "../app/ports/input";
+import type { QuickPickOptions, TextInputOptions, TextInputPort } from "../app/ports/input";
 import type { LoggerPort, LogMetadata } from "../app/ports/logger";
 import type { NotificationOptions, NotificationPort } from "../app/ports/notifications";
 import type { OutputChannelPort, OutputPort } from "../app/ports/output";
@@ -393,11 +393,24 @@ export class RecordingDiagnostics implements DiagnosticPort {
 
 export class RecordingTextInput implements TextInputPort {
   readonly prompts: TextInputOptions[] = [];
+  readonly quickPicks: Array<{
+    items: readonly { label: string }[];
+    options?: QuickPickOptions;
+  }> = [];
   nextValues: Array<string | undefined> = [];
+  nextQuickPickValues: Array<{ label: string } | undefined> = [];
 
   async showInputBox(options: TextInputOptions): Promise<string | undefined> {
     this.prompts.push(options);
     return this.nextValues.shift();
+  }
+
+  async showQuickPick<T extends { label: string }>(
+    items: readonly T[],
+    options?: QuickPickOptions,
+  ): Promise<T | undefined> {
+    this.quickPicks.push({ items, options });
+    return this.nextQuickPickValues.shift() as T | undefined;
   }
 }
 

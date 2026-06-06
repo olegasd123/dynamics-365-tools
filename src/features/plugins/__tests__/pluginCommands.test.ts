@@ -1,12 +1,12 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as vscode from "vscode";
 import {
   ImmediateProgress,
   MemoryWorkspaceFiles,
   RecordingClipboard,
   RecordingFileDialogs,
   RecordingNotifications,
+  RecordingTextInput,
 } from "../../../testSupport/fakes";
 import type { NotificationPort } from "../../../app/ports/notifications";
 import { DataverseClient } from "../../dataverse/dataverseClient";
@@ -122,7 +122,7 @@ test("validateAssemblyUpdateTarget warns but allows version changes", async () =
 
   const result = await validateAssemblyUpdateTarget({
     assemblyId: "assembly-id",
-    assemblyUri: vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
+    assemblyUri: { fsPath: "/workspace/Contoso.Plugins.dll" },
     pluginService: service as any,
     pluginRegistration: registration as any,
     notifications,
@@ -251,6 +251,67 @@ test("updatePluginAssembly opens file dialog in the last DLL folder", async () =
   );
 
   assert.strictEqual(fileDialogs.openDialogOptions[0]?.defaultPath, "/workspace/bin/Debug/net462");
+});
+
+test("updatePluginAssembly selects assembly through input port", async () => {
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [undefined];
+  const input = new RecordingTextInput();
+  const env = { name: "Dev", url: "https://dev.crm.dynamics.com" };
+  const assemblyPick = {
+    label: "Contoso.Plugins",
+    description: "1.0.0.0",
+    assembly: { id: "assembly-id", name: "Contoso.Plugins" },
+  };
+  input.nextQuickPickValues = [assemblyPick];
+
+  await updatePluginAssembly(
+    legacyContext({
+      configuration: {
+        loadConfiguration: async () => ({ environments: [env] }),
+        workspaceRoot: "/workspace",
+      },
+      ui: {
+        pickEnvironment: async () => env,
+      },
+      secrets: {
+        getCredentials: async () => undefined,
+      },
+      auth: {
+        getAccessToken: async () => "token",
+      },
+      lastSelection: {
+        getLastEnvironment: () => undefined,
+        setLastEnvironment: async () => undefined,
+        getLastAssemblyDllPath: () => undefined,
+      },
+      connections: {
+        createClient: async () =>
+          ({
+            get: async () => ({
+              value: [
+                {
+                  pluginassemblyid: "assembly-id",
+                  name: "Contoso.Plugins",
+                  version: "1.0.0.0",
+                },
+              ],
+            }),
+          }) as any,
+      },
+      pluginRegistration: {},
+      pluginExplorer: {},
+      assemblyStatusBar: {},
+      notifications: createNotifications(),
+      files: createPluginFiles(),
+      fileDialogs,
+      input,
+      progress: new ImmediateProgress(),
+    } as any),
+  );
+
+  assert.strictEqual(input.quickPicks[0].options?.placeHolder, "Select plugin assembly to update");
+  assert.strictEqual(fileDialogs.openDialogOptions[0]?.defaultPath, "/workspace");
 });
 
 test("updateAssemblyFromFileDialog removes missing plugin types before patching assembly", async () => {

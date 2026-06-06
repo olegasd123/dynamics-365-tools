@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { ConfigurationService } from "../../config/configurationService";
 import { BindingService } from "../bindingService";
@@ -15,7 +14,11 @@ import {
   Dynamics365Configuration,
   EnvironmentConfig,
 } from "../../config/domain/models";
-import { WorkspaceFileType, type WorkspaceFilesPort } from "../../../app/ports/files";
+import {
+  WorkspaceFileType,
+  type FsPathTarget,
+  type WorkspaceFilesPort,
+} from "../../../app/ports/files";
 import type { NotificationPort } from "../../../app/ports/notifications";
 import { resolveTargetUri, pickEnvironmentAndAuth } from "../../../app/commandUtils";
 import { addBinding } from "./bindingCommands";
@@ -115,7 +118,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
   );
 }
 
-export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | undefined) {
+export async function openResourceMenu(ctx: CommandContext, uri: FsPathTarget | undefined) {
   const {
     configuration,
     ui,
@@ -190,7 +193,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
 
 export async function publishResource(
   ctx: CommandContext,
-  uri: vscode.Uri | undefined,
+  uri: FsPathTarget | undefined,
 ): Promise<void> {
   const {
     configuration,
@@ -272,7 +275,7 @@ export async function publishResource(
 
 async function publishFlow(
   binding: BindingEntry,
-  targetUri: vscode.Uri,
+  targetUri: FsPathTarget,
   configuration: ConfigurationService,
   ui: SolutionPicker,
   publisher: WebResourcePublisher,
@@ -314,7 +317,7 @@ async function publishFlow(
 
 async function publishFolder(
   folderBinding: BindingEntry,
-  folderUri: vscode.Uri,
+  folderUri: FsPathTarget,
   supportedExtensions: Set<string>,
   configuration: ConfigurationService,
   bindings: BindingService,
@@ -442,7 +445,7 @@ async function publishFolder(
 function confirmPublishTarget(
   configuration: ConfigurationService,
   notifications: NotificationPort,
-  targetUri: vscode.Uri,
+  targetUri: FsPathTarget,
   env: EnvironmentConfig,
   isFolder: boolean,
 ): Promise<boolean> {

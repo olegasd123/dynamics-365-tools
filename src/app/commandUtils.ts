@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import type { AuthService } from "../features/auth/authService";
 import type { SecretService } from "../features/auth/secretService";
 import type { ConfigurationService } from "../features/config/configurationService";
@@ -7,20 +6,21 @@ import type { DataverseClient } from "../features/dataverse/dataverseClient";
 import type { EnvironmentAuthContext } from "../features/dataverse/environmentConnectionService";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import type { CommandContext } from "./commandContext";
+import type { FsPathTarget } from "./ports/files";
 import type { NotificationPort } from "./ports/notifications";
 import type { SolutionPicker } from "./solutionPicker";
 
 export async function resolveTargetUri(
   notifications: NotificationPort,
-  uri?: vscode.Uri,
+  uri?: FsPathTarget,
   activeFilePath?: string,
-): Promise<vscode.Uri | undefined> {
+): Promise<FsPathTarget | undefined> {
   if (uri) {
     return uri;
   }
 
   if (activeFilePath) {
-    return vscode.Uri.file(activeFilePath);
+    return { fsPath: activeFilePath };
   }
 
   await notifications.info("Select a file or folder to proceed.");

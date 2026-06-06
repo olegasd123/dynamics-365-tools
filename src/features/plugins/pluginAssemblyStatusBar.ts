@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
+import type { FsPathTarget } from "../../app/ports/files";
 import type { EnvironmentConfig } from "../config/domain/models";
 
 export interface LastAssemblyPublishContext {
   assemblyId: string;
   assemblyName?: string;
   environment: EnvironmentConfig;
-  assemblyUri: vscode.Uri;
+  assemblyUri: FsPathTarget;
 }
 
 export class PluginAssemblyStatusBarService {
@@ -43,7 +44,10 @@ export class PluginAssemblyStatusBarService {
       return;
     }
 
-    const relative = vscode.workspace.asRelativePath(this.last.assemblyUri, false);
+    const relative = vscode.workspace.asRelativePath(
+      vscode.Uri.file(this.last.assemblyUri.fsPath),
+      false,
+    );
     const assemblyName = this.last.assemblyName ?? "assembly";
     this.item.text = `$(package) ${this.last.environment.name} • ${assemblyName}`;
     this.item.tooltip = `Publish ${relative} to ${this.last.environment.name}`;

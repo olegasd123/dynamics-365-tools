@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
+import type { FsPathTarget } from "../../app/ports/files";
 import type { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 
 export interface LastPublishContext {
   binding: BindingEntry;
   environment: EnvironmentConfig;
-  targetUri: vscode.Uri;
+  targetUri: FsPathTarget;
   isFolder: boolean;
 }
 
@@ -43,7 +44,10 @@ export class WebResourceStatusBarService {
       return;
     }
 
-    const relative = vscode.workspace.asRelativePath(this.last.targetUri, false);
+    const relative = vscode.workspace.asRelativePath(
+      vscode.Uri.file(this.last.targetUri.fsPath),
+      false,
+    );
     const target = this.last.isFolder ? `${relative}/` : relative;
     this.item.text = `$(file-code) ${this.last.environment.name} • ${this.last.binding.solutionName}`;
     this.item.tooltip = `Publish ${target} to ${this.last.environment.name} (${this.last.binding.remotePath})`;
