@@ -1,7 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
-import * as vscode from "vscode";
 import { MemoryWorkspaceFiles, RecordingNotifications } from "../../../testSupport/fakes";
 import {
   buildSupportedSet,
@@ -17,11 +16,7 @@ test("collectSupportedFiles returns nested supported files", async () => {
   workspaceFiles.addFile(path.join(root, "nested", "style.css"), "body{}");
   workspaceFiles.addFile(path.join(root, "nested", "readme.txt"), "skip");
 
-  const files = await collectSupportedFiles(
-    vscode.Uri.file(root),
-    buildSupportedSet(),
-    workspaceFiles,
-  );
+  const files = await collectSupportedFiles({ fsPath: root }, buildSupportedSet(), workspaceFiles);
   const relative = files.map((file) => path.relative(root, file.fsPath)).sort();
 
   assert.deepStrictEqual(relative, ["nested/style.css", "script.js"]);
@@ -36,10 +31,10 @@ test("collectSupportedFiles stops when cancelled", async () => {
   const token = {
     isCancellationRequested: true,
     onCancellationRequested: () => ({ dispose: () => {} }),
-  } as vscode.CancellationToken;
+  };
 
   const files = await collectSupportedFiles(
-    vscode.Uri.file(root),
+    { fsPath: root },
     buildSupportedSet(),
     workspaceFiles,
     token,
@@ -55,7 +50,7 @@ test("ensureSupportedResource reports unsupported files through notification por
   const notifications = new RecordingNotifications();
 
   const supported = await ensureSupportedResource(
-    vscode.Uri.file(file),
+    { fsPath: file },
     buildSupportedSet(),
     workspaceFiles,
     notifications,

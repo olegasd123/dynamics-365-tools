@@ -4,6 +4,7 @@ import test from "node:test";
 import * as vscode from "vscode";
 import type { CommandContext } from "../../../app/commandContext";
 import {
+  ImmediateProgress,
   MemoryWorkspaceFiles,
   RecordingNotifications,
   RecordingWorkbench,
@@ -80,7 +81,7 @@ function createCommandContext(overrides: {
       logger: {},
       notifications,
       output: {},
-      progress: {},
+      progress: new ImmediateProgress(),
       workbench,
       files: overrides.files,
       fileDialogs: {},

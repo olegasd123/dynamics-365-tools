@@ -1,5 +1,4 @@
 import * as path from "path";
-import type * as vscode from "vscode";
 import {
   DiagnosticEntry,
   DiagnosticSeverity,
@@ -9,6 +8,7 @@ import {
 import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { PcfBuildStatus, PcfControlProject } from "./models";
 import { NpmRunner } from "./npmRunner";
 import { PcfStatusBarService } from "./pcfStatusBar";
@@ -17,7 +17,7 @@ import { RunningProcess } from "./processRunner";
 
 export interface PcfBuildOptions {
   production?: boolean;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
 }
 
 interface WatchEntry {
@@ -25,7 +25,7 @@ interface WatchEntry {
   process: RunningProcess;
 }
 
-export class PcfBuildService implements vscode.Disposable {
+export class PcfBuildService {
   private readonly statuses = new Map<string, PcfBuildStatus>();
   private readonly outputChannels = new Map<string, OutputChannelPort>();
   private readonly watches = new Map<string, WatchEntry>();
@@ -174,7 +174,7 @@ export class PcfBuildService implements vscode.Disposable {
   private async ensureNodeModules(
     project: PcfControlProject,
     output: OutputChannelPort,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<boolean> {
     if (await this.files.exists(path.join(project.rootUri, "node_modules"))) {
       return true;

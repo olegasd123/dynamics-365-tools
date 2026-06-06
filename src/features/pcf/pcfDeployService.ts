@@ -1,8 +1,8 @@
 import * as path from "path";
-import type * as vscode from "vscode";
 import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { ConfigurationService } from "../config/configurationService";
 import { EnvironmentConfig } from "../config/domain/models";
 import type { DataverseClient } from "../dataverse/dataverseClient";
@@ -17,7 +17,7 @@ export interface PcfDeployOptions {
   publishWorkflows?: boolean;
   timeoutMs?: number;
   pollIntervalMs?: number;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
 }
 
 export interface PcfDeployResult {
@@ -36,7 +36,7 @@ interface CustomControlListResponse {
   }>;
 }
 
-export class PcfDeployService implements vscode.Disposable {
+export class PcfDeployService {
   private readonly output: OutputChannelPort;
 
   constructor(

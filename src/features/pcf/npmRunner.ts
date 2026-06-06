@@ -1,6 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import type * as vscode from "vscode";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { ProcessRunResult } from "./models";
 import { ProcessRunner, RunningProcess } from "./processRunner";
 
@@ -24,7 +24,7 @@ export class NpmRunner {
   install(
     projectRoot: string,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<ProcessRunResult> {
     return this.runner.run("npm", ["install"], { cwd: projectRoot, onLine, token });
   }
@@ -34,7 +34,7 @@ export class NpmRunner {
     script: string,
     scriptArgs: string[] = [],
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<ProcessRunResult> {
     return this.runner.run("npm", buildRunArgs(script, scriptArgs), {
       cwd: projectRoot,
@@ -47,7 +47,7 @@ export class NpmRunner {
     projectRoot: string,
     args: string[] = [],
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): RunningProcess {
     return this.runner.start("npm", ["start", ...args], {
       cwd: projectRoot,

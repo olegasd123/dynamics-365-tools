@@ -1,11 +1,11 @@
 import { spawn } from "child_process";
-import type * as vscode from "vscode";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { ProcessRunResult } from "./models";
 
 export interface ProcessRunOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
   onLine?: (line: string, stream: "stdout" | "stderr") => void;
 }
 
@@ -61,7 +61,7 @@ export class ProcessRunner {
         });
       };
 
-      const cancellation = options.token?.onCancellationRequested(() => {
+      const cancellation = options.token?.onCancellationRequested?.(() => {
         if (!child.killed) {
           child.kill();
         }

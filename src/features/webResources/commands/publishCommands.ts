@@ -38,6 +38,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
     lastSelection,
     notifications,
     files,
+    progress,
   } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
   const last = statusBar.getLastPublish();
@@ -90,6 +91,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
       publishCache,
       notifications,
       files,
+      progress,
       config,
       preferredEnvName,
     );
@@ -124,6 +126,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
     lastSelection,
     notifications,
     files,
+    progress,
     workbench,
   } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
@@ -163,6 +166,7 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
       publishCache,
       notifications,
       files,
+      progress,
       config,
     );
     return;
@@ -198,6 +202,7 @@ export async function publishResource(
     lastSelection,
     notifications,
     files,
+    progress,
     workbench,
   } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
@@ -243,6 +248,7 @@ export async function publishResource(
       publishCache,
       notifications,
       files,
+      progress,
       config,
     );
     return;
@@ -322,6 +328,7 @@ async function publishFolder(
   publishCache: PublishCacheService,
   notifications: NotificationPort,
   files: WorkspaceFilesPort,
+  progressPort: CommandContext["core"]["progress"],
   config?: Dynamics365Configuration,
   preferredEnvName?: string,
 ): Promise<void> {
@@ -349,9 +356,8 @@ async function publishFolder(
     sharedAuth = { ...sharedAuth, accessToken: connection.token };
   }
 
-  await vscode.window.withProgress(
+  await progressPort.withProgress(
     {
-      location: vscode.ProgressLocation.Notification,
       title: `Publishing to ${publishAuth.env.name}…`,
       cancellable: true,
     },

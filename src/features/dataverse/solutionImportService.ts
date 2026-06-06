@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { XMLParser } from "fast-xml-parser";
-import type * as vscode from "vscode";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 
 export interface SolutionImportClient {
   get<T>(path: string): Promise<T>;
@@ -15,7 +15,7 @@ export interface SolutionImportOptions {
   publishWorkflows?: boolean;
   timeoutMs?: number;
   pollIntervalMs?: number;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
   onStatus?: (message: string) => void;
 }
 
@@ -205,7 +205,7 @@ export class SolutionImportService {
     }
   }
 
-  private throwIfCancelled(token?: vscode.CancellationToken): void {
+  private throwIfCancelled(token?: CancellationTokenLike): void {
     if (token?.isCancellationRequested) {
       throw new Error("Solution import cancelled.");
     }

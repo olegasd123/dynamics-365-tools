@@ -1,7 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
-import * as vscode from "vscode";
 import {
   MemoryWorkspaceFiles,
   RecordingClipboard,
@@ -63,7 +62,7 @@ test("resolvePaths maps folder bindings to nested files", async () => {
       solutionName: "CoreWebResources",
       kind: "folder",
     },
-    vscode.Uri.file(file),
+    { fsPath: file },
   );
 
   assert.strictEqual(paths.localPath, file);
@@ -84,7 +83,7 @@ test("resolvePaths rejects publishing a directory target", async () => {
         solutionName: "CoreWebResources",
         kind: "folder",
       },
-      vscode.Uri.file(folder),
+      { fsPath: folder },
     ),
     /Select a file inside the bound folder to publish/,
   );
@@ -135,7 +134,7 @@ test("publish fails fast when solution is missing", async () => {
       },
       { name: "dev", url: "https://example" },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
     );
 
     assert.strictEqual(result.failed, 1);
@@ -184,7 +183,7 @@ test("publish aborts when remotePath matches multiple resources", async () => {
       },
       { name: "dev", url: "https://example", manageMissingComponents: true },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
     );
 
     assert.strictEqual(result.failed, 1);
@@ -204,7 +203,7 @@ test("publish returns cancellation result when token is cancelled", async () => 
   const token = {
     isCancellationRequested: true,
     onCancellationRequested: () => ({ dispose: () => {} }),
-  } as vscode.CancellationToken;
+  };
 
   const originalFetch = global.fetch;
   let fetchCalled = false;
@@ -224,7 +223,7 @@ test("publish returns cancellation result when token is cancelled", async () => 
       },
       { name: "dev", url: "https://example" },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
       { cancellationToken: token },
     );
 
@@ -284,7 +283,7 @@ test("publish creates a new web resource and adds it to the solution", async () 
       },
       { name: "dev", url: "https://example", manageMissingComponents: true },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
     );
 
     assert.deepStrictEqual(result, {
@@ -346,7 +345,7 @@ test("publish updates an existing web resource for folder binding", async () => 
       },
       { name: "test", url: "https://example.test" },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
     );
 
     assert.deepStrictEqual(result, {
@@ -394,7 +393,7 @@ test("publish skips when cache reports unchanged", async () => {
       },
       { name: "dev", url: "https://example" },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
       { cache },
     );
 
@@ -443,7 +442,7 @@ test("publish respects manageMissingComponents=false and skips missing resource"
       },
       { name: "prod", url: "https://example.prod", manageMissingComponents: false },
       { accessToken: "token" },
-      vscode.Uri.file(file),
+      { fsPath: file },
     );
 
     assert.deepStrictEqual(result, {

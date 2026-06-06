@@ -17,6 +17,10 @@ export interface WorkspaceDirectoryEntry {
   type: WorkspaceFileType;
 }
 
+export interface FsPathTarget {
+  readonly fsPath: string;
+}
+
 export interface WorkspaceFilesPort {
   readonly workspaceRoot: string | undefined;
   readonly workspaceFolders: readonly string[];

@@ -1,7 +1,11 @@
-import * as vscode from "vscode";
 import * as path from "path";
-import { WorkspaceFileType, type WorkspaceFilesPort } from "../../../app/ports/files";
+import {
+  WorkspaceFileType,
+  type FsPathTarget,
+  type WorkspaceFilesPort,
+} from "../../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../../app/ports/notifications";
+import type { CancellationTokenLike } from "../../../app/ports/progress";
 import { WEB_RESOURCE_SUPPORTED_EXTENSIONS } from "../../config/configurationService";
 
 export function buildSupportedSet(): Set<string> {
@@ -9,7 +13,7 @@ export function buildSupportedSet(): Set<string> {
 }
 
 export async function ensureSupportedResource(
-  uri: vscode.Uri,
+  uri: FsPathTarget,
   supportedExtensions: Set<string>,
   files: WorkspaceFilesPort,
   notifications: NotificationPort = new NoopNotificationService(),
@@ -31,12 +35,12 @@ export async function ensureSupportedResource(
 }
 
 export async function collectSupportedFiles(
-  folder: vscode.Uri,
+  folder: FsPathTarget,
   supportedExtensions: Set<string>,
   workspaceFiles: WorkspaceFilesPort,
-  cancellationToken?: vscode.CancellationToken,
-): Promise<vscode.Uri[]> {
-  const files: vscode.Uri[] = [];
+  cancellationToken?: CancellationTokenLike,
+): Promise<FsPathTarget[]> {
+  const files: FsPathTarget[] = [];
   const pendingFolders: string[] = [folder.fsPath];
 
   while (pendingFolders.length) {
@@ -62,7 +66,7 @@ export async function collectSupportedFiles(
         type === WorkspaceFileType.File &&
         isSupportedExtension(path.extname(name).toLowerCase(), supportedExtensions)
       ) {
-        files.push(vscode.Uri.file(child));
+        files.push({ fsPath: child });
       }
     }
   }

@@ -1,10 +1,10 @@
 import * as path from "path";
-import type * as vscode from "vscode";
 import { XMLParser } from "fast-xml-parser";
 import { WorkspaceFileType, type WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopTextInput, TextInputPort } from "../../app/ports/input";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { NoopWorkbench, WorkbenchPort } from "../../app/ports/workbench";
 import { ConfigurationService } from "../config/configurationService";
 import { CdsSolutionProject, PcfControlProject, PcfPackageResult } from "./models";
@@ -16,12 +16,12 @@ import { PcfTelemetryService } from "./pcfTelemetry";
 
 export interface PcfPackageOptions {
   managed: boolean;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
 }
 
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "out", "bin", "obj"]);
 
-export class PcfPackageService implements vscode.Disposable {
+export class PcfPackageService {
   private readonly output: OutputChannelPort;
 
   constructor(
@@ -124,7 +124,7 @@ export class PcfPackageService implements vscode.Disposable {
   private async resolveSolutionWrapper(
     project: PcfControlProject,
     pcfProjectPath: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<CdsSolutionProject | undefined> {
     const existing = await this.findExistingSolution(project, pcfProjectPath);
     if (existing) {
@@ -176,7 +176,7 @@ export class PcfPackageService implements vscode.Disposable {
   private async ensureSolutionReferencesPcf(
     solution: CdsSolutionProject,
     pcfProjectPath: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<CdsSolutionProject | undefined> {
     if (referencesPcfProject(solution, pcfProjectPath)) {
       return solution;
@@ -208,7 +208,7 @@ export class PcfPackageService implements vscode.Disposable {
     project: PcfControlProject,
     pcfProjectPath: string,
     solutionRoot: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<CdsSolutionProject | undefined> {
     if (!(await this.ensurePacAvailable())) {
       return undefined;

@@ -1,9 +1,9 @@
 import * as path from "path";
-import type * as vscode from "vscode";
 import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopTextInput, TextInputPort } from "../../app/ports/input";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { XMLParser } from "fast-xml-parser";
 import { EnvironmentConfig } from "../config/domain/models";
 import { PacCli } from "./pacCli";
@@ -11,7 +11,7 @@ import { PcfControlProject } from "./models";
 import { PcfTelemetryService } from "./pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
 
-export class PcfPushService implements vscode.Disposable {
+export class PcfPushService {
   private readonly output: OutputChannelPort;
 
   constructor(
@@ -56,7 +56,7 @@ export class PcfPushService implements vscode.Disposable {
 
   async warnForAuthMismatch(
     env: EnvironmentConfig,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<boolean> {
     const profile = await this.pacCli.whoami();
     if (profile?.url && sameEnvironmentUrl(profile.url, env.url)) {
@@ -85,7 +85,7 @@ export class PcfPushService implements vscode.Disposable {
     project: PcfControlProject,
     env: EnvironmentConfig,
     publisherPrefix: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<boolean> {
     this.output.show(true);
     this.output.appendLine("");

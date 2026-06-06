@@ -1,12 +1,12 @@
-import * as vscode from "vscode";
 import * as path from "path";
+import type { FsPathTarget } from "../../app/ports/files";
 import { BindingEntry, BindingSnapshot } from "../config/domain/models";
 import { ConfigurationService } from "../config/configurationService";
 
 export class BindingService {
   constructor(private readonly config: ConfigurationService) {}
 
-  async getBinding(uri: vscode.Uri): Promise<BindingEntry | undefined> {
+  async getBinding(uri: FsPathTarget): Promise<BindingEntry | undefined> {
     const snapshot = await this.config.loadBindings();
     const targetPath = path.normalize(uri.fsPath);
     const matches = snapshot.bindings.filter((binding) => this.pathMatches(binding, targetPath));

@@ -1,9 +1,9 @@
-import type * as vscode from "vscode";
 import * as path from "path";
 import { ClipboardPort, NoopClipboard } from "../../app/ports/clipboard";
-import { WorkspaceFilesPort, WorkspaceFileType } from "../../app/ports/files";
+import { WorkspaceFilesPort, WorkspaceFileType, type FsPathTarget } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
+import type { CancellationTokenLike } from "../../app/ports/progress";
 import { formatErrorDetails } from "../../shared/errorDetails";
 import { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 import { DataverseClient, isDefaultSolution } from "../dataverse/dataverseClient";
@@ -34,7 +34,7 @@ export interface PublishOptions {
   isFirst?: boolean;
   /** Optional cache used to skip unchanged files during folder publish. */
   cache?: PublishCacheService;
-  cancellationToken?: vscode.CancellationToken;
+  cancellationToken?: CancellationTokenLike;
 }
 
 export interface PublishResult {
@@ -65,7 +65,7 @@ export class WebResourcePublisher {
     binding: BindingEntry,
     env: EnvironmentConfig,
     auth: PublishAuth = {},
-    targetUri?: vscode.Uri,
+    targetUri?: FsPathTarget,
     options: PublishOptions = {},
   ): Promise<PublishResult> {
     const result: PublishResult = { created: 0, updated: 0, skipped: 0, failed: 0 };
@@ -199,7 +199,7 @@ export class WebResourcePublisher {
 
   private async resolvePaths(
     binding: BindingEntry,
-    targetUri?: vscode.Uri,
+    targetUri?: FsPathTarget,
   ): Promise<{ localPath: string; remotePath: string }> {
     const bindingRoot = this.resolveLocalPath(binding.relativeLocalPath);
     const targetPath = targetUri?.fsPath ?? bindingRoot;
@@ -372,7 +372,7 @@ export class WebResourcePublisher {
   private async publishWebResource(
     client: DataverseClient,
     webResourceId: string,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: CancellationTokenLike,
   ): Promise<void> {
     this.throwIfCancelled(cancellationToken);
     const parameterXml = `<importexportxml><webresources><webresource>${webResourceId}</webresource></webresources></importexportxml>`;
@@ -383,7 +383,7 @@ export class WebResourcePublisher {
     client: DataverseClient,
     webResourceId: string,
     remotePath: string,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: CancellationTokenLike,
   ): Promise<void> {
     const run = async () => {
       this.throwIfCancelled(cancellationToken);
@@ -396,7 +396,7 @@ export class WebResourcePublisher {
     await next;
   }
 
-  private throwIfCancelled(token?: vscode.CancellationToken): void {
+  private throwIfCancelled(token?: CancellationTokenLike): void {
     if (this.isCancelled(token)) {
       const error = new Error("Publish cancelled");
       (error as any).cancelled = true;
@@ -404,7 +404,7 @@ export class WebResourcePublisher {
     }
   }
 
-  private isCancelled(token?: vscode.CancellationToken): boolean {
+  private isCancelled(token?: CancellationTokenLike): boolean {
     return token?.isCancellationRequested ?? false;
   }
 
