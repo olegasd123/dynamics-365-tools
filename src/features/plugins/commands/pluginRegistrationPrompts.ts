@@ -11,12 +11,26 @@ import { SolutionPicker } from "../../../app/solutionPicker";
 import { PluginStep } from "../models";
 import { PluginService } from "../pluginService";
 import type { NotificationPort } from "../../../app/ports/notifications";
+import {
+  asTooltipString,
+  buildFilteringAttributePickItems,
+  buildMessageNamePickItems,
+  buildModePickItems,
+  buildPrimaryEntityPickItems,
+  buildStagePickItems,
+  buildStepDefaultName,
+  getDefaultMessagePropertyName,
+  getImageTypeOptions,
+  normalizeOptionalInput,
+  type FilteringAttributePickItem,
+  type MessageNamePickItem,
+  type PrimaryEntityPickItem,
+} from "./pluginRegistrationLogic";
 
-type MessagePickItem = vscode.QuickPickItem & { isCustom?: boolean };
+export { asTooltipString, buildStepDefaultName, getDefaultMessagePropertyName };
+
 type PrimaryEntityPick = { value?: string; cancelled: boolean };
-type PrimaryEntityPickItem = vscode.QuickPickItem & { type: "entity" | "custom" | "none" };
 type FilteringAttributesPick = { value?: string; cancelled: boolean };
-type FilteringPickItem = vscode.QuickPickItem & { pickType: "attribute" | "custom" };
 
 export async function resolveServiceForNode(
   placeHolder: string,
@@ -51,15 +65,6 @@ export async function resolveServiceForNode(
   return new PluginService(client, solutionComponents);
 }
 
-export function buildStepDefaultName(
-  typeName: string,
-  message: string,
-  entity: string | undefined,
-): string {
-  const entityLabel = entity || "global";
-  return `${typeName}: ${message} of ${entityLabel}`;
-}
-
 export async function pickMessageName(
   service: PluginService,
   notifications: NotificationPort,
@@ -79,34 +84,17 @@ export async function pickMessageName(
     return promptForMessageName(defaultValue);
   }
 
-  const deduped = Array.from(new Set(messageNames));
-  const items: MessagePickItem[] = deduped.map((name) => ({
-    label: name,
-    picked: name === defaultValue,
-  }));
-
-  if (defaultValue && !deduped.includes(defaultValue)) {
-    items.unshift({
-      label: defaultValue,
-      description: "Current value",
-      picked: true,
-    });
-  }
-
-  items.unshift({
-    label: "Enter custom message name...",
-    description: "Type a message name manually",
-    isCustom: true,
-  });
-
-  const selection = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select SDK message name",
-    matchOnDescription: true,
-    ignoreFocusOut: true,
-  });
+  const selection = await vscode.window.showQuickPick(
+    buildMessageNamePickItems(messageNames, defaultValue),
+    {
+      placeHolder: "Select SDK message name",
+      matchOnDescription: true,
+      ignoreFocusOut: true,
+    },
+  );
 
   if (!selection) return undefined;
-  if ((selection as MessagePickItem).isCustom) {
+  if ((selection as MessageNamePickItem).isCustom) {
     return promptForMessageName(defaultValue);
   }
 
@@ -140,41 +128,14 @@ export async function pickPrimaryEntity(
     return promptForPrimaryEntity(defaultValue);
   }
 
-  const deduped = Array.from(new Set(entities)).sort((a, b) => a.localeCompare(b));
-  const items: PrimaryEntityPickItem[] = [
+  const selection = await vscode.window.showQuickPick(
+    buildPrimaryEntityPickItems(entities, defaultValue),
     {
-      label: "Global message (no primary entity)",
-      description: "Use for messages without a primary entity",
-      type: "none",
-      picked: !defaultValue,
+      placeHolder: "Select primary entity or choose global message",
+      matchOnDescription: true,
+      ignoreFocusOut: true,
     },
-    ...deduped.map((name) => ({
-      label: name,
-      type: "entity" as const,
-      picked: name === defaultValue,
-    })),
-  ];
-
-  if (defaultValue && !deduped.includes(defaultValue)) {
-    items.splice(1, 0, {
-      label: defaultValue,
-      description: "Current value",
-      type: "entity",
-      picked: true,
-    });
-  }
-
-  items.push({
-    label: "Enter custom logical name...",
-    description: "Type a logical name manually",
-    type: "custom",
-  });
-
-  const selection = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select primary entity or choose global message",
-    matchOnDescription: true,
-    ignoreFocusOut: true,
-  });
+  );
 
   if (!selection) return { value: undefined, cancelled: true };
 
@@ -195,8 +156,7 @@ async function promptForPrimaryEntity(defaultValue?: string): Promise<PrimaryEnt
   if (value === undefined) {
     return { value: undefined, cancelled: true };
   }
-  const trimmed = value.trim();
-  return { value: trimmed || undefined, cancelled: false };
+  return { value: normalizeOptionalInput(value), cancelled: false };
 }
 
 export async function pickFilteringAttributes(
@@ -221,37 +181,24 @@ export async function pickFilteringAttributes(
     return promptForFilteringAttributes(defaultValue);
   }
 
-  const defaults = parseFilteringAttributes(defaultValue);
-  const items: FilteringPickItem[] = attributes
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
-    .map((attr) => ({
-      label: attr,
-      pickType: "attribute" as const,
-      picked: defaults.has(attr),
-    }));
-
-  items.unshift({
-    label: "Enter custom list...",
-    description: "Type attributes manually",
-    pickType: "custom",
-  });
-
-  const selection = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select filtering attributes",
-    matchOnDescription: true,
-    canPickMany: true,
-    ignoreFocusOut: true,
-  });
+  const selection = await vscode.window.showQuickPick(
+    buildFilteringAttributePickItems(attributes, defaultValue),
+    {
+      placeHolder: "Select filtering attributes",
+      matchOnDescription: true,
+      canPickMany: true,
+      ignoreFocusOut: true,
+    },
+  );
 
   if (!selection) return { value: defaultValue, cancelled: true };
 
-  if (selection.some((item) => (item as FilteringPickItem).pickType === "custom")) {
+  if (selection.some((item) => (item as FilteringAttributePickItem).pickType === "custom")) {
     return promptForFilteringAttributes(defaultValue);
   }
 
   const chosen = selection
-    .filter((item) => (item as FilteringPickItem).pickType === "attribute")
+    .filter((item) => (item as FilteringAttributePickItem).pickType === "attribute")
     .map((item) => item.label)
     .filter(Boolean);
   return { value: chosen.join(","), cancelled: false };
@@ -269,52 +216,20 @@ async function promptForFilteringAttributes(
   if (value === undefined) {
     return { value: undefined, cancelled: true };
   }
-  const trimmed = value.trim();
-  return { value: trimmed || undefined, cancelled: false };
-}
-
-function parseFilteringAttributes(value?: string): Set<string> {
-  if (!value) return new Set();
-  return new Set(
-    value
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean),
-  );
+  return { value: normalizeOptionalInput(value), cancelled: false };
 }
 
 export async function pickStage(defaultStage?: number): Promise<number | undefined> {
-  const options = [
-    { label: "Pre-validation", description: "Before pipeline", value: 10 },
-    { label: "Pre-operation", description: "Before core operation", value: 20 },
-    { label: "Post-operation", description: "After core operation", value: 40 },
-  ];
-  const pick = await vscode.window.showQuickPick(
-    options.map((o) => ({
-      label: o.label,
-      description: o.description,
-      value: o.value,
-      picked: o.value === defaultStage,
-    })),
-    { placeHolder: "Select pipeline stage" },
-  );
+  const pick = await vscode.window.showQuickPick(buildStagePickItems(defaultStage), {
+    placeHolder: "Select pipeline stage",
+  });
   return pick?.value;
 }
 
 export async function pickMode(defaultMode?: number): Promise<number | undefined> {
-  const options = [
-    { label: "Synchronous", description: "Runs in pipeline", value: 0 },
-    { label: "Asynchronous", description: "Background", value: 1 },
-  ];
-  const pick = await vscode.window.showQuickPick(
-    options.map((o) => ({
-      label: o.label,
-      description: o.description,
-      value: o.value,
-      picked: o.value === defaultMode,
-    })),
-    { placeHolder: "Select execution mode" },
-  );
+  const pick = await vscode.window.showQuickPick(buildModePickItems(defaultMode), {
+    placeHolder: "Select execution mode",
+  });
   return pick?.value;
 }
 
@@ -333,38 +248,4 @@ export async function pickImageType(
     { placeHolder: "Select image type" },
   );
   return pick?.value;
-}
-
-export function getDefaultMessagePropertyName(step: PluginStep): string {
-  const message = step.messageName?.toLowerCase();
-  if (message === "create") {
-    return "Id";
-  }
-  return "Target";
-}
-
-function getImageTypeOptions(
-  step: PluginStep,
-): Array<{ label: string; value: number; description?: string }> {
-  const message = step.messageName?.toLowerCase();
-  if (message === "create") {
-    return [{ label: "Post-image", value: 1, description: "Create supports post-images only" }];
-  }
-  if (message === "delete") {
-    return [{ label: "Pre-image", value: 0, description: "Delete supports pre-images only" }];
-  }
-  return [
-    { label: "Pre-image", value: 0 },
-    { label: "Post-image", value: 1 },
-    { label: "Both", value: 2 },
-  ];
-}
-
-export function asTooltipString(
-  tooltip: string | vscode.MarkdownString | undefined,
-): string | undefined {
-  if (!tooltip) return undefined;
-  const raw = typeof tooltip === "string" ? tooltip : (tooltip.value ?? "");
-  const cleaned = raw.replace(/\*\*/g, "").trim();
-  return cleaned || undefined;
 }

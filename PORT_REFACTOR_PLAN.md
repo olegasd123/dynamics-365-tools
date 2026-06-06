@@ -92,7 +92,7 @@ Validation:
 - PCF tests continue to cover packaging, deploy, push, build, and settings behavior.
 - Full validation suite passes.
 
-## Milestone 5: Ribbon And Plugin Prompt Boundaries
+## Milestone 5: Ribbon And Plugin Prompt Boundaries [Done]
 
 Review ribbon/plugin prompt modules and split pure decision logic from UI collection where useful.
 
