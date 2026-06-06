@@ -115,7 +115,7 @@ Validation:
 - Tests should target extracted pure functions or command orchestration through focused fakes.
 - Full validation suite passes.
 
-## Milestone 6: Shim Reduction
+## Milestone 6: Shim Reduction [Done]
 
 Shrink `tests/shims/vscode.js` after the high-value areas are migrated.
 

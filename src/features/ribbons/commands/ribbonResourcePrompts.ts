@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
@@ -388,7 +389,7 @@ async function listJavaScriptFunctionSuggestions(localPath: string | undefined):
     return [];
   }
 
-  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(localPath)).then(
+  const stat = await fs.stat(localPath).then(
     (value) => value,
     () => undefined,
   );
@@ -396,7 +397,7 @@ async function listJavaScriptFunctionSuggestions(localPath: string | undefined):
     return [];
   }
 
-  const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(localPath));
+  const bytes = await fs.readFile(localPath);
   const source = Buffer.from(bytes).toString("utf8");
   return extractJavaScriptFunctionSuggestions(source);
 }
