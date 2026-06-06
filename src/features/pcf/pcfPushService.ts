@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { XMLParser } from "fast-xml-parser";
 import { EnvironmentConfig } from "../config/domain/models";
 import { PacCli } from "./pacCli";
@@ -10,14 +11,17 @@ import { PcfTelemetryService } from "./pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
 
 export class PcfPushService implements vscode.Disposable {
-  private readonly output = vscode.window.createOutputChannel("PCF Push");
+  private readonly output: OutputChannelPort;
 
   constructor(
     private readonly pacCli: PacCli,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
-  ) {}
+    output: OutputPort = new NoopOutputPort(),
+  ) {
+    this.output = output.createChannel("PCF Push");
+  }
 
   async resolvePublisherPrefix(project: PcfControlProject): Promise<string | undefined> {
     const cdsPrefix = await readPublisherPrefixFromCdsProject(project.cdsProjectUri);

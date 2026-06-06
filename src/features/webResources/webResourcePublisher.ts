@@ -1,7 +1,9 @@
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import * as path from "path";
+import { ClipboardPort, NoopClipboard } from "../../app/ports/clipboard";
 import { WorkspaceFilesPort, WorkspaceFileType } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { formatErrorDetails } from "../../shared/errorDetails";
 import { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 import { DataverseClient, isDefaultSolution } from "../dataverse/dataverseClient";
@@ -45,7 +47,7 @@ export interface PublishResult {
 }
 
 export class WebResourcePublisher {
-  private readonly output: vscode.OutputChannel;
+  private readonly output: OutputChannelPort;
   // CRM backend rejects concurrent PublishXml calls; serialize them with a queue.
   private publishQueue: Promise<void> = Promise.resolve();
 
@@ -53,8 +55,10 @@ export class WebResourcePublisher {
     private readonly connections: EnvironmentConnectionService,
     private readonly files: WorkspaceFilesPort,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
+    output: OutputPort = new NoopOutputPort(),
+    private readonly clipboard: ClipboardPort = new NoopClipboard(),
   ) {
-    this.output = vscode.window.createOutputChannel("Dynamics 365 Tools Publisher");
+    this.output = output.createChannel("Dynamics 365 Tools Publisher");
   }
 
   async publish(
@@ -430,7 +434,7 @@ export class WebResourcePublisher {
 
     const details = formatErrorDetails(error);
     try {
-      await vscode.env.clipboard.writeText(details);
+      await this.clipboard.writeText(details);
       this.output.appendLine("  ↳ Error details copied to clipboard");
     } catch {
       // Clipboard failures should not crash publish flow.

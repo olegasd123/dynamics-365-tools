@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { PcfBuildStatus, PcfControlProject } from "./models";
 import { NpmRunner } from "./npmRunner";
 import { PcfStatusBarService } from "./pcfStatusBar";
@@ -20,7 +21,7 @@ interface WatchEntry {
 
 export class PcfBuildService implements vscode.Disposable {
   private readonly statuses = new Map<string, PcfBuildStatus>();
-  private readonly outputChannels = new Map<string, vscode.OutputChannel>();
+  private readonly outputChannels = new Map<string, OutputChannelPort>();
   private readonly watches = new Map<string, WatchEntry>();
   private readonly diagnosticFilesByProject = new Map<string, string[]>();
   private readonly diagnostics = vscode.languages.createDiagnosticCollection("d365-pcf");
@@ -32,6 +33,7 @@ export class PcfBuildService implements vscode.Disposable {
     private readonly statusBar: PcfStatusBarService,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
+    private readonly output: OutputPort = new NoopOutputPort(),
   ) {}
 
   getBuildStatus(project: PcfControlProject): PcfBuildStatus {
@@ -164,7 +166,7 @@ export class PcfBuildService implements vscode.Disposable {
 
   private async ensureNodeModules(
     project: PcfControlProject,
-    output: vscode.OutputChannel,
+    output: OutputChannelPort,
     token?: vscode.CancellationToken,
   ): Promise<boolean> {
     if (await exists(path.join(project.rootUri, "node_modules"))) {
@@ -204,13 +206,13 @@ export class PcfBuildService implements vscode.Disposable {
     }
   }
 
-  private getOutput(project: PcfControlProject): vscode.OutputChannel {
+  private getOutput(project: PcfControlProject): OutputChannelPort {
     const existing = this.outputChannels.get(project.rootUri);
     if (existing) {
       return existing;
     }
 
-    const created = vscode.window.createOutputChannel(`PCF: ${project.fullName}`);
+    const created = this.output.createChannel(`PCF: ${project.fullName}`);
     this.outputChannels.set(project.rootUri, created);
     return created;
   }

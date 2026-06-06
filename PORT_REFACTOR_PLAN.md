@@ -31,7 +31,7 @@ Validation:
 - `npm run lint`
 - `npm test`
 
-## Milestone 2: Output And Clipboard Ports
+## Milestone 2: Output And Clipboard Ports [Done]
 
 Introduce small ports for output channels and clipboard operations where services have real behavior tied to output or copy actions.
 

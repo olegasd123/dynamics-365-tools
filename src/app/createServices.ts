@@ -35,8 +35,10 @@ import { WebResourceStatusBarService } from "../features/webResources/webResourc
 import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import { VsCodeAuthenticationService } from "../platform/vscode/authenticationService";
+import { VsCodeClipboard } from "../platform/vscode/clipboard";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
+import { VsCodeOutputPort } from "../platform/vscode/output";
 import { VsCodeOutputLogger } from "../platform/vscode/outputLogger";
 import { VsCodeSecretStore, VsCodeStateStore } from "../platform/vscode/storage";
 import { VsCodeWorkbench } from "../platform/vscode/workbench";
@@ -49,6 +51,8 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
 
   const notifications = lazy(() => new VsCodeNotificationService());
   const logger = lazyDisposable(() => new VsCodeOutputLogger(), disposables);
+  const output = lazy(() => new VsCodeOutputPort());
+  const clipboard = lazy(() => new VsCodeClipboard());
   const files = lazy(() => new VsCodeWorkspaceFiles());
   const authentication = lazy(() => new VsCodeAuthenticationService());
   const workbench = lazy(() => new VsCodeWorkbench());
@@ -74,7 +78,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
 
   const bindings = lazy(() => new BindingService(configuration()));
   const publishCache = lazy(() => new PublishCacheService(configuration()));
-  const publisher = lazy(() => new WebResourcePublisher(connections(), files(), notifications()));
+  const publisher = lazy(
+    () => new WebResourcePublisher(connections(), files(), notifications(), output(), clipboard()),
+  );
   const webResources = lazy(() => new WebResourceUrlService(notifications()));
 
   const pluginAssemblyIntrospector = lazy(
@@ -123,7 +129,8 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   );
   const pcfTelemetry = lazyDisposable(() => new PcfTelemetryService(), disposables);
   const pcfBuildService = lazyDisposable(
-    () => new PcfBuildService(npmRunner(), pcfStatusBar(), notifications(), pcfTelemetry()),
+    () =>
+      new PcfBuildService(npmRunner(), pcfStatusBar(), notifications(), pcfTelemetry(), output()),
     disposables,
   );
   const pcfEnvironmentService = lazy(() => new PcfEnvironmentService(connections()));
@@ -131,7 +138,14 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     () => new PcfWorkspaceSettingsService(configuration(), files()),
   );
   const pcfPushService = lazyDisposable(
-    () => new PcfPushService(pacCli(), pcfWorkspaceSettings(), notifications(), pcfTelemetry()),
+    () =>
+      new PcfPushService(
+        pacCli(),
+        pcfWorkspaceSettings(),
+        notifications(),
+        pcfTelemetry(),
+        output(),
+      ),
     disposables,
   );
   const pcfDeployService = lazyDisposable(
@@ -142,6 +156,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
         configuration(),
         notifications(),
         pcfTelemetry(),
+        output(),
       ),
     disposables,
   );
@@ -154,6 +169,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
         configuration(),
         notifications(),
         pcfTelemetry(),
+        output(),
       ),
     disposables,
   );

@@ -2,7 +2,12 @@ import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
 import * as vscode from "vscode";
-import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
+import {
+  MemoryWorkspaceFiles,
+  RecordingClipboard,
+  RecordingNotifications,
+  RecordingOutput,
+} from "../../../testSupport/fakes";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { WebResourcePublisher } from "../webResourcePublisher";
 
@@ -27,8 +32,21 @@ function createWorkspace(): { workspaceRoot: string; files: MemoryWorkspaceFiles
   return { workspaceRoot, files: new MemoryWorkspaceFiles(workspaceRoot) };
 }
 
-function createPublisher(files: MemoryWorkspaceFiles): WebResourcePublisher {
-  return new WebResourcePublisher(new FakeConnections() as any, files);
+function createPublisher(
+  files: MemoryWorkspaceFiles,
+  ports: {
+    notifications?: RecordingNotifications;
+    output?: RecordingOutput;
+    clipboard?: RecordingClipboard;
+  } = {},
+): WebResourcePublisher {
+  return new WebResourcePublisher(
+    new FakeConnections() as any,
+    files,
+    ports.notifications,
+    ports.output,
+    ports.clipboard,
+  );
 }
 
 test("resolvePaths maps folder bindings to nested files", async () => {
@@ -103,7 +121,11 @@ test("publish fails fast when solution is missing", async () => {
   }) as any;
 
   try {
-    const publisher = createPublisher(files);
+    const notifications = new RecordingNotifications();
+    const output = new RecordingOutput();
+    const clipboard = new RecordingClipboard();
+    notifications.nextErrorAction = "Copy error details";
+    const publisher = createPublisher(files, { notifications, output, clipboard });
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -118,8 +140,10 @@ test("publish fails fast when solution is missing", async () => {
 
     assert.strictEqual(result.failed, 1);
     assert.strictEqual(calls.length, 2);
-    const logs = (publisher as any).output.logs.join("\n");
+    const logs = output.channels[0]?.lines.join("\n") ?? "";
     assert.match(logs, /Solution MissingSolution not found/);
+    assert.match(clipboard.values[0] ?? "", /Message: Solution MissingSolution not found/);
+    assert.match(logs, /Error details copied to clipboard/);
   } finally {
     global.fetch = originalFetch;
   }
@@ -149,7 +173,8 @@ test("publish aborts when remotePath matches multiple resources", async () => {
   }) as any;
 
   try {
-    const publisher = createPublisher(files);
+    const output = new RecordingOutput();
+    const publisher = createPublisher(files, { output });
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -164,7 +189,7 @@ test("publish aborts when remotePath matches multiple resources", async () => {
 
     assert.strictEqual(result.failed, 1);
     assert.strictEqual(calls.length, 2);
-    const logs = (publisher as any).output.logs.join("\n");
+    const logs = output.channels[0]?.lines.join("\n") ?? "";
     assert.match(logs, /Multiple web resources found/);
   } finally {
     global.fetch = originalFetch;

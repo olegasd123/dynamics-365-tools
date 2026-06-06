@@ -1,9 +1,11 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import type { ClipboardPort } from "../app/ports/clipboard";
 import { WorkspaceFileType } from "../app/ports/files";
 import type { WorkspaceFileStat, WorkspaceFilesPort } from "../app/ports/files";
 import type { LoggerPort, LogMetadata } from "../app/ports/logger";
 import type { NotificationPort } from "../app/ports/notifications";
+import type { OutputChannelPort, OutputPort } from "../app/ports/output";
 import type { SecretStorePort, StateStorePort } from "../app/ports/storage";
 import type { WorkbenchPort } from "../app/ports/workbench";
 
@@ -213,6 +215,48 @@ export class RecordingWorkbench implements WorkbenchPort {
 
   setStatusBarMessage(message: string): void {
     this.statusMessages.push(message);
+  }
+}
+
+export class RecordingOutputChannel implements OutputChannelPort {
+  readonly lines: string[] = [];
+  shown = false;
+  disposed = false;
+
+  constructor(readonly name: string) {}
+
+  appendLine(value: string): void {
+    this.lines.push(value);
+  }
+
+  show(): void {
+    this.shown = true;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+  }
+}
+
+export class RecordingOutput implements OutputPort {
+  readonly channels: RecordingOutputChannel[] = [];
+
+  createChannel(name: string): RecordingOutputChannel {
+    const channel = new RecordingOutputChannel(name);
+    this.channels.push(channel);
+    return channel;
+  }
+}
+
+export class RecordingClipboard implements ClipboardPort {
+  readonly values: string[] = [];
+  failWrites = false;
+
+  async writeText(value: string): Promise<void> {
+    if (this.failWrites) {
+      throw new Error("Clipboard write failed");
+    }
+    this.values.push(value);
   }
 }
 

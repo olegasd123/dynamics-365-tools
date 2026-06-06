@@ -3,6 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { XMLParser } from "fast-xml-parser";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "../../app/ports/output";
 import { ConfigurationService } from "../config/configurationService";
 import { CdsSolutionProject, PcfControlProject, PcfPackageResult } from "./models";
 import { PacCli } from "./pacCli";
@@ -19,7 +20,7 @@ export interface PcfPackageOptions {
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "out", "bin", "obj"]);
 
 export class PcfPackageService implements vscode.Disposable {
-  private readonly output = vscode.window.createOutputChannel("PCF Package");
+  private readonly output: OutputChannelPort;
 
   constructor(
     private readonly pacCli: PacCli,
@@ -28,7 +29,10 @@ export class PcfPackageService implements vscode.Disposable {
     private readonly configuration: ConfigurationService,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
-  ) {}
+    output: OutputPort = new NoopOutputPort(),
+  ) {
+    this.output = output.createChannel("PCF Package");
+  }
 
   async packageControl(
     project: PcfControlProject,
