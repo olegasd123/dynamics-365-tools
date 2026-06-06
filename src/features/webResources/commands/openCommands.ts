@@ -20,7 +20,7 @@ export async function openInCrm(ctx: CommandContext, uri: vscode.Uri | undefined
     workbench,
   } = ctx.core;
   const { bindings, urls: webResources } = ctx.webResource;
-  const targetUri = await resolveTargetUri(notifications, uri);
+  const targetUri = await resolveTargetUri(notifications, uri, workbench.activeFilePath);
   if (!targetUri) {
     return;
   }

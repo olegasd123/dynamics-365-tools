@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import type { ClipboardPort } from "../app/ports/clipboard";
 import type { DiagnosticEntry, DiagnosticPort } from "../app/ports/diagnostics";
+import type { FileDialogPort, OpenFileDialogOptions } from "../app/ports/fileDialogs";
 import { WorkspaceFileType } from "../app/ports/files";
 import type {
   WorkspaceDirectoryEntry,
@@ -10,8 +11,14 @@ import type {
 } from "../app/ports/files";
 import type { TextInputOptions, TextInputPort } from "../app/ports/input";
 import type { LoggerPort, LogMetadata } from "../app/ports/logger";
-import type { NotificationPort } from "../app/ports/notifications";
+import type { NotificationOptions, NotificationPort } from "../app/ports/notifications";
 import type { OutputChannelPort, OutputPort } from "../app/ports/output";
+import type {
+  CancellationTokenLike,
+  ProgressOptions,
+  ProgressPort,
+  ProgressReporter,
+} from "../app/ports/progress";
 import type { SecretStorePort, StateStorePort } from "../app/ports/storage";
 import type { WorkbenchPort } from "../app/ports/workbench";
 
@@ -206,6 +213,21 @@ export class RecordingNotifications implements NotificationPort {
   readonly infos: string[] = [];
   readonly warnings: string[] = [];
   readonly errors: string[] = [];
+  readonly infoPrompts: Array<{
+    message: string;
+    actions: readonly string[];
+    options?: NotificationOptions;
+  }> = [];
+  readonly warningPrompts: Array<{
+    message: string;
+    actions: readonly string[];
+    options?: NotificationOptions;
+  }> = [];
+  readonly errorPrompts: Array<{
+    message: string;
+    actions: readonly string[];
+    options?: NotificationOptions;
+  }> = [];
 
   nextInfoAction: string | undefined;
   nextWarningAction: string | undefined;
@@ -223,19 +245,60 @@ export class RecordingNotifications implements NotificationPort {
     this.errors.push(message);
   }
 
-  async askInfo<T extends string>(message: string): Promise<T | undefined> {
+  async askInfo<T extends string>(
+    message: string,
+    actions: readonly T[] = [],
+    options?: NotificationOptions,
+  ): Promise<T | undefined> {
     this.infos.push(message);
+    this.infoPrompts.push({ message, actions, options });
     return this.nextInfoAction as T | undefined;
   }
 
-  async askWarning<T extends string>(message: string): Promise<T | undefined> {
+  async askWarning<T extends string>(
+    message: string,
+    actions: readonly T[] = [],
+    options?: NotificationOptions,
+  ): Promise<T | undefined> {
     this.warnings.push(message);
+    this.warningPrompts.push({ message, actions, options });
     return this.nextWarningAction as T | undefined;
   }
 
-  async askError<T extends string>(message: string): Promise<T | undefined> {
+  async askError<T extends string>(
+    message: string,
+    actions: readonly T[] = [],
+    options?: NotificationOptions,
+  ): Promise<T | undefined> {
     this.errors.push(message);
+    this.errorPrompts.push({ message, actions, options });
     return this.nextErrorAction as T | undefined;
+  }
+}
+
+export class RecordingFileDialogs implements FileDialogPort {
+  readonly openDialogOptions: OpenFileDialogOptions[] = [];
+  nextOpenSelections: Array<string[] | undefined> = [];
+
+  async showOpenDialog(options: OpenFileDialogOptions): Promise<string[] | undefined> {
+    this.openDialogOptions.push(options);
+    return this.nextOpenSelections.shift();
+  }
+}
+
+export class ImmediateProgress implements ProgressPort {
+  readonly runs: ProgressOptions[] = [];
+  readonly token: CancellationTokenLike = {
+    isCancellationRequested: false,
+    onCancellationRequested: () => ({ dispose: () => undefined }),
+  };
+
+  async withProgress<T>(
+    options: ProgressOptions,
+    task: (progress: ProgressReporter, token: CancellationTokenLike) => Thenable<T>,
+  ): Promise<T> {
+    this.runs.push(options);
+    return task({ report: () => undefined }, this.token);
   }
 }
 
@@ -245,6 +308,7 @@ export class RecordingWorkbench implements WorkbenchPort {
   readonly externalUrls: string[] = [];
   readonly statusMessages: string[] = [];
   openExternalResult = true;
+  activeFilePath: string | undefined;
 
   constructor(public hasWorkspace: boolean) {}
 

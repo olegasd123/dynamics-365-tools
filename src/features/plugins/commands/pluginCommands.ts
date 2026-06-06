@@ -28,7 +28,9 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     assemblyStatusBar,
     notifications,
     files,
+    fileDialogs,
     input,
+    progress,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
@@ -54,17 +56,18 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     return;
   }
 
-  const assemblyFile = await vscode.window.showOpenDialog({
+  const assemblyFile = await fileDialogs.showOpenDialog({
     canSelectFolders: false,
     canSelectMany: false,
     filters: { Assemblies: ["dll"] },
     title: "Select plugin assembly (.dll)",
   });
-  if (!assemblyFile || !assemblyFile[0]) {
+  const assemblyPath = assemblyFile?.[0];
+  if (!assemblyPath) {
     return;
   }
 
-  const defaultName = path.basename(assemblyFile[0].fsPath, path.extname(assemblyFile[0].fsPath));
+  const defaultName = path.basename(assemblyPath, path.extname(assemblyPath));
   const name = await input.showInputBox({
     prompt: "Enter plugin assembly name",
     value: defaultName,
@@ -79,7 +82,6 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     return;
   }
 
-  const assemblyPath = assemblyFile[0].fsPath;
   const content = await files.readFile(assemblyPath);
   const contentBase64 = Buffer.from(content).toString("base64");
 
@@ -101,6 +103,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
         assemblyPath,
         solutionName: solution.name,
         manageMissingComponents: true,
+        progress,
       });
       pluginSummary = syncResult;
     } catch (syncError) {
@@ -142,6 +145,8 @@ export async function updatePluginAssembly(
     assemblyStatusBar,
     notifications,
     files,
+    fileDialogs,
+    progress,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
@@ -218,16 +223,12 @@ export async function updatePluginAssembly(
 
   const lastDllPath = lastSelection.getLastAssemblyDllPath(env.name, assemblyId);
   const workspaceRoot = configuration.workspaceRoot ?? files.workspaceRoot;
-  const defaultUri = lastDllPath
-    ? vscode.Uri.file(path.dirname(lastDllPath))
-    : workspaceRoot
-      ? vscode.Uri.file(workspaceRoot)
-      : undefined;
+  const defaultPath = lastDllPath ? path.dirname(lastDllPath) : workspaceRoot;
 
   await updateAssemblyFromFileDialog({
     assemblyId,
     assemblyName,
-    defaultUri,
+    defaultPath,
     env,
     manageMissingComponents: env.manageMissingComponents === true,
     pluginService: service,
@@ -237,6 +238,8 @@ export async function updatePluginAssembly(
     lastSelection,
     notifications,
     files,
+    fileDialogs,
+    progress,
   });
 }
 

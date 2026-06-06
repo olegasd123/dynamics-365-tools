@@ -124,9 +124,10 @@ export async function openResourceMenu(ctx: CommandContext, uri: vscode.Uri | un
     lastSelection,
     notifications,
     files,
+    workbench,
   } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
-  const targetUri = await resolveTargetUri(notifications, uri);
+  const targetUri = await resolveTargetUri(notifications, uri, workbench.activeFilePath);
   if (!targetUri) {
     return;
   }
@@ -197,9 +198,10 @@ export async function publishResource(
     lastSelection,
     notifications,
     files,
+    workbench,
   } = ctx.core;
   const { bindings, publisher, publishCache } = ctx.webResource;
-  const targetUri = await resolveTargetUri(notifications, uri);
+  const targetUri = await resolveTargetUri(notifications, uri, workbench.activeFilePath);
   if (!targetUri) {
     return;
   }

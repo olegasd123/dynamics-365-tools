@@ -1,5 +1,6 @@
 export interface WorkbenchPort {
   readonly hasWorkspace: boolean;
+  readonly activeFilePath: string | undefined;
 
   executeCommand(commandId: string, ...args: unknown[]): Promise<unknown>;
   openWorkspaceFile(relativePath: string): Promise<void>;
@@ -9,6 +10,7 @@ export interface WorkbenchPort {
 
 export class NoopWorkbench implements WorkbenchPort {
   readonly hasWorkspace = false;
+  readonly activeFilePath = undefined;
 
   async executeCommand(): Promise<unknown> {
     return undefined;

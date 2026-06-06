@@ -134,7 +134,11 @@ export async function promptJavaScriptAction(
     return undefined;
   }
 
-  const functionName = await pickJavaScriptFunctionName(library, current?.functionName);
+  const functionName = await pickJavaScriptFunctionName(
+    ctx.core.files,
+    library,
+    current?.functionName,
+  );
   if (!functionName) {
     return undefined;
   }

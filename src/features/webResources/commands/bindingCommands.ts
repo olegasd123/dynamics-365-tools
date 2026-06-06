@@ -10,9 +10,9 @@ import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHel
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const { configuration, ui, notifications, files } = ctx.core;
+  const { configuration, ui, notifications, files, workbench } = ctx.core;
   const { bindings } = ctx.webResource;
-  const targetUri = await resolveTargetUri(notifications, uri);
+  const targetUri = await resolveTargetUri(notifications, uri, workbench.activeFilePath);
   if (!targetUri) {
     return;
   }

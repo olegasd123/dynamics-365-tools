@@ -1,5 +1,4 @@
 import * as path from "path";
-import * as vscode from "vscode";
 import { promisify } from "util";
 import { execFile } from "child_process";
 import * as fs from "fs/promises";
@@ -11,23 +10,23 @@ import type { NotificationPort } from "../../../app/ports/notifications";
 const execFileAsync = promisify(execFile);
 
 export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
-  const { configuration, notifications, files, clipboard, input } = ctx.core;
+  const { configuration, notifications, files, fileDialogs, clipboard, input } = ctx.core;
   const workspaceRoot = configuration.workspaceRoot ?? files.workspaceRoot;
 
-  const projectPick = await vscode.window.showOpenDialog({
+  const projectPick = await fileDialogs.showOpenDialog({
     canSelectFiles: true,
     canSelectFolders: false,
     canSelectMany: false,
-    defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined,
+    defaultPath: workspaceRoot,
     filters: { "C# Project": ["csproj"], "All Files": ["*"] },
     openLabel: "Select .csproj to strong-name",
   });
-  if (!projectPick || !projectPick[0]) {
+  const csprojPath = projectPick?.[0];
+  if (!csprojPath) {
     return;
   }
 
-  const csprojUri = projectPick[0];
-  const projectDir = path.dirname(csprojUri.fsPath);
+  const projectDir = path.dirname(csprojPath);
 
   const filename = await input.showInputBox({
     prompt: "Enter file name for the strong name key (.snk)",
@@ -53,7 +52,7 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
     await files.createDirectory(path.dirname(resolvedPath));
     await execFileAsync(snTool.command, [...snTool.generateArgs, resolvedPath]);
     const token = await generatePublicKeyTokenValue(snTool, resolvedPath);
-    await ensureCsprojStrongName(files, csprojUri.fsPath, relativeKeyPath);
+    await ensureCsprojStrongName(files, csprojPath, relativeKeyPath);
 
     const message = token
       ? `Strong name key created and project updated. Public key token: ${token}`

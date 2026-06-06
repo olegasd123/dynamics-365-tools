@@ -13,14 +13,14 @@ import type { SolutionPicker } from "./solutionPicker";
 export async function resolveTargetUri(
   notifications: NotificationPort,
   uri?: vscode.Uri,
+  activeFilePath?: string,
 ): Promise<vscode.Uri | undefined> {
   if (uri) {
     return uri;
   }
 
-  const editorUri = vscode.window.activeTextEditor?.document.uri;
-  if (editorUri) {
-    return editorUri;
+  if (activeFilePath) {
+    return vscode.Uri.file(activeFilePath);
   }
 
   await notifications.info("Select a file or folder to proceed.");

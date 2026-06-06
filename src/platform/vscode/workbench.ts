@@ -6,6 +6,10 @@ export class VsCodeWorkbench implements WorkbenchPort {
     return Boolean(vscode.workspace.workspaceFolders?.length);
   }
 
+  get activeFilePath(): string | undefined {
+    return vscode.window.activeTextEditor?.document.uri.fsPath;
+  }
+
   async executeCommand(commandId: string, ...args: unknown[]): Promise<unknown> {
     return vscode.commands.executeCommand(commandId, ...args);
   }

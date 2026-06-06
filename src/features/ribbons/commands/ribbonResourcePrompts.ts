@@ -1,4 +1,3 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
@@ -367,11 +366,12 @@ async function collectJavaScriptFiles(files: WorkspaceFilesPort, root: string): 
 }
 
 export async function pickJavaScriptFunctionName(
+  files: WorkspaceFilesPort,
   library: WebResourceLibraryPick,
   currentFunctionName?: string,
 ): Promise<string | undefined> {
   const suggestions = withDefaultJavaScriptFunctionSuggestions(
-    await listJavaScriptFunctionSuggestions(library.localPath),
+    await listJavaScriptFunctionSuggestions(files, library.localPath),
   );
   if (!suggestions.length) {
     return showRibbonInputBox({
@@ -409,12 +409,15 @@ export async function pickJavaScriptFunctionName(
   });
 }
 
-async function listJavaScriptFunctionSuggestions(localPath: string | undefined): Promise<string[]> {
+async function listJavaScriptFunctionSuggestions(
+  files: WorkspaceFilesPort,
+  localPath: string | undefined,
+): Promise<string[]> {
   if (!localPath) {
     return [];
   }
 
-  const stat = await fs.stat(localPath).then(
+  const stat = await files.stat(localPath).then(
     (value) => value,
     () => undefined,
   );
@@ -422,7 +425,7 @@ async function listJavaScriptFunctionSuggestions(localPath: string | undefined):
     return [];
   }
 
-  const bytes = await fs.readFile(localPath);
+  const bytes = await files.readFile(localPath);
   const source = Buffer.from(bytes).toString("utf8");
   return extractJavaScriptFunctionSuggestions(source);
 }

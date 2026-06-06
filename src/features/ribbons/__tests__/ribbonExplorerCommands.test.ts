@@ -6,6 +6,7 @@ import test from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
 import { VsCodeNotificationService } from "../../../platform/vscode/notificationService";
+import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
@@ -66,6 +67,7 @@ function legacyContext<T extends Record<string, any>>(ctx: T): T {
       authorizations: ctx.authorizations,
       secrets: ctx.secrets,
       notifications: ctx.notifications,
+      files: ctx.files ?? new MemoryWorkspaceFiles("/workspace"),
       lastSelection: ctx.lastSelection,
       connections: ctx.connections,
       statusBar: ctx.statusBar,
@@ -428,14 +430,13 @@ test("removes imported ribbon solution after confirmation", async () => {
 });
 
 test("adds command action from actions group node", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-action-"));
-  await fs.mkdir(path.join(workspaceRoot, "src/account"), { recursive: true });
-  await fs.writeFile(
+  const workspaceRoot = "/workspace/d365-ribbon-action";
+  const files = new MemoryWorkspaceFiles(workspaceRoot);
+  files.addFile(
     path.join(workspaceRoot, "src/account/ribbon.js"),
     `function onValidateAndSaveClick() {
   return true;
 }`,
-    "utf8",
   );
 
   const source = `<RibbonDiffXml>
@@ -512,6 +513,7 @@ test("adds command action from actions group node", async () => {
           resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
           getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
         },
+        files,
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;
@@ -2908,10 +2910,10 @@ test("prefills saved JavaScript action values while editing", async () => {
 });
 
 test("suggests full namespace while editing JavaScript action function", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-js-namespace-"));
+  const workspaceRoot = "/workspace/d365-ribbon-js-namespace";
+  const files = new MemoryWorkspaceFiles(workspaceRoot);
   const localPath = path.join(workspaceRoot, "src/account/ribbon.js");
-  await fs.mkdir(path.dirname(localPath), { recursive: true });
-  await fs.writeFile(
+  files.addFile(
     localPath,
     `"use strict";
 var Hjk;
@@ -2932,7 +2934,6 @@ var Hjk;
         Account.Ribbon = Ribbon;
     })(Account = Hjk.Account || (Hjk.Account = {}));
 })(Hjk || (Hjk = {}));`,
-    "utf8",
   );
 
   const source = `<RibbonDiffXml>
@@ -3007,6 +3008,7 @@ var Hjk;
           resolveLocalPath: (value: string) => path.join(workspaceRoot, value),
           getRelativeToWorkspace: (value: string) => path.relative(workspaceRoot, value),
         },
+        files,
         ribbonEditorState: {
           queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
             patches = queuedPatches;

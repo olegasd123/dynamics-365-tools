@@ -14,6 +14,8 @@ import {
 } from "./pluginAssemblyIdentity";
 import type { NotificationPort } from "../../../app/ports/notifications";
 import type { WorkspaceFilesPort } from "../../../app/ports/files";
+import { NoopFileDialogs, type FileDialogPort } from "../../../app/ports/fileDialogs";
+import { NoopProgress, type ProgressPort } from "../../../app/ports/progress";
 
 type PluginSyncContext = {
   registration: PluginRegistrationManager;
@@ -22,6 +24,7 @@ type PluginSyncContext = {
   assemblyPath: string;
   solutionName?: string;
   manageMissingComponents?: boolean;
+  progress?: ProgressPort;
 };
 
 export function buildAssemblySuccessMessage(
@@ -43,19 +46,15 @@ export async function syncPluginsForAssembly(
 
 async function runPluginSyncForAssembly(context: PluginSyncContext): Promise<PluginSyncResult> {
   const title = `Syncing plugins for ${path.basename(context.assemblyPath)}`;
-  return vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title,
-    },
-    () =>
-      context.registration.syncPluginTypes({
-        pluginService: context.pluginService,
-        assemblyId: context.assemblyId,
-        assemblyPath: context.assemblyPath,
-        solutionName: context.solutionName,
-        manageMissingComponents: context.manageMissingComponents,
-      }),
+  const progress = context.progress ?? new NoopProgress();
+  return progress.withProgress({ title }, () =>
+    context.registration.syncPluginTypes({
+      pluginService: context.pluginService,
+      assemblyId: context.assemblyId,
+      assemblyPath: context.assemblyPath,
+      solutionName: context.solutionName,
+      manageMissingComponents: context.manageMissingComponents,
+    }),
   );
 }
 
@@ -72,10 +71,12 @@ type AssemblyUpdateContext = {
   lastSelection: LastSelectionService;
   notifications: NotificationPort;
   files: WorkspaceFilesPort;
+  progress?: ProgressPort;
 };
 
 type AssemblyUpdateFileDialogContext = Omit<AssemblyUpdateContext, "assemblyUri"> & {
-  defaultUri?: vscode.Uri;
+  defaultPath?: string;
+  fileDialogs?: FileDialogPort;
 };
 
 type AssemblyUpdateValidationContext = {
@@ -104,22 +105,24 @@ type PluginDeleteFailure = {
 export async function updateAssemblyFromFileDialog(
   context: AssemblyUpdateFileDialogContext,
 ): Promise<void> {
+  const fileDialogs = context.fileDialogs ?? new NoopFileDialogs();
   while (true) {
-    const assemblyFile = await vscode.window.showOpenDialog({
+    const assemblyFile = await fileDialogs.showOpenDialog({
       canSelectFolders: false,
       canSelectMany: false,
       filters: { Assemblies: ["dll"] },
-      defaultUri: context.defaultUri,
+      defaultPath: context.defaultPath,
       title: "Select updated plugin assembly (.dll)",
     });
-    if (!assemblyFile || !assemblyFile[0]) {
+    const assemblyPath = assemblyFile?.[0];
+    if (!assemblyPath) {
       return;
     }
 
     try {
       await updateAssemblyFromUri({
         ...context,
-        assemblyUri: assemblyFile[0],
+        assemblyUri: vscode.Uri.file(assemblyPath),
       });
       return;
     } catch (error) {
@@ -177,6 +180,7 @@ export async function updateAssemblyFromUri(context: AssemblyUpdateContext): Pro
       assemblyPath: context.assemblyUri.fsPath,
       solutionName: undefined,
       manageMissingComponents: context.manageMissingComponents,
+      progress: context.progress,
     });
     pluginSummary = formatPluginSyncResult(
       mergePluginSyncResults(preUpdateSyncResult, postUpdateSyncResult),
@@ -314,11 +318,9 @@ async function removeDeletedPluginTypesBeforeAssemblyUpdate(
     return emptyPluginSyncResult();
   }
 
-  return vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Removing missing plugins for ${path.basename(context.assemblyUri.fsPath)}`,
-    },
+  const progress = context.progress ?? new NoopProgress();
+  return progress.withProgress(
+    { title: `Removing missing plugins for ${path.basename(context.assemblyUri.fsPath)}` },
     async () => {
       const removed: PluginType[] = [];
       const failures: PluginDeleteFailure[] = [];

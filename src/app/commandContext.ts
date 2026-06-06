@@ -34,10 +34,12 @@ import type { WebResourceStatusBarService } from "../features/webResources/webRe
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import type { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
 import type { ClipboardPort } from "./ports/clipboard";
+import type { FileDialogPort } from "./ports/fileDialogs";
 import type { TextInputPort } from "./ports/input";
 import type { LoggerPort } from "./ports/logger";
 import type { NotificationPort } from "./ports/notifications";
 import type { OutputPort } from "./ports/output";
+import type { ProgressPort } from "./ports/progress";
 import type { WorkbenchPort } from "./ports/workbench";
 import type { WorkspaceFilesPort } from "./ports/files";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
@@ -64,8 +66,10 @@ export interface CoreServices {
   logger: LoggerPort;
   notifications: NotificationPort;
   output: OutputPort;
+  progress: ProgressPort;
   workbench: WorkbenchPort;
   files: WorkspaceFilesPort;
+  fileDialogs: FileDialogPort;
   clipboard: ClipboardPort;
   input: TextInputPort;
   lastSelection: LastSelectionService;

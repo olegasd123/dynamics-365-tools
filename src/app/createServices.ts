@@ -37,12 +37,14 @@ import { WebResourceUrlService } from "../features/webResources/webResourceUrlSe
 import { VsCodeAuthenticationService } from "../platform/vscode/authenticationService";
 import { VsCodeClipboard } from "../platform/vscode/clipboard";
 import { VsCodeDiagnostics } from "../platform/vscode/diagnostics";
+import { VsCodeFileDialogs } from "../platform/vscode/fileDialogs";
 import { VsCodeTextInput } from "../platform/vscode/input";
 import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
 import { VsCodeOutputPort } from "../platform/vscode/output";
 import { VsCodeOutputLogger } from "../platform/vscode/outputLogger";
 import { watchPcfManifests } from "../platform/vscode/pcfProjectWatcher";
+import { VsCodeProgress } from "../platform/vscode/progress";
 import { VsCodeSecretStore, VsCodeStateStore } from "../platform/vscode/storage";
 import { VsCodeWorkbench } from "../platform/vscode/workbench";
 import { VsCodeWorkspaceFiles } from "../platform/vscode/workspaceFiles";
@@ -55,7 +57,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   const notifications = lazy(() => new VsCodeNotificationService());
   const logger = lazyDisposable(() => new VsCodeOutputLogger(), disposables);
   const output = lazy(() => new VsCodeOutputPort());
+  const progress = lazy(() => new VsCodeProgress());
   const clipboard = lazy(() => new VsCodeClipboard());
+  const fileDialogs = lazy(() => new VsCodeFileDialogs());
   const input = lazy(() => new VsCodeTextInput());
   const files = lazy(() => new VsCodeWorkspaceFiles());
   const authentication = lazy(() => new VsCodeAuthenticationService());
@@ -240,11 +244,17 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     get output() {
       return output();
     },
+    get progress() {
+      return progress();
+    },
     get workbench() {
       return workbench();
     },
     get files() {
       return files();
+    },
+    get fileDialogs() {
+      return fileDialogs();
     },
     get clipboard() {
       return clipboard();
