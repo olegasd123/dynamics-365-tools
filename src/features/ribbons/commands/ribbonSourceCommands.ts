@@ -268,7 +268,7 @@ export async function publishRibbonToEnvironment(
         "Copy Error XML",
       ]);
       if (action === "Copy Error XML") {
-        await vscode.env.clipboard.writeText(error.log);
+        await ctx.core.clipboard.writeText(error.log);
       }
       return;
     }

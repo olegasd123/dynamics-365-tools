@@ -3,7 +3,7 @@ import test from "node:test";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import * as vscode from "vscode";
+import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
 import { PcfProjectLocator } from "../pcfProjectLocator";
 
 test("locates PCF projects in workspace folders", async () => {
@@ -24,11 +24,8 @@ test("locates PCF projects in workspace folders", async () => {
   );
   await fs.writeFile(path.join(controlRoot, "pcfconfig.json"), JSON.stringify({ outDir: "build" }));
 
-  const previousFolders = vscode.workspace.workspaceFolders;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
-
   try {
-    const locator = new PcfProjectLocator();
+    const locator = new PcfProjectLocator(new NodeWorkspaceFiles(workspaceRoot));
     const projects = await locator.refresh();
 
     assert.strictEqual(projects.length, 1);
@@ -38,7 +35,6 @@ test("locates PCF projects in workspace folders", async () => {
     assert.strictEqual(projects[0].outputDir, path.join(controlRoot, "build"));
     locator.dispose();
   } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
@@ -63,11 +59,8 @@ test("uses the PCF project folder when the manifest is in a control subfolder", 
     `,
   );
 
-  const previousFolders = vscode.workspace.workspaceFolders;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
-
   try {
-    const locator = new PcfProjectLocator();
+    const locator = new PcfProjectLocator(new NodeWorkspaceFiles(workspaceRoot));
     const projects = await locator.refresh();
 
     assert.strictEqual(projects.length, 1);
@@ -84,7 +77,6 @@ test("uses the PCF project folder when the manifest is in a control subfolder", 
     );
     locator.dispose();
   } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
@@ -102,17 +94,13 @@ test("locator ignores node_modules manifests", async () => {
     `,
   );
 
-  const previousFolders = vscode.workspace.workspaceFolders;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
-
   try {
-    const locator = new PcfProjectLocator();
+    const locator = new PcfProjectLocator(new NodeWorkspaceFiles(workspaceRoot));
     const projects = await locator.refresh();
 
     assert.deepStrictEqual(projects, []);
     locator.dispose();
   } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });

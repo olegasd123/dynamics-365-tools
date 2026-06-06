@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { PcfControlProject, PcfTemplateKind } from "./models";
 import { PcfManifestReader } from "./pcfManifestReader";
@@ -24,6 +25,7 @@ export class PcfProjectLocator implements vscode.Disposable {
   readonly onDidChangeProjects = this.onDidChangeProjectsEmitter.event;
 
   constructor(
+    private readonly files: Pick<WorkspaceFilesPort, "workspaceFolders">,
     private readonly manifestReader = new PcfManifestReader(),
     private readonly notifications: NotificationPort = new NoopNotificationService(),
   ) {}
@@ -95,11 +97,10 @@ export class PcfProjectLocator implements vscode.Disposable {
   }
 
   private async findManifestUris(): Promise<vscode.Uri[]> {
-    const folders = vscode.workspace.workspaceFolders ?? [];
     const manifests: vscode.Uri[] = [];
 
-    for (const folder of folders) {
-      const matches = await findManifests(folder.uri.fsPath);
+    for (const folder of this.files.workspaceFolders) {
+      const matches = await findManifests(folder);
       manifests.push(...matches.map((filePath) => vscode.Uri.file(filePath)));
     }
 

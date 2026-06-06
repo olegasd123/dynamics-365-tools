@@ -467,8 +467,8 @@ async function ensurePac(ctx: CommandContext): Promise<boolean> {
     ["Install pac CLI"],
   );
   if (action === "Install pac CLI") {
-    await vscode.env.openExternal(
-      vscode.Uri.parse("https://learn.microsoft.com/power-platform/developer/cli/introduction"),
+    await ctx.core.workbench.openExternal(
+      "https://learn.microsoft.com/power-platform/developer/cli/introduction",
     );
   }
   return false;

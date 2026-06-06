@@ -33,6 +33,7 @@ import type { PublishCacheService } from "../features/webResources/publishCacheS
 import type { WebResourceStatusBarService } from "../features/webResources/webResourceStatusBar";
 import type { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
 import type { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
+import type { ClipboardPort } from "./ports/clipboard";
 import type { TextInputPort } from "./ports/input";
 import type { LoggerPort } from "./ports/logger";
 import type { NotificationPort } from "./ports/notifications";
@@ -63,6 +64,7 @@ export interface CoreServices {
   notifications: NotificationPort;
   workbench: WorkbenchPort;
   files: WorkspaceFilesPort;
+  clipboard: ClipboardPort;
   input: TextInputPort;
   lastSelection: LastSelectionService;
   connections: EnvironmentConnectionService;

@@ -11,6 +11,10 @@ export class VsCodeWorkspaceFiles implements WorkspaceFilesPort {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   }
 
+  get workspaceFolders(): readonly string[] {
+    return vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [];
+  }
+
   async stat(fsPath: string): Promise<WorkspaceFileStat> {
     const stat = await vscode.workspace.fs.stat(vscode.Uri.file(fsPath));
     return {

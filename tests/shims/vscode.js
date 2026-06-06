@@ -106,15 +106,6 @@ const commands = {
   executeCommand: async () => undefined,
 };
 
-const env = {
-  clipboard: {
-    value: "",
-    async writeText(value) {
-      this.value = value;
-    },
-  },
-};
-
 class Position {
   constructor(line, character) {
     this.line = line;
@@ -241,7 +232,6 @@ module.exports = {
   workspace,
   window,
   commands,
-  env,
   languages,
   Position,
   Range,

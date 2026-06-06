@@ -216,8 +216,7 @@ export async function updatePluginAssembly(
   }
 
   const lastDllPath = lastSelection.getLastAssemblyDllPath(env.name, assemblyId);
-  const workspaceRoot =
-    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceRoot = configuration.workspaceRoot ?? files.workspaceRoot;
   const defaultUri = lastDllPath
     ? vscode.Uri.file(path.dirname(lastDllPath))
     : workspaceRoot

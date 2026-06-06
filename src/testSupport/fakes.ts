@@ -18,6 +18,10 @@ import type { WorkbenchPort } from "../app/ports/workbench";
 export class NodeWorkspaceFiles implements WorkspaceFilesPort {
   constructor(public workspaceRoot: string | undefined) {}
 
+  get workspaceFolders(): readonly string[] {
+    return this.workspaceRoot ? [this.workspaceRoot] : [];
+  }
+
   async stat(fsPath: string): Promise<WorkspaceFileStat> {
     const stats = await fs.stat(fsPath);
     return {
@@ -72,6 +76,10 @@ export class MemoryWorkspaceFiles implements WorkspaceFilesPort {
     if (workspaceRoot) {
       this.addDirectory(workspaceRoot);
     }
+  }
+
+  get workspaceFolders(): readonly string[] {
+    return this.workspaceRoot ? [this.workspaceRoot] : [];
   }
 
   addFile(fsPath: string, content: string | Uint8Array): void {

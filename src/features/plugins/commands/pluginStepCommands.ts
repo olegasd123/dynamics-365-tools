@@ -287,7 +287,7 @@ export async function copyStepDescription(
     return;
   }
 
-  await vscode.env.clipboard.writeText(tooltip);
+  await ctx.core.clipboard.writeText(tooltip);
   void ctx.core.notifications.info("Step info copied to clipboard.");
 }
 

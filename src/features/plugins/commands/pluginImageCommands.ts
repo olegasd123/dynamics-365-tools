@@ -203,6 +203,6 @@ export async function copyImageDescription(
     return;
   }
 
-  await vscode.env.clipboard.writeText(tooltip);
+  await ctx.core.clipboard.writeText(tooltip);
   void ctx.core.notifications.info("Image info copied to clipboard.");
 }

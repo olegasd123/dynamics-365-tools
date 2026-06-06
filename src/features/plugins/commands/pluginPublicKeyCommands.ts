@@ -4,14 +4,15 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 import * as fs from "fs/promises";
 import { CommandContext } from "../../../app/commandContext";
+import type { ClipboardPort } from "../../../app/ports/clipboard";
+import type { WorkspaceFilesPort } from "../../../app/ports/files";
 import type { NotificationPort } from "../../../app/ports/notifications";
 
 const execFileAsync = promisify(execFile);
 
 export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
-  const { configuration, notifications } = ctx.core;
-  const workspaceRoot =
-    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const { configuration, notifications, files, clipboard } = ctx.core;
+  const workspaceRoot = configuration.workspaceRoot ?? files.workspaceRoot;
 
   const projectPick = await vscode.window.showOpenDialog({
     canSelectFiles: true,
@@ -49,15 +50,15 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
   }
 
   try {
-    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(resolvedPath)));
+    await files.createDirectory(path.dirname(resolvedPath));
     await execFileAsync(snTool.command, [...snTool.generateArgs, resolvedPath]);
     const token = await generatePublicKeyTokenValue(snTool, resolvedPath);
-    await ensureCsprojStrongName(csprojUri, relativeKeyPath);
+    await ensureCsprojStrongName(files, csprojUri.fsPath, relativeKeyPath);
 
     const message = token
       ? `Strong name key created and project updated. Public key token: ${token}`
       : "Strong name key created and project updated. Failed to read public key token from sn output.";
-    showPublicKeyTokenResult(notifications, message, token);
+    showPublicKeyTokenResult(notifications, clipboard, message, token);
   } catch (error) {
     void notifications.error(
       `Failed to generate strong name key: ${error instanceof Error ? error.message : String(error)}`,
@@ -67,6 +68,7 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
 
 export function showPublicKeyTokenResult(
   notifications: NotificationPort,
+  clipboard: ClipboardPort,
   message: string,
   token?: string,
 ): void {
@@ -75,7 +77,7 @@ export function showPublicKeyTokenResult(
     async (selection) => {
       if (selection === copyAction && token) {
         try {
-          await vscode.env.clipboard.writeText(token);
+          await clipboard.writeText(token);
         } catch (error) {
           void notifications.error(
             `Failed to copy public key token: ${error instanceof Error ? error.message : String(error)}`,
@@ -124,10 +126,11 @@ async function generatePublicKeyTokenValue(
 }
 
 async function ensureCsprojStrongName(
-  csprojUri: vscode.Uri,
+  files: WorkspaceFilesPort,
+  csprojPath: string,
   keyFileRelative: string,
 ): Promise<void> {
-  const content = (await vscode.workspace.fs.readFile(csprojUri)).toString();
+  const content = Buffer.from(await files.readFile(csprojPath)).toString("utf8");
   if (content.includes("<AssemblyOriginatorKeyFile")) {
     return;
   }
@@ -149,7 +152,7 @@ async function ensureCsprojStrongName(
       ? `${content.slice(0, index)}${insertion}\n${closingTag}\n`
       : `${content.trimEnd()}\n${insertion}\n${closingTag}\n`;
 
-  await vscode.workspace.fs.writeFile(csprojUri, Buffer.from(updated, "utf8"));
+  await files.writeFile(csprojPath, Buffer.from(updated, "utf8"));
 }
 
 type SnTool = {

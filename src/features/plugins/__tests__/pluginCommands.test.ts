@@ -2,7 +2,12 @@ import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
 import { VsCodeNotificationService } from "../../../platform/vscode/notificationService";
-import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
+import {
+  MemoryWorkspaceFiles,
+  RecordingClipboard,
+  RecordingNotifications,
+} from "../../../testSupport/fakes";
+import type { NotificationPort } from "../../../app/ports/notifications";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import {
   AssemblyIdentityValidationError,
@@ -43,6 +48,7 @@ function legacyContext<T extends Record<string, any>>(ctx: T): T {
       auth: ctx.auth,
       secrets: ctx.secrets,
       notifications: ctx.notifications,
+      clipboard: ctx.clipboard,
       lastSelection: ctx.lastSelection,
       connections: ctx.connections,
       assemblyStatusBar: ctx.assemblyStatusBar,
@@ -717,35 +723,43 @@ test("updateAssemblyFromFileDialog asks before creating new plugin types when mi
 });
 
 test("showPublicKeyTokenResult does not wait for notification selection", () => {
-  const originalShowInformationMessage = vscode.window.showInformationMessage;
   let shownMessage = "";
-  (vscode.window as any).showInformationMessage = (message: string) => {
-    shownMessage = message;
-    return new Promise(() => {});
-  };
+  const notifications = {
+    info: async () => undefined,
+    warning: async () => undefined,
+    error: async () => undefined,
+    askInfo: (message: string) => {
+      shownMessage = message;
+      return new Promise(() => {});
+    },
+    askWarning: async () => undefined,
+    askError: async () => undefined,
+  } as NotificationPort;
 
-  try {
-    showPublicKeyTokenResult(createNotifications(), "Strong name key created.", "abcdef1234567890");
-  } finally {
-    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
-  }
+  showPublicKeyTokenResult(
+    notifications,
+    new RecordingClipboard(),
+    "Strong name key created.",
+    "abcdef1234567890",
+  );
 
   assert.strictEqual(shownMessage, "Strong name key created.");
 });
 
 test("showPublicKeyTokenResult copies token when action is selected", async () => {
-  const originalShowInformationMessage = vscode.window.showInformationMessage;
-  (vscode.window as any).showInformationMessage = async () => "Copy token";
-  (vscode.env.clipboard as any).value = "";
+  const notifications = new RecordingNotifications();
+  notifications.nextInfoAction = "Copy token";
+  const clipboard = new RecordingClipboard();
 
-  try {
-    showPublicKeyTokenResult(createNotifications(), "Strong name key created.", "abcdef1234567890");
-    await new Promise((resolve) => setImmediate(resolve));
-  } finally {
-    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
-  }
+  showPublicKeyTokenResult(
+    notifications,
+    clipboard,
+    "Strong name key created.",
+    "abcdef1234567890",
+  );
+  await new Promise((resolve) => setImmediate(resolve));
 
-  assert.strictEqual((vscode.env.clipboard as any).value, "abcdef1234567890");
+  assert.deepStrictEqual(clipboard.values, ["abcdef1234567890"]);
 });
 
 test("extractToken reads Mono strong name output", () => {

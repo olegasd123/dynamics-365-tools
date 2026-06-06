@@ -19,6 +19,7 @@ export interface WorkspaceDirectoryEntry {
 
 export interface WorkspaceFilesPort {
   readonly workspaceRoot: string | undefined;
+  readonly workspaceFolders: readonly string[];
 
   stat(fsPath: string): Promise<WorkspaceFileStat>;
   exists(fsPath: string): Promise<boolean>;

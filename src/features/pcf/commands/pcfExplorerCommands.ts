@@ -1,4 +1,3 @@
-import * as fs from "fs/promises";
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { PcfDeployedControlNode } from "../pcfExplorer";
@@ -60,8 +59,8 @@ export async function updatePcfFromLocal(
       ["Install pac CLI"],
     );
     if (action === "Install pac CLI") {
-      await vscode.env.openExternal(
-        vscode.Uri.parse("https://learn.microsoft.com/power-platform/developer/cli/introduction"),
+      await ctx.core.workbench.openExternal(
+        "https://learn.microsoft.com/power-platform/developer/cli/introduction",
       );
     }
     return;
@@ -104,7 +103,7 @@ export async function copyPcfDeployedControlId(
     return;
   }
 
-  await vscode.env.clipboard.writeText(node.control.customControlId);
+  await ctx.core.clipboard.writeText(node.control.customControlId);
   await ctx.core.notifications.info(`Copied PCF control ID for ${node.control.name}.`);
 }
 
@@ -125,7 +124,7 @@ export async function syncPcfManifestVersionFromEnvironment(
   }
 
   const project = node.control.workspaceMatch;
-  const content = await fs.readFile(project.manifestUri, "utf8");
+  const content = Buffer.from(await ctx.core.files.readFile(project.manifestUri)).toString("utf8");
   const updated = updateControlVersionInManifest(content, node.control.version);
   if (updated === content) {
     await ctx.core.notifications.info(
@@ -134,7 +133,7 @@ export async function syncPcfManifestVersionFromEnvironment(
     return;
   }
 
-  await fs.writeFile(project.manifestUri, updated, "utf8");
+  await ctx.core.files.writeFile(project.manifestUri, Buffer.from(updated, "utf8"));
   await ctx.pcf.projectLocator.refresh();
   ctx.pcf.explorer.refresh();
   await ctx.core.notifications.info(

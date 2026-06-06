@@ -191,7 +191,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     disposables,
   );
   const pcfProjectLocator = lazyDisposable(
-    () => new PcfProjectLocator(undefined, notifications()),
+    () => new PcfProjectLocator(files(), undefined, notifications()),
     disposables,
   );
   const pcfExplorer = lazy(() => {
@@ -234,6 +234,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get files() {
       return files();
+    },
+    get clipboard() {
+      return clipboard();
     },
     get input() {
       return input();
