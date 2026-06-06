@@ -42,6 +42,7 @@ import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
 import { VsCodeNotificationService } from "../platform/vscode/notificationService";
 import { VsCodeOutputPort } from "../platform/vscode/output";
 import { VsCodeOutputLogger } from "../platform/vscode/outputLogger";
+import { watchPcfManifests } from "../platform/vscode/pcfProjectWatcher";
 import { VsCodeSecretStore, VsCodeStateStore } from "../platform/vscode/storage";
 import { VsCodeWorkbench } from "../platform/vscode/workbench";
 import { VsCodeWorkspaceFiles } from "../platform/vscode/workspaceFiles";
@@ -68,7 +69,13 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
   const authorizations = lazy(() => new AuthorizationStore(globalState()));
   const lastSelection = lazy(() => new LastSelectionService(workspaceState()));
   const connections = lazy(
-    () => new EnvironmentConnectionService(auth(), secrets(), notifications()),
+    () =>
+      new EnvironmentConnectionService(
+        auth(),
+        secrets(),
+        notifications(),
+        buildDefaultUserAgent(extensionContext),
+      ),
   );
   const statusBar = lazyDisposable(
     () => new WebResourceStatusBarService("dynamics365Tools.publishLastResource"),
@@ -191,13 +198,14 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     disposables,
   );
   const pcfProjectLocator = lazyDisposable(
-    () => new PcfProjectLocator(files(), undefined, notifications()),
+    () => new PcfProjectLocator(files(), undefined, notifications(), watchPcfManifests),
     disposables,
   );
   const pcfExplorer = lazy(() => {
     return new PcfExplorerProvider(
       configuration(),
       extensionContext.workspaceState,
+      files(),
       pcfProjectLocator(),
       pcfProcessRunner(),
       pacCli(),
@@ -228,6 +236,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get notifications() {
       return notifications();
+    },
+    get output() {
+      return output();
     },
     get workbench() {
       return workbench();
@@ -383,4 +394,12 @@ function lazyDisposable<T extends vscode.Disposable>(
     }
     return value;
   };
+}
+
+function buildDefaultUserAgent(extensionContext: vscode.ExtensionContext): string {
+  const extension = extensionContext as {
+    extension?: { packageJSON?: { version?: string } };
+  };
+  const version = extension.extension?.packageJSON?.version || "dev";
+  return `Dynamics365Tools-VSCode/${version}`;
 }

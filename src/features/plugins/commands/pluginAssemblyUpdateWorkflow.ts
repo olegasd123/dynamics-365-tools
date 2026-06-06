@@ -412,12 +412,12 @@ export async function confirmAssemblyPublish(
   notifications: NotificationPort,
   assemblyUri: vscode.Uri,
   env: EnvironmentConfig,
+  relativePath: string,
   assemblyName?: string,
 ): Promise<boolean> {
-  const relative = vscode.workspace.asRelativePath(assemblyUri, false);
   const displayName = assemblyName ?? path.basename(assemblyUri.fsPath);
   const choice = await notifications.askWarning(
-    `Publish ${displayName} (${relative}) to ${env.name}?`,
+    `Publish ${displayName} (${relativePath}) to ${env.name}?`,
     ["Publish"],
     { modal: true },
   );

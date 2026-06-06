@@ -15,6 +15,7 @@ import { PcfEnvironmentService } from "./pcfEnvironmentService";
 import { PcfProjectLocator } from "./pcfProjectLocator";
 import { ProcessRunner } from "./processRunner";
 import type { NotificationPort } from "../../app/ports/notifications";
+import type { WorkspaceFilesPort } from "../../app/ports/files";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.pcf.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.pcf.filterConfiguredSolutions";
@@ -177,6 +178,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   constructor(
     private readonly configuration: ConfigurationService,
     private readonly state: vscode.Memento,
+    private readonly files: Pick<WorkspaceFilesPort, "workspaceFolders">,
     private readonly locator: PcfProjectLocator,
     private readonly runner: ProcessRunner,
     private readonly pacCli: PacCli,
@@ -402,10 +404,8 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       return undefined;
     }
 
-    const folder = vscode.workspace.workspaceFolders?.find((item) =>
-      samePath(item.uri.fsPath, root),
-    );
-    return folder?.name ?? path.basename(root);
+    const folder = this.files.workspaceFolders.find((item) => samePath(item, root));
+    return folder ? path.basename(folder) : path.basename(root);
   }
 }
 

@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { ConfigurationService } from "../../config/configurationService";
 import { SolutionPicker } from "../../../app/solutionPicker";
@@ -20,7 +19,8 @@ import {
 } from "./pluginRegistrationPrompts";
 
 export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications, input } =
+    ctx.core;
   const { explorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
   if (!node) {
@@ -67,7 +67,7 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
   const mode = await pickMode();
   if (mode === undefined) return;
 
-  const rankValue = await vscode.window.showInputBox({
+  const rankValue = await input.showInputBox({
     prompt: "Execution rank (lower runs first)",
     value: "1",
     validateInput: (val) => (Number.isNaN(Number(val)) ? "Enter a number" : undefined),
@@ -77,7 +77,7 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
   const rank = Number(rankValue) || 1;
 
   const defaultName = buildStepDefaultName(node.pluginType.name, messageName, primaryEntity);
-  const name = await vscode.window.showInputBox({
+  const name = await input.showInputBox({
     prompt: "Step name",
     value: defaultName,
     ignoreFocusOut: true,
@@ -106,7 +106,8 @@ export async function createPluginStep(ctx: CommandContext, node?: PluginTypeNod
 }
 
 export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications, input } =
+    ctx.core;
   const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin step in the Plugins explorer.");
@@ -156,7 +157,7 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
   const mode = await pickMode(node.step.mode);
   if (mode === undefined) return;
 
-  const rankValue = await vscode.window.showInputBox({
+  const rankValue = await input.showInputBox({
     prompt: "Execution rank (lower runs first)",
     value: String(node.step.rank ?? 1),
     validateInput: (val) => (Number.isNaN(Number(val)) ? "Enter a number" : undefined),
@@ -165,7 +166,7 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
   if (rankValue === undefined) return;
   const rank = Number(rankValue) || 1;
 
-  const name = await vscode.window.showInputBox({
+  const name = await input.showInputBox({
     prompt: "Step name",
     value: node.step.name,
     ignoreFocusOut: true,

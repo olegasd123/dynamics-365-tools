@@ -8,7 +8,7 @@ import { detectTool } from "../pacCli";
 import { PcfControlProjectNode } from "../pcfExplorer";
 
 type WorkspaceFolderPick = vscode.QuickPickItem & {
-  folder: vscode.WorkspaceFolder;
+  folderPath: string;
 };
 
 const MANIFEST_FILENAME = "ControlManifest.Input.xml";
@@ -36,8 +36,8 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const parentFolder = await pickParentFolder(ctx);
-  if (!parentFolder) {
+  const parentFolderPath = await pickParentFolder(ctx);
+  if (!parentFolderPath) {
     return;
   }
 
@@ -55,7 +55,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     prompt: "Control name",
     placeHolder: "LinearInput",
     ignoreFocusOut: true,
-    validateInput: (value) => validateNewPcfControlName(value, parentFolder.uri.fsPath),
+    validateInput: (value) => validateNewPcfControlName(value, parentFolderPath),
   });
   if (!name) {
     return;
@@ -98,13 +98,13 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const targetRoot = path.join(parentFolder.uri.fsPath, name.trim());
+  const targetRoot = path.join(parentFolderPath, name.trim());
   if (await isNonEmptyDirectory(targetRoot)) {
     await ctx.core.notifications.error(`Folder ${targetRoot} already exists and is not empty.`);
     return;
   }
 
-  const output = vscode.window.createOutputChannel("PCF: New Control");
+  const output = ctx.core.output.createChannel("PCF: New Control");
   output.show(true);
   output.appendLine(`[${new Date().toISOString()}] Create ${namespace.trim()}.${name.trim()}`);
 
@@ -434,8 +434,8 @@ export async function resolvePcfProject(
 
 const resolveProject = resolvePcfProject;
 
-async function pickParentFolder(ctx: CommandContext): Promise<vscode.WorkspaceFolder | undefined> {
-  const folders = vscode.workspace.workspaceFolders ?? [];
+async function pickParentFolder(ctx: CommandContext): Promise<string | undefined> {
+  const folders = ctx.core.files.workspaceFolders;
   if (!folders.length) {
     await ctx.core.notifications.error("Open a workspace folder before creating a PCF control.");
     return undefined;
@@ -446,14 +446,14 @@ async function pickParentFolder(ctx: CommandContext): Promise<vscode.WorkspaceFo
   }
 
   const pick = await vscode.window.showQuickPick<WorkspaceFolderPick>(
-    folders.map((folder) => ({
-      label: folder.name,
-      description: folder.uri.fsPath,
-      folder,
+    folders.map((folderPath) => ({
+      label: path.basename(folderPath),
+      description: folderPath,
+      folderPath,
     })),
     { placeHolder: "Select parent workspace folder" },
   );
-  return pick?.folder;
+  return pick?.folderPath;
 }
 
 async function ensurePac(ctx: CommandContext): Promise<boolean> {

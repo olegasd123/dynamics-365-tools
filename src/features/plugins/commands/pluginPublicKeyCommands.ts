@@ -11,7 +11,7 @@ import type { NotificationPort } from "../../../app/ports/notifications";
 const execFileAsync = promisify(execFile);
 
 export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
-  const { configuration, notifications, files, clipboard } = ctx.core;
+  const { configuration, notifications, files, clipboard, input } = ctx.core;
   const workspaceRoot = configuration.workspaceRoot ?? files.workspaceRoot;
 
   const projectPick = await vscode.window.showOpenDialog({
@@ -29,7 +29,7 @@ export async function generatePublicKeyToken(ctx: CommandContext): Promise<void>
   const csprojUri = projectPick[0];
   const projectDir = path.dirname(csprojUri.fsPath);
 
-  const filename = await vscode.window.showInputBox({
+  const filename = await input.showInputBox({
     prompt: "Enter file name for the strong name key (.snk)",
     value: "plugin.snk",
     ignoreFocusOut: true,

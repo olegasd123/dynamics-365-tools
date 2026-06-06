@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { PcfDeployedControlNode } from "../pcfExplorer";
@@ -11,7 +12,7 @@ export async function setPcfSolutionFilter(ctx: CommandContext, enabled: boolean
 }
 
 export async function setPcfWorkspaceFolderFilter(ctx: CommandContext): Promise<void> {
-  const folders = vscode.workspace.workspaceFolders ?? [];
+  const folders = ctx.core.files.workspaceFolders;
   if (folders.length <= 1) {
     await ctx.core.notifications.info("Only one workspace folder is open.");
     await ctx.pcf.explorer.setWorkspaceFolderFilter(undefined);
@@ -26,10 +27,10 @@ export async function setPcfWorkspaceFolderFilter(ctx: CommandContext): Promise<
   const pick = await vscode.window.showQuickPick(
     [
       all,
-      ...folders.map((folder) => ({
-        label: folder.name,
-        description: folder.uri.fsPath,
-        rootUri: folder.uri.fsPath,
+      ...folders.map((folderPath) => ({
+        label: path.basename(folderPath),
+        description: folderPath,
+        rootUri: folderPath,
       })),
     ],
     { placeHolder: "Filter PCF controls by workspace folder" },

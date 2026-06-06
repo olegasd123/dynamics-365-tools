@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { EnvironmentConfig } from "../config/domain/models";
 import { AuthService } from "../auth/authService";
@@ -22,6 +21,7 @@ export class EnvironmentConnectionService {
     private readonly auth: AuthService,
     private readonly secrets: SecretService,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
+    private readonly defaultUserAgent = "Dynamics365Tools-VSCode/dev",
   ) {}
 
   async createConnection(
@@ -98,9 +98,7 @@ export class EnvironmentConnectionService {
     if (env.userAgent?.trim()) {
       return env.userAgent.trim();
     }
-    const extension = vscode.extensions.getExtension("dynamics365tools.dynamics-365-tools");
-    const version = (extension?.packageJSON as { version?: string })?.version || "dev";
-    return `Dynamics365Tools-VSCode/${version}`;
+    return this.defaultUserAgent;
   }
 
   private async acquireTokenWithClientCredentials(

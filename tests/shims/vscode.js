@@ -27,25 +27,10 @@ const workspace = {
   workspaceFolders: undefined,
 };
 
-const messages = {
-  info: [],
-  warn: [],
-  error: [],
-};
-
 const window = {
-  showInformationMessage: async (msg) => {
-    messages.info.push(msg);
-    return undefined;
-  },
-  showWarningMessage: async (msg) => {
-    messages.warn.push(msg);
-    return undefined;
-  },
-  showErrorMessage: async (msg) => {
-    messages.error.push(msg);
-    return undefined;
-  },
+  showInformationMessage: async () => undefined,
+  showWarningMessage: async () => undefined,
+  showErrorMessage: async () => undefined,
   showInputBox: async () => undefined,
   showQuickPick: async () => undefined,
   showSaveDialog: async () => undefined,
@@ -97,7 +82,6 @@ const window = {
     window.__lastWebviewPanel = panel;
     return panel;
   },
-  __messages: messages,
   __lastWebviewPanel: undefined,
 };
 

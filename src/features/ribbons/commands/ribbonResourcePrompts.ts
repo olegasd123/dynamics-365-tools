@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { pickDataverseClient } from "../../../app/commandUtils";
+import { WorkspaceFileType, type WorkspaceFilesPort } from "../../../app/ports/files";
 import { BindingEntry } from "../../config/domain/models";
 import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
@@ -324,21 +325,45 @@ async function listFolderJavaScriptLibraries(
   binding: BindingEntry,
 ): Promise<WebResourceLibraryPick[]> {
   const root = ctx.core.configuration.resolveLocalPath(binding.relativeLocalPath);
-  const files = await vscode.workspace.findFiles(
-    new vscode.RelativePattern(root, "**/*.js"),
-    "**/node_modules/**",
-  );
+  const files = await collectJavaScriptFiles(ctx.core.files, root);
 
-  return files.map((file) => {
-    const relative = path.relative(root, file.fsPath).replace(/\\/g, "/");
+  return files.map((filePath) => {
+    const relative = path.relative(root, filePath).replace(/\\/g, "/");
     const uniqueName = joinRemotePath(binding.remotePath, relative);
     return {
       label: uniqueName,
-      description: ctx.core.configuration.getRelativeToWorkspace(file.fsPath),
+      description: ctx.core.configuration.getRelativeToWorkspace(filePath),
       uniqueName,
-      localPath: file.fsPath,
+      localPath: filePath,
     };
   });
+}
+
+async function collectJavaScriptFiles(files: WorkspaceFilesPort, root: string): Promise<string[]> {
+  const discovered: string[] = [];
+
+  async function visit(dir: string): Promise<void> {
+    let entries: Awaited<ReturnType<WorkspaceFilesPort["readDirectory"]>>;
+    try {
+      entries = await files.readDirectory(dir);
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.type === WorkspaceFileType.Directory) {
+        if (entry.name !== "node_modules") {
+          await visit(fullPath);
+        }
+      } else if (entry.type === WorkspaceFileType.File && entry.name.endsWith(".js")) {
+        discovered.push(fullPath);
+      }
+    }
+  }
+
+  await visit(root);
+  return discovered.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
 export async function pickJavaScriptFunctionName(

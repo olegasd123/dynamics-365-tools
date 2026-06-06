@@ -1,14 +1,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { CommandContext } from "../../../app/commandContext";
+import type { OutputPort } from "../../../app/ports/output";
 import { WorkspaceFileType } from "../../../app/ports/files";
 import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
 import { pickDataverseClient, resolveTargetUri } from "../../../app/commandUtils";
 import type { DataverseClient } from "../../dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
-
-const bindingOutput = vscode.window.createOutputChannel("Dynamics 365 Tools Binding");
 
 export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
   const { configuration, ui, notifications, files } = ctx.core;
@@ -110,6 +109,7 @@ async function confirmFolderBinding(
     }
 
     logBindingDiff(
+      ctx.core.output,
       target.env.name,
       folderUri.fsPath,
       remotePath,
@@ -164,12 +164,14 @@ async function listWebResourceNamesByPrefix(
 }
 
 function logBindingDiff(
+  output: OutputPort,
   environmentName: string,
   localFolderPath: string,
   remotePath: string,
   onlyLocal: string[],
   onlyCrm: string[],
 ): void {
+  const bindingOutput = output.createChannel("Dynamics 365 Tools Binding");
   bindingOutput.appendLine("────────────────────────────────────────────────────────────────────");
   bindingOutput.appendLine(`[${new Date().toISOString()}] Folder binding diff`);
   bindingOutput.appendLine(`Environment: ${environmentName}`);

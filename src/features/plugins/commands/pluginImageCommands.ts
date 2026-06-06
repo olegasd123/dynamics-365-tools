@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "../../../app/commandContext";
 import { PluginImageNode, PluginStepNode } from "../pluginExplorer";
 import {
@@ -10,7 +9,8 @@ import {
 } from "./pluginRegistrationPrompts";
 
 export async function createPluginImage(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications, input } =
+    ctx.core;
   const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin step in the Plugins explorer.");
@@ -33,14 +33,14 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
   const type = await pickImageType(node.step);
   if (type === undefined) return;
 
-  const entityAlias = await vscode.window.showInputBox({
+  const entityAlias = await input.showInputBox({
     prompt: "Image entity alias",
     value: type === 0 ? "PreImage" : type === 1 ? "PostImage" : "Image",
     ignoreFocusOut: true,
   });
   if (!entityAlias) return;
 
-  const messagePropertyName = await vscode.window.showInputBox({
+  const messagePropertyName = await input.showInputBox({
     prompt: "Message property name",
     value: getDefaultMessagePropertyName(node.step),
     ignoreFocusOut: true,
@@ -55,7 +55,7 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
   if (attributesPick.cancelled) return;
   const attributes = attributesPick.value;
 
-  const name = await vscode.window.showInputBox({
+  const name = await input.showInputBox({
     prompt: "Image name",
     value: entityAlias,
     ignoreFocusOut: true,
@@ -78,7 +78,8 @@ export async function createPluginImage(ctx: CommandContext, node?: PluginStepNo
 }
 
 export async function editPluginImage(ctx: CommandContext, node?: PluginImageNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications, input } =
+    ctx.core;
   const { explorer } = ctx.plugins;
   if (!node) {
     void notifications.info("Run this command from a plugin image in the Plugins explorer.");
@@ -101,14 +102,14 @@ export async function editPluginImage(ctx: CommandContext, node?: PluginImageNod
   const type = await pickImageType(node.step, node.image.type);
   if (type === undefined) return;
 
-  const entityAlias = await vscode.window.showInputBox({
+  const entityAlias = await input.showInputBox({
     prompt: "Image entity alias",
     value: node.image.entityAlias ?? "Image",
     ignoreFocusOut: true,
   });
   if (!entityAlias) return;
 
-  const messagePropertyName = await vscode.window.showInputBox({
+  const messagePropertyName = await input.showInputBox({
     prompt: "Message property name",
     value: node.image.messagePropertyName ?? getDefaultMessagePropertyName(node.step),
     ignoreFocusOut: true,
@@ -124,7 +125,7 @@ export async function editPluginImage(ctx: CommandContext, node?: PluginImageNod
   if (attributesPick.cancelled) return;
   const attributes = attributesPick.value;
 
-  const name = await vscode.window.showInputBox({
+  const name = await input.showInputBox({
     prompt: "Image name",
     value: node.image.name,
     ignoreFocusOut: true,

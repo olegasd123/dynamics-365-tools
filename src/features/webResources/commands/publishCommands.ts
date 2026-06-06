@@ -63,6 +63,7 @@ export async function publishLastResource(ctx: CommandContext): Promise<void> {
 
   if (
     !(await confirmPublishTarget(
+      configuration,
       notifications,
       last.targetUri,
       configuredEnvironment,
@@ -431,12 +432,13 @@ async function publishFolder(
 }
 
 function confirmPublishTarget(
+  configuration: ConfigurationService,
   notifications: NotificationPort,
   targetUri: vscode.Uri,
   env: EnvironmentConfig,
   isFolder: boolean,
 ): Promise<boolean> {
-  const relative = vscode.workspace.asRelativePath(targetUri, false);
+  const relative = configuration.getRelativeToWorkspace(targetUri.fsPath);
   const target = isFolder ? `${relative}/` : relative;
   return (async () => {
     const result = await notifications.askWarning(

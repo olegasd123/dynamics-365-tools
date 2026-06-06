@@ -37,6 +37,7 @@ import type { ClipboardPort } from "./ports/clipboard";
 import type { TextInputPort } from "./ports/input";
 import type { LoggerPort } from "./ports/logger";
 import type { NotificationPort } from "./ports/notifications";
+import type { OutputPort } from "./ports/output";
 import type { WorkbenchPort } from "./ports/workbench";
 import type { WorkspaceFilesPort } from "./ports/files";
 import type { LastSelectionService } from "../platform/vscode/lastSelectionStore";
@@ -62,6 +63,7 @@ export interface CoreServices {
   secrets: SecretService;
   logger: LoggerPort;
   notifications: NotificationPort;
+  output: OutputPort;
   workbench: WorkbenchPort;
   files: WorkspaceFilesPort;
   clipboard: ClipboardPort;

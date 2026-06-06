@@ -19,13 +19,6 @@ import {
   validateAssemblyUpdateTarget,
 } from "../commands/pluginCommands";
 
-function clearMessages(): void {
-  const messages = (vscode.window as any).__messages;
-  messages.info.length = 0;
-  messages.warn.length = 0;
-  messages.error.length = 0;
-}
-
 function createNotifications(): VsCodeNotificationService {
   return new VsCodeNotificationService();
 }
@@ -104,7 +97,7 @@ test("validateAssemblyIdentity blocks a different culture", () => {
 });
 
 test("validateAssemblyUpdateTarget warns but allows version changes", async () => {
-  clearMessages();
+  const notifications = new RecordingNotifications();
   const service = {
     getAssembly: async () => ({
       id: "assembly-id",
@@ -127,13 +120,12 @@ test("validateAssemblyUpdateTarget warns but allows version changes", async () =
     assemblyUri: vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
     pluginService: service as any,
     pluginRegistration: registration as any,
-    notifications: createNotifications(),
+    notifications,
   });
 
-  const messages = (vscode.window as any).__messages;
   assert.strictEqual(result, true);
   assert.ok(
-    messages.warn.some((message: string) =>
+    notifications.warnings.some((message) =>
       message.includes("version will change from 1.0.0.0 to 1.1.0.0"),
     ),
   );

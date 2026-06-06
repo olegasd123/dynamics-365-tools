@@ -28,6 +28,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     assemblyStatusBar,
     notifications,
     files,
+    input,
   } = ctx.core;
   const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
@@ -64,7 +65,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
   }
 
   const defaultName = path.basename(assemblyFile[0].fsPath, path.extname(assemblyFile[0].fsPath));
-  const name = await vscode.window.showInputBox({
+  const name = await input.showInputBox({
     prompt: "Enter plugin assembly name",
     value: defaultName,
     ignoreFocusOut: true,
@@ -287,6 +288,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     notifications,
     last.assemblyUri,
     selection.env,
+    configuration.getRelativeToWorkspace(last.assemblyUri.fsPath),
     last.assemblyName,
   );
   if (!confirmed) {
