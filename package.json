@@ -1013,7 +1013,7 @@
         {
           "command": "dynamics365Tools.ribbons.addRuleChildStep",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonRuleStep:OrRule",
-          "group": "inline@10"
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.addLocLabel",
