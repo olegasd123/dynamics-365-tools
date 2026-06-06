@@ -173,6 +173,15 @@ export async function hideOobRibbonButton(
     return;
   }
 
+  const choice = await ctx.core.notifications.askWarning(
+    `Hide OOB button "${command.label}"?`,
+    ["Hide"],
+    { modal: true },
+  );
+  if (choice !== "Hide") {
+    return;
+  }
+
   const baseId = makeHideActionId(target.document, target.view.scope, getOobControlId(command));
   const hideActionId = nextHideActionId(target.document, { hideActionId: baseId });
   ctx.ribbon.editorState.queuePatches(

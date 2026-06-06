@@ -102,6 +102,21 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
 
   const plan = createRibbonCascadeDeletePlan(document, node.contextValue, range);
   if (!plan?.related.length) {
+    const alreadyConfirmed =
+      node.contextValue === "d365RibbonParameter" ||
+      node.contextValue === "d365RibbonHideAction" ||
+      node.contextValue === "d365RibbonLocLabelTitle";
+    if (!alreadyConfirmed) {
+      const deleteInfo = resolveDeleteInfo(node.contextValue);
+      const choice = await ctx.core.notifications.askWarning(
+        `Delete ${deleteInfo.kind} ${node.label}?`,
+        [deleteInfo.buttonLabel],
+        { modal: true, detail: deleteInfo.detail },
+      );
+      if (choice !== deleteInfo.buttonLabel) {
+        return;
+      }
+    }
     ctx.ribbon.editorState.queuePatches(document, [
       createDeleteNodePatch(document.sourceText, range),
     ]);
@@ -128,6 +143,60 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
       : [createDeleteNodePatch(document.sourceText, range)],
   );
   ctx.ribbon.explorer.refresh();
+}
+
+function resolveDeleteInfo(contextValue: string): {
+  kind: string;
+  buttonLabel: string;
+  detail: string;
+} {
+  if (contextValue === "d365RibbonEnableRule") {
+    return {
+      kind: "enable rule",
+      buttonLabel: "Delete Enable Rule",
+      detail: "This removes the EnableRule XML from the ribbon.",
+    };
+  }
+  if (contextValue === "d365RibbonDisplayRule") {
+    return {
+      kind: "display rule",
+      buttonLabel: "Delete Display Rule",
+      detail: "This removes the DisplayRule XML from the ribbon.",
+    };
+  }
+  if (contextValue.startsWith("d365RibbonRuleStep:")) {
+    return {
+      kind: "rule step",
+      buttonLabel: "Delete Rule Step",
+      detail: "This removes the rule step XML from the ribbon.",
+    };
+  }
+  if (contextValue === "d365RibbonCustomAction") {
+    return {
+      kind: "custom action",
+      buttonLabel: "Delete Custom Action",
+      detail: "This removes the CustomAction XML from the ribbon.",
+    };
+  }
+  if (contextValue === "d365RibbonCommandDefinition") {
+    return {
+      kind: "command",
+      buttonLabel: "Delete Command",
+      detail: "This removes the CommandDefinition XML from the ribbon.",
+    };
+  }
+  if (contextValue === "d365RibbonLocLabel") {
+    return {
+      kind: "loc label",
+      buttonLabel: "Delete Loc Label",
+      detail: "This removes the LocLabel XML from the ribbon.",
+    };
+  }
+  return {
+    kind: "ribbon item",
+    buttonLabel: "Delete",
+    detail: "This removes the item XML from the ribbon.",
+  };
 }
 
 function findLocLabelTitleDeleteTarget(
