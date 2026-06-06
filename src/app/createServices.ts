@@ -74,7 +74,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
 
   const bindings = lazy(() => new BindingService(configuration()));
   const publishCache = lazy(() => new PublishCacheService(configuration()));
-  const publisher = lazy(() => new WebResourcePublisher(connections(), notifications()));
+  const publisher = lazy(() => new WebResourcePublisher(connections(), files(), notifications()));
   const webResources = lazy(() => new WebResourceUrlService(notifications()));
 
   const pluginAssemblyIntrospector = lazy(

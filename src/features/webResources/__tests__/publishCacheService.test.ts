@@ -3,7 +3,8 @@ import test from "node:test";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import * as vscode from "vscode";
+import { WorkspaceFileType } from "../../../app/ports/files";
+import type { WorkspaceFileStat } from "../../../app/ports/files";
 import { PublishCacheService } from "../publishCacheService";
 import { ConfigurationService } from "../../config/configurationService";
 
@@ -11,8 +12,8 @@ test("publish cache tracks unchanged files per environment", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-cache-"));
   const configuration = { workspaceRoot } as unknown as ConfigurationService;
   const cache = new PublishCacheService(configuration);
-  const stat: vscode.FileStat = {
-    type: vscode.FileType.File,
+  const stat: WorkspaceFileStat = {
+    type: WorkspaceFileType.File,
     ctime: 0,
     mtime: 123,
     size: 10,

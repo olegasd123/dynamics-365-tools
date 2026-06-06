@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import type { WorkspaceFileStat } from "../../app/ports/files";
 import { ConfigurationService } from "../config/configurationService";
 import { publishCacheSchema } from "../config/schema";
 
@@ -16,7 +17,7 @@ export class PublishCacheService {
 
   async isUnchanged(
     remotePath: string,
-    stat: vscode.FileStat,
+    stat: WorkspaceFileStat,
     hash: string,
     environment?: string,
   ): Promise<boolean> {
@@ -44,7 +45,7 @@ export class PublishCacheService {
 
   async update(
     remotePath: string,
-    stat: vscode.FileStat,
+    stat: WorkspaceFileStat,
     hash: string,
     environment?: string,
   ): Promise<void> {

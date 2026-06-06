@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import type { WorkspaceFilesPort } from "../app/ports/files";
+import { WorkspaceFileType } from "../app/ports/files";
+import type { WorkspaceFileStat, WorkspaceFilesPort } from "../app/ports/files";
 import type { LoggerPort, LogMetadata } from "../app/ports/logger";
 import type { NotificationPort } from "../app/ports/notifications";
 import type { SecretStorePort, StateStorePort } from "../app/ports/storage";
@@ -9,9 +10,18 @@ import type { WorkbenchPort } from "../app/ports/workbench";
 export class NodeWorkspaceFiles implements WorkspaceFilesPort {
   constructor(public workspaceRoot: string | undefined) {}
 
+  async stat(fsPath: string): Promise<WorkspaceFileStat> {
+    const stats = await fs.stat(fsPath);
+    return {
+      type: stats.isDirectory() ? WorkspaceFileType.Directory : WorkspaceFileType.File,
+      ctime: stats.ctimeMs,
+      mtime: stats.mtimeMs,
+      size: stats.size,
+    };
+  }
+
   async exists(fsPath: string): Promise<boolean> {
-    return fs
-      .stat(fsPath)
+    return this.stat(fsPath)
       .then(() => true)
       .catch(() => false);
   }
@@ -27,6 +37,87 @@ export class NodeWorkspaceFiles implements WorkspaceFilesPort {
 
   async createDirectory(fsPath: string): Promise<void> {
     await fs.mkdir(fsPath, { recursive: true });
+  }
+}
+
+type MemoryFileEntry = WorkspaceFileStat & {
+  content?: Uint8Array;
+};
+
+export class MemoryWorkspaceFiles implements WorkspaceFilesPort {
+  private readonly entries = new Map<string, MemoryFileEntry>();
+  private clock = 1;
+
+  constructor(public workspaceRoot: string | undefined) {
+    if (workspaceRoot) {
+      this.addDirectory(workspaceRoot);
+    }
+  }
+
+  addFile(fsPath: string, content: string | Uint8Array): void {
+    const bytes = typeof content === "string" ? Buffer.from(content, "utf8") : content;
+    this.addDirectory(path.dirname(fsPath));
+    this.entries.set(this.normalize(fsPath), {
+      type: WorkspaceFileType.File,
+      ctime: this.clock,
+      mtime: this.clock++,
+      size: bytes.byteLength,
+      content: bytes,
+    });
+  }
+
+  addDirectory(fsPath: string): void {
+    const normalized = this.normalize(fsPath);
+    const parent = path.dirname(normalized);
+    if (parent && parent !== normalized && !this.entries.has(parent)) {
+      this.addDirectory(parent);
+    }
+    if (!this.entries.has(normalized)) {
+      this.entries.set(normalized, {
+        type: WorkspaceFileType.Directory,
+        ctime: this.clock,
+        mtime: this.clock++,
+        size: 0,
+      });
+    }
+  }
+
+  async stat(fsPath: string): Promise<WorkspaceFileStat> {
+    const entry = this.getEntry(fsPath);
+    const { type, ctime, mtime, size } = entry;
+    return { type, ctime, mtime, size };
+  }
+
+  async exists(fsPath: string): Promise<boolean> {
+    return this.entries.has(this.normalize(fsPath));
+  }
+
+  async readFile(fsPath: string): Promise<Uint8Array> {
+    const entry = this.getEntry(fsPath);
+    if (entry.type !== WorkspaceFileType.File || !entry.content) {
+      throw Object.assign(new Error(`File not found: ${fsPath}`), { code: "ENOENT" });
+    }
+    return entry.content;
+  }
+
+  async writeFile(fsPath: string, content: Uint8Array): Promise<void> {
+    this.addFile(fsPath, content);
+  }
+
+  async createDirectory(fsPath: string): Promise<void> {
+    this.addDirectory(fsPath);
+  }
+
+  private getEntry(fsPath: string): MemoryFileEntry {
+    const entry = this.entries.get(this.normalize(fsPath));
+    if (!entry) {
+      throw Object.assign(new Error(`Path not found: ${fsPath}`), { code: "ENOENT" });
+    }
+    return entry;
+  }
+
+  private normalize(fsPath: string): string {
+    return path.normalize(fsPath);
   }
 }
 

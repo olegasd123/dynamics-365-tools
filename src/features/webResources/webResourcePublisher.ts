@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { WorkspaceFilesPort, WorkspaceFileType } from "../../app/ports/files";
 import { NoopNotificationService, NotificationPort } from "../../app/ports/notifications";
 import { formatErrorDetails } from "../../shared/errorDetails";
 import { BindingEntry, EnvironmentConfig } from "../config/domain/models";
@@ -50,6 +51,7 @@ export class WebResourcePublisher {
 
   constructor(
     private readonly connections: EnvironmentConnectionService,
+    private readonly files: WorkspaceFilesPort,
     private readonly notifications: NotificationPort = new NoopNotificationService(),
   ) {
     this.output = vscode.window.createOutputChannel("Dynamics 365 Tools Publisher");
@@ -79,7 +81,7 @@ export class WebResourcePublisher {
     try {
       this.throwIfCancelled(cancellationToken);
       const { localPath, remotePath } = await this.resolvePaths(binding, targetUri);
-      const fileStat = await vscode.workspace.fs.stat(vscode.Uri.file(localPath));
+      const fileStat = await this.files.stat(localPath);
       let content: Buffer | undefined;
       let hash: string | undefined;
 
@@ -197,8 +199,8 @@ export class WebResourcePublisher {
   ): Promise<{ localPath: string; remotePath: string }> {
     const bindingRoot = this.resolveLocalPath(binding.relativeLocalPath);
     const targetPath = targetUri?.fsPath ?? bindingRoot;
-    const targetStat = await vscode.workspace.fs.stat(vscode.Uri.file(targetPath));
-    if (targetStat.type === vscode.FileType.Directory) {
+    const targetStat = await this.files.stat(targetPath);
+    if (targetStat.type === WorkspaceFileType.Directory) {
       throw new Error("Select a file inside the bound folder to publish.");
     }
 
@@ -224,7 +226,7 @@ export class WebResourcePublisher {
       return path.normalize(bindingPath);
     }
 
-    const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspace = this.files.workspaceRoot;
     if (!workspace) {
       throw new Error("No workspace folder detected; cannot resolve binding path.");
     }
@@ -245,8 +247,7 @@ export class WebResourcePublisher {
   }
 
   private async readFile(localPath: string): Promise<Buffer> {
-    const uri = vscode.Uri.file(localPath);
-    return Buffer.from(await vscode.workspace.fs.readFile(uri));
+    return Buffer.from(await this.files.readFile(localPath));
   }
 
   private hashContent(content: Buffer): string {

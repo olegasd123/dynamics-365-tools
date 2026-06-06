@@ -14,7 +14,7 @@ Move logic-heavy VS Code dependencies behind small capability ports while leavin
 
 Important: Mark a milestone as `[Done]` when it's completed.
 
-## Milestone 1: Publish File System Isolation
+## Milestone 1: Publish File System Isolation [Done]
 
 Refactor `src/features/webResources/webResourcePublisher.ts` to stop using `vscode.workspace.fs` and workspace folders directly.
 

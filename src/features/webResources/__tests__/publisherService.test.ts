@@ -1,9 +1,8 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as fs from "fs/promises";
-import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
+import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { DataverseClient } from "../../dataverse/dataverseClient";
 import { WebResourcePublisher } from "../webResourcePublisher";
 
@@ -23,18 +22,25 @@ class FakeConnections {
   }
 }
 
+function createWorkspace(): { workspaceRoot: string; files: MemoryWorkspaceFiles } {
+  const workspaceRoot = path.join("/workspace", "project");
+  return { workspaceRoot, files: new MemoryWorkspaceFiles(workspaceRoot) };
+}
+
+function createPublisher(files: MemoryWorkspaceFiles): WebResourcePublisher {
+  return new WebResourcePublisher(new FakeConnections() as any, files);
+}
+
 test("resolvePaths maps folder bindings to nested files", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const folder = path.join(workspaceRoot, "web");
   const file = path.join(folder, "script.js");
-  await fs.mkdir(folder, { recursive: true });
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
-  const publisher = new WebResourcePublisher(new FakeConnections() as any);
+  const publisher = createPublisher(files);
   const paths = await (publisher as any).resolvePaths(
     {
-      relativeLocalPath: folder,
+      relativeLocalPath: path.join(path.basename(workspaceRoot), "web"),
       remotePath: "new_/web",
       solutionName: "CoreWebResources",
       kind: "folder",
@@ -44,16 +50,14 @@ test("resolvePaths maps folder bindings to nested files", async () => {
 
   assert.strictEqual(paths.localPath, file);
   assert.strictEqual(paths.remotePath, "new_/web/script.js");
-  await fs.rm(workspaceRoot, { recursive: true, force: true });
 });
 
 test("resolvePaths rejects publishing a directory target", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const folder = path.join(workspaceRoot, "web");
-  await fs.mkdir(folder, { recursive: true });
+  files.addDirectory(folder);
 
-  const publisher = new WebResourcePublisher(new FakeConnections() as any);
+  const publisher = createPublisher(files);
   await assert.rejects(
     (publisher as any).resolvePaths(
       {
@@ -66,12 +70,10 @@ test("resolvePaths rejects publishing a directory target", async () => {
     ),
     /Select a file inside the bound folder to publish/,
   );
-
-  await fs.rm(workspaceRoot, { recursive: true, force: true });
 });
 
 test("detectType maps known extensions to correct codes", () => {
-  const publisher = new WebResourcePublisher(new FakeConnections() as any);
+  const publisher = createPublisher(createWorkspace().files);
   assert.strictEqual((publisher as any).detectType("file.css"), 2);
   assert.strictEqual((publisher as any).detectType("file.js"), 3);
   assert.strictEqual((publisher as any).detectType("file.xml"), 4);
@@ -83,10 +85,9 @@ test("detectType maps known extensions to correct codes", () => {
 });
 
 test("publish fails fast when solution is missing", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const file = path.join(workspaceRoot, "script.js");
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const calls: string[] = [];
   const originalFetch = global.fetch;
@@ -102,7 +103,7 @@ test("publish fails fast when solution is missing", async () => {
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -121,15 +122,13 @@ test("publish fails fast when solution is missing", async () => {
     assert.match(logs, /Solution MissingSolution not found/);
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
 test("publish aborts when remotePath matches multiple resources", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const file = path.join(workspaceRoot, "script.js");
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const calls: string[] = [];
   const originalFetch = global.fetch;
@@ -150,7 +149,7 @@ test("publish aborts when remotePath matches multiple resources", async () => {
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -169,15 +168,13 @@ test("publish aborts when remotePath matches multiple resources", async () => {
     assert.match(logs, /Multiple web resources found/);
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
 test("publish returns cancellation result when token is cancelled", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const file = path.join(workspaceRoot, "script.js");
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const token = {
     isCancellationRequested: true,
@@ -192,7 +189,7 @@ test("publish returns cancellation result when token is cancelled", async () => 
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -211,15 +208,13 @@ test("publish returns cancellation result when token is cancelled", async () => 
     assert.strictEqual(fetchCalled, false);
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
 test("publish creates a new web resource and adds it to the solution", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const file = path.join(workspaceRoot, "script.js");
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const calls: Array<{ url: string; method: string | undefined; body?: string }> = [];
   const originalFetch = global.fetch;
@@ -254,7 +249,7 @@ test("publish creates a new web resource and adds it to the solution", async () 
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -280,17 +275,14 @@ test("publish creates a new web resource and adds it to the solution", async () 
     assert.strictEqual(createBody.displayname, "script.js");
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
 test("publish updates an existing web resource for folder binding", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const folder = path.join(workspaceRoot, "web");
   const file = path.join(folder, "script.js");
-  await fs.mkdir(folder, { recursive: true });
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const calls: Array<{ url: string; method: string | undefined; body?: string }> = [];
   const originalFetch = global.fetch;
@@ -319,7 +311,7 @@ test("publish updates an existing web resource for folder binding", async () => 
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: folder,
@@ -348,15 +340,13 @@ test("publish updates an existing web resource for folder binding", async () => 
     );
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
 test("publish skips when cache reports unchanged", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const file = path.join(workspaceRoot, "script.js");
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const cache = {
     isUnchanged: async () => true,
@@ -369,7 +359,7 @@ test("publish skips when cache reports unchanged", async () => {
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -391,15 +381,13 @@ test("publish skips when cache reports unchanged", async () => {
     });
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
 test("publish respects manageMissingComponents=false and skips missing resource", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dynamics365-publish-"));
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const { workspaceRoot, files } = createWorkspace();
   const file = path.join(workspaceRoot, "script.js");
-  await fs.writeFile(file, "console.log('hi');");
+  files.addFile(file, "console.log('hi');");
 
   const calls: string[] = [];
   const originalFetch = global.fetch;
@@ -420,7 +408,7 @@ test("publish respects manageMissingComponents=false and skips missing resource"
   }) as any;
 
   try {
-    const publisher = new WebResourcePublisher(new FakeConnections() as any);
+    const publisher = createPublisher(files);
     const result = await publisher.publish(
       {
         relativeLocalPath: file,
@@ -445,6 +433,5 @@ test("publish respects manageMissingComponents=false and skips missing resource"
     );
   } finally {
     global.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
