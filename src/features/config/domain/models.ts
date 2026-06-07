@@ -5,6 +5,4 @@ export type {
   Dynamics365Configuration,
   BindingEntry,
   BindingSnapshot,
-  PublishCacheEntry,
-  PublishCache,
 } from "../schema";
