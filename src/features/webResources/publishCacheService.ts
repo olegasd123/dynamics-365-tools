@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 import * as path from "path";
+import type { WorkspaceFilesPort, WorkspaceFileStat } from "@app/ports/files";
 import { ConfigurationService } from "../config/configurationService";
 import { publishCacheSchema } from "../config/schema";
 
@@ -12,11 +12,14 @@ interface PublishCacheEntry {
 export class PublishCacheService {
   private cache: Record<string, PublishCacheEntry> | undefined;
 
-  constructor(private readonly configuration: ConfigurationService) {}
+  constructor(
+    private readonly configuration: ConfigurationService,
+    private readonly files: WorkspaceFilesPort,
+  ) {}
 
   async isUnchanged(
     remotePath: string,
-    stat: vscode.FileStat,
+    stat: WorkspaceFileStat,
     hash: string,
     environment?: string,
   ): Promise<boolean> {
@@ -44,7 +47,7 @@ export class PublishCacheService {
 
   async update(
     remotePath: string,
-    stat: vscode.FileStat,
+    stat: WorkspaceFileStat,
     hash: string,
     environment?: string,
   ): Promise<void> {
@@ -70,14 +73,14 @@ export class PublishCacheService {
       return true;
     }
 
-    const cacheUri = await this.getCacheUri();
-    if (!cacheUri) {
+    const cachePath = this.getCachePath();
+    if (!cachePath) {
       return false;
     }
 
     try {
-      await this.ensureVscodeFolder(cacheUri);
-      const content = await vscode.workspace.fs.readFile(cacheUri);
+      await this.ensureVscodeFolder(cachePath);
+      const content = await this.files.readFile(cachePath);
       this.cache = publishCacheSchema.parse(
         this.parseJson(content, "dynamics365tools.publishCache.json"),
       ) as Record<string, PublishCacheEntry>;
@@ -93,32 +96,26 @@ export class PublishCacheService {
   }
 
   private async save(): Promise<void> {
-    const cacheUri = await this.getCacheUri();
-    if (!cacheUri) {
+    const cachePath = this.getCachePath();
+    if (!cachePath) {
       return;
     }
-    await this.ensureVscodeFolder(cacheUri);
-    await vscode.workspace.fs.writeFile(
-      cacheUri,
-      Buffer.from(JSON.stringify(this.cache, null, 2), "utf8"),
-    );
+    await this.ensureVscodeFolder(cachePath);
+    await this.files.writeFile(cachePath, Buffer.from(JSON.stringify(this.cache, null, 2), "utf8"));
   }
 
-  private async getCacheUri(): Promise<vscode.Uri | undefined> {
+  private getCachePath(): string | undefined {
     const root = this.configuration.workspaceRoot;
     if (!root) {
       return undefined;
     }
-    const workspaceUri = vscode.Uri.file(root);
-    return vscode.Uri.joinPath(workspaceUri, ".vscode", "dynamics365tools.publishCache.json");
+    return path.join(root, ".vscode", "dynamics365tools.publishCache.json");
   }
 
-  private async ensureVscodeFolder(cacheUri: vscode.Uri): Promise<void> {
-    const vscodeDir = vscode.Uri.file(path.dirname(cacheUri.fsPath));
-    try {
-      await vscode.workspace.fs.stat(vscodeDir);
-    } catch {
-      await vscode.workspace.fs.createDirectory(vscodeDir);
+  private async ensureVscodeFolder(cachePath: string): Promise<void> {
+    const vscodeDir = path.dirname(cachePath);
+    if (!(await this.files.exists(vscodeDir))) {
+      await this.files.createDirectory(vscodeDir);
     }
   }
 

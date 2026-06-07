@@ -21,10 +21,6 @@ export class PcfStatusBarService implements vscode.Disposable {
     this.render();
   }
 
-  getWatching(): PcfWatchContext | undefined {
-    return this.watching;
-  }
-
   clear(project?: PcfControlProject): void {
     if (project && this.watching?.project.rootUri !== project.rootUri) {
       return;

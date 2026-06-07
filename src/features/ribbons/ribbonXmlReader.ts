@@ -12,7 +12,17 @@ import {
   LocLabel,
   LocLabelTitle,
   MenuSectionNode,
+  RibbonCommandClientType,
   RibbonDocument,
+  RibbonEntityPropertyName,
+  RibbonOrganizationSetting,
+  RibbonPageRuleAddress,
+  RibbonRelationshipType,
+  RibbonRuleAppliesTo,
+  RibbonRuleFormType,
+  RibbonRuleFormState,
+  RibbonRulePrivilegeDepth,
+  RibbonRulePrivilegeType,
   RibbonScope,
   RibbonSectionRanges,
   RibbonView,
@@ -607,6 +617,11 @@ function readCommandUINode(
         command: attr(node, "Command"),
         labelLocId: optionalAttr(node, "LabelLocId") ?? locLabelIdFromReference(labelText),
         labelText: isLocLabelReference(labelText) ? undefined : labelText,
+        alt: optionalAttr(node, "Alt"),
+        toolTipTitle: isLocLabelReference(toolTipTitle) ? undefined : toolTipTitle,
+        toolTipDescription: isLocLabelReference(toolTipDescription)
+          ? undefined
+          : toolTipDescription,
         toolTipTitleLocId:
           optionalAttr(node, "ToolTipTitleLocId") ?? locLabelIdFromReference(toolTipTitle),
         toolTipDescriptionLocId:
@@ -614,6 +629,7 @@ function readCommandUINode(
           locLabelIdFromReference(toolTipDescription),
         image16x16: readImageRef(node, "Image16by16"),
         image32x32: readImageRef(node, "Image32by32"),
+        modernImage: readImageRef(node, "ModernImage"),
         templateAlias: optionalAttr(node, "TemplateAlias"),
         sequence: numberAttr(node, "Sequence"),
         range: node.range,
@@ -707,6 +723,10 @@ function readActions(sourceText: string, commandDefinition: XmlElementRange): Co
       return {
         kind: "Url",
         address: attr(node, "Address"),
+        passParams: booleanAttr(node, "PassParams"),
+        winMode: numberAttr(node, "WinMode"),
+        winParams: optionalAttr(node, "WinParams"),
+        parameters: readActionParameters(node),
         range: node.range,
       };
     }
@@ -730,6 +750,10 @@ function actionParameter(node: XmlElementRange): ActionParameter {
     kind: parameterKind(node.name),
     value: attr(node, "Value"),
   };
+  const name = optionalAttr(node, "Name");
+  if (name !== undefined) {
+    parameter.name = name;
+  }
 
   Object.defineProperty(parameter, "range", {
     value: node.range,
@@ -775,8 +799,12 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
       return {
         kind: "EntityPrivilegeRule",
         entityName: optionalAttr(node, "EntityName"),
-        privilegeType: optionalAttr(node, "PrivilegeType"),
-        privilegeDepth: optionalAttr(node, "PrivilegeDepth"),
+        privilegeType: optionalAttr(node, "PrivilegeType") as RibbonRulePrivilegeType | undefined,
+        privilegeDepth: optionalAttr(node, "PrivilegeDepth") as
+          | RibbonRulePrivilegeDepth
+          | undefined,
+        appliesTo: optionalAttr(node, "AppliesTo") as RibbonRuleAppliesTo | undefined,
+        default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
@@ -785,20 +813,127 @@ function readRuleStep(sourceText: string, node: XmlElementRange): RuleStep {
         kind: "ValueRule",
         field: optionalAttr(node, "Field"),
         value: optionalAttr(node, "Value"),
+        default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
     case "FormStateRule":
       return {
         kind: "FormStateRule",
-        state: optionalAttr(node, "State"),
+        state: optionalAttr(node, "State") as RibbonRuleFormState | undefined,
+        default: booleanAttr(node, "Default"),
         invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
     case "CommandClientTypeRule":
       return {
         kind: "CommandClientTypeRule",
-        type: optionalAttr(node, "Type") as "Modern" | "Refresh" | undefined,
+        type: optionalAttr(node, "Type") as RibbonCommandClientType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "FormTypeRule":
+      return {
+        kind: "FormTypeRule",
+        type: optionalAttr(node, "Type") as RibbonRuleFormType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "EntityPropertyRule":
+      return {
+        kind: "EntityPropertyRule",
+        propertyName: optionalAttr(node, "PropertyName") as RibbonEntityPropertyName | undefined,
+        propertyValue: booleanAttr(node, "PropertyValue"),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "MiscellaneousPrivilegeRule":
+      return {
+        kind: "MiscellaneousPrivilegeRule",
+        privilegeName: optionalAttr(node, "PrivilegeName"),
+        privilegeDepth: optionalAttr(node, "PrivilegeDepth") as
+          | RibbonRulePrivilegeDepth
+          | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "OrganizationSettingRule":
+      return {
+        kind: "OrganizationSettingRule",
+        setting: optionalAttr(node, "Setting") as RibbonOrganizationSetting | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "HideForTabletExperienceRule":
+      return {
+        kind: "HideForTabletExperienceRule",
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "RelationshipTypeRule":
+      return {
+        kind: "RelationshipTypeRule",
+        type: optionalAttr(node, "Type") as RibbonRelationshipType | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "ReferencingAttributeRequiredRule":
+      return {
+        kind: "ReferencingAttributeRequiredRule",
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "PageRule":
+      return {
+        kind: "PageRule",
+        address: optionalAttr(node, "Address") as RibbonPageRuleAddress | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "OrRule":
+      return {
+        kind: "OrRule",
+        children: node.children.map((child) => readRuleStep(sourceText, child)),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "SelectionCountRule":
+      return {
+        kind: "SelectionCountRule",
+        appliesTo: optionalAttr(node, "AppliesTo") as RibbonRuleAppliesTo | undefined,
+        minimum: numberAttr(node, "Minimum"),
+        maximum: numberAttr(node, "Maximum"),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "RecordPrivilegeRule":
+      return {
+        kind: "RecordPrivilegeRule",
+        privilegeType: optionalAttr(node, "PrivilegeType") as RibbonRulePrivilegeType | undefined,
+        appliesTo: optionalAttr(node, "AppliesTo") as "PrimaryEntity" | undefined,
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
+        range: node.range,
+      };
+    case "EntityRule":
+      return {
+        kind: "EntityRule",
+        entityName: optionalAttr(node, "EntityName"),
+        appliesTo: optionalAttr(node, "AppliesTo") as RibbonRuleAppliesTo | undefined,
+        context: optionalAttr(node, "Context"),
+        default: booleanAttr(node, "Default"),
+        invertResult: booleanAttr(node, "InvertResult"),
         range: node.range,
       };
     default:
@@ -860,7 +995,7 @@ function booleanAttr(node: XmlElementRange, name: string): boolean | undefined {
     return undefined;
   }
 
-  return value.toLowerCase() === "true";
+  return value.toLowerCase() === "true" || value === "1";
 }
 
 function readImageRef(node: XmlElementRange, name: string): ImageRef | undefined {

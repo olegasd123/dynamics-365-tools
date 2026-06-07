@@ -1,33 +1,10 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as vscode from "vscode";
+import { MemoryStateStore } from "../../../testSupport/fakes";
 import { AuthorizationStore } from "../authorizationStore";
 
-class MemoryMemento implements vscode.Memento {
-  private map = new Map<string, unknown>();
-
-  keys(): readonly string[] {
-    return Array.from(this.map.keys());
-  }
-
-  get<T>(key: string, defaultValue?: T): T | undefined {
-    if (!this.map.has(key)) {
-      return defaultValue;
-    }
-    return this.map.get(key) as T;
-  }
-
-  async update(key: string, value: any): Promise<void> {
-    if (value === undefined) {
-      this.map.delete(key);
-      return;
-    }
-    this.map.set(key, value);
-  }
-}
-
 test("save stores and updates authorizations by URL", async () => {
-  const store = new AuthorizationStore(new MemoryMemento());
+  const store = new AuthorizationStore(new MemoryStateStore());
 
   await store.save({
     name: "dev",
@@ -51,7 +28,7 @@ test("save stores and updates authorizations by URL", async () => {
 });
 
 test("toEnvironment applies fallback auth type", () => {
-  const store = new AuthorizationStore(new MemoryMemento());
+  const store = new AuthorizationStore(new MemoryStateStore());
   const env = store.toEnvironment(
     {
       name: "test",

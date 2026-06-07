@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import type { SecretStorePort } from "@app/ports/storage";
 
 export interface EnvironmentCredentials {
   clientId: string;
@@ -7,7 +7,7 @@ export interface EnvironmentCredentials {
 }
 
 export class SecretService {
-  constructor(private readonly secrets: vscode.SecretStorage) {}
+  constructor(private readonly secrets: SecretStorePort) {}
 
   async getCredentials(envName: string): Promise<EnvironmentCredentials | undefined> {
     const raw = await this.secrets.get(this.buildKey(envName));

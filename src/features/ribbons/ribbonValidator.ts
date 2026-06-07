@@ -12,6 +12,7 @@ import {
   RuleStep,
   TextRange,
 } from "./models";
+import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
 
 export type RibbonValidationSeverity = "error" | "warning";
@@ -25,13 +26,23 @@ export interface RibbonValidationIssue {
 const KNOWN_CRM_PARAMETERS = new Set([
   "PrimaryControl",
   "SelectedControl",
+  "SelectedControlSelectedItemCount",
   "SelectedControlSelectedItemIds",
   "SelectedControlSelectedItemReferences",
+  "SelectedControlAllItemCount",
+  "SelectedControlAllItemIds",
+  "SelectedControlAllItemReferences",
+  "SelectedControlUnselectedItemCount",
+  "SelectedControlUnselectedItemIds",
+  "SelectedControlUnselectedItemReferences",
   "SelectedEntityTypeName",
   "FirstPrimaryItemId",
   "PrimaryEntityTypeName",
   "PrimaryItemIds",
   "CommandProperties",
+  "OrgName",
+  "OrgLcid",
+  "UserLcid",
 ]);
 
 export function validateRibbonDocument(document: RibbonDocument): RibbonValidationIssue[] {
@@ -184,7 +195,7 @@ function validateRuleRefs(
   range: TextRange,
 ): RibbonValidationIssue[] {
   return refs
-    .filter((id) => id && !knownIds.has(id))
+    .filter((id) => id && !knownIds.has(id) && !isKnownBuiltInRuleRef(label, id))
     .map((id) => ({
       severity: "error" as const,
       message: `CommandDefinition references missing ${label} '${id}'.`,
@@ -192,16 +203,34 @@ function validateRuleRefs(
     }));
 }
 
+function isKnownBuiltInRuleRef(label: "EnableRule" | "DisplayRule", id: string): boolean {
+  return label === "EnableRule" && isBuiltInEnableRule(id);
+}
+
 function validateCommandAction(action: CommandAction): RibbonValidationIssue[] {
-  if (action.kind !== "JavaScriptFunction") {
-    return [];
+  if (action.kind === "JavaScriptFunction") {
+    return [
+      ...required(action.library.uniqueName, "JavaScript library", action.range),
+      ...required(action.functionName, "JavaScript function name", action.range),
+      ...validateActionParameters(action.parameters),
+    ];
   }
 
-  return [
-    ...required(action.library.uniqueName, "JavaScript library", action.range),
-    ...required(action.functionName, "JavaScript function name", action.range),
-    ...validateActionParameters(action.parameters),
-  ];
+  if (action.kind === "Url") {
+    return [
+      ...required(action.address, "URL address", action.range),
+      ...validateActionParameters(action.parameters),
+      ...action.parameters
+        .filter((parameter) => !parameter.name)
+        .map((parameter) => ({
+          severity: "error" as const,
+          message: "URL action parameter name is required.",
+          range: parameter.range ?? action.range,
+        })),
+    ];
+  }
+
+  return [];
 }
 
 function validateActionParameters(parameters: ActionParameter[]): RibbonValidationIssue[] {
@@ -225,14 +254,72 @@ function validateRules(
 }
 
 function validateRuleStep(step: RuleStep): RibbonValidationIssue[] {
-  if (step.kind !== "CustomRule") {
-    return [];
+  switch (step.kind) {
+    case "CustomRule":
+      return [
+        ...required(step.library.uniqueName, "CustomRule library", step.range),
+        ...required(step.functionName, "CustomRule function name", step.range),
+      ];
+    case "ValueRule":
+      return [
+        ...required(step.field, "ValueRule field", step.range),
+        ...required(step.value, "ValueRule value", step.range),
+      ];
+    case "FormStateRule":
+      return required(step.state, "FormStateRule state", step.range);
+    case "CommandClientTypeRule":
+      return required(step.type, "CommandClientTypeRule type", step.range);
+    case "FormTypeRule":
+      return required(step.type, "FormTypeRule type", step.range);
+    case "EntityPropertyRule":
+      return [
+        ...required(step.propertyName, "EntityPropertyRule property name", step.range),
+        ...requiredBoolean(step.propertyValue, "EntityPropertyRule property value", step.range),
+      ];
+    case "MiscellaneousPrivilegeRule":
+      return required(step.privilegeName, "MiscellaneousPrivilegeRule privilege name", step.range);
+    case "OrganizationSettingRule":
+      return required(step.setting, "OrganizationSettingRule setting", step.range);
+    case "HideForTabletExperienceRule":
+      return [];
+    case "RelationshipTypeRule":
+      return required(step.type, "RelationshipTypeRule type", step.range);
+    case "ReferencingAttributeRequiredRule":
+      return [];
+    case "PageRule":
+      return required(step.address, "PageRule address", step.range);
+    case "OrRule":
+      return step.children.length
+        ? step.children.flatMap(validateRuleStep)
+        : [
+            {
+              severity: "error",
+              message: "OrRule child rule step is required.",
+              range: step.range,
+            },
+          ];
+    case "EntityPrivilegeRule":
+      return [
+        ...required(step.privilegeType, "EntityPrivilegeRule privilege type", step.range),
+        ...required(step.privilegeDepth, "EntityPrivilegeRule privilege depth", step.range),
+      ];
+    case "RecordPrivilegeRule":
+      return required(step.privilegeType, "RecordPrivilegeRule privilege type", step.range);
+    case "SelectionCountRule":
+      return step.minimum === undefined && step.maximum === undefined
+        ? [
+            {
+              severity: "error",
+              message: "SelectionCountRule minimum or maximum is required.",
+              range: step.range,
+            },
+          ]
+        : [];
+    case "EntityRule":
+      return [];
+    case "Unknown":
+      return [];
   }
-
-  return [
-    ...required(step.library.uniqueName, "CustomRule library", step.range),
-    ...required(step.functionName, "CustomRule function name", step.range),
-  ];
 }
 
 function validateLocLabels(labels: LocLabel[]): RibbonValidationIssue[] {
@@ -290,4 +377,20 @@ function required(
           range,
         },
       ];
+}
+
+function requiredBoolean(
+  value: boolean | undefined,
+  label: string,
+  range: TextRange,
+): RibbonValidationIssue[] {
+  return value === undefined
+    ? [
+        {
+          severity: "error",
+          message: `${label} is required.`,
+          range,
+        },
+      ]
+    : [];
 }

@@ -1,27 +1,27 @@
 import * as vscode from "vscode";
-import { openInCrm } from "../features/webResources/commands/openCommands";
+import { openInCrm } from "@features/webResources/commands/openCommands";
 import {
   openResourceMenu,
   publishLastResource,
   publishResource,
-} from "../features/webResources/commands/publishCommands";
-import { addBinding } from "../features/webResources/commands/bindingCommands";
+} from "@features/webResources/commands/publishCommands";
+import { addBinding } from "@features/webResources/commands/bindingCommands";
 import {
   addEnvironment,
   addSolution,
   editConfiguration,
-} from "../features/config/commands/configCommands";
+} from "@features/config/commands/configCommands";
 import {
   setEnvironmentCredentials,
   signInInteractive,
   signOut,
-} from "../features/auth/commands/authCommands";
+} from "@features/auth/commands/authCommands";
 import {
   generatePublicKeyToken,
   registerPluginAssembly,
   publishLastPluginAssembly,
   updatePluginAssembly,
-} from "../features/plugins/commands/pluginCommands";
+} from "@features/plugins/commands/pluginCommands";
 import {
   createPluginImage,
   createPluginStep,
@@ -33,37 +33,50 @@ import {
   editPluginImage,
   editPluginStep,
   enablePluginStep,
-} from "../features/plugins/commands/pluginStepCommands";
-import { deletePluginType } from "../features/plugins/commands/pluginTypeCommands";
+} from "@features/plugins/commands/pluginStepCommands";
+import { deletePluginType } from "@features/plugins/commands/pluginTypeCommands";
+import {
+  addCustomRibbonButton,
+  hideAndStubOobRibbonButtons,
+  hideOobRibbonButton,
+  reorderOobRibbonButtons,
+} from "@features/ribbons/commands/ribbonButtonCommands";
 import {
   addRibbonCommandDefinition,
   addRibbonCommandAction,
+  overrideOobRibbonCommand,
+} from "@features/ribbons/commands/ribbonCommandDefinitionCommands";
+import {
+  addRibbonLocLabel,
+  addRibbonLocLabelTitle,
+} from "@features/ribbons/commands/ribbonLabelCommands";
+import {
+  addRibbonRuleChildStep,
+  deleteRibbonNode,
+  editRibbonNode,
+  moveRibbonNodeDown,
+  moveRibbonNodeUp,
+} from "@features/ribbons/commands/ribbonNodeCommands";
+import {
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
   addRibbonDisplayRule,
   addRibbonEnableRule,
-  addRibbonLocLabel,
-  addRibbonLocLabelTitle,
-  addCustomRibbonButton,
-  deleteRibbonNode,
-  editRibbonNode,
-  hideAndStubOobRibbonButtons,
-  hideOobRibbonButton,
-  moveRibbonNodeDown,
-  moveRibbonNodeUp,
-  openRibbonsFromSolution,
+} from "@features/ribbons/commands/ribbonRuleCommands";
+import {
+  cleanupGeneratedRibbonSolutions,
   openRibbonFile,
-  overrideOobRibbonCommand,
+  openRibbonSolutionLocation,
+  openRibbonsFromSolution,
   publishRibbonToEnvironment,
   pullRibbonsFromEnvironment,
+  redoRibbonEdit,
   refreshRibbonExplorer,
-  reorderOobRibbonButtons,
+  removeRibbonSolutionSource,
   saveRibbonSolutionZip,
   saveRibbonSource,
-  cleanupGeneratedRibbonSolutions,
-  redoRibbonEdit,
   undoRibbonEdit,
-} from "../features/ribbons/commands/ribbonExplorerCommands";
+} from "@features/ribbons/commands/ribbonSourceCommands";
 import {
   buildPcfControl,
   newPcfControl,
@@ -71,7 +84,7 @@ import {
   refreshPcfExplorer,
   stopPcfWatch,
   watchPcfControl,
-} from "../features/pcf/commands/pcfWorkspaceCommands";
+} from "@features/pcf/commands/pcfWorkspaceCommands";
 import {
   copyPcfDeployedControlId,
   setPcfWorkspaceFolderFilter,
@@ -79,12 +92,12 @@ import {
   setPcfSolutionFilter,
   togglePcfSolutionFilter,
   updatePcfFromLocal,
-} from "../features/pcf/commands/pcfExplorerCommands";
+} from "@features/pcf/commands/pcfExplorerCommands";
 import {
   deployLastPcfSolution,
   packageManagedPcfControl,
   packageUnmanagedPcfControl,
-} from "../features/pcf/commands/pcfReleaseCommands";
+} from "@features/pcf/commands/pcfReleaseCommands";
 import { CommandContext } from "./commandContext";
 import { CommandRunOptions, runCommandWithHealthCheck } from "./commandRunner";
 
@@ -140,15 +153,15 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.plugins.publishLastAssembly", () => publishLastPluginAssembly(ctx)),
     register("dynamics365Tools.plugins.updateAssembly", (node) => updatePluginAssembly(ctx, node)),
     register("dynamics365Tools.plugins.deletePluginType", (node) => deletePluginType(ctx, node)),
-    register("dynamics365Tools.plugins.refreshExplorer", () => ctx.pluginExplorer.refresh()),
+    register("dynamics365Tools.plugins.refreshExplorer", () => ctx.plugins.explorer.refresh()),
     register("dynamics365Tools.plugins.toggleSolutionFilter", () =>
-      ctx.pluginExplorer.toggleSolutionFilter(),
+      ctx.plugins.explorer.toggleSolutionFilter(),
     ),
     register("dynamics365Tools.plugins.enableSolutionFilter", () =>
-      ctx.pluginExplorer.setSolutionFilter(true),
+      ctx.plugins.explorer.setSolutionFilter(true),
     ),
     register("dynamics365Tools.plugins.disableSolutionFilter", () =>
-      ctx.pluginExplorer.setSolutionFilter(false),
+      ctx.plugins.explorer.setSolutionFilter(false),
     ),
     register("dynamics365Tools.plugins.generatePublicKeyToken", () => generatePublicKeyToken(ctx)),
     register("dynamics365Tools.ribbons.refreshExplorer", () => refreshRibbonExplorer(ctx), {
@@ -163,12 +176,26 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.redo", () => redoRibbonEdit(ctx), {
       validateConfiguration: false,
     }),
-    register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(node), {
+    register("dynamics365Tools.ribbons.openFile", (node) => openRibbonFile(ctx, node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.openSolutionLocation",
+      (node) => openRibbonSolutionLocation(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.ribbons.openSolutionZip", () => openRibbonsFromSolution(ctx), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.removeSolutionSource",
+      (node) => removeRibbonSolutionSource(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register(
       "dynamics365Tools.ribbons.saveSolutionZip",
       (node) => saveRibbonSolutionZip(ctx, node),
@@ -196,6 +223,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register(
       "dynamics365Tools.ribbons.addCustomButton",
       (node) => addCustomRibbonButton(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.addHideOobButton",
+      (node) => hideOobRibbonButton(ctx, node),
       {
         validateConfiguration: false,
       },
@@ -258,6 +292,13 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.addDisplayRule", (node) => addRibbonDisplayRule(ctx, node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.addRuleChildStep",
+      (node) => addRibbonRuleChildStep(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register("dynamics365Tools.ribbons.addLocLabel", (node) => addRibbonLocLabel(ctx, node), {
       validateConfiguration: false,
     }),
@@ -286,8 +327,12 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.plugins.disableStep", (node) => disablePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.deleteStep", (node) => deletePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.createImage", (node) => createPluginImage(ctx, node)),
-    register("dynamics365Tools.plugins.copyStepDescription", (node) => copyStepDescription(node)),
-    register("dynamics365Tools.plugins.copyImageDescription", (node) => copyImageDescription(node)),
+    register("dynamics365Tools.plugins.copyStepDescription", (node) =>
+      copyStepDescription(ctx, node),
+    ),
+    register("dynamics365Tools.plugins.copyImageDescription", (node) =>
+      copyImageDescription(ctx, node),
+    ),
     register("dynamics365Tools.plugins.editImage", (node) => editPluginImage(ctx, node)),
     register("dynamics365Tools.plugins.deleteImage", (node) => deletePluginImage(ctx, node)),
     register("dynamics365Tools.pcf.refreshExplorer", () => refreshPcfExplorer(ctx), {
@@ -357,42 +402,80 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     ),
     register(
       "dynamics365Tools.pcf.copyDeployedControlId",
-      (node) => copyPcfDeployedControlId(node),
+      (node) => copyPcfDeployedControlId(ctx, node),
       {
         validateConfiguration: false,
       },
     ),
-    vscode.window.registerTreeDataProvider("dynamics365Tools.pluginExplorer", ctx.pluginExplorer),
-    vscode.window.registerTreeDataProvider("dynamics365Tools.pcfExplorer", ctx.pcfExplorer),
+    registerLazyTreeDataProvider("dynamics365Tools.pluginExplorer", () => ctx.plugins.explorer),
+    registerLazyTreeDataProvider("dynamics365Tools.pcfExplorer", () => ctx.pcf.explorer),
     createRibbonTreeView(ctx),
-    ctx.pcfProjectLocator,
-    ctx.pcfBuildService,
-    ctx.pcfPushService,
-    ctx.pcfDeployService,
-    ctx.pcfPackageService,
-    ctx.pcfProcessRunner,
-    ctx.pcfStatusBar,
-    ctx.pcfTelemetry,
-    ctx.ribbonDiagnostics,
-    ctx.ribbonFormPanel,
-    ctx.statusBar,
-    ctx.assemblyStatusBar,
   );
 
   return disposables;
 }
 
 function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
+  const treeDataProvider = new LazyTreeDataProvider(() => ctx.ribbon.explorer);
   const treeView = vscode.window.createTreeView("dynamics365Tools.ribbonExplorer", {
-    treeDataProvider: ctx.ribbonExplorer,
+    treeDataProvider,
   });
 
   const selectionSubscription = treeView.onDidChangeSelection((event) => {
     const [node] = event.selection;
     if (node) {
-      ctx.ribbonFormPanel.show(node);
+      ctx.ribbon.formPanel.show(node);
     }
   });
 
-  return vscode.Disposable.from(treeView, selectionSubscription);
+  return vscode.Disposable.from(treeView, selectionSubscription, treeDataProvider);
+}
+
+function registerLazyTreeDataProvider<T>(
+  viewId: string,
+  loadProvider: () => vscode.TreeDataProvider<T>,
+): vscode.Disposable {
+  const treeDataProvider = new LazyTreeDataProvider(loadProvider);
+  return vscode.Disposable.from(
+    vscode.window.registerTreeDataProvider(viewId, treeDataProvider),
+    treeDataProvider,
+  );
+}
+
+class LazyTreeDataProvider<T> implements vscode.TreeDataProvider<T>, vscode.Disposable {
+  private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
+    T | T[] | null | undefined | void
+  >();
+  readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
+  private providerPromise?: Promise<vscode.TreeDataProvider<T>>;
+  private eventSubscription?: vscode.Disposable;
+
+  constructor(private readonly loadProvider: () => vscode.TreeDataProvider<T>) {}
+
+  async getTreeItem(element: T): Promise<vscode.TreeItem> {
+    const provider = await this.getProvider();
+    return provider.getTreeItem(element);
+  }
+
+  async getChildren(element?: T): Promise<T[]> {
+    const provider = await this.getProvider();
+    return (await provider.getChildren?.(element)) ?? [];
+  }
+
+  dispose(): void {
+    this.eventSubscription?.dispose();
+    this.onDidChangeTreeDataEmitter.dispose();
+  }
+
+  private async getProvider(): Promise<vscode.TreeDataProvider<T>> {
+    if (!this.providerPromise) {
+      this.providerPromise = Promise.resolve(this.loadProvider()).then((provider) => {
+        this.eventSubscription = provider.onDidChangeTreeData?.((event) => {
+          this.onDidChangeTreeDataEmitter.fire(event);
+        });
+        return provider;
+      });
+    }
+    return this.providerPromise;
+  }
 }

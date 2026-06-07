@@ -1,26 +1,20 @@
 import * as path from "path";
-import * as vscode from "vscode";
-import { promisify } from "util";
-import { execFile } from "child_process";
-import * as fs from "fs/promises";
-import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
-import { CommandContext } from "../../../app/commandContext";
+import { pickEnvironmentAndAuth } from "@app/commandUtils";
+import { CommandContext } from "@app/commandContext";
 import {
   EnvironmentAuthContext,
   EnvironmentConnectionService,
-} from "../../dataverse/environmentConnectionService";
-import { DataverseClient } from "../../dataverse/dataverseClient";
-import { SolutionComponentService } from "../../dataverse/solutionComponentService";
-import { PluginAssembly, PluginType } from "../models";
+} from "@features/dataverse/environmentConnectionService";
+import { SolutionComponentService } from "@features/dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
-import { PluginAssemblyNode, PluginExplorerProvider } from "../pluginExplorer";
-import { PluginRegistrationManager, PluginSyncResult } from "../pluginRegistrationManager";
-import { AssemblyIdentity, DiscoveredPluginType } from "../pluginAssemblyIntrospector";
-import { AssemblyStatusBarService } from "../../../platform/vscode/statusBar";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { EnvironmentConfig } from "../../config/domain/models";
-
-const execFileAsync = promisify(execFile);
+import { PluginAssemblyNode } from "../pluginExplorer";
+import {
+  buildAssemblySuccessMessage,
+  confirmAssemblyPublish,
+  syncPluginsForAssembly,
+  updateAssemblyFromFileDialog,
+  updateAssemblyFromUri,
+} from "./pluginAssemblyUpdateWorkflow";
 
 export async function registerPluginAssembly(ctx: CommandContext): Promise<void> {
   const {
@@ -30,10 +24,14 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     auth,
     lastSelection,
     connections,
-    pluginRegistration,
-    pluginExplorer,
     assemblyStatusBar,
-  } = ctx;
+    notifications,
+    files,
+    fileDialogs,
+    input,
+    progress,
+  } = ctx.core;
+  const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
   const selection = await pickEnvironmentAndAuth(
     configuration,
@@ -44,30 +42,32 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     config,
     undefined,
     { placeHolder: "Select environment to register plugin assembly" },
+    notifications,
   );
   if (!selection) {
     return;
   }
 
   if (selection.env.manageMissingComponents !== true) {
-    void vscode.window.showWarningMessage(
+    void notifications.warning(
       `Environment ${selection.env.name} is configured to block missing component management. Enable manageMissingComponents to register plugin assemblies.`,
     );
     return;
   }
 
-  const assemblyFile = await vscode.window.showOpenDialog({
+  const assemblyFile = await fileDialogs.showOpenDialog({
     canSelectFolders: false,
     canSelectMany: false,
     filters: { Assemblies: ["dll"] },
     title: "Select plugin assembly (.dll)",
   });
-  if (!assemblyFile || !assemblyFile[0]) {
+  const assemblyPath = assemblyFile?.[0];
+  if (!assemblyPath) {
     return;
   }
 
-  const defaultName = path.basename(assemblyFile[0].fsPath, path.extname(assemblyFile[0].fsPath));
-  const name = await vscode.window.showInputBox({
+  const defaultName = path.basename(assemblyPath, path.extname(assemblyPath));
+  const name = await input.showInputBox({
     prompt: "Enter plugin assembly name",
     value: defaultName,
     ignoreFocusOut: true,
@@ -81,8 +81,7 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     return;
   }
 
-  const assemblyPath = assemblyFile[0].fsPath;
-  const content = await vscode.workspace.fs.readFile(assemblyFile[0]);
+  const content = await files.readFile(assemblyPath);
   const contentBase64 = Buffer.from(content).toString("base64");
 
   try {
@@ -103,10 +102,11 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
         assemblyPath,
         solutionName: solution.name,
         manageMissingComponents: true,
+        progress,
       });
       pluginSummary = syncResult;
     } catch (syncError) {
-      void vscode.window.showErrorMessage(
+      void notifications.error(
         `Assembly registered, but plugins failed to sync: ${String(syncError)}`,
       );
       pluginSyncFailed = true;
@@ -116,17 +116,17 @@ export async function registerPluginAssembly(ctx: CommandContext): Promise<void>
     assemblyStatusBar.setLastPublish({
       assemblyId,
       assemblyName: name,
-      assemblyUri: vscode.Uri.file(assemblyPath),
+      assemblyUri: { fsPath: assemblyPath },
       environment: selection.env,
     });
     if (!pluginSyncFailed) {
-      vscode.window.showInformationMessage(
+      await notifications.info(
         buildAssemblySuccessMessage(name, selection.env.name, pluginSummary),
       );
     }
     pluginExplorer?.refresh();
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to register plugin assembly: ${String(error)}`);
+    void notifications.error(`Failed to register plugin assembly: ${String(error)}`);
   }
 }
 
@@ -141,10 +141,14 @@ export async function updatePluginAssembly(
     auth,
     lastSelection,
     connections,
-    pluginRegistration,
-    pluginExplorer,
     assemblyStatusBar,
-  } = ctx;
+    notifications,
+    files,
+    fileDialogs,
+    input,
+    progress,
+  } = ctx.core;
+  const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadConfiguration();
 
   const selection = targetNode
@@ -157,6 +161,7 @@ export async function updatePluginAssembly(
         config,
         targetNode.env.name,
         { placeHolder: "Select environment to update plugin assembly" },
+        notifications,
       )
     : await pickEnvironmentAndAuth(
         configuration,
@@ -167,6 +172,7 @@ export async function updatePluginAssembly(
         config,
         undefined,
         { placeHolder: "Select environment to update plugin assembly" },
+        notifications,
       );
 
   if (!selection) {
@@ -178,7 +184,7 @@ export async function updatePluginAssembly(
   try {
     service = await createPluginService(connections, selection.auth, env);
   } catch (error) {
-    void vscode.window.showErrorMessage(String(error));
+    void notifications.error(String(error));
     return;
   }
 
@@ -191,11 +197,11 @@ export async function updatePluginAssembly(
   } else {
     const assemblies = await service.listAssemblies();
     if (!assemblies.length) {
-      vscode.window.showInformationMessage(`No plugin assemblies found in ${env.name}.`);
+      await notifications.info(`No plugin assemblies found in ${env.name}.`);
       return;
     }
 
-    const pick = await vscode.window.showQuickPick(
+    const pick = await input.showQuickPick(
       assemblies.map((assembly) => ({
         label: assembly.name,
         description: assembly.version,
@@ -211,23 +217,18 @@ export async function updatePluginAssembly(
   }
 
   if (!assemblyId) {
-    vscode.window.showErrorMessage("No plugin assembly selected for update.");
+    await notifications.error("No plugin assembly selected for update.");
     return;
   }
 
   const lastDllPath = lastSelection.getLastAssemblyDllPath(env.name, assemblyId);
-  const workspaceRoot =
-    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const defaultUri = lastDllPath
-    ? vscode.Uri.file(path.dirname(lastDllPath))
-    : workspaceRoot
-      ? vscode.Uri.file(workspaceRoot)
-      : undefined;
+  const workspaceRoot = configuration.workspaceRoot ?? files.workspaceRoot;
+  const defaultPath = lastDllPath ? path.dirname(lastDllPath) : workspaceRoot;
 
   await updateAssemblyFromFileDialog({
     assemblyId,
     assemblyName,
-    defaultUri,
+    defaultPath,
     env,
     manageMissingComponents: env.manageMissingComponents === true,
     pluginService: service,
@@ -235,6 +236,10 @@ export async function updatePluginAssembly(
     pluginExplorer,
     assemblyStatusBar,
     lastSelection,
+    notifications,
+    files,
+    fileDialogs,
+    progress,
   });
 }
 
@@ -246,23 +251,22 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     auth,
     lastSelection,
     connections,
-    pluginRegistration,
-    pluginExplorer,
     assemblyStatusBar,
-  } = ctx;
+    notifications,
+    files,
+  } = ctx.core;
+  const { registration: pluginRegistration, explorer: pluginExplorer } = ctx.plugins;
 
   const last = assemblyStatusBar.getLastPublish();
   if (!last) {
-    vscode.window.showInformationMessage(
-      "Publish a plugin assembly first to enable quick publish.",
-    );
+    await notifications.info("Publish a plugin assembly first to enable quick publish.");
     return;
   }
 
   try {
-    await vscode.workspace.fs.stat(last.assemblyUri);
+    await files.stat(last.assemblyUri.fsPath);
   } catch {
-    vscode.window.showWarningMessage("Last published plugin assembly no longer exists.");
+    await notifications.warning("Last published plugin assembly no longer exists.");
     assemblyStatusBar.clear();
     return;
   }
@@ -277,14 +281,17 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
     config,
     last.environment.name,
     { placeHolder: "Select environment to publish plugin assembly" },
+    notifications,
   );
   if (!selection) {
     return;
   }
 
   const confirmed = await confirmAssemblyPublish(
+    notifications,
     last.assemblyUri,
     selection.env,
+    configuration.getRelativeToWorkspace(last.assemblyUri.fsPath),
     last.assemblyName,
   );
   if (!confirmed) {
@@ -295,7 +302,7 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
   try {
     service = await createPluginService(connections, selection.auth, selection.env);
   } catch (error) {
-    void vscode.window.showErrorMessage(String(error));
+    void notifications.error(String(error));
     return;
   }
 
@@ -311,722 +318,12 @@ export async function publishLastPluginAssembly(ctx: CommandContext): Promise<vo
       pluginExplorer,
       assemblyStatusBar,
       lastSelection,
+      notifications,
+      files,
     });
   } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to publish plugin assembly: ${String(error)}`);
+    void notifications.error(`Failed to publish plugin assembly: ${String(error)}`);
   }
-}
-
-export async function generatePublicKeyToken(ctx: CommandContext): Promise<void> {
-  const { configuration } = ctx;
-  const workspaceRoot =
-    configuration.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
-  const projectPick = await vscode.window.showOpenDialog({
-    canSelectFiles: true,
-    canSelectFolders: false,
-    canSelectMany: false,
-    defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined,
-    filters: { "C# Project": ["csproj"], "All Files": ["*"] },
-    openLabel: "Select .csproj to strong-name",
-  });
-  if (!projectPick || !projectPick[0]) {
-    return;
-  }
-
-  const csprojUri = projectPick[0];
-  const projectDir = path.dirname(csprojUri.fsPath);
-
-  const filename = await vscode.window.showInputBox({
-    prompt: "Enter file name for the strong name key (.snk)",
-    value: "plugin.snk",
-    ignoreFocusOut: true,
-  });
-  if (!filename) {
-    return;
-  }
-
-  const resolvedPath = path.join(projectDir, filename);
-  const relativeKeyPath = path.relative(projectDir, resolvedPath).replace(/\\/g, "/");
-
-  const snTool = await resolveSnTool();
-  if (!snTool) {
-    void vscode.window.showErrorMessage(
-      "Strong Name tool (sn.exe/sn) not found. Install the .NET SDK and ensure the `sn` tool is on your PATH.",
-    );
-    return;
-  }
-
-  try {
-    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(resolvedPath)));
-    await execFileAsync(snTool.command, [...snTool.generateArgs, resolvedPath]);
-    const token = await generatePublicKeyTokenValue(snTool, resolvedPath);
-    await ensureCsprojStrongName(csprojUri, relativeKeyPath);
-
-    const message = token
-      ? `Strong name key created and project updated. Public key token: ${token}`
-      : "Strong name key created and project updated. Failed to read public key token from sn output.";
-    showPublicKeyTokenResult(message, token);
-  } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Failed to generate strong name key: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-export function showPublicKeyTokenResult(message: string, token?: string): void {
-  const copyAction = token ? "Copy token" : undefined;
-  void vscode.window.showInformationMessage(message, copyAction ?? "OK").then(
-    async (selection) => {
-      if (selection === copyAction && token) {
-        try {
-          await vscode.env.clipboard.writeText(token);
-        } catch (error) {
-          void vscode.window.showErrorMessage(
-            `Failed to copy public key token: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
-    },
-    () => undefined,
-  );
-}
-
-export function extractToken(output?: string): string | undefined {
-  if (!output) {
-    return undefined;
-  }
-  const match =
-    output.match(/Public key token is\s+([0-9a-fA-F]+)/i) ||
-    output.match(/Public key token=(\w+)/i) ||
-    output.match(/Public key token:\s*([0-9a-fA-F]+)/i);
-  return match?.[1];
-}
-
-async function generatePublicKeyTokenValue(
-  snTool: SnTool,
-  keyPath: string,
-): Promise<string | undefined> {
-  const publicKeyPath = path.join(
-    path.dirname(keyPath),
-    `.tmp-${path.basename(keyPath)}.public.snk`,
-  );
-
-  try {
-    await execFileAsync(snTool.command, [...snTool.publicArgs, keyPath, publicKeyPath]);
-    const tokenOutput = await execFileAsync(snTool.command, [...snTool.tokenArgs, publicKeyPath]);
-    return extractToken(tokenOutput.stdout) || extractToken(tokenOutput.stderr);
-  } catch (error) {
-    const stderr = (error as any)?.stderr || (error as any)?.message;
-    throw new Error(`sn failed to produce public key token: ${stderr ?? error}`);
-  } finally {
-    try {
-      await fs.unlink(publicKeyPath);
-    } catch {
-      // ignore cleanup errors
-    }
-  }
-}
-
-async function ensureCsprojStrongName(
-  csprojUri: vscode.Uri,
-  keyFileRelative: string,
-): Promise<void> {
-  const content = (await vscode.workspace.fs.readFile(csprojUri)).toString();
-  if (content.includes("<AssemblyOriginatorKeyFile")) {
-    return;
-  }
-
-  const insertion = [
-    "  <PropertyGroup>",
-    "    <SignAssembly>true</SignAssembly>",
-    `    <AssemblyOriginatorKeyFile>${keyFileRelative}</AssemblyOriginatorKeyFile>`,
-    "  </PropertyGroup>",
-    "  <ItemGroup>",
-    `    <None Include="${keyFileRelative}" />`,
-    "  </ItemGroup>",
-  ].join("\n");
-
-  const closingTag = "</Project>";
-  const index = content.lastIndexOf(closingTag);
-  const updated =
-    index >= 0
-      ? `${content.slice(0, index)}${insertion}\n${closingTag}\n`
-      : `${content.trimEnd()}\n${insertion}\n${closingTag}\n`;
-
-  await vscode.workspace.fs.writeFile(csprojUri, Buffer.from(updated, "utf8"));
-}
-
-type PluginSyncContext = {
-  registration: PluginRegistrationManager;
-  pluginService: PluginService;
-  assemblyId: string;
-  assemblyPath: string;
-  solutionName?: string;
-  manageMissingComponents?: boolean;
-};
-
-function buildAssemblySuccessMessage(
-  assemblyName: string | undefined,
-  envName: string,
-  pluginSummary?: string,
-  action: "registered" | "updated" = "registered",
-): string {
-  const normalizedName = assemblyName ?? "assembly";
-  const base = `Plugin assembly ${normalizedName} has been ${action} in ${envName}.`;
-  return pluginSummary ? `${base} ${pluginSummary}` : base;
-}
-
-async function syncPluginsForAssembly(context: PluginSyncContext): Promise<string | undefined> {
-  return formatPluginSyncResult(await runPluginSyncForAssembly(context));
-}
-
-async function runPluginSyncForAssembly(context: PluginSyncContext): Promise<PluginSyncResult> {
-  const title = `Syncing plugins for ${path.basename(context.assemblyPath)}`;
-  return vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title,
-    },
-    () =>
-      context.registration.syncPluginTypes({
-        pluginService: context.pluginService,
-        assemblyId: context.assemblyId,
-        assemblyPath: context.assemblyPath,
-        solutionName: context.solutionName,
-        manageMissingComponents: context.manageMissingComponents,
-      }),
-  );
-}
-
-type AssemblyUpdateContext = {
-  assemblyId: string;
-  assemblyName?: string;
-  assemblyUri: vscode.Uri;
-  env: EnvironmentConfig;
-  manageMissingComponents: boolean;
-  pluginService: PluginService;
-  pluginRegistration: PluginRegistrationManager;
-  pluginExplorer?: PluginExplorerProvider;
-  assemblyStatusBar: AssemblyStatusBarService;
-  lastSelection: LastSelectionService;
-};
-
-type AssemblyUpdateFileDialogContext = Omit<AssemblyUpdateContext, "assemblyUri"> & {
-  defaultUri?: vscode.Uri;
-};
-
-type AssemblyUpdateValidationContext = {
-  assemblyId: string;
-  assemblyUri: vscode.Uri;
-  pluginService: Pick<PluginService, "getAssembly" | "listPluginTypes">;
-  pluginRegistration: Pick<PluginRegistrationManager, "inspectAssembly">;
-};
-
-type AssemblyUpdatePreflight = {
-  targetAssembly: PluginAssembly;
-  diff: PluginComponentDiff;
-};
-
-type PluginComponentDiff = {
-  deletedTypes: PluginType[];
-  newTypes: DiscoveredPluginType[];
-};
-
-type PluginDeleteFailure = {
-  plugin: PluginType;
-  error: unknown;
-};
-
-export async function updateAssemblyFromFileDialog(
-  context: AssemblyUpdateFileDialogContext,
-): Promise<void> {
-  while (true) {
-    const assemblyFile = await vscode.window.showOpenDialog({
-      canSelectFolders: false,
-      canSelectMany: false,
-      filters: { Assemblies: ["dll"] },
-      defaultUri: context.defaultUri,
-      title: "Select updated plugin assembly (.dll)",
-    });
-    if (!assemblyFile || !assemblyFile[0]) {
-      return;
-    }
-
-    try {
-      await updateAssemblyFromUri({
-        ...context,
-        assemblyUri: assemblyFile[0],
-      });
-      return;
-    } catch (error) {
-      if (error instanceof AssemblyIdentityValidationError) {
-        await vscode.window.showErrorMessage(error.message, { modal: true });
-        continue;
-      }
-
-      void vscode.window.showErrorMessage(`Failed to update plugin assembly: ${String(error)}`);
-      return;
-    }
-  }
-}
-
-async function updateAssemblyFromUri(context: AssemblyUpdateContext): Promise<void> {
-  const preflight = await prepareAssemblyUpdate({
-    assemblyId: context.assemblyId,
-    assemblyUri: context.assemblyUri,
-    pluginService: context.pluginService,
-    pluginRegistration: context.pluginRegistration,
-  });
-
-  const content = await vscode.workspace.fs.readFile(context.assemblyUri);
-  const contentBase64 = Buffer.from(content).toString("base64");
-
-  const confirmed = await confirmPluginComponentChanges({
-    assemblyName: context.assemblyName ?? preflight.targetAssembly.name,
-    diff: preflight.diff,
-    manageMissingComponents: context.manageMissingComponents,
-  });
-  if (!confirmed) {
-    return;
-  }
-
-  const preUpdateSyncResult = await removeDeletedPluginTypesBeforeAssemblyUpdate(
-    context,
-    preflight.diff.deletedTypes,
-  );
-
-  await context.pluginService.updateAssembly(context.assemblyId, contentBase64);
-  await context.lastSelection.setLastAssemblyDllPath(
-    context.env.name,
-    context.assemblyId,
-    context.assemblyUri.fsPath,
-  );
-
-  let pluginSummary: string | undefined;
-  try {
-    const postUpdateSyncResult = await runPluginSyncForAssembly({
-      registration: context.pluginRegistration,
-      pluginService: context.pluginService,
-      assemblyId: context.assemblyId,
-      assemblyPath: context.assemblyUri.fsPath,
-      solutionName: undefined,
-      manageMissingComponents: context.manageMissingComponents,
-    });
-    pluginSummary = formatPluginSyncResult(
-      mergePluginSyncResults(preUpdateSyncResult, postUpdateSyncResult),
-    );
-  } catch (syncError) {
-    void vscode.window.showErrorMessage(
-      `Assembly updated, but plugins failed to sync: ${String(syncError)}`,
-    );
-    context.assemblyStatusBar.setLastPublish({
-      assemblyId: context.assemblyId,
-      assemblyName: context.assemblyName,
-      assemblyUri: context.assemblyUri,
-      environment: context.env,
-    });
-    context.pluginExplorer?.refresh();
-    return;
-  }
-
-  context.assemblyStatusBar.setLastPublish({
-    assemblyId: context.assemblyId,
-    assemblyName: context.assemblyName,
-    assemblyUri: context.assemblyUri,
-    environment: context.env,
-  });
-  vscode.window.showInformationMessage(
-    buildAssemblySuccessMessage(context.assemblyName, context.env.name, pluginSummary, "updated"),
-  );
-  context.pluginExplorer?.refresh();
-}
-
-export async function validateAssemblyUpdateTarget(
-  context: AssemblyUpdateValidationContext,
-): Promise<boolean> {
-  await prepareAssemblyUpdate(context);
-  return true;
-}
-
-async function prepareAssemblyUpdate(
-  context: AssemblyUpdateValidationContext,
-): Promise<AssemblyUpdatePreflight> {
-  const [targetAssembly, localInspection] = await Promise.all([
-    context.pluginService.getAssembly(context.assemblyId),
-    context.pluginRegistration.inspectAssembly(context.assemblyUri.fsPath),
-  ]);
-
-  validateAssemblyIdentity(targetAssembly, localInspection.assembly);
-  showVersionChangeWarning(targetAssembly, localInspection.assembly);
-
-  const existingTypes = await context.pluginService.listPluginTypes(context.assemblyId);
-
-  return {
-    targetAssembly,
-    diff: buildPluginComponentDiff(existingTypes, localInspection.plugins),
-  };
-}
-
-export class AssemblyIdentityValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AssemblyIdentityValidationError";
-  }
-}
-
-export function validateAssemblyIdentity(
-  targetAssembly: PluginAssembly,
-  localAssembly: AssemblyIdentity,
-): void {
-  if (normalizeAssemblyName(targetAssembly.name) !== normalizeAssemblyName(localAssembly.name)) {
-    throw new AssemblyIdentityValidationError(
-      `Selected CRM assembly is "${targetAssembly.name}", but the DLL is "${localAssembly.name}". Select the matching DLL for this assembly.`,
-    );
-  }
-
-  const targetToken = normalizePublicKeyToken(targetAssembly.publicKeyToken);
-  const localToken = normalizePublicKeyToken(localAssembly.publicKeyToken);
-  if (targetToken && targetToken !== localToken) {
-    throw new AssemblyIdentityValidationError(
-      `Selected CRM assembly "${targetAssembly.name}" has public key token "${targetToken}", but the DLL has "${localToken ?? "none"}". Select the matching signed DLL.`,
-    );
-  }
-
-  const targetCulture = normalizeCulture(targetAssembly.culture);
-  const localCulture = normalizeCulture(localAssembly.culture);
-  if (targetCulture !== localCulture) {
-    throw new AssemblyIdentityValidationError(
-      `Selected CRM assembly "${targetAssembly.name}" uses culture "${targetCulture ?? "neutral"}", but the DLL uses "${localCulture ?? "neutral"}". Select the matching DLL.`,
-    );
-  }
-}
-
-function showVersionChangeWarning(
-  targetAssembly: PluginAssembly,
-  localAssembly: AssemblyIdentity,
-): void {
-  const targetVersion = normalizeVersion(targetAssembly.version);
-  const localVersion = normalizeVersion(localAssembly.version);
-  if (targetVersion === localVersion) {
-    return;
-  }
-
-  void vscode.window.showWarningMessage(
-    `Plugin assembly version will change from ${targetVersion ?? "unknown"} to ${localVersion ?? "unknown"}.`,
-  );
-}
-
-async function confirmPluginComponentChanges(context: {
-  assemblyName: string;
-  diff: PluginComponentDiff;
-  manageMissingComponents: boolean;
-}): Promise<boolean> {
-  const deletedCount = context.diff.deletedTypes.length;
-  const newCount = context.diff.newTypes.length;
-  if (!deletedCount && !newCount) {
-    return true;
-  }
-
-  if (!context.manageMissingComponents && deletedCount) {
-    await vscode.window.showErrorMessage(
-      `Plugin assembly ${context.assemblyName} cannot be updated because ${deletedCount} plugin type(s) were removed from the DLL and manageMissingComponents is false.`,
-      {
-        modal: true,
-        detail: formatPluginComponentDiffDetail(context.diff, {
-          includeDeleteWarning: false,
-          includeManageMissingFalseBlock: true,
-          includeSkippedCreationNote: newCount > 0,
-        }),
-      },
-    );
-    return false;
-  }
-
-  if (!context.manageMissingComponents) {
-    const updateAssembly = "Update Assembly";
-    const choice = await vscode.window.showWarningMessage(
-      `Update plugin assembly ${context.assemblyName} without creating ${newCount} new plugin type(s)?`,
-      {
-        modal: true,
-        detail: formatPluginComponentDiffDetail(context.diff, {
-          includeSkippedCreationNote: true,
-        }),
-      },
-      updateAssembly,
-    );
-    return choice === updateAssembly;
-  }
-
-  const action = deletedCount ? "Remove and Update" : "Update Assembly";
-  const choice = await vscode.window.showWarningMessage(
-    `Update plugin assembly ${context.assemblyName} and sync ${deletedCount + newCount} plugin type change(s)?`,
-    {
-      modal: true,
-      detail: formatPluginComponentDiffDetail(context.diff, {
-        includeDeleteWarning: deletedCount > 0,
-      }),
-    },
-    action,
-  );
-  return choice === action;
-}
-
-async function removeDeletedPluginTypesBeforeAssemblyUpdate(
-  context: AssemblyUpdateContext,
-  deletedTypes: PluginType[],
-): Promise<PluginSyncResult> {
-  if (!deletedTypes.length || context.manageMissingComponents !== true) {
-    return emptyPluginSyncResult();
-  }
-
-  return vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Removing missing plugins for ${path.basename(context.assemblyUri.fsPath)}`,
-    },
-    async () => {
-      const removed: PluginType[] = [];
-      const failures: PluginDeleteFailure[] = [];
-      for (const plugin of deletedTypes) {
-        try {
-          await context.pluginService.deletePluginTypeCascade(plugin.id);
-        } catch (error) {
-          failures.push({ plugin, error });
-          continue;
-        }
-        removed.push(plugin);
-      }
-
-      if (failures.length) {
-        throw new Error(
-          `Failed to delete ${failures.length} missing plugin type(s). Assembly was not updated because Dataverse still has plugin types that are missing from the DLL.\n${formatPluginDeleteFailures(
-            failures,
-          )}`,
-        );
-      }
-
-      return {
-        created: [],
-        updated: [],
-        removed,
-        skippedCreation: [],
-        skippedRemoval: [],
-      };
-    },
-  );
-}
-
-function formatPluginDeleteFailures(failures: PluginDeleteFailure[]): string {
-  const limit = 10;
-  const lines = failures.slice(0, limit).map(({ plugin, error }) => {
-    const name = plugin.typeName || plugin.name || "unknown";
-    return `- ${name}: ${String(error)}`;
-  });
-  const remaining = failures.length - lines.length;
-  if (remaining > 0) {
-    lines.push(`- and ${remaining} more`);
-  }
-
-  return lines.join("\n");
-}
-
-function buildPluginComponentDiff(
-  existingTypes: PluginType[],
-  localPlugins: DiscoveredPluginType[],
-): PluginComponentDiff {
-  const existingByType = new Map<string, PluginType>();
-  for (const plugin of existingTypes) {
-    const key = normalizeTypeName(plugin.typeName);
-    if (key) {
-      existingByType.set(key, plugin);
-    }
-  }
-
-  const localKeys = new Set<string>();
-  const newTypes: DiscoveredPluginType[] = [];
-  for (const plugin of localPlugins) {
-    const key = normalizeTypeName(plugin.typeName);
-    if (!key || localKeys.has(key)) {
-      continue;
-    }
-
-    localKeys.add(key);
-    if (!existingByType.has(key)) {
-      newTypes.push(plugin);
-    }
-  }
-
-  const deletedTypes = [...existingByType.entries()]
-    .filter(([key]) => !localKeys.has(key))
-    .map(([, plugin]) => plugin);
-
-  return { deletedTypes, newTypes };
-}
-
-function normalizeAssemblyName(value: string | undefined): string {
-  return value?.trim().toLowerCase() ?? "";
-}
-
-function normalizePublicKeyToken(value: string | undefined): string | undefined {
-  const normalized = value?.trim().toLowerCase();
-  return normalized && normalized !== "none" && normalized !== "null" ? normalized : undefined;
-}
-
-function normalizeCulture(value: string | undefined): string | undefined {
-  const normalized = value?.trim().toLowerCase();
-  return normalized && normalized !== "neutral" && normalized !== "none" && normalized !== "null"
-    ? normalized
-    : undefined;
-}
-
-function normalizeVersion(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized || undefined;
-}
-
-function normalizeTypeName(value: string | undefined): string | undefined {
-  const normalized = value?.trim().toLowerCase();
-  return normalized || undefined;
-}
-
-async function confirmAssemblyPublish(
-  assemblyUri: vscode.Uri,
-  env: EnvironmentConfig,
-  assemblyName?: string,
-): Promise<boolean> {
-  const relative = vscode.workspace.asRelativePath(assemblyUri, false);
-  const displayName = assemblyName ?? path.basename(assemblyUri.fsPath);
-  const choice = await vscode.window.showWarningMessage(
-    `Publish ${displayName} (${relative}) to ${env.name}?`,
-    { modal: true },
-    "Publish",
-  );
-  return choice === "Publish";
-}
-
-function formatPluginSyncResult(result: PluginSyncResult): string | undefined {
-  const parts: string[] = [];
-  if (result.created.length) parts.push(`${result.created.length} created`);
-  if (result.updated.length) parts.push(`${result.updated.length} updated`);
-  if (result.removed.length) parts.push(`${result.removed.length} removed`);
-  if (result.skippedCreation.length) {
-    parts.push(
-      `${result.skippedCreation.length} creation skipped (manageMissingComponents is false): ${formatPluginNames(
-        result.skippedCreation,
-      )}`,
-    );
-  }
-  if (result.skippedRemoval.length) {
-    parts.push(
-      `${result.skippedRemoval.length} removal skipped (manageMissingComponents is false): ${formatPluginNames(
-        result.skippedRemoval,
-      )}`,
-    );
-  }
-
-  if (!parts.length) {
-    return "Plugins: No plugin type changes detected.";
-  }
-
-  return `Plugins: ${parts.join(", ")}.`;
-}
-
-function mergePluginSyncResults(
-  first: PluginSyncResult,
-  second: PluginSyncResult | undefined,
-): PluginSyncResult {
-  if (!second) {
-    return first;
-  }
-
-  return {
-    created: [...first.created, ...second.created],
-    updated: [...first.updated, ...second.updated],
-    removed: [...first.removed, ...second.removed],
-    skippedCreation: [...first.skippedCreation, ...second.skippedCreation],
-    skippedRemoval: [...first.skippedRemoval, ...second.skippedRemoval],
-  };
-}
-
-function emptyPluginSyncResult(): PluginSyncResult {
-  return {
-    created: [],
-    updated: [],
-    removed: [],
-    skippedCreation: [],
-    skippedRemoval: [],
-  };
-}
-
-function formatPluginNames(plugins: Array<{ typeName?: string; name?: string }>): string {
-  return plugins.map((plugin) => plugin.typeName || plugin.name || "unknown").join(", ");
-}
-
-function formatPluginComponentDiffDetail(
-  diff: PluginComponentDiff,
-  options: {
-    includeDeleteWarning?: boolean;
-    includeManageMissingFalseBlock?: boolean;
-    includeSkippedCreationNote?: boolean;
-  } = {},
-): string {
-  const sections: string[] = [];
-  if (options.includeManageMissingFalseBlock) {
-    sections.push("The assembly cannot be updated because manageMissingComponents is false.");
-  }
-  if (options.includeSkippedCreationNote) {
-    sections.push("New plugin types will not be created because manageMissingComponents is false.");
-  }
-  if (options.includeDeleteWarning && diff.deletedTypes.length) {
-    sections.push("Related steps and images will also be deleted.");
-  }
-  if (diff.deletedTypes.length) {
-    sections.push(`Removed from DLL:\n${formatPluginList(diff.deletedTypes)}`);
-  }
-  if (diff.newTypes.length) {
-    sections.push(`New in DLL:\n${formatPluginList(diff.newTypes)}`);
-  }
-
-  return sections.join("\n\n");
-}
-
-function formatPluginList(plugins: Array<{ typeName?: string; name?: string }>): string {
-  const limit = 30;
-  const names = plugins
-    .slice(0, limit)
-    .map((plugin) => `- ${plugin.typeName || plugin.name || "unknown"}`);
-  const remaining = plugins.length - names.length;
-  if (remaining > 0) {
-    names.push(`- and ${remaining} more`);
-  }
-
-  return names.join("\n");
-}
-
-type SnTool = {
-  command: string;
-  generateArgs: string[];
-  publicArgs: string[];
-  tokenArgs: string[];
-};
-
-async function resolveSnTool(): Promise<SnTool | undefined> {
-  const candidates: SnTool[] = [
-    { command: "sn", generateArgs: ["-k"], publicArgs: ["-p"], tokenArgs: ["-t"] },
-    { command: "sn.exe", generateArgs: ["-k"], publicArgs: ["-p"], tokenArgs: ["-t"] },
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      await execFileAsync(candidate.command, ["-?"]);
-      return candidate;
-    } catch {
-      // Continue to next candidate
-    }
-  }
-
-  return undefined;
 }
 
 async function createPluginService(
@@ -1034,11 +331,26 @@ async function createPluginService(
   authContext: EnvironmentAuthContext,
   env: Parameters<EnvironmentConnectionService["createConnection"]>[0],
 ): Promise<PluginService> {
-  const connection = await connections.createConnection(env, authContext);
-  if (!connection) {
+  const client = await connections.createClient(env, authContext);
+  if (!client) {
     throw new Error(`Authentication failed for ${env.name}.`);
   }
-  const client = new DataverseClient(connection);
   const solutionComponents = new SolutionComponentService(client);
   return new PluginService(client, solutionComponents);
 }
+
+export {
+  extractToken,
+  generatePublicKeyToken,
+  showPublicKeyTokenResult,
+} from "./pluginPublicKeyCommands";
+
+export {
+  AssemblyIdentityValidationError,
+  validateAssemblyIdentity,
+} from "./pluginAssemblyIdentity";
+
+export {
+  updateAssemblyFromFileDialog,
+  validateAssemblyUpdateTarget,
+} from "./pluginAssemblyUpdateWorkflow";

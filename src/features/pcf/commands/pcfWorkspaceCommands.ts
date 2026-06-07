@@ -2,13 +2,13 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { XMLParser } from "fast-xml-parser";
-import type { CommandContext } from "../../../app/commandContext";
+import type { CommandContext } from "@app/commandContext";
 import type { PcfControlProject } from "../models";
 import { detectTool } from "../pacCli";
 import { PcfControlProjectNode } from "../pcfExplorer";
 
 type WorkspaceFolderPick = vscode.QuickPickItem & {
-  folder: vscode.WorkspaceFolder;
+  folderPath: string;
 };
 
 const MANIFEST_FILENAME = "ControlManifest.Input.xml";
@@ -26,8 +26,9 @@ const IGNORED_GENERATED_DIRECTORIES = new Set([
 ]);
 
 export async function refreshPcfExplorer(ctx: CommandContext): Promise<void> {
-  await ctx.pcfProjectLocator.refresh();
-  ctx.pcfExplorer.refresh();
+  await ctx.pcf.projectLocator.initialize();
+  await ctx.pcf.projectLocator.refresh();
+  ctx.pcf.explorer.refresh();
 }
 
 export async function newPcfControl(ctx: CommandContext): Promise<void> {
@@ -35,8 +36,8 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const parentFolder = await pickParentFolder();
-  if (!parentFolder) {
+  const parentFolderPath = await pickParentFolder(ctx);
+  if (!parentFolderPath) {
     return;
   }
 
@@ -54,7 +55,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     prompt: "Control name",
     placeHolder: "LinearInput",
     ignoreFocusOut: true,
-    validateInput: (value) => validateNewPcfControlName(value, parentFolder.uri.fsPath),
+    validateInput: (value) => validateNewPcfControlName(value, parentFolderPath),
   });
   if (!name) {
     return;
@@ -97,13 +98,13 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const targetRoot = path.join(parentFolder.uri.fsPath, name.trim());
+  const targetRoot = path.join(parentFolderPath, name.trim());
   if (await isNonEmptyDirectory(targetRoot)) {
-    vscode.window.showErrorMessage(`Folder ${targetRoot} already exists and is not empty.`);
+    await ctx.core.notifications.error(`Folder ${targetRoot} already exists and is not empty.`);
     return;
   }
 
-  const output = vscode.window.createOutputChannel("PCF: New Control");
+  const output = ctx.core.output.createChannel("PCF: New Control");
   output.show(true);
   output.appendLine(`[${new Date().toISOString()}] Create ${namespace.trim()}.${name.trim()}`);
 
@@ -115,7 +116,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
       cancellable: true,
     },
     async (_progress, token) =>
-      ctx.pacCli.pcfInit(
+      ctx.pcf.pacCli.pcfInit(
         {
           namespace: namespace.trim(),
           name: name.trim(),
@@ -132,7 +133,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
   if (result.exitCode !== 0) {
     output.appendLine(`pac exited with code ${result.exitCode}.`);
     await removeEmptyDirectory(targetRoot);
-    vscode.window.showErrorMessage(
+    await ctx.core.notifications.error(
       `Failed to create PCF control ${name.trim()}. See PCF: New Control output.`,
     );
     return;
@@ -155,7 +156,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
       },
       async (_progress, token) => {
         output.appendLine("Running npm install...");
-        return ctx.pcfProcessRunner.run("npm", ["install"], {
+        return ctx.pcf.processRunner.run("npm", ["install"], {
           cwd: targetRoot,
           onLine: (line, stream) =>
             output.appendLine(stream === "stderr" ? `[stderr] ${line}` : line),
@@ -166,7 +167,7 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
 
     if (installResult.exitCode !== 0) {
       output.appendLine(`npm install exited with code ${installResult.exitCode}.`);
-      vscode.window.showWarningMessage(
+      await ctx.core.notifications.warning(
         `PCF control ${namespace.trim()}.${name.trim()} was created, but npm install failed. See PCF: New Control output.`,
       );
     }
@@ -177,11 +178,11 @@ export async function newPcfControl(ctx: CommandContext): Promise<void> {
   if (sourceFile) {
     await vscode.window.showTextDocument(vscode.Uri.file(sourceFile));
   } else {
-    vscode.window.showWarningMessage(
+    await ctx.core.notifications.warning(
       `PCF control ${namespace.trim()}.${name.trim()} was created, but no source file was found.`,
     );
   }
-  vscode.window.showInformationMessage(`PCF control ${namespace.trim()}.${name.trim()} created.`);
+  await ctx.core.notifications.info(`PCF control ${namespace.trim()}.${name.trim()} created.`);
 }
 
 export async function buildPcfControl(
@@ -204,10 +205,10 @@ export async function buildPcfControl(
       cancellable: true,
     },
     async (_progress, token) => {
-      const ok = await ctx.pcfBuildService.build(project, { token });
+      const ok = await ctx.pcf.buildService.build(project, { token });
       if (ok) {
-        await ctx.pcfProjectLocator.refresh();
-        ctx.pcfExplorer.refresh();
+        await ctx.pcf.projectLocator.refresh();
+        ctx.pcf.explorer.refresh();
       }
     },
   );
@@ -226,7 +227,7 @@ export async function watchPcfControl(
     return;
   }
 
-  await ctx.pcfBuildService.startWatch(project);
+  await ctx.pcf.buildService.startWatch(project);
 }
 
 export async function pushPcfControl(
@@ -242,18 +243,18 @@ export async function pushPcfControl(
     return;
   }
 
-  const config = await ctx.configuration.loadConfiguration();
-  const env = await ctx.ui.pickEnvironment(
+  const config = await ctx.core.configuration.loadConfiguration();
+  const env = await ctx.core.ui.pickEnvironment(
     config.environments,
-    ctx.lastSelection.getLastEnvironment(),
+    ctx.core.lastSelection.getLastEnvironment(),
     { placeHolder: "Select environment for PCF push" },
   );
   if (!env) {
     return;
   }
 
-  await ctx.lastSelection.setLastEnvironment(env.name);
-  const publisherPrefix = await ctx.pcfPushService.resolvePublisherPrefix(project);
+  await ctx.core.lastSelection.setLastEnvironment(env.name);
+  const publisherPrefix = await ctx.pcf.pushService.resolvePublisherPrefix(project);
   if (!publisherPrefix) {
     return;
   }
@@ -265,15 +266,15 @@ export async function pushPcfControl(
       cancellable: true,
     },
     async (_progress, token) => {
-      const canContinue = await ctx.pcfPushService.warnForAuthMismatch(env, token);
+      const canContinue = await ctx.pcf.pushService.warnForAuthMismatch(env, token);
       if (!canContinue) {
         return;
       }
 
-      const ok = await ctx.pcfPushService.push(project, env, publisherPrefix, token);
+      const ok = await ctx.pcf.pushService.push(project, env, publisherPrefix, token);
       if (ok) {
-        await ctx.pcfProjectLocator.refresh();
-        ctx.pcfExplorer.refresh();
+        await ctx.pcf.projectLocator.refresh();
+        ctx.pcf.explorer.refresh();
       }
     },
   );
@@ -284,7 +285,7 @@ export async function stopPcfWatch(
   nodeOrUri?: PcfControlProjectNode | vscode.Uri,
 ): Promise<void> {
   const project = await resolveProject(ctx, nodeOrUri, { allowPick: false });
-  ctx.pcfBuildService.stopWatch(project);
+  ctx.pcf.buildService.stopWatch(project);
 }
 
 export async function normalizeGeneratedPcfTsConfig(projectRoot: string): Promise<boolean> {
@@ -394,7 +395,8 @@ export async function resolvePcfProject(
     return nodeOrUri.project;
   }
 
-  const projects = ctx.pcfProjectLocator.getProjects();
+  await ctx.pcf.projectLocator.initialize();
+  const projects = ctx.pcf.projectLocator.getProjects();
   const uri =
     nodeOrUri instanceof vscode.Uri ? nodeOrUri : vscode.window.activeTextEditor?.document.uri;
   if (uri) {
@@ -422,7 +424,7 @@ export async function resolvePcfProject(
   );
   if (!pick) {
     if (!projects.length) {
-      vscode.window.showWarningMessage("No PCF controls found in this workspace.");
+      await ctx.core.notifications.warning("No PCF controls found in this workspace.");
     }
     return undefined;
   }
@@ -432,10 +434,10 @@ export async function resolvePcfProject(
 
 const resolveProject = resolvePcfProject;
 
-async function pickParentFolder(): Promise<vscode.WorkspaceFolder | undefined> {
-  const folders = vscode.workspace.workspaceFolders ?? [];
+async function pickParentFolder(ctx: CommandContext): Promise<string | undefined> {
+  const folders = ctx.core.files.workspaceFolders;
   if (!folders.length) {
-    vscode.window.showErrorMessage("Open a workspace folder before creating a PCF control.");
+    await ctx.core.notifications.error("Open a workspace folder before creating a PCF control.");
     return undefined;
   }
 
@@ -444,41 +446,41 @@ async function pickParentFolder(): Promise<vscode.WorkspaceFolder | undefined> {
   }
 
   const pick = await vscode.window.showQuickPick<WorkspaceFolderPick>(
-    folders.map((folder) => ({
-      label: folder.name,
-      description: folder.uri.fsPath,
-      folder,
+    folders.map((folderPath) => ({
+      label: path.basename(folderPath),
+      description: folderPath,
+      folderPath,
     })),
     { placeHolder: "Select parent workspace folder" },
   );
-  return pick?.folder;
+  return pick?.folderPath;
 }
 
 async function ensurePac(ctx: CommandContext): Promise<boolean> {
-  const result = await ctx.pacCli.detect();
+  const result = await ctx.pcf.pacCli.detect();
   if (result.available) {
     return true;
   }
 
-  const action = await vscode.window.showErrorMessage(
+  const action = await ctx.core.notifications.askError(
     `Power Platform CLI is required for PCF commands: ${result.error ?? "pac not found"}.`,
-    "Install pac CLI",
+    ["Install pac CLI"],
   );
   if (action === "Install pac CLI") {
-    await vscode.env.openExternal(
-      vscode.Uri.parse("https://learn.microsoft.com/power-platform/developer/cli/introduction"),
+    await ctx.core.workbench.openExternal(
+      "https://learn.microsoft.com/power-platform/developer/cli/introduction",
     );
   }
   return false;
 }
 
 async function ensureNpm(ctx: CommandContext): Promise<boolean> {
-  const result = await detectTool(ctx.pcfProcessRunner, "npm", ["--version"]);
+  const result = await detectTool(ctx.pcf.processRunner, "npm", ["--version"]);
   if (result.available) {
     return true;
   }
 
-  vscode.window.showErrorMessage(
+  await ctx.core.notifications.error(
     `npm is required for this PCF command: ${result.error ?? "npm not found"}.`,
   );
   return false;

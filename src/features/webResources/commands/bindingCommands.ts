@@ -1,29 +1,32 @@
-import * as vscode from "vscode";
 import * as path from "path";
-import { CommandContext } from "../../../app/commandContext";
-import { BindingEntry, Dynamics365Configuration } from "../../config/domain/models";
-import { pickEnvironmentAndAuth, resolveTargetUri } from "../../../platform/vscode/commandUtils";
-import { DataverseClient } from "../../dataverse/dataverseClient";
+import { CommandContext } from "@app/commandContext";
+import type { OutputPort } from "@app/ports/output";
+import { WorkspaceFileType, type FsPathTarget } from "@app/ports/files";
+import { BindingEntry, Dynamics365Configuration } from "@features/config/domain/models";
+import { pickDataverseClient, resolveTargetUri } from "@app/commandUtils";
+import type { DataverseClient } from "@features/dataverse/dataverseClient";
 import { buildSupportedSet, collectSupportedFiles } from "../core/webResourceHelpers";
 import { compareFolderBindingResources, normalizeRemotePath } from "../folderBindingDiff";
 
-const bindingOutput = vscode.window.createOutputChannel("Dynamics 365 Tools Binding");
-
-export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefined): Promise<void> {
-  const { configuration, bindings, ui } = ctx;
-  const targetUri = await resolveTargetUri(uri);
+export async function addBinding(
+  ctx: CommandContext,
+  uri: FsPathTarget | undefined,
+): Promise<void> {
+  const { configuration, ui, notifications, files, workbench } = ctx.core;
+  const { bindings } = ctx.webResource;
+  const targetUri = await resolveTargetUri(notifications, uri, workbench.activeFilePath);
   if (!targetUri) {
     return;
   }
 
   const config = await configuration.loadConfiguration();
-  const stat = await vscode.workspace.fs.stat(targetUri);
-  const kind = stat.type === vscode.FileType.Directory ? "folder" : "file";
+  const stat = await files.stat(targetUri.fsPath);
+  const kind = stat.type === WorkspaceFileType.Directory ? "folder" : "file";
   const relative = configuration.getRelativeToWorkspace(targetUri.fsPath);
   const solutionConfig = await ui.promptSolution(config.solutions);
 
   if (!solutionConfig) {
-    vscode.window.showWarningMessage("No solution selected. Binding was not created.");
+    await notifications.warning("No solution selected. Binding was not created.");
     return;
   }
 
@@ -48,7 +51,7 @@ export async function addBinding(ctx: CommandContext, uri: vscode.Uri | undefine
   };
 
   await bindings.addOrUpdateBinding(binding);
-  vscode.window.showInformationMessage(
+  await notifications.info(
     `Bound ${relative || targetUri.fsPath} to ${remotePath} (${solutionConfig.name}).`,
   );
 }
@@ -73,32 +76,24 @@ function buildDefaultRemotePath(relativePath: string, defaultPrefix?: string): s
 
 async function confirmFolderBinding(
   ctx: CommandContext,
-  folderUri: vscode.Uri,
+  folderUri: FsPathTarget,
   remotePath: string,
   config: Dynamics365Configuration,
 ): Promise<boolean> {
-  const { configuration, ui, secrets, auth, lastSelection, connections } = ctx;
-  const supportedFiles = await collectSupportedFiles(folderUri, buildSupportedSet());
+  const supportedFiles = await collectSupportedFiles(
+    folderUri,
+    buildSupportedSet(),
+    ctx.core.files,
+  );
   if (!supportedFiles.length) {
     return true;
   }
 
-  const authContext = await pickEnvironmentAndAuth(
-    configuration,
-    ui,
-    secrets,
-    auth,
-    lastSelection,
+  const target = await pickDataverseClient(ctx, {
     config,
-    undefined,
-    { placeHolder: "Select environment to compare local and CRM resources" },
-  );
-  if (!authContext) {
-    return false;
-  }
-
-  const connection = await connections.createConnection(authContext.env, authContext.auth);
-  if (!connection) {
+    placeHolder: "Select environment to compare local and CRM resources",
+  });
+  if (!target) {
     return false;
   }
 
@@ -108,7 +103,7 @@ async function confirmFolderBinding(
   });
 
   try {
-    const client = new DataverseClient(connection);
+    const client = target.client;
     const crmResources = await listWebResourceNamesByPrefix(client, remotePath);
     const summary = compareFolderBindingResources(localRemotePaths, crmResources);
     if (!summary.hasDifferences) {
@@ -116,24 +111,23 @@ async function confirmFolderBinding(
     }
 
     logBindingDiff(
-      authContext.env.name,
+      ctx.core.output,
+      target.env.name,
       folderUri.fsPath,
       remotePath,
       summary.onlyLocal,
       summary.onlyCrm,
     );
-    const decision = await vscode.window.showWarningMessage(
-      `Binding check for ${authContext.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
-      "Create Binding",
-      "Cancel",
+    const decision = await ctx.core.notifications.askWarning(
+      `Binding check for ${target.env.name}: local ${summary.localCount}, CRM ${summary.crmCount}, match ${summary.matchCount}, only local ${summary.onlyLocalCount}, only CRM ${summary.onlyCrmCount}. Continue?`,
+      ["Create Binding", "Cancel"],
     );
     return decision === "Create Binding";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const decision = await vscode.window.showWarningMessage(
+    const decision = await ctx.core.notifications.askWarning(
       `Could not compare local files with CRM resources: ${message}. Continue creating binding?`,
-      "Create Binding",
-      "Cancel",
+      ["Create Binding", "Cancel"],
     );
     return decision === "Create Binding";
   }
@@ -172,12 +166,14 @@ async function listWebResourceNamesByPrefix(
 }
 
 function logBindingDiff(
+  output: OutputPort,
   environmentName: string,
   localFolderPath: string,
   remotePath: string,
   onlyLocal: string[],
   onlyCrm: string[],
 ): void {
+  const bindingOutput = output.createChannel("Dynamics 365 Tools Binding");
   bindingOutput.appendLine("────────────────────────────────────────────────────────────────────");
   bindingOutput.appendLine(`[${new Date().toISOString()}] Folder binding diff`);
   bindingOutput.appendLine(`Environment: ${environmentName}`);

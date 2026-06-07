@@ -1,6 +1,7 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import { WorkspaceFileType } from "@app/ports/files";
+import type { WorkspaceDirectoryEntry, WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
 import { PcfControlProject, PcfTemplateKind } from "./models";
 import { PcfManifestReader } from "./pcfManifestReader";
 
@@ -15,15 +16,30 @@ const IGNORED_DIRECTORIES = new Set([
   "obj",
 ]);
 
-export class PcfProjectLocator implements vscode.Disposable {
+type Disposable = { dispose(): void };
+type EventListener<T> = (event: T) => void;
+export type PcfProjectWatch = (listener: () => void) => Disposable | undefined;
+
+export class PcfProjectLocator implements Disposable {
   private projects: PcfControlProject[] = [];
-  private watcher?: vscode.FileSystemWatcher;
-  private readonly onDidChangeProjectsEmitter = new vscode.EventEmitter<void>();
+  private watcher?: Disposable;
+  private initializePromise?: Promise<void>;
+  private readonly onDidChangeProjectsEmitter = new SimpleEventEmitter<void>();
   readonly onDidChangeProjects = this.onDidChangeProjectsEmitter.event;
 
-  constructor(private readonly manifestReader = new PcfManifestReader()) {}
+  constructor(
+    private readonly files: WorkspaceFilesPort,
+    private readonly manifestReader = new PcfManifestReader(),
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
+    private readonly watchManifests?: PcfProjectWatch,
+  ) {}
 
   async initialize(): Promise<void> {
+    this.initializePromise ??= this.doInitialize();
+    await this.initializePromise;
+  }
+
+  private async doInitialize(): Promise<void> {
     await this.refresh();
     this.startWatching();
   }
@@ -33,15 +49,15 @@ export class PcfProjectLocator implements vscode.Disposable {
   }
 
   async refresh(): Promise<PcfControlProject[]> {
-    const manifests = await this.findManifestUris();
+    const manifests = await this.findManifestPaths();
     const projects: PcfControlProject[] = [];
 
-    for (const manifestUri of manifests) {
+    for (const manifestPath of manifests) {
       try {
-        projects.push(await this.createProject(manifestUri));
+        projects.push(await this.createProject(manifestPath));
       } catch (error) {
-        void vscode.window.showWarningMessage(
-          `Failed to read PCF manifest ${manifestUri.fsPath}: ${String(error)}`,
+        void this.notifications.warning(
+          `Failed to read PCF manifest ${manifestPath}: ${String(error)}`,
         );
       }
     }
@@ -58,18 +74,18 @@ export class PcfProjectLocator implements vscode.Disposable {
     this.onDidChangeProjectsEmitter.dispose();
   }
 
-  private async createProject(manifestUri: vscode.Uri): Promise<PcfControlProject> {
-    const manifestRoot = path.dirname(manifestUri.fsPath);
-    const rootUri = await resolveProjectRoot(manifestRoot);
-    const manifestContent = await fs.readFile(manifestUri.fsPath, "utf8");
+  private async createProject(manifestPath: string): Promise<PcfControlProject> {
+    const manifestRoot = path.dirname(manifestPath);
+    const rootUri = await resolveProjectRoot(this.files, manifestRoot);
+    const manifestContent = Buffer.from(await this.files.readFile(manifestPath)).toString("utf8");
     const manifest = this.manifestReader.read(manifestContent);
-    const packageJson = await readJsonFile(path.join(rootUri, "package.json"));
-    const pcfConfig = await readJsonFile(path.join(rootUri, "pcfconfig.json"));
+    const packageJson = await readJsonFile(this.files, path.join(rootUri, "package.json"));
+    const pcfConfig = await readJsonFile(this.files, path.join(rootUri, "pcfconfig.json"));
     const outputDir = resolveOutputDir(rootUri, manifest.constructor, pcfConfig);
 
     return {
       rootUri,
-      manifestUri: manifestUri.fsPath,
+      manifestUri: manifestPath,
       namespace: manifest.namespace,
       constructor: manifest.constructor,
       fullName: `${manifest.namespace}.${manifest.constructor}`,
@@ -79,68 +95,62 @@ export class PcfProjectLocator implements vscode.Disposable {
       description: manifest.description,
       templateKind: detectTemplateKind(packageJson),
       outputDir,
-      hasNodeModules: await exists(path.join(rootUri, "node_modules")),
-      cdsProjectUri: await findNearestCdsProject(rootUri),
+      hasNodeModules: await exists(this.files, path.join(rootUri, "node_modules")),
+      cdsProjectUri: await findNearestCdsProject(this.files, rootUri),
     };
   }
 
-  private async findManifestUris(): Promise<vscode.Uri[]> {
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    const manifests: vscode.Uri[] = [];
+  private async findManifestPaths(): Promise<string[]> {
+    const manifests: string[] = [];
 
-    for (const folder of folders) {
-      const matches = await findManifests(folder.uri.fsPath);
-      manifests.push(...matches.map((filePath) => vscode.Uri.file(filePath)));
+    for (const folder of this.files.workspaceFolders) {
+      const matches = await findManifests(this.files, folder);
+      manifests.push(...matches);
     }
 
     return manifests;
   }
 
   private startWatching(): void {
-    if (this.watcher || !vscode.workspace.createFileSystemWatcher) {
+    if (this.watcher || !this.watchManifests) {
       return;
     }
 
-    this.watcher = vscode.workspace.createFileSystemWatcher(`**/${MANIFEST_FILENAME}`);
     const refresh = () => {
       void this.refresh();
     };
-    this.watcher.onDidCreate(refresh);
-    this.watcher.onDidChange(refresh);
-    this.watcher.onDidDelete(refresh);
+    this.watcher = this.watchManifests(refresh);
   }
 }
 
-async function findManifests(root: string): Promise<string[]> {
+async function findManifests(files: WorkspaceFilesPort, root: string): Promise<string[]> {
   const manifests: string[] = [];
 
   async function visit(dir: string): Promise<void> {
-    let entries: Array<import("fs").Dirent>;
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    const entries = await listDirectoryEntries(files, dir);
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (entry.type === WorkspaceFileType.Directory) {
         if (!IGNORED_DIRECTORIES.has(entry.name)) {
           await visit(fullPath);
         }
-      } else if (entry.isFile() && entry.name === MANIFEST_FILENAME) {
+      } else if (entry.type === WorkspaceFileType.File && entry.name === MANIFEST_FILENAME) {
         manifests.push(fullPath);
       }
     }
   }
 
   await visit(root);
-  return manifests;
+  return manifests.sort();
 }
 
-async function readJsonFile(filePath: string): Promise<unknown | undefined> {
+async function readJsonFile(
+  files: Pick<WorkspaceFilesPort, "readFile">,
+  filePath: string,
+): Promise<unknown | undefined> {
   try {
-    const content = await fs.readFile(filePath, "utf8");
+    const content = Buffer.from(await files.readFile(filePath)).toString("utf8");
     return JSON.parse(content) as unknown;
   } catch {
     return undefined;
@@ -168,8 +178,11 @@ function resolveOutputDir(rootUri: string, controlName: string, pcfConfig: unkno
   return path.join(rootUri, "out", "controls", controlName);
 }
 
-async function resolveProjectRoot(manifestRoot: string): Promise<string> {
-  const pcfProjectRoot = await findNearestDirectoryWithFile(manifestRoot, (name) =>
+async function resolveProjectRoot(
+  files: WorkspaceFilesPort,
+  manifestRoot: string,
+): Promise<string> {
+  const pcfProjectRoot = await findNearestDirectoryWithFile(files, manifestRoot, (name) =>
     name.endsWith(".pcfproj"),
   );
   if (pcfProjectRoot) {
@@ -177,20 +190,21 @@ async function resolveProjectRoot(manifestRoot: string): Promise<string> {
   }
 
   return (
-    (await findNearestDirectoryWithFile(manifestRoot, (name) => name === "package.json")) ??
+    (await findNearestDirectoryWithFile(files, manifestRoot, (name) => name === "package.json")) ??
     manifestRoot
   );
 }
 
 async function findNearestDirectoryWithFile(
+  files: WorkspaceFilesPort,
   startDir: string,
   matches: (name: string) => boolean,
 ): Promise<string | undefined> {
   let current = startDir;
 
   while (true) {
-    const entries = await listDirectoryEntries(current);
-    if (entries.some((entry) => entry.isFile() && matches(entry.name))) {
+    const entries = await listDirectoryEntries(files, current);
+    if (entries.some((entry) => entry.type === WorkspaceFileType.File && matches(entry.name))) {
       return current;
     }
 
@@ -202,10 +216,13 @@ async function findNearestDirectoryWithFile(
   }
 }
 
-async function findNearestCdsProject(projectRoot: string): Promise<string | undefined> {
+async function findNearestCdsProject(
+  files: WorkspaceFilesPort,
+  projectRoot: string,
+): Promise<string | undefined> {
   let current = projectRoot;
   while (true) {
-    const cdsProjects = await listCdsProjects(current);
+    const cdsProjects = await listCdsProjects(files, current);
     if (cdsProjects.length) {
       return cdsProjects[0];
     }
@@ -218,28 +235,50 @@ async function findNearestCdsProject(projectRoot: string): Promise<string | unde
   }
 }
 
-async function listCdsProjects(dir: string): Promise<string[]> {
-  const entries = await listDirectoryEntries(dir);
+async function listCdsProjects(files: WorkspaceFilesPort, dir: string): Promise<string[]> {
+  const entries = await listDirectoryEntries(files, dir);
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".cdsproj"))
+    .filter((entry) => entry.type === WorkspaceFileType.File && entry.name.endsWith(".cdsproj"))
     .map((entry) => path.join(dir, entry.name))
     .sort();
 }
 
-async function listDirectoryEntries(dir: string): Promise<Array<import("fs").Dirent>> {
+async function listDirectoryEntries(
+  files: Pick<WorkspaceFilesPort, "readDirectory">,
+  dir: string,
+): Promise<WorkspaceDirectoryEntry[]> {
   try {
-    return await fs.readdir(dir, { withFileTypes: true });
+    return await files.readDirectory(dir);
   } catch {
     return [];
   }
 }
 
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await fs.stat(filePath);
-    return true;
-  } catch {
-    return false;
+async function exists(
+  files: Pick<WorkspaceFilesPort, "exists">,
+  filePath: string,
+): Promise<boolean> {
+  return files.exists(filePath);
+}
+
+class SimpleEventEmitter<T> {
+  private readonly listeners = new Set<EventListener<T>>();
+
+  readonly event = (listener: EventListener<T>) => {
+    this.listeners.add(listener);
+    return {
+      dispose: () => this.listeners.delete(listener),
+    };
+  };
+
+  fire(value: T): void {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+
+  dispose(): void {
+    this.listeners.clear();
   }
 }
 

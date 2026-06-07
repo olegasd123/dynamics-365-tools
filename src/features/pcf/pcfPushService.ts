@@ -1,6 +1,9 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import { NoopTextInput, TextInputPort } from "@app/ports/input";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { XMLParser } from "fast-xml-parser";
 import { EnvironmentConfig } from "../config/domain/models";
 import { PacCli } from "./pacCli";
@@ -8,17 +11,23 @@ import { PcfControlProject } from "./models";
 import { PcfTelemetryService } from "./pcfTelemetry";
 import { PcfWorkspaceSettingsService } from "./pcfWorkspaceSettings";
 
-export class PcfPushService implements vscode.Disposable {
-  private readonly output = vscode.window.createOutputChannel("PCF Push");
+export class PcfPushService {
+  private readonly output: OutputChannelPort;
 
   constructor(
     private readonly pacCli: PacCli,
     private readonly settings: PcfWorkspaceSettingsService,
+    private readonly files: WorkspaceFilesPort,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
-  ) {}
+    output: OutputPort = new NoopOutputPort(),
+    private readonly input: TextInputPort = new NoopTextInput(),
+  ) {
+    this.output = output.createChannel("PCF Push");
+  }
 
   async resolvePublisherPrefix(project: PcfControlProject): Promise<string | undefined> {
-    const cdsPrefix = await readPublisherPrefixFromCdsProject(project.cdsProjectUri);
+    const cdsPrefix = await readPublisherPrefixFromCdsProject(this.files, project.cdsProjectUri);
     if (cdsPrefix) {
       await this.settings.updateProjectSettings(project, { publisherPrefix: cdsPrefix });
       return cdsPrefix;
@@ -29,7 +38,7 @@ export class PcfPushService implements vscode.Disposable {
       return stored;
     }
 
-    const entered = await vscode.window.showInputBox({
+    const entered = await this.input.showInputBox({
       prompt: `Publisher prefix for ${project.fullName}`,
       placeHolder: "new",
       value: stored,
@@ -47,7 +56,7 @@ export class PcfPushService implements vscode.Disposable {
 
   async warnForAuthMismatch(
     env: EnvironmentConfig,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<boolean> {
     const profile = await this.pacCli.whoami();
     if (profile?.url && sameEnvironmentUrl(profile.url, env.url)) {
@@ -64,11 +73,11 @@ export class PcfPushService implements vscode.Disposable {
     );
 
     if (result.exitCode !== 0) {
-      vscode.window.showErrorMessage(`pac auth create failed with exit code ${result.exitCode}.`);
+      await this.notifications.error(`pac auth create failed with exit code ${result.exitCode}.`);
       return false;
     }
 
-    vscode.window.showInformationMessage(`pac auth profile synced to ${env.name}.`);
+    await this.notifications.info(`pac auth profile synced to ${env.name}.`);
     return true;
   }
 
@@ -76,7 +85,7 @@ export class PcfPushService implements vscode.Disposable {
     project: PcfControlProject,
     env: EnvironmentConfig,
     publisherPrefix: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<boolean> {
     this.output.show(true);
     this.output.appendLine("");
@@ -98,7 +107,7 @@ export class PcfPushService implements vscode.Disposable {
     this.telemetry?.push(project, result.exitCode === 0, result.durationMs);
 
     if (result.exitCode !== 0) {
-      vscode.window.showErrorMessage(`PCF push failed for ${project.fullName}.`);
+      await this.notifications.error(`PCF push failed for ${project.fullName}.`);
       return false;
     }
 
@@ -106,7 +115,7 @@ export class PcfPushService implements vscode.Disposable {
       publisherPrefix,
       lastDeployedEnv: env.name,
     });
-    vscode.window.showInformationMessage(`PCF control ${project.fullName} pushed to ${env.name}.`);
+    await this.notifications.info(`PCF control ${project.fullName} pushed to ${env.name}.`);
     return true;
   }
 
@@ -130,6 +139,7 @@ export function validatePublisherPrefix(value: string): string | undefined {
 }
 
 async function readPublisherPrefixFromCdsProject(
+  files: WorkspaceFilesPort,
   cdsProjectUri?: string,
 ): Promise<string | undefined> {
   if (!cdsProjectUri) {
@@ -144,7 +154,7 @@ async function readPublisherPrefixFromCdsProject(
   ];
 
   for (const candidate of candidates) {
-    const prefix = await readPublisherPrefix(candidate);
+    const prefix = await readPublisherPrefix(files, candidate);
     if (prefix) {
       return prefix;
     }
@@ -153,9 +163,12 @@ async function readPublisherPrefixFromCdsProject(
   return undefined;
 }
 
-async function readPublisherPrefix(filePath: string): Promise<string | undefined> {
+async function readPublisherPrefix(
+  files: WorkspaceFilesPort,
+  filePath: string,
+): Promise<string | undefined> {
   try {
-    const content = await fs.readFile(filePath, "utf8");
+    const content = Buffer.from(await files.readFile(filePath)).toString("utf8");
     const parsed = new XMLParser({ ignoreAttributes: false }).parse(content) as unknown;
     const found = findKey(parsed, "CustomizationPrefix");
     return typeof found === "string" && found.trim() ? found.trim() : undefined;

@@ -16,12 +16,15 @@ import {
   RuleStep,
   TextRange,
   XmlElementRange,
+  ButtonNode,
 } from "./models";
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonEditorState } from "./ribbonEditorState";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
+import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
 import { scanXmlElements } from "./ribbonXmlReader";
+import type { NotificationPort } from "@app/ports/notifications";
 
 export type RibbonExplorerNode =
   | RibbonSourceNode
@@ -157,6 +160,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     private readonly locator: RibbonSourceLocator,
     private readonly editorState: RibbonEditorState,
     private readonly diagnostics?: RibbonDiagnosticsService,
+    private readonly notifications?: NotificationPort,
   ) {}
 
   refresh(node?: RibbonExplorerNode): void {
@@ -227,7 +231,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
           )
         : [new RibbonEmptyNode("No RibbonDiffXml blocks found", "Check the source files")];
     } catch (error) {
-      void vscode.window.showErrorMessage(`Failed to load ribbons: ${String(error)}`);
+      void this.notifications?.error(`Failed to load ribbons: ${String(error)}`);
       return [new RibbonEmptyNode("Failed to load ribbons", "See the error notification")];
     }
   }
@@ -360,21 +364,7 @@ function customActionNode(document: RibbonDocument, action: CustomAction): Ribbo
             action.commandUI.kind === "Button" ? action.commandUI.command : undefined,
             `d365Ribbon${action.commandUI.kind}`,
             action.commandUI.kind === "Button" ? "symbol-method" : "symbol-misc",
-            [
-              ["Id", commandUiId(action.commandUI)],
-              ["Kind", action.commandUI.kind],
-              [
-                "Command",
-                action.commandUI.kind === "Button" ? action.commandUI.command : undefined,
-              ],
-              [
-                "Label",
-                action.commandUI.kind === "Button"
-                  ? (action.commandUI.labelText ?? action.commandUI.labelLocId)
-                  : undefined,
-              ],
-              ["Sequence", commandUiSequence(action.commandUI)],
-            ],
+            commandUiDetails(action.commandUI),
             [],
             { document, range: action.commandUI.range },
           ),
@@ -382,6 +372,37 @@ function customActionNode(document: RibbonDocument, action: CustomAction): Ribbo
       : [],
     { document, range: action.range },
   );
+}
+
+function commandUiDetails(commandUI: NonNullable<CustomAction["commandUI"]>) {
+  const rows: Array<[string, RibbonDetailValue]> = [
+    ["Id", commandUiId(commandUI)],
+    ["Kind", commandUI.kind],
+  ];
+
+  if (commandUI.kind === "Button") {
+    rows.push(
+      ["Command", commandUI.command],
+      ["Label", commandUI.labelText ?? commandUI.labelLocId],
+      ...optionalButtonDetails(commandUI),
+      ["Sequence", commandUI.sequence],
+    );
+    return rows;
+  }
+
+  rows.push(["Sequence", commandUiSequence(commandUI)]);
+  return rows;
+}
+
+function optionalButtonDetails(button: ButtonNode): Array<[string, RibbonDetailValue]> {
+  return [
+    ["Alt", button.alt],
+    ["Tool tip title", button.toolTipTitle],
+    ["Tool tip description", button.toolTipDescription],
+    ["Image 16", button.image16x16?.webResourceUniqueName],
+    ["Image 32", button.image32x32?.webResourceUniqueName],
+    ["Modern image", button.modernImage?.webResourceUniqueName],
+  ];
 }
 
 function commandUiId(commandUI: NonNullable<CustomAction["commandUI"]>): string {
@@ -429,9 +450,23 @@ function commandDefinitionNode(
       ["Actions", command.actions.length],
     ],
     [
-      ruleRefGroupNode("EnableRules", command.enableRuleRefs, "d365RibbonEnableRuleRefs"),
-      ruleRefGroupNode("DisplayRules", command.displayRuleRefs, "d365RibbonDisplayRuleRefs"),
-      actionGroupNode(document, command.actions),
+      ruleRefGroupNode(
+        document,
+        command,
+        "EnableRules",
+        "EnableRule",
+        command.enableRuleRefs,
+        "d365RibbonEnableRuleRefs",
+      ),
+      ruleRefGroupNode(
+        document,
+        command,
+        "DisplayRules",
+        "DisplayRule",
+        command.displayRuleRefs,
+        "d365RibbonDisplayRuleRefs",
+      ),
+      actionGroupNode(document, command),
     ],
     { document, range: command.range },
   );
@@ -483,29 +518,71 @@ function locLabelNode(document: RibbonDocument, label: LocLabel): RibbonItemNode
   );
 }
 
-function ruleRefGroupNode(label: string, refs: string[], contextValue: string): RibbonItemNode {
+function ruleRefGroupNode(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  label: string,
+  refName: "EnableRule" | "DisplayRule",
+  refs: string[],
+  contextValue: string,
+): RibbonItemNode {
+  const refElements = commandRuleRefElements(document, command, label, refName);
+
   return new RibbonItemNode(
     label,
     String(refs.length),
     contextValue,
     "references",
     [],
-    refs.map(ruleRefNode),
+    refs.map((id, index) => ruleRefNode(document, id, refName, refElements[index])),
+    { document, range: command.range },
   );
 }
 
-function ruleRefNode(id: string): RibbonItemNode {
-  return new RibbonItemNode(id, undefined, "d365RibbonRuleRef", "symbol-key", [["Id", id]]);
+function ruleRefNode(
+  document: RibbonDocument,
+  id: string,
+  refName: "EnableRule" | "DisplayRule",
+  element: XmlElementRange | undefined,
+): RibbonItemNode {
+  const builtIn = refName === "EnableRule" && isBuiltInEnableRule(id);
+  return new RibbonItemNode(
+    id,
+    builtIn ? "Built-in enable rule" : refName,
+    "d365RibbonRuleRef",
+    "symbol-key",
+    [
+      ["Id", id],
+      ["Kind", builtIn ? "Built-in EnableRule" : refName],
+    ],
+    [],
+    element ? { document, range: element.range } : undefined,
+  );
 }
 
-function actionGroupNode(document: RibbonDocument, actions: CommandAction[]): RibbonItemNode {
+function commandRuleRefElements(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  containerName: string,
+  refName: "EnableRule" | "DisplayRule",
+): XmlElementRange[] {
+  const commandElement = collectElements(scanXmlElements(document.sourceText)).find((node) =>
+    sameRange(node.range, command.range),
+  );
+  const container = commandElement?.children.find((child) => child.name === containerName);
+
+  return container?.children.filter((child) => child.name === refName) ?? [];
+}
+
+function actionGroupNode(document: RibbonDocument, command: CommandDefinition): RibbonItemNode {
   return new RibbonItemNode(
     "Actions",
-    String(actions.length),
+    String(command.actions.length),
     "d365RibbonActions",
     "run",
     [],
-    actions.map((action, index) => commandActionNode(document, action, index)),
+    command.actions.map((action, index) => commandActionNode(document, action, index)),
+    { document, range: command.range },
   );
 }
 
@@ -540,8 +617,12 @@ function commandActionNode(
       [
         ["Index", index + 1],
         ["Address", action.address],
+        ["Pass params", boolText(action.passParams)],
+        ["Window mode", action.winMode],
+        ["Window params", action.winParams],
+        ["Parameters", parameterValues(action.parameters)],
       ],
-      [],
+      parameterNodes(document, action.parameters),
       { document, range: action.range },
     );
   }
@@ -561,13 +642,20 @@ function commandActionNode(
 }
 
 function ruleStepNode(document: RibbonDocument, step: RuleStep, index: number): RibbonItemNode {
+  const children =
+    step.kind === "OrRule"
+      ? step.children.map((child, childIndex) => ruleStepNode(document, child, childIndex))
+      : step.kind === "CustomRule"
+        ? parameterNodes(document, step.parameters)
+        : [];
+
   return new RibbonItemNode(
     `${index + 1}. ${step.kind}`,
     ruleStepDescription(step),
     `d365RibbonRuleStep:${step.kind}`,
     step.kind === "Unknown" ? "warning" : "symbol-property",
     ruleStepDetails(step, index),
-    step.kind === "CustomRule" ? parameterNodes(document, step.parameters) : [],
+    children,
     { document, range: step.range },
   );
 }
@@ -584,6 +672,30 @@ function ruleStepDescription(step: RuleStep): string | undefined {
       return step.state;
     case "CommandClientTypeRule":
       return step.type;
+    case "FormTypeRule":
+      return step.type;
+    case "EntityPropertyRule":
+      return step.propertyName;
+    case "MiscellaneousPrivilegeRule":
+      return step.privilegeName;
+    case "OrganizationSettingRule":
+      return step.setting;
+    case "HideForTabletExperienceRule":
+      return undefined;
+    case "RelationshipTypeRule":
+      return step.type;
+    case "ReferencingAttributeRequiredRule":
+      return undefined;
+    case "PageRule":
+      return step.address;
+    case "OrRule":
+      return `${step.children.length} child step${step.children.length === 1 ? "" : "s"}`;
+    case "SelectionCountRule":
+      return selectionCountText(step.minimum, step.maximum);
+    case "RecordPrivilegeRule":
+      return step.privilegeType;
+    case "EntityRule":
+      return step.entityName ?? step.appliesTo ?? step.context;
     case "Unknown":
       return undefined;
   }
@@ -611,6 +723,8 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
         ["Entity", step.entityName],
         ["Privilege", step.privilegeType],
         ["Depth", step.privilegeDepth],
+        ["Applies to", step.appliesTo],
+        ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];
     case "ValueRule":
@@ -618,15 +732,127 @@ function ruleStepDetails(step: RuleStep, index: number): Array<[string, RibbonDe
         ...base,
         ["Field", step.field],
         ["Value", step.value],
+        ["Default", boolText(step.default)],
         ["Invert result", boolText(step.invertResult)],
       ];
     case "FormStateRule":
-      return [...base, ["State", step.state], ["Invert result", boolText(step.invertResult)]];
+      return [
+        ...base,
+        ["State", step.state],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
     case "CommandClientTypeRule":
-      return [...base, ["Type", step.type]];
+      return [
+        ...base,
+        ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "FormTypeRule":
+      return [
+        ...base,
+        ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "EntityPropertyRule":
+      return [
+        ...base,
+        ["Property", step.propertyName],
+        ["Value", boolText(step.propertyValue)],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "MiscellaneousPrivilegeRule":
+      return [
+        ...base,
+        ["Privilege", step.privilegeName],
+        ["Depth", step.privilegeDepth],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "OrganizationSettingRule":
+      return [
+        ...base,
+        ["Setting", step.setting],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "HideForTabletExperienceRule":
+      return [
+        ...base,
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "RelationshipTypeRule":
+      return [
+        ...base,
+        ["Type", step.type],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "ReferencingAttributeRequiredRule":
+      return [
+        ...base,
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "PageRule":
+      return [
+        ...base,
+        ["Address", step.address],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "OrRule":
+      return [
+        ...base,
+        ["Child steps", step.children.length],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "SelectionCountRule":
+      return [
+        ...base,
+        ["Applies to", step.appliesTo],
+        ["Minimum", step.minimum],
+        ["Maximum", step.maximum],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "RecordPrivilegeRule":
+      return [
+        ...base,
+        ["Privilege", step.privilegeType],
+        ["Applies to", step.appliesTo],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
+    case "EntityRule":
+      return [
+        ...base,
+        ["Entity", step.entityName],
+        ["Applies to", step.appliesTo],
+        ["Context", step.context],
+        ["Default", boolText(step.default)],
+        ["Invert result", boolText(step.invertResult)],
+      ];
     case "Unknown":
       return [...base, ["Raw XML", step.raw]];
   }
+}
+
+function selectionCountText(minimum: number | undefined, maximum: number | undefined): string {
+  if (minimum !== undefined && maximum !== undefined) {
+    return minimum === maximum ? String(minimum) : `${minimum}-${maximum}`;
+  }
+
+  if (minimum !== undefined) {
+    return `>= ${minimum}`;
+  }
+
+  return maximum !== undefined ? `<= ${maximum}` : "Any";
 }
 
 function parameterNodes(document: RibbonDocument, parameters: ActionParameter[]): RibbonItemNode[] {
@@ -639,6 +865,7 @@ function parameterNodes(document: RibbonDocument, parameters: ActionParameter[])
         "symbol-parameter",
         [
           ["Kind", parameter.kind],
+          ["Name", parameter.name],
           ["Value", parameter.value],
         ],
         [],
@@ -648,7 +875,11 @@ function parameterNodes(document: RibbonDocument, parameters: ActionParameter[])
 }
 
 function parameterValues(parameters: ActionParameter[]): string[] | undefined {
-  return parameters.length ? parameters.map((parameter) => parameter.value) : undefined;
+  return parameters.length
+    ? parameters.map((parameter) =>
+        parameter.name ? `${parameter.name}=${parameter.value}` : parameter.value,
+      )
+    : undefined;
 }
 
 function locLabelTitleNode(document: RibbonDocument, title: LocLabelTitle): RibbonItemNode {

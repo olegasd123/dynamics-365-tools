@@ -1,7 +1,11 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
 import { XMLParser } from "fast-xml-parser";
+import { WorkspaceFileType, type WorkspaceFilesPort } from "@app/ports/files";
+import { NoopTextInput, TextInputPort } from "@app/ports/input";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
+import { NoopWorkbench, WorkbenchPort } from "@app/ports/workbench";
 import { ConfigurationService } from "../config/configurationService";
 import { CdsSolutionProject, PcfControlProject, PcfPackageResult } from "./models";
 import { PacCli } from "./pacCli";
@@ -12,29 +16,36 @@ import { PcfTelemetryService } from "./pcfTelemetry";
 
 export interface PcfPackageOptions {
   managed: boolean;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
 }
 
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "out", "bin", "obj"]);
 
-export class PcfPackageService implements vscode.Disposable {
-  private readonly output = vscode.window.createOutputChannel("PCF Package");
+export class PcfPackageService {
+  private readonly output: OutputChannelPort;
 
   constructor(
     private readonly pacCli: PacCli,
     private readonly runner: ProcessRunner,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly files: WorkspaceFilesPort,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
-  ) {}
+    output: OutputPort = new NoopOutputPort(),
+    private readonly input: TextInputPort = new NoopTextInput(),
+    private readonly workbench: WorkbenchPort = new NoopWorkbench(),
+  ) {
+    this.output = output.createChannel("PCF Package");
+  }
 
   async packageControl(
     project: PcfControlProject,
     options: PcfPackageOptions,
   ): Promise<PcfPackageResult | undefined> {
-    const pcfProjectPath = await findPcfProjectPath(project.rootUri);
+    const pcfProjectPath = await findPcfProjectPath(this.files, project.rootUri);
     if (!pcfProjectPath) {
-      vscode.window.showErrorMessage(`No .pcfproj file was found for ${project.fullName}.`);
+      await this.notifications.error(`No .pcfproj file was found for ${project.fullName}.`);
       return undefined;
     }
 
@@ -70,7 +81,7 @@ export class PcfPackageService implements vscode.Disposable {
 
     if (result.exitCode !== 0) {
       this.telemetry?.package(project, false, options.managed, result.durationMs);
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `PCF solution package failed for ${project.fullName} with exit code ${result.exitCode}.`,
       );
       return undefined;
@@ -78,9 +89,9 @@ export class PcfPackageService implements vscode.Disposable {
 
     const zipPath =
       parseSolutionZipPath(`${result.stdout}\n${result.stderr}`, solution.rootUri) ??
-      (await findNewestSolutionZip(solution.rootUri, buildConfiguration));
+      (await findNewestSolutionZip(this.files, solution.rootUri, buildConfiguration));
     if (!zipPath) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `PCF solution package built, but no solution .zip path could be found for ${project.fullName}.`,
       );
       return undefined;
@@ -93,7 +104,7 @@ export class PcfPackageService implements vscode.Disposable {
     });
     this.telemetry?.package(project, true, options.managed, result.durationMs);
     this.output.appendLine(`Packaged solution: ${zipPath}`);
-    vscode.window.showInformationMessage(
+    await this.notifications.info(
       `PCF solution package created for ${project.fullName}: ${storedZipPath}`,
     );
 
@@ -113,7 +124,7 @@ export class PcfPackageService implements vscode.Disposable {
   private async resolveSolutionWrapper(
     project: PcfControlProject,
     pcfProjectPath: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<CdsSolutionProject | undefined> {
     const existing = await this.findExistingSolution(project, pcfProjectPath);
     if (existing) {
@@ -122,19 +133,18 @@ export class PcfPackageService implements vscode.Disposable {
 
     const workspaceRoot = this.configuration.workspaceRoot ?? path.dirname(project.rootUri);
     const defaultSolutionRoot = path.join(workspaceRoot, "solution");
-    const defaultSolution = await findFirstCdsProject(defaultSolutionRoot);
+    const defaultSolution = await findFirstCdsProject(this.files, defaultSolutionRoot);
     if (defaultSolution) {
       return this.ensureSolutionReferencesPcf(
-        await readCdsSolutionProject(defaultSolution),
+        await readCdsSolutionProject(this.files, defaultSolution),
         pcfProjectPath,
         token,
       );
     }
 
-    const action = await vscode.window.showWarningMessage(
+    const action = await this.notifications.askWarning(
       `No .cdsproj solution wrapper references ${project.fullName}. Create one at ${defaultSolutionRoot}?`,
-      "Create",
-      "Cancel",
+      ["Create", "Cancel"],
     );
     if (action !== "Create") {
       return undefined;
@@ -148,13 +158,13 @@ export class PcfPackageService implements vscode.Disposable {
     pcfProjectPath: string,
   ): Promise<CdsSolutionProject | undefined> {
     if (project.cdsProjectUri) {
-      return readCdsSolutionProject(project.cdsProjectUri);
+      return readCdsSolutionProject(this.files, project.cdsProjectUri);
     }
 
     const workspaceRoot = this.configuration.workspaceRoot ?? path.dirname(project.rootUri);
-    const cdsProjects = await findCdsProjects(workspaceRoot);
+    const cdsProjects = await findCdsProjects(this.files, workspaceRoot);
     for (const cdsProjectUri of cdsProjects) {
-      const solution = await readCdsSolutionProject(cdsProjectUri);
+      const solution = await readCdsSolutionProject(this.files, cdsProjectUri);
       if (referencesPcfProject(solution, pcfProjectPath)) {
         return solution;
       }
@@ -166,7 +176,7 @@ export class PcfPackageService implements vscode.Disposable {
   private async ensureSolutionReferencesPcf(
     solution: CdsSolutionProject,
     pcfProjectPath: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<CdsSolutionProject | undefined> {
     if (referencesPcfProject(solution, pcfProjectPath)) {
       return solution;
@@ -185,20 +195,20 @@ export class PcfPackageService implements vscode.Disposable {
       token,
     );
     if (result.exitCode !== 0) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `Failed to add PCF project reference to ${path.basename(solution.cdsProjectUri)}.`,
       );
       return undefined;
     }
 
-    return readCdsSolutionProject(solution.cdsProjectUri);
+    return readCdsSolutionProject(this.files, solution.cdsProjectUri);
   }
 
   private async createSolutionWrapper(
     project: PcfControlProject,
     pcfProjectPath: string,
     solutionRoot: string,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<CdsSolutionProject | undefined> {
     if (!(await this.ensurePacAvailable())) {
       return undefined;
@@ -209,7 +219,7 @@ export class PcfPackageService implements vscode.Disposable {
       return undefined;
     }
 
-    const publisherName = await vscode.window.showInputBox({
+    const publisherName = await this.input.showInputBox({
       prompt: "Publisher name for the generated PCF solution wrapper",
       placeHolder: "Contoso",
       value: `${publisherPrefix} Publisher`,
@@ -220,7 +230,7 @@ export class PcfPackageService implements vscode.Disposable {
       return undefined;
     }
 
-    await fs.mkdir(solutionRoot, { recursive: true });
+    await this.files.createDirectory(solutionRoot);
     this.output.show(true);
     this.output.appendLine(`Creating PCF solution wrapper at ${solutionRoot}`);
     const initResult = await this.pacCli.solutionInit(
@@ -230,17 +240,17 @@ export class PcfPackageService implements vscode.Disposable {
       token,
     );
     if (initResult.exitCode !== 0) {
-      vscode.window.showErrorMessage("Failed to create the PCF solution wrapper.");
+      await this.notifications.error("Failed to create the PCF solution wrapper.");
       return undefined;
     }
 
-    const cdsProjectUri = await findFirstCdsProject(solutionRoot);
+    const cdsProjectUri = await findFirstCdsProject(this.files, solutionRoot);
     if (!cdsProjectUri) {
-      vscode.window.showErrorMessage("pac solution init completed, but no .cdsproj was found.");
+      await this.notifications.error("pac solution init completed, but no .cdsproj was found.");
       return undefined;
     }
 
-    const solution = await readCdsSolutionProject(cdsProjectUri);
+    const solution = await readCdsSolutionProject(this.files, cdsProjectUri);
     const referenced = await this.ensureSolutionReferencesPcf(solution, pcfProjectPath, token);
     if (!referenced) {
       return undefined;
@@ -254,7 +264,7 @@ export class PcfPackageService implements vscode.Disposable {
 
   private async resolvePublisherPrefix(project: PcfControlProject): Promise<string | undefined> {
     const stored = (await this.settings.getProjectSettings(project)).publisherPrefix;
-    const entered = await vscode.window.showInputBox({
+    const entered = await this.input.showInputBox({
       prompt: `Publisher prefix for the generated solution wrapper for ${project.fullName}`,
       placeHolder: "new",
       value: stored,
@@ -276,13 +286,13 @@ export class PcfPackageService implements vscode.Disposable {
       return true;
     }
 
-    const action = await vscode.window.showErrorMessage(
+    const action = await this.notifications.askError(
       `Power Platform CLI is required to create or update PCF solution wrappers: ${result.error ?? "pac not found"}.`,
-      "Install pac CLI",
+      ["Install pac CLI"],
     );
     if (action === "Install pac CLI") {
-      await vscode.env.openExternal(
-        vscode.Uri.parse("https://learn.microsoft.com/power-platform/developer/cli/introduction"),
+      await this.workbench.openExternal(
+        "https://learn.microsoft.com/power-platform/developer/cli/introduction",
       );
     }
     return false;
@@ -312,11 +322,14 @@ export function parseSolutionZipPath(output: string, cwd: string): string | unde
   return path.isAbsolute(candidate) ? path.normalize(candidate) : path.resolve(cwd, candidate);
 }
 
-async function findPcfProjectPath(projectRoot: string): Promise<string | undefined> {
+async function findPcfProjectPath(
+  files: WorkspaceFilesPort,
+  projectRoot: string,
+): Promise<string | undefined> {
   try {
-    const entries = await fs.readdir(projectRoot, { withFileTypes: true });
+    const entries = await files.readDirectory(projectRoot);
     const pcfProjects = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".pcfproj"))
+      .filter((entry) => entry.type === WorkspaceFileType.File && entry.name.endsWith(".pcfproj"))
       .map((entry) => path.join(projectRoot, entry.name))
       .sort();
     return pcfProjects[0];
@@ -325,29 +338,32 @@ async function findPcfProjectPath(projectRoot: string): Promise<string | undefin
   }
 }
 
-async function findFirstCdsProject(root: string): Promise<string | undefined> {
-  const projects = await findCdsProjects(root);
+async function findFirstCdsProject(
+  files: WorkspaceFilesPort,
+  root: string,
+): Promise<string | undefined> {
+  const projects = await findCdsProjects(files, root);
   return projects[0];
 }
 
-async function findCdsProjects(root: string): Promise<string[]> {
+async function findCdsProjects(files: WorkspaceFilesPort, root: string): Promise<string[]> {
   const projects: string[] = [];
 
   async function visit(dir: string): Promise<void> {
-    let entries: Array<import("fs").Dirent>;
+    let entries: Awaited<ReturnType<WorkspaceFilesPort["readDirectory"]>>;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      entries = await files.readDirectory(dir);
     } catch {
       return;
     }
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (entry.type === WorkspaceFileType.Directory) {
         if (!IGNORED_DIRECTORIES.has(entry.name)) {
           await visit(fullPath);
         }
-      } else if (entry.isFile() && entry.name.endsWith(".cdsproj")) {
+      } else if (entry.type === WorkspaceFileType.File && entry.name.endsWith(".cdsproj")) {
         projects.push(fullPath);
       }
     }
@@ -357,9 +373,12 @@ async function findCdsProjects(root: string): Promise<string[]> {
   return projects.sort();
 }
 
-async function readCdsSolutionProject(cdsProjectUri: string): Promise<CdsSolutionProject> {
+async function readCdsSolutionProject(
+  files: WorkspaceFilesPort,
+  cdsProjectUri: string,
+): Promise<CdsSolutionProject> {
   const rootUri = path.dirname(cdsProjectUri);
-  const content = await fs.readFile(cdsProjectUri, "utf8").catch(() => "");
+  const content = await readUtf8(files, cdsProjectUri).catch(() => "");
   const referencedPcfProjects = [
     ...content.matchAll(/<ProjectReference\b[^>]*\bInclude=["']([^"']+\.pcfproj)["']/gi),
   ].map((match) => path.resolve(rootUri, match[1]));
@@ -368,7 +387,7 @@ async function readCdsSolutionProject(cdsProjectUri: string): Promise<CdsSolutio
     rootUri,
     cdsProjectUri,
     referencedPcfProjects,
-    publisherPrefix: await readPublisherPrefixFromSolution(rootUri),
+    publisherPrefix: await readPublisherPrefixFromSolution(files, rootUri),
     solutionUniqueName: path.basename(cdsProjectUri, ".cdsproj"),
   };
 }
@@ -380,7 +399,10 @@ function referencesPcfProject(solution: CdsSolutionProject, pcfProjectPath: stri
   );
 }
 
-async function readPublisherPrefixFromSolution(root: string): Promise<string | undefined> {
+async function readPublisherPrefixFromSolution(
+  files: WorkspaceFilesPort,
+  root: string,
+): Promise<string | undefined> {
   const candidates = [
     path.join(root, "src", "Other", "Solution.xml"),
     path.join(root, "Other", "Solution.xml"),
@@ -388,7 +410,7 @@ async function readPublisherPrefixFromSolution(root: string): Promise<string | u
   ];
 
   for (const candidate of candidates) {
-    const prefix = await readPublisherPrefix(candidate);
+    const prefix = await readPublisherPrefix(files, candidate);
     if (prefix) {
       return prefix;
     }
@@ -396,9 +418,12 @@ async function readPublisherPrefixFromSolution(root: string): Promise<string | u
   return undefined;
 }
 
-async function readPublisherPrefix(filePath: string): Promise<string | undefined> {
+async function readPublisherPrefix(
+  files: WorkspaceFilesPort,
+  filePath: string,
+): Promise<string | undefined> {
   try {
-    const content = await fs.readFile(filePath, "utf8");
+    const content = await readUtf8(files, filePath);
     const parsed = new XMLParser({ ignoreAttributes: false }).parse(content) as unknown;
     const found = findKey(parsed, "CustomizationPrefix");
     return typeof found === "string" && found.trim() ? found.trim() : undefined;
@@ -408,6 +433,7 @@ async function readPublisherPrefix(filePath: string): Promise<string | undefined
 }
 
 async function findNewestSolutionZip(
+  files: WorkspaceFilesPort,
   solutionRoot: string,
   configuration: "Debug" | "Release",
 ): Promise<string | undefined> {
@@ -415,20 +441,20 @@ async function findNewestSolutionZip(
   const zips: Array<{ filePath: string; mtimeMs: number }> = [];
 
   async function visit(dir: string): Promise<void> {
-    let entries: Array<import("fs").Dirent>;
+    let entries: Awaited<ReturnType<WorkspaceFilesPort["readDirectory"]>>;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      entries = await files.readDirectory(dir);
     } catch {
       return;
     }
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (entry.type === WorkspaceFileType.Directory) {
         await visit(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith(".zip")) {
-        const stat = await fs.stat(fullPath);
-        zips.push({ filePath: fullPath, mtimeMs: stat.mtimeMs });
+      } else if (entry.type === WorkspaceFileType.File && entry.name.endsWith(".zip")) {
+        const stat = await files.stat(fullPath);
+        zips.push({ filePath: fullPath, mtimeMs: stat.mtime });
       }
     }
   }
@@ -438,6 +464,10 @@ async function findNewestSolutionZip(
   }
 
   return zips.sort((a, b) => b.mtimeMs - a.mtimeMs)[0]?.filePath;
+}
+
+async function readUtf8(files: WorkspaceFilesPort, filePath: string): Promise<string> {
+  return Buffer.from(await files.readFile(filePath)).toString("utf8");
 }
 
 function findKey(value: unknown, key: string): unknown {

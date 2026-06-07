@@ -1,4 +1,4 @@
-import type * as vscode from "vscode";
+import type { StateStorePort } from "@app/ports/storage";
 import { NormalizedEnvironmentConfig } from "../config/domain/models";
 
 export interface AuthorizationProfile {
@@ -11,7 +11,7 @@ export interface AuthorizationProfile {
 const AUTHORIZATIONS_KEY = "dynamics365tools.authorizations";
 
 export class AuthorizationStore {
-  constructor(private readonly globalState: vscode.Memento) {}
+  constructor(private readonly globalState: StateStorePort) {}
 
   list(): AuthorizationProfile[] {
     const saved = this.globalState.get<AuthorizationProfile[]>(AUTHORIZATIONS_KEY, []);

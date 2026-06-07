@@ -1,21 +1,25 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
-import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
+import { SolutionPicker } from "@app/solutionPicker";
+import { RecordingNotifications } from "../../../testSupport/fakes";
+
+function createUi(notifications = new RecordingNotifications()): SolutionPicker {
+  return new SolutionPicker(notifications);
+}
 
 test("pickEnvironment shows error and returns undefined when list is empty", async () => {
-  const ui = new SolutionPicker();
-  const messages = (vscode.window as any).__messages;
-  messages.error.length = 0;
+  const notifications = new RecordingNotifications();
+  const ui = createUi(notifications);
 
   const env = await ui.pickEnvironment([]);
 
   assert.strictEqual(env, undefined);
-  assert.ok(messages.error[0].includes("No environments configured"));
+  assert.ok(notifications.errors[0].includes("No environments configured"));
 });
 
 test("pickEnvironment marks default environment as picked", async () => {
-  const ui = new SolutionPicker();
+  const ui = createUi();
   const originalQuickPick = (vscode.window as any).showQuickPick;
   let receivedItems: any[] | undefined;
   (vscode.window as any).showQuickPick = async (items: any[]) => {
@@ -41,7 +45,7 @@ test("pickEnvironment marks default environment as picked", async () => {
 });
 
 test("promptSolution uses quick pick when solutions exist", async () => {
-  const ui = new SolutionPicker();
+  const ui = createUi();
   const originalQuickPick = (vscode.window as any).showQuickPick;
   let receivedItems: any[] | undefined;
   (vscode.window as any).showQuickPick = async (items: any[]) => {
@@ -66,7 +70,7 @@ test("promptSolution uses quick pick when solutions exist", async () => {
 });
 
 test("promptSolution allows selecting the default solution when none configured", async () => {
-  const ui = new SolutionPicker();
+  const ui = createUi();
   const originalInputBox = (vscode.window as any).showInputBox;
   const originalQuickPick = (vscode.window as any).showQuickPick;
   let receivedItems: any[] | undefined;
@@ -90,7 +94,7 @@ test("promptSolution allows selecting the default solution when none configured"
 });
 
 test("promptSolution lets user enter a custom solution via quick pick", async () => {
-  const ui = new SolutionPicker();
+  const ui = createUi();
   const originalInputBox = (vscode.window as any).showInputBox;
   const originalQuickPick = (vscode.window as any).showQuickPick;
   (vscode.window as any).showInputBox = async () => "EnteredSolution";

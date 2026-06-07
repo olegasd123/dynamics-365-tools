@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
-import { applyRibbonPatches, applyRibbonPatchSequence } from "../ribbonPatchWriter";
+import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments } from "../ribbonXmlReader";
 import {
   createCommandDefinitionPatches,
@@ -20,6 +20,7 @@ import {
   createNodeAttributeValuePatch,
   createOobButtonReorderPatches,
   createOobStubReplacementPatches,
+  createRuleChildStepPatch,
   createRuleStepReplacePatch,
   createSwapNodePatches,
 } from "../ribbonEditPatches";
@@ -44,8 +45,12 @@ test("creates a custom button with command action and label", () => {
       buttonId: "d365tools.account.Form.Validate.Button",
       commandId: "d365tools.account.Form.Validate.Command",
       labelLocId: "d365tools.account.Form.Validate.Label",
+      alt: "Validate",
+      toolTipTitle: "Validate",
+      toolTipDescription: "Validate and save the row",
       image16x16: "new_/icons/save16.png",
       image32x32: "new_/icons/save32.png",
+      modernImage: "new_/icons/save.svg",
       action: {
         kind: "JavaScriptFunction",
         library: "new_/scripts/account.js",
@@ -74,6 +79,17 @@ test("creates a custom button with command action and label", () => {
   assert.match(updated, /<CommandDefinitions>/);
   assert.match(updated, /<LocLabels>/);
   assert.strictEqual(form.customActions[0].commandUI?.kind, "Button");
+  const button = form.customActions[0].commandUI;
+  assert.strictEqual(button?.kind === "Button" ? button.alt : undefined, "Validate");
+  assert.strictEqual(button?.kind === "Button" ? button.toolTipTitle : undefined, "Validate");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescription : undefined,
+    "Validate and save the row",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.modernImage?.webResourceUniqueName : undefined,
+    "new_/icons/save.svg",
+  );
   assert.strictEqual(form.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
   assert.deepStrictEqual(
     form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
@@ -87,7 +103,10 @@ test("creates a custom button with command action and label", () => {
   assert.strictEqual(form.locLabels[0].titles[0].description, "Validate and save");
   assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
   assert.match(updated, /LabelText="\$LocLabels:d365tools\.account\.Form\.Validate\.Label"/);
-  assert.match(updated, /<Button[^>]+Sequence="10"/);
+  assert.match(
+    updated,
+    /LabelText="\$LocLabels:d365tools\.account\.Form\.Validate\.Label" Alt="Validate" ToolTipTitle="Validate" ToolTipDescription="Validate and save the row" Image16by16="\$webresource:new_\/icons\/save16\.png" Image32by32="\$webresource:new_\/icons\/save32\.png" ModernImage="\$webresource:new_\/icons\/save\.svg" Sequence="10"/,
+  );
   assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
@@ -416,6 +435,40 @@ test("adds an action to an existing command definition", () => {
   assert.match(updated, /FunctionName="validateAndSave"/);
 });
 
+test("adds URL action options and named parameters", () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="d365tools.account.Form.Open.Command" />
+  </CommandDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const updated = applyRibbonPatchSequence(source, [
+    createCommandActionPatch(document, document.views[0].commandDefinitions[0], {
+      kind: "Url",
+      address: "$webresource:new_/page.htm",
+      passParams: true,
+      winMode: 1,
+      winParams: "height=600,width=800",
+      parameters: [
+        { kind: "Crm", name: "recordId", value: "FirstPrimaryItemId" },
+        { kind: "String", name: "source", value: "ribbon" },
+      ],
+    }),
+  ]);
+
+  assert.match(
+    updated,
+    /<Url Address="\$webresource:new_\/page\.htm" PassParams="true" WinMode="1" WinParams="height=600,width=800">/,
+  );
+  assert.match(updated, /<CrmParameter Name="recordId" Value="FirstPrimaryItemId" \/>/);
+  assert.match(updated, /<StringParameter Name="source" Value="ribbon" \/>/);
+});
+
 test("adds rule references to command definitions", () => {
   const source = `<RibbonDiffXml>
   <CommandDefinitions>
@@ -557,6 +610,255 @@ test("creates custom rules with CRM parameters", () => {
   assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
+test("creates common enable rule step types", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const cases = [
+    {
+      id: "new.SelectionCount",
+      step: {
+        kind: "SelectionCountRule" as const,
+        appliesTo: "SelectedEntity" as const,
+        minimum: 1,
+        maximum: 1,
+      },
+    },
+    {
+      id: "new.RecordPrivilege",
+      step: {
+        kind: "RecordPrivilegeRule" as const,
+        privilegeType: "AppendTo" as const,
+        appliesTo: "PrimaryEntity" as const,
+      },
+    },
+    {
+      id: "new.Entity",
+      step: {
+        kind: "EntityRule" as const,
+        entityName: "account",
+        appliesTo: "SelectedEntity" as const,
+        context: "HomePageGrid",
+      },
+    },
+    {
+      id: "new.Legacy",
+      step: {
+        kind: "CommandClientTypeRule" as const,
+        type: "Legacy" as const,
+      },
+    },
+  ];
+
+  for (const input of cases) {
+    const updated = applyRibbonPatchSequence(source, [createEnableRulePatches(document, input)[0]]);
+    const [updatedDocument] = readRibbonDocuments(updated, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+
+    assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, input.step.kind);
+  }
+});
+
+test("creates flat display rule step types", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  const cases = [
+    {
+      id: "new.FormType",
+      step: {
+        kind: "FormTypeRule" as const,
+        type: "Main" as const,
+      },
+    },
+    {
+      id: "new.EntityProperty",
+      step: {
+        kind: "EntityPropertyRule" as const,
+        propertyName: "HasNotes" as const,
+        propertyValue: true,
+      },
+    },
+    {
+      id: "new.MiscPrivilege",
+      step: {
+        kind: "MiscellaneousPrivilegeRule" as const,
+        privilegeName: "ExportToExcel",
+        privilegeDepth: "Basic" as const,
+      },
+    },
+    {
+      id: "new.OrganizationSetting",
+      step: {
+        kind: "OrganizationSettingRule" as const,
+        setting: "IsSharepointEnabled" as const,
+      },
+    },
+    {
+      id: "new.HideForTablet",
+      step: {
+        kind: "HideForTabletExperienceRule" as const,
+      },
+    },
+    {
+      id: "new.RelationshipType",
+      step: {
+        kind: "RelationshipTypeRule" as const,
+        type: "OneToMany" as const,
+      },
+    },
+    {
+      id: "new.ReferencingRequired",
+      step: {
+        kind: "ReferencingAttributeRequiredRule" as const,
+      },
+    },
+    {
+      id: "new.Page",
+      step: {
+        kind: "PageRule" as const,
+        address: "/dashboards/dashboard.aspx",
+      },
+    },
+    {
+      id: "new.Or",
+      step: {
+        kind: "OrRule" as const,
+        children: [
+          {
+            kind: "FormStateRule" as const,
+            state: "Create" as const,
+          },
+          {
+            kind: "FormStateRule" as const,
+            state: "Existing" as const,
+          },
+        ],
+      },
+    },
+  ];
+
+  for (const input of cases) {
+    const updated = applyRibbonPatchSequence(source, [
+      createDisplayRulePatches(document, input)[0],
+    ]);
+    const [updatedDocument] = readRibbonDocuments(updated, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+
+    assert.strictEqual(updatedDocument.views[0].displayRules[0].steps[0].kind, input.step.kind);
+    assert.match(updated, new RegExp(`<${input.step.kind}`));
+  }
+});
+
+test("adds a child step to an OrRule", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.Display">
+        <OrRule />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const orRule = document.views[0].displayRules[0].steps[0];
+
+  const updated = applyRibbonPatchSequence(source, [
+    createRuleChildStepPatch(document.sourceText, orRule, {
+      kind: "FormStateRule",
+      state: "Create",
+    }),
+  ]);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedOrRule = updatedDocument.views[0].displayRules[0].steps[0];
+
+  assert.strictEqual(updatedOrRule.kind, "OrRule");
+  assert.deepStrictEqual(
+    updatedOrRule.kind === "OrRule"
+      ? updatedOrRule.children.map((step) =>
+          step.kind === "FormStateRule" ? step.state : undefined,
+        )
+      : [],
+    ["Create"],
+  );
+  assert.match(updated, /<OrRule>\n\s+<FormStateRule State="Create" \/>\n\s+<\/OrRule>/);
+});
+
+test("replaces rule steps with common enable rule step types", () => {
+  const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="old.enable">
+        <CustomRule Library="$webresource:new_/scripts/account.js" FunctionName="isEnabled" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const replacements = [
+    {
+      kind: "SelectionCountRule" as const,
+      minimum: 1,
+      maximum: 1,
+    },
+    {
+      kind: "RecordPrivilegeRule" as const,
+      privilegeType: "Read" as const,
+    },
+    {
+      kind: "EntityRule" as const,
+      entityName: "account",
+    },
+  ];
+
+  for (const replacement of replacements) {
+    const [document] = readRibbonDocuments(source, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+    const updated = applyRibbonPatchSequence(source, [
+      createRuleStepReplacePatch(
+        document.sourceText,
+        document.views[0].enableRules[0].steps[0],
+        replacement,
+      ),
+    ]);
+    const [updatedDocument] = readRibbonDocuments(updated, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Application",
+    });
+
+    assert.strictEqual(updatedDocument.views[0].enableRules[0].steps[0].kind, replacement.kind);
+  }
+});
+
 test("creates a loc label section when needed", () => {
   const source = `<RibbonDiffXml>
   <Templates />
@@ -651,24 +953,10 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
   });
   const view = document.views[0];
 
-  const updated = applyRibbonPatches(source, [
-    createCustomButtonReplacePatch(document.sourceText, view.customActions[0].range, {
-      customActionId: "new.action",
-      location: "new.location",
-      sequence: 20,
-      buttonId: "new.button",
-      commandId: "new.command",
-      labelText: "New label",
-      action: { kind: "Url", address: "" },
-    }),
-    createHideActionReplacePatch(document.sourceText, view.hideActions[0].range, {
-      hideActionId: "new.hide",
-      location: "new.location",
-    }),
-    createCommandActionReplacePatch(document.sourceText, view.commandDefinitions[0].actions[0], {
-      kind: "JavaScriptFunction",
-      library: "new_/scripts/account.js",
-      functionName: "validateAndSave",
+  const updated = applyRibbonPatchSequence(source, [
+    createLocLabelTitleReplacePatch(document.sourceText, view.locLabels[0].titles[0], {
+      languageCode: 1033,
+      description: "New label",
     }),
     createRuleStepReplacePatch(document.sourceText, view.displayRules[0].steps[0], {
       kind: "ValueRule",
@@ -676,9 +964,29 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
       value: "0",
       invertResult: true,
     }),
-    createLocLabelTitleReplacePatch(document.sourceText, view.locLabels[0].titles[0], {
-      languageCode: 1033,
-      description: "New label",
+    createCommandActionReplacePatch(document.sourceText, view.commandDefinitions[0].actions[0], {
+      kind: "JavaScriptFunction",
+      library: "new_/scripts/account.js",
+      functionName: "validateAndSave",
+    }),
+    createHideActionReplacePatch(document.sourceText, view.hideActions[0].range, {
+      hideActionId: "new.hide",
+      location: "new.location",
+    }),
+    createCustomButtonReplacePatch(document.sourceText, view.customActions[0].range, {
+      customActionId: "new.action",
+      location: "new.location",
+      sequence: 20,
+      buttonId: "new.button",
+      commandId: "new.command",
+      labelText: "New label",
+      alt: "New alt",
+      toolTipTitle: "New title",
+      toolTipDescription: "New description",
+      image16x16: "new_/icons/new16.png",
+      image32x32: "new_/icons/new32.png",
+      modernImage: "new_/icons/new.svg",
+      action: { kind: "Url", address: "" },
     }),
   ]);
   const [updatedDocument] = readRibbonDocuments(updated, {
@@ -693,6 +1001,17 @@ test("replaces editable ribbon nodes without touching surrounding XML", () => {
   assert.strictEqual(updatedView.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
   assert.strictEqual(updatedView.displayRules[0].steps[0].kind, "ValueRule");
   assert.strictEqual(updatedView.locLabels[0].titles[0].description, "New label");
+  const button = updatedView.customActions[0].commandUI;
+  assert.strictEqual(button?.kind === "Button" ? button.alt : undefined, "New alt");
+  assert.strictEqual(button?.kind === "Button" ? button.toolTipTitle : undefined, "New title");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescription : undefined,
+    "New description",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.modernImage?.webResourceUniqueName : undefined,
+    "new_/icons/new.svg",
+  );
   assert.match(updated, /<CommandDefinitions>/);
   assert.doesNotMatch(updated, /old\.hide/);
 });
@@ -723,7 +1042,7 @@ test("replaces node ids without rebuilding child XML", () => {
   });
   const view = document.views[0];
 
-  const updated = applyRibbonPatches(source, [
+  const updated = applyRibbonPatchSequence(source, [
     createNodeAttributeValuePatch(
       document.sourceText,
       view.commandDefinitions[0].range,
@@ -799,7 +1118,7 @@ test("swaps sibling XML nodes without changing their content", () => {
   });
   const [first, second] = document.views[0].commandDefinitions;
 
-  const updated = applyRibbonPatches(
+  const updated = applyRibbonPatchSequence(
     source,
     createSwapNodePatches(document.sourceText, first.range, second.range),
   );

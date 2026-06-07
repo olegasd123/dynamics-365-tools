@@ -1,12 +1,7 @@
 const path = require("path");
-const fs = require("fs/promises");
 
-const FileType = {
-  Unknown: 0,
-  File: 1,
-  Directory: 2,
-  SymbolicLink: 64,
-};
+// This shim intentionally covers only VS Code surfaces still exercised by tests:
+// UI prompts/webviews/tree/status bars, command registration, diagnostics, and URI helpers.
 
 class Uri {
   constructor(fsPath) {
@@ -30,52 +25,12 @@ class Uri {
 
 const workspace = {
   workspaceFolders: undefined,
-  fs: {
-    async stat(uri) {
-      const stats = await fs.stat(uri.fsPath);
-      return {
-        type: stats.isDirectory() ? FileType.Directory : FileType.File,
-      };
-    },
-    async readFile(uri) {
-      return fs.readFile(uri.fsPath);
-    },
-    async writeFile(uri, content) {
-      await fs.mkdir(path.dirname(uri.fsPath), { recursive: true });
-      await fs.writeFile(uri.fsPath, content);
-    },
-    async createDirectory(uri) {
-      await fs.mkdir(uri.fsPath, { recursive: true });
-    },
-    async readDirectory(uri) {
-      const entries = await fs.readdir(uri.fsPath, { withFileTypes: true });
-      return entries.map((entry) => [
-        entry.name,
-        entry.isDirectory() ? FileType.Directory : FileType.File,
-      ]);
-    },
-  },
-};
-
-const messages = {
-  info: [],
-  warn: [],
-  error: [],
 };
 
 const window = {
-  showInformationMessage: async (msg) => {
-    messages.info.push(msg);
-    return undefined;
-  },
-  showWarningMessage: async (msg) => {
-    messages.warn.push(msg);
-    return undefined;
-  },
-  showErrorMessage: async (msg) => {
-    messages.error.push(msg);
-    return undefined;
-  },
+  showInformationMessage: async () => undefined,
+  showWarningMessage: async () => undefined,
+  showErrorMessage: async () => undefined,
   showInputBox: async () => undefined,
   showQuickPick: async () => undefined,
   showSaveDialog: async () => undefined,
@@ -127,60 +82,12 @@ const window = {
     window.__lastWebviewPanel = panel;
     return panel;
   },
-  __messages: messages,
   __lastWebviewPanel: undefined,
-};
-
-const extensions = {
-  getExtension: () => undefined,
-};
-
-class InMemorySecretStorage {
-  constructor() {
-    this.map = new Map();
-  }
-
-  async get(key) {
-    return this.map.get(key);
-  }
-
-  async store(key, value) {
-    this.map.set(key, value);
-  }
-
-  async delete(key) {
-    this.map.delete(key);
-  }
-}
-
-const authentication = {
-  getSession: async () => {
-    throw new Error("authentication.getSession not stubbed");
-  },
-  removeSession: undefined,
 };
 
 const commands = {
   registerCommand: () => ({ dispose: () => {} }),
   executeCommand: async () => undefined,
-};
-
-const env = {
-  clipboard: {
-    value: "",
-    async writeText(value) {
-      this.value = value;
-    },
-  },
-  openExternal: async () => true,
-  createTelemetryLogger: () => ({
-    isUsageEnabled: true,
-    isErrorsEnabled: true,
-    onDidChangeEnableStates: () => ({ dispose: () => {} }),
-    logUsage: () => {},
-    logError: () => {},
-    dispose: () => {},
-  }),
 };
 
 class Position {
@@ -308,17 +215,12 @@ module.exports = {
   Uri,
   workspace,
   window,
-  extensions,
   commands,
-  env,
   languages,
-  FileType,
   Position,
   Range,
   Diagnostic,
   DiagnosticSeverity,
-  authentication,
-  InMemorySecretStorage,
   EventEmitter,
   ProgressLocation,
   StatusBarAlignment,

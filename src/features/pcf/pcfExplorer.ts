@@ -14,6 +14,8 @@ import { PcfBuildService } from "./pcfBuildService";
 import { PcfEnvironmentService } from "./pcfEnvironmentService";
 import { PcfProjectLocator } from "./pcfProjectLocator";
 import { ProcessRunner } from "./processRunner";
+import type { NotificationPort } from "@app/ports/notifications";
+import type { WorkspaceFilesPort } from "@app/ports/files";
 
 const SOLUTION_FILTER_STATE_KEY = "d365Tools.pcf.filterConfiguredSolutions";
 const SOLUTION_FILTER_CONTEXT_KEY = "d365Tools.pcf.filterConfiguredSolutions";
@@ -171,21 +173,30 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   private toolchainStatus?: PcfToolchainStatus;
   private filterByConfiguredSolutions = true;
   private workspaceFolderFilterRoot?: string;
+  private initializePromise?: Promise<void>;
 
   constructor(
     private readonly configuration: ConfigurationService,
     private readonly state: vscode.Memento,
+    private readonly files: Pick<WorkspaceFilesPort, "workspaceFolders">,
     private readonly locator: PcfProjectLocator,
     private readonly runner: ProcessRunner,
     private readonly pacCli: PacCli,
     private readonly buildService: PcfBuildService,
     private readonly environmentService: PcfEnvironmentService,
+    private readonly notifications: NotificationPort,
   ) {
     this.locator.onDidChangeProjects(() => this.refresh());
     this.buildService.onDidChangeStatus(() => this.refresh());
   }
 
   async initialize(): Promise<void> {
+    this.initializePromise ??= this.doInitialize();
+    await this.initializePromise;
+  }
+
+  private async doInitialize(): Promise<void> {
+    await this.locator.initialize();
     this.filterByConfiguredSolutions = this.state.get<boolean>(SOLUTION_FILTER_STATE_KEY, true);
     this.workspaceFolderFilterRoot = this.state.get<string | undefined>(
       WORKSPACE_FOLDER_FILTER_STATE_KEY,
@@ -207,6 +218,8 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async getChildren(element?: PcfExplorerNode): Promise<PcfExplorerNode[]> {
+    await this.initialize();
+
     if (!element) {
       const projects = this.getVisibleProjects();
       const roots: PcfExplorerNode[] = [
@@ -255,10 +268,12 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async toggleSolutionFilter(): Promise<void> {
+    await this.initialize();
     await this.setSolutionFilter(!this.filterByConfiguredSolutions);
   }
 
   async setSolutionFilter(enabled: boolean): Promise<void> {
+    await this.initialize();
     if (this.filterByConfiguredSolutions === enabled) {
       return;
     }
@@ -270,6 +285,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
   }
 
   async setWorkspaceFolderFilter(rootUri: string | undefined): Promise<void> {
+    await this.initialize();
     this.workspaceFolderFilterRoot = rootUri;
     await this.state.update(WORKSPACE_FOLDER_FILTER_STATE_KEY, rootUri);
     this.refresh();
@@ -338,7 +354,7 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       return controls.map((control) => new PcfDeployedControlNode(env, control));
     } catch (error) {
       const message = String(error);
-      void vscode.window.showErrorMessage(
+      void this.notifications.error(
         isUserNotMemberError(message)
           ? `Failed to load PCF controls from ${env.name}: account has no access. Run 'Dynamics 365 Tools: Sign In (Interactive)' and select the correct account for this environment.`
           : `Failed to load PCF controls from ${env.name}: ${message}`,
@@ -388,10 +404,8 @@ export class PcfExplorerProvider implements vscode.TreeDataProvider<PcfExplorerN
       return undefined;
     }
 
-    const folder = vscode.workspace.workspaceFolders?.find((item) =>
-      samePath(item.uri.fsPath, root),
-    );
-    return folder?.name ?? path.basename(root);
+    const folder = this.files.workspaceFolders.find((item) => samePath(item, root));
+    return folder ? path.basename(folder) : path.basename(root);
   }
 }
 

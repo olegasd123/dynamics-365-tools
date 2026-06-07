@@ -16,8 +16,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push({ dispose: () => clearTimeout(timer) });
 
-  const services = await createServices(context);
-  context.subscriptions.push(...registerCommands(services));
+  const services = createServices(context);
+  context.subscriptions.push(services, ...registerCommands(services));
 }
 
 export function deactivate() {}

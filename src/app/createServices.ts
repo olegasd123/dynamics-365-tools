@@ -1,162 +1,415 @@
 import * as vscode from "vscode";
-import { AuthService } from "../features/auth/authService";
-import { AuthorizationStore } from "../features/auth/authorizationStore";
-import { SecretService } from "../features/auth/secretService";
-import { ConfigurationService } from "../features/config/configurationService";
-import { EnvironmentConnectionService } from "../features/dataverse/environmentConnectionService";
-import { NpmRunner } from "../features/pcf/npmRunner";
-import { createPacCommandCandidates, PacCli } from "../features/pcf/pacCli";
-import { PcfBuildService } from "../features/pcf/pcfBuildService";
-import { PcfDeployService } from "../features/pcf/pcfDeployService";
-import { PcfEnvironmentService } from "../features/pcf/pcfEnvironmentService";
-import { PcfExplorerProvider } from "../features/pcf/pcfExplorer";
-import { PcfPackageService } from "../features/pcf/pcfPackageService";
-import { PcfProjectLocator } from "../features/pcf/pcfProjectLocator";
-import { PcfPushService } from "../features/pcf/pcfPushService";
-import { PcfStatusBarService } from "../features/pcf/pcfStatusBar";
-import { PcfTelemetryService } from "../features/pcf/pcfTelemetry";
-import { PcfWorkspaceSettingsService } from "../features/pcf/pcfWorkspaceSettings";
-import { ProcessRunner } from "../features/pcf/processRunner";
-import { PluginAssemblyIntrospector } from "../features/plugins/pluginAssemblyIntrospector";
-import { PluginExplorerProvider } from "../features/plugins/pluginExplorer";
-import { PluginRegistrationManager } from "../features/plugins/pluginRegistrationManager";
-import { RibbonDiagnosticsService } from "../features/ribbons/ribbonDiagnostics";
-import { RibbonEditorState } from "../features/ribbons/ribbonEditorState";
-import { RibbonExplorerProvider } from "../features/ribbons/ribbonExplorer";
-import { RibbonPublishService } from "../features/ribbons/ribbonPublishService";
-import { RibbonRepository } from "../features/ribbons/ribbonRepository";
-import { RibbonSourceLocator } from "../features/ribbons/ribbonSourceLocator";
-import { SolutionZipService } from "../features/ribbons/solutionZipService";
-import { RibbonFormPanel } from "../features/ribbons/webview/ribbonFormPanel";
-import { BindingService } from "../features/webResources/bindingService";
-import { PublishCacheService } from "../features/webResources/publishCacheService";
-import { WebResourcePublisher } from "../features/webResources/webResourcePublisher";
-import { WebResourceUrlService } from "../features/webResources/webResourceUrlService";
-import { LastSelectionService } from "../platform/vscode/lastSelectionStore";
-import { AssemblyStatusBarService, StatusBarService } from "../platform/vscode/statusBar";
-import { SolutionPicker } from "../platform/vscode/ui/solutionPicker";
+import { AuthService } from "@features/auth/authService";
+import { AuthorizationStore } from "@features/auth/authorizationStore";
+import { SecretService } from "@features/auth/secretService";
+import { ConfigurationService } from "@features/config/configurationService";
+import { EnvironmentConnectionService } from "@features/dataverse/environmentConnectionService";
+import { NpmRunner } from "@features/pcf/npmRunner";
+import { createPacCommandCandidates, PacCli } from "@features/pcf/pacCli";
+import { PcfBuildService } from "@features/pcf/pcfBuildService";
+import { PcfDeployService } from "@features/pcf/pcfDeployService";
+import { PcfEnvironmentService } from "@features/pcf/pcfEnvironmentService";
+import { PcfExplorerProvider } from "@features/pcf/pcfExplorer";
+import { PcfPackageService } from "@features/pcf/pcfPackageService";
+import { PcfProjectLocator } from "@features/pcf/pcfProjectLocator";
+import { PcfPushService } from "@features/pcf/pcfPushService";
+import { PcfStatusBarService } from "@features/pcf/pcfStatusBar";
+import { PcfTelemetryService } from "@features/pcf/pcfTelemetry";
+import { PcfWorkspaceSettingsService } from "@features/pcf/pcfWorkspaceSettings";
+import { ProcessRunner } from "@features/pcf/processRunner";
+import { PluginAssemblyStatusBarService } from "@features/plugins/pluginAssemblyStatusBar";
+import { PluginAssemblyIntrospector } from "@features/plugins/pluginAssemblyIntrospector";
+import { PluginExplorerProvider } from "@features/plugins/pluginExplorer";
+import { PluginRegistrationManager } from "@features/plugins/pluginRegistrationManager";
+import { RibbonDiagnosticsService } from "@features/ribbons/ribbonDiagnostics";
+import { RibbonEditorState } from "@features/ribbons/ribbonEditorState";
+import { RibbonExplorerProvider } from "@features/ribbons/ribbonExplorer";
+import { RibbonPublishService } from "@features/ribbons/ribbonPublishService";
+import { RibbonRepository } from "@features/ribbons/ribbonRepository";
+import { RibbonSourceLocator } from "@features/ribbons/ribbonSourceLocator";
+import { SolutionZipService } from "@features/ribbons/solutionZipService";
+import { RibbonFormPanel } from "@features/ribbons/webview/ribbonFormPanel";
+import { BindingService } from "@features/webResources/bindingService";
+import { PublishCacheService } from "@features/webResources/publishCacheService";
+import { WebResourceStatusBarService } from "@features/webResources/webResourceStatusBar";
+import { WebResourcePublisher } from "@features/webResources/webResourcePublisher";
+import { WebResourceUrlService } from "@features/webResources/webResourceUrlService";
+import { VsCodeAuthenticationService } from "@platform/vscode/authenticationService";
+import { VsCodeClipboard } from "@platform/vscode/clipboard";
+import { VsCodeDiagnostics } from "@platform/vscode/diagnostics";
+import { VsCodeFileDialogs } from "@platform/vscode/fileDialogs";
+import { VsCodeTextInput } from "@platform/vscode/input";
+import { LastSelectionService } from "./lastSelectionService";
+import { VsCodeNotificationService } from "@platform/vscode/notificationService";
+import { VsCodeOutputPort } from "@platform/vscode/output";
+import { VsCodeOutputLogger } from "@platform/vscode/outputLogger";
+import { watchPcfManifests } from "@platform/vscode/pcfProjectWatcher";
+import { VsCodeProgress } from "@platform/vscode/progress";
+import { VsCodeSecretStore, VsCodeStateStore } from "@platform/vscode/storage";
+import { VsCodeWorkbench } from "@platform/vscode/workbench";
+import { VsCodeWorkspaceFiles } from "@platform/vscode/workspaceFiles";
 import { CommandContext } from "./commandContext";
+import { SolutionPicker } from "./solutionPicker";
 
-export async function createServices(
-  extensionContext: vscode.ExtensionContext,
-): Promise<CommandContext> {
-  const configuration = new ConfigurationService();
-  const bindings = new BindingService(configuration);
-  const ui = new SolutionPicker();
+export function createServices(extensionContext: vscode.ExtensionContext): CommandContext {
+  const disposables: vscode.Disposable[] = [];
 
-  const secrets = new SecretService(extensionContext.secrets);
-  const auth = new AuthService();
-  const authorizations = new AuthorizationStore(extensionContext.globalState);
-  const lastSelection = new LastSelectionService(extensionContext.workspaceState);
+  const notifications = lazy(() => new VsCodeNotificationService());
+  const logger = lazyDisposable(() => new VsCodeOutputLogger(), disposables);
+  const output = lazy(() => new VsCodeOutputPort());
+  const progress = lazy(() => new VsCodeProgress());
+  const clipboard = lazy(() => new VsCodeClipboard());
+  const fileDialogs = lazy(() => new VsCodeFileDialogs());
+  const input = lazy(() => new VsCodeTextInput());
+  const files = lazy(() => new VsCodeWorkspaceFiles());
+  const authentication = lazy(() => new VsCodeAuthenticationService());
+  const workbench = lazy(() => new VsCodeWorkbench());
+  const globalState = lazy(() => new VsCodeStateStore(extensionContext.globalState));
+  const workspaceState = lazy(() => new VsCodeStateStore(extensionContext.workspaceState));
+  const configuration = lazy(() => new ConfigurationService(files()));
+  const ui = lazy(() => new SolutionPicker(notifications()));
+  const secrets = lazy(() => new SecretService(new VsCodeSecretStore(extensionContext.secrets)));
+  const auth = lazy(() => new AuthService(authentication(), notifications()));
+  const authorizations = lazy(() => new AuthorizationStore(globalState()));
+  const lastSelection = lazy(() => new LastSelectionService(workspaceState()));
+  const connections = lazy(
+    () =>
+      new EnvironmentConnectionService(
+        auth(),
+        secrets(),
+        notifications(),
+        buildDefaultUserAgent(extensionContext),
+      ),
+  );
+  const statusBar = lazyDisposable(
+    () => new WebResourceStatusBarService("dynamics365Tools.publishLastResource"),
+    disposables,
+  );
+  const assemblyStatusBar = lazyDisposable(
+    () => new PluginAssemblyStatusBarService("dynamics365Tools.plugins.publishLastAssembly"),
+    disposables,
+  );
 
-  const publishCache = new PublishCacheService(configuration);
-  const connections = new EnvironmentConnectionService(auth, secrets);
+  const bindings = lazy(() => new BindingService(configuration()));
+  const publishCache = lazy(() => new PublishCacheService(configuration(), files()));
+  const publisher = lazy(
+    () => new WebResourcePublisher(connections(), files(), notifications(), output(), clipboard()),
+  );
+  const webResources = lazy(() => new WebResourceUrlService(notifications()));
 
-  const publisher = new WebResourcePublisher(connections);
-  const webResources = new WebResourceUrlService();
+  const pluginAssemblyIntrospector = lazy(
+    () => new PluginAssemblyIntrospector(extensionContext.extensionPath),
+  );
+  const pluginRegistration = lazy(
+    () => new PluginRegistrationManager(pluginAssemblyIntrospector()),
+  );
+  const pluginExplorer = lazy(() => {
+    return new PluginExplorerProvider(
+      configuration(),
+      connections(),
+      extensionContext.workspaceState,
+      notifications(),
+    );
+  });
 
-  const pluginAssemblyIntrospector = new PluginAssemblyIntrospector(extensionContext.extensionPath);
-  const pluginRegistration = new PluginRegistrationManager(pluginAssemblyIntrospector);
-  const ribbonSourceLocator = new RibbonSourceLocator();
-  const ribbonRepository = new RibbonRepository();
-  const ribbonPublishService = new RibbonPublishService();
-  const solutionZipService = new SolutionZipService();
-  const ribbonEditorState = new RibbonEditorState(ribbonRepository);
-  const ribbonDiagnostics = new RibbonDiagnosticsService();
-  const ribbonExplorer = new RibbonExplorerProvider(
-    configuration,
-    ribbonSourceLocator,
-    ribbonEditorState,
-    ribbonDiagnostics,
-  );
-  const ribbonFormPanel = new RibbonFormPanel();
-  const pluginExplorer = new PluginExplorerProvider(
-    configuration,
-    connections,
-    extensionContext.workspaceState,
-  );
-  await pluginExplorer.initialize();
+  const ribbonSourceLocator = lazy(() => new RibbonSourceLocator());
+  const ribbonRepository = lazy(() => new RibbonRepository());
+  const ribbonPublishService = lazy(() => new RibbonPublishService());
+  const solutionZipService = lazy(() => new SolutionZipService());
+  const ribbonEditorState = lazy(() => new RibbonEditorState(ribbonRepository()));
+  const ribbonDiagnostics = lazyDisposable(() => new RibbonDiagnosticsService(), disposables);
+  const ribbonExplorer = lazy(() => {
+    return new RibbonExplorerProvider(
+      configuration(),
+      ribbonSourceLocator(),
+      ribbonEditorState(),
+      ribbonDiagnostics(),
+      notifications(),
+    );
+  });
+  const ribbonFormPanel = lazyDisposable(() => new RibbonFormPanel(), disposables);
 
-  const pcfProcessRunner = new ProcessRunner();
-  const pacCli = new PacCli(
-    pcfProcessRunner,
-    createPacCommandCandidates(extensionContext.globalStorageUri.fsPath),
+  const pcfProcessRunner = lazyDisposable(() => new ProcessRunner(), disposables);
+  const pacCli = lazy(() => {
+    return new PacCli(
+      pcfProcessRunner(),
+      createPacCommandCandidates(extensionContext.globalStorageUri.fsPath),
+    );
+  });
+  const npmRunner = lazy(() => new NpmRunner(pcfProcessRunner()));
+  const pcfStatusBar = lazyDisposable(
+    () => new PcfStatusBarService("dynamics365Tools.pcf.stopWatch"),
+    disposables,
   );
-  const npmRunner = new NpmRunner(pcfProcessRunner);
-  const pcfStatusBar = new PcfStatusBarService("dynamics365Tools.pcf.stopWatch");
-  const pcfTelemetry = new PcfTelemetryService();
-  const pcfBuildService = new PcfBuildService(npmRunner, pcfStatusBar, pcfTelemetry);
-  const pcfEnvironmentService = new PcfEnvironmentService(connections);
-  const pcfWorkspaceSettings = new PcfWorkspaceSettingsService(configuration);
-  const pcfPushService = new PcfPushService(pacCli, pcfWorkspaceSettings, pcfTelemetry);
-  const pcfDeployService = new PcfDeployService(
-    connections,
-    pcfWorkspaceSettings,
-    configuration,
-    pcfTelemetry,
+  const pcfTelemetry = lazyDisposable(() => new PcfTelemetryService(), disposables);
+  const pcfBuildService = lazyDisposable(
+    () =>
+      new PcfBuildService(
+        npmRunner(),
+        pcfStatusBar(),
+        files(),
+        new VsCodeDiagnostics("d365-pcf"),
+        notifications(),
+        pcfTelemetry(),
+        output(),
+      ),
+    disposables,
   );
-  const pcfPackageService = new PcfPackageService(
-    pacCli,
-    pcfProcessRunner,
-    pcfWorkspaceSettings,
-    configuration,
-    pcfTelemetry,
+  const pcfEnvironmentService = lazy(() => new PcfEnvironmentService(connections()));
+  const pcfWorkspaceSettings = lazy(
+    () => new PcfWorkspaceSettingsService(configuration(), files()),
   );
-  const pcfProjectLocator = new PcfProjectLocator();
-  await pcfProjectLocator.initialize();
-  const pcfExplorer = new PcfExplorerProvider(
-    configuration,
-    extensionContext.workspaceState,
-    pcfProjectLocator,
-    pcfProcessRunner,
-    pacCli,
-    pcfBuildService,
-    pcfEnvironmentService,
+  const pcfPushService = lazyDisposable(
+    () =>
+      new PcfPushService(
+        pacCli(),
+        pcfWorkspaceSettings(),
+        files(),
+        notifications(),
+        pcfTelemetry(),
+        output(),
+        input(),
+      ),
+    disposables,
   );
-  await pcfExplorer.initialize();
+  const pcfDeployService = lazyDisposable(
+    () =>
+      new PcfDeployService(
+        connections(),
+        pcfWorkspaceSettings(),
+        configuration(),
+        files(),
+        notifications(),
+        pcfTelemetry(),
+        output(),
+      ),
+    disposables,
+  );
+  const pcfPackageService = lazyDisposable(
+    () =>
+      new PcfPackageService(
+        pacCli(),
+        pcfProcessRunner(),
+        pcfWorkspaceSettings(),
+        configuration(),
+        files(),
+        notifications(),
+        pcfTelemetry(),
+        output(),
+        input(),
+        workbench(),
+      ),
+    disposables,
+  );
+  const pcfProjectLocator = lazyDisposable(
+    () => new PcfProjectLocator(files(), undefined, notifications(), watchPcfManifests),
+    disposables,
+  );
+  const pcfExplorer = lazy(() => {
+    return new PcfExplorerProvider(
+      configuration(),
+      extensionContext.workspaceState,
+      files(),
+      pcfProjectLocator(),
+      pcfProcessRunner(),
+      pacCli(),
+      pcfBuildService(),
+      pcfEnvironmentService(),
+      notifications(),
+    );
+  });
 
-  const statusBar = new StatusBarService("dynamics365Tools.publishLastResource");
-  const assemblyStatusBar = new AssemblyStatusBarService(
-    "dynamics365Tools.plugins.publishLastAssembly",
-  );
+  const core = {
+    get configuration() {
+      return configuration();
+    },
+    get ui() {
+      return ui();
+    },
+    get auth() {
+      return auth();
+    },
+    get authorizations() {
+      return authorizations();
+    },
+    get secrets() {
+      return secrets();
+    },
+    get logger() {
+      return logger();
+    },
+    get notifications() {
+      return notifications();
+    },
+    get output() {
+      return output();
+    },
+    get progress() {
+      return progress();
+    },
+    get workbench() {
+      return workbench();
+    },
+    get files() {
+      return files();
+    },
+    get fileDialogs() {
+      return fileDialogs();
+    },
+    get clipboard() {
+      return clipboard();
+    },
+    get input() {
+      return input();
+    },
+    get lastSelection() {
+      return lastSelection();
+    },
+    get connections() {
+      return connections();
+    },
+    get statusBar() {
+      return statusBar();
+    },
+    get assemblyStatusBar() {
+      return assemblyStatusBar();
+    },
+  };
+
+  const webResource = {
+    get bindings() {
+      return bindings();
+    },
+    get publishCache() {
+      return publishCache();
+    },
+    get publisher() {
+      return publisher();
+    },
+    get urls() {
+      return webResources();
+    },
+  };
+
+  const plugins = {
+    get explorer() {
+      return pluginExplorer();
+    },
+    get registration() {
+      return pluginRegistration();
+    },
+  };
+
+  const ribbon = {
+    get sourceLocator() {
+      return ribbonSourceLocator();
+    },
+    get repository() {
+      return ribbonRepository();
+    },
+    get publishService() {
+      return ribbonPublishService();
+    },
+    get solutionZipService() {
+      return solutionZipService();
+    },
+    get editorState() {
+      return ribbonEditorState();
+    },
+    get diagnostics() {
+      return ribbonDiagnostics();
+    },
+    get explorer() {
+      return ribbonExplorer();
+    },
+    get formPanel() {
+      return ribbonFormPanel();
+    },
+  };
+
+  const pcf = {
+    get processRunner() {
+      return pcfProcessRunner();
+    },
+    get pacCli() {
+      return pacCli();
+    },
+    get npmRunner() {
+      return npmRunner();
+    },
+    get buildService() {
+      return pcfBuildService();
+    },
+    get deployService() {
+      return pcfDeployService();
+    },
+    get environmentService() {
+      return pcfEnvironmentService();
+    },
+    get packageService() {
+      return pcfPackageService();
+    },
+    get pushService() {
+      return pcfPushService();
+    },
+    get workspaceSettings() {
+      return pcfWorkspaceSettings();
+    },
+    get projectLocator() {
+      return pcfProjectLocator();
+    },
+    get explorer() {
+      return pcfExplorer();
+    },
+    get statusBar() {
+      return pcfStatusBar();
+    },
+    get telemetry() {
+      return pcfTelemetry();
+    },
+  };
 
   return {
     extensionContext,
-    configuration,
-    ui,
-    secrets,
-    auth,
-    authorizations,
-    lastSelection,
-    bindings,
-    publishCache,
-    publisher,
-    webResources,
-    connections,
-    pluginExplorer,
-    pluginRegistration,
-    ribbonSourceLocator,
-    ribbonRepository,
-    ribbonPublishService,
-    solutionZipService,
-    ribbonEditorState,
-    ribbonDiagnostics,
-    ribbonExplorer,
-    ribbonFormPanel,
-    pcfProcessRunner,
-    pacCli,
-    npmRunner,
-    pcfBuildService,
-    pcfDeployService,
-    pcfEnvironmentService,
-    pcfPackageService,
-    pcfPushService,
-    pcfWorkspaceSettings,
-    pcfProjectLocator,
-    pcfExplorer,
-    pcfStatusBar,
-    pcfTelemetry,
-    statusBar,
-    assemblyStatusBar,
+    core,
+    webResource,
+    plugins,
+    ribbon,
+    pcf,
+    dispose() {
+      for (const disposable of disposables.splice(0).reverse()) {
+        disposable.dispose();
+      }
+    },
   };
+}
+
+function lazy<T>(factory: () => T): () => T {
+  let value: T | undefined;
+  return () => {
+    value ??= factory();
+    return value;
+  };
+}
+
+function lazyDisposable<T extends vscode.Disposable>(
+  factory: () => T,
+  disposables: vscode.Disposable[],
+): () => T {
+  let value: T | undefined;
+  return () => {
+    if (!value) {
+      value = factory();
+      disposables.push(value);
+    }
+    return value;
+  };
+}
+
+function buildDefaultUserAgent(extensionContext: vscode.ExtensionContext): string {
+  const extension = extensionContext as {
+    extension?: { packageJSON?: { version?: string } };
+  };
+  const version = extension.extension?.packageJSON?.version || "dev";
+  return `Dynamics365Tools-VSCode/${version}`;
 }

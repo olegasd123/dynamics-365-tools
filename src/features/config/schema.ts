@@ -69,5 +69,3 @@ export type SolutionConfig = z.output<typeof solutionSchema>;
 export type Dynamics365Configuration = z.output<typeof configurationSchema>;
 export type BindingEntry = z.output<typeof bindingEntrySchema>;
 export type BindingSnapshot = z.output<typeof bindingsSchema>;
-export type PublishCacheEntry = z.output<typeof publishCacheEntrySchema>;
-export type PublishCache = z.output<typeof publishCacheSchema>;

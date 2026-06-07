@@ -9,7 +9,13 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "@app/*": ["./src/app/*"],
+      "@features/*": ["./src/features/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@shared/*": ["./src/shared/*"]
+    }
   },
   "include": ["src"]
 }

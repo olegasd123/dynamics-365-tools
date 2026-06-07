@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import test from "node:test";
-import { applyRibbonPatches } from "../ribbonPatchWriter";
+import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
 
 const ribbonXml = `<RibbonDiffXml>
@@ -8,7 +8,7 @@ const ribbonXml = `<RibbonDiffXml>
     <!-- keep this comment -->
     <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="10">
       <CommandUIDefinition>
-        <Button Id="new.account.Form.Button" Command="new.account.Validate.Command" LabelText="Validate" Image16by16="$webresource:new_/img/validate16.png" />
+        <Button Id="new.account.Form.Button" Command="new.account.Validate.Command" LabelText="Validate" Alt="Validate" ToolTipTitle="Validate" ToolTipDescription="Validate and save the row" Image16by16="$webresource:new_/img/validate16.png" Image32by32="$webresource:new_/img/validate32.png" ModernImage="$webresource:new_/img/validate.svg" />
       </CommandUIDefinition>
     </CustomAction>
     <HideCustomAction HideActionId="new.account.Form.Hide.Save" Location="Mscrm.Form.account.MainTab.Save.Controls._children" />
@@ -26,7 +26,9 @@ const ribbonXml = `<RibbonDiffXml>
         <JavaScriptFunction Library="$webresource:new_/scripts/account.js" FunctionName="validate">
           <StringParameter Value="beforeSave" />
         </JavaScriptFunction>
-        <Url Address="https://example.com" />
+        <Url Address="https://example.com" PassParams="true" WinMode="1" WinParams="height=600,width=800">
+          <CrmParameter Name="recordId" Value="FirstPrimaryItemId" />
+        </Url>
         <UnknownAction Foo="Bar" />
       </Actions>
     </CommandDefinition>
@@ -91,15 +93,198 @@ test("reads major ribbon sections and known nodes with ranges", () => {
   assert.strictEqual(view.customActions[0].id, "new.account.Form.Button.CustomAction");
   assert.strictEqual(view.customActions[0].sequence, 10);
   assert.strictEqual(view.customActions[0].commandUI?.kind, "Button");
+  const button = view.customActions[0].commandUI;
+  assert.strictEqual(button?.kind === "Button" ? button.alt : undefined, "Validate");
+  assert.strictEqual(button?.kind === "Button" ? button.toolTipTitle : undefined, "Validate");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescription : undefined,
+    "Validate and save the row",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.image32x32?.webResourceUniqueName : undefined,
+    "new_/img/validate32.png",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.modernImage?.webResourceUniqueName : undefined,
+    "new_/img/validate.svg",
+  );
   assert.strictEqual(view.hideActions[0].hideActionId, "new.account.Form.Hide.Save");
   assert.strictEqual(view.commandDefinitions[0].enableRuleRefs[0], "new.account.Enable");
-  assert.strictEqual(view.commandDefinitions[0].actions[0].kind, "JavaScriptFunction");
+  const command = view.commandDefinitions[0];
+  assert.strictEqual(command.actions[0].kind, "JavaScriptFunction");
+  assert.deepStrictEqual(
+    command.actions[0].kind === "JavaScriptFunction"
+      ? command.actions[0].parameters.map((parameter) => parameter.kind)
+      : [],
+    ["String"],
+  );
+  assert.strictEqual(command.actions[1].kind, "Url");
+  assert.strictEqual(
+    command.actions[1].kind === "Url" ? command.actions[1].passParams : false,
+    true,
+  );
+  assert.strictEqual(command.actions[1].kind === "Url" ? command.actions[1].winMode : undefined, 1);
+  assert.strictEqual(
+    command.actions[1].kind === "Url" ? command.actions[1].winParams : undefined,
+    "height=600,width=800",
+  );
+  assert.deepStrictEqual(
+    command.actions[1].kind === "Url"
+      ? command.actions[1].parameters.map((parameter) => ({
+          kind: parameter.kind,
+          name: parameter.name,
+          value: parameter.value,
+        }))
+      : [],
+    [{ kind: "Crm", name: "recordId", value: "FirstPrimaryItemId" }],
+  );
   assert.strictEqual(view.enableRules[0].steps[0].kind, "CustomRule");
   assert.strictEqual(view.displayRules[0].steps[0].kind, "EntityPrivilegeRule");
   assert.strictEqual(view.locLabels[0].titles[0].description, "Validate & Save");
   assert.strictEqual(view.unknownNodeRanges.length, 1);
   assert.strictEqual(document.views[1].customActions.length, 0);
   assert.strictEqual(document.views[2].customActions.length, 0);
+});
+
+test("reads common enable rule step types", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.account.Enable">
+        <SelectionCountRule AppliesTo="SelectedEntity" Minimum="1" Maximum="2" Default="true" />
+        <RecordPrivilegeRule PrivilegeType="AppendTo" AppliesTo="PrimaryEntity" InvertResult="true" />
+        <EntityRule EntityName="account" AppliesTo="SelectedEntity" Context="HomePageGrid" />
+        <CommandClientTypeRule Type="Legacy" />
+        <UnknownRule Foo="Bar" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Application" },
+  );
+
+  const steps = document.views[0].enableRules[0].steps;
+
+  assert.deepStrictEqual(
+    steps.map((step) => step.kind),
+    ["SelectionCountRule", "RecordPrivilegeRule", "EntityRule", "CommandClientTypeRule", "Unknown"],
+  );
+  assert.strictEqual(steps[0].kind === "SelectionCountRule" ? steps[0].minimum : undefined, 1);
+  assert.strictEqual(steps[0].kind === "SelectionCountRule" ? steps[0].maximum : undefined, 2);
+  assert.strictEqual(
+    steps[1].kind === "RecordPrivilegeRule" ? steps[1].privilegeType : undefined,
+    "AppendTo",
+  );
+  assert.strictEqual(steps[2].kind === "EntityRule" ? steps[2].context : undefined, "HomePageGrid");
+  assert.strictEqual(
+    steps[3].kind === "CommandClientTypeRule" ? steps[3].type : undefined,
+    "Legacy",
+  );
+  assert.match(steps[4].kind === "Unknown" ? steps[4].raw : "", /UnknownRule/);
+});
+
+test("reads flat display rule step types", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <FormTypeRule Type="Main" />
+        <EntityPropertyRule PropertyName="HasNotes" PropertyValue="true" />
+        <MiscellaneousPrivilegeRule PrivilegeName="ExportToExcel" PrivilegeDepth="Basic" />
+        <OrganizationSettingRule Setting="IsSharepointEnabled" />
+        <HideForTabletExperienceRule InvertResult="true" />
+        <RelationshipTypeRule Type="OneToMany" />
+        <ReferencingAttributeRequiredRule Default="true" />
+        <PageRule Address="/dashboards/dashboard.aspx" />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Application" },
+  );
+
+  const steps = document.views[0].displayRules[0].steps;
+
+  assert.deepStrictEqual(
+    steps.map((step) => step.kind),
+    [
+      "FormTypeRule",
+      "EntityPropertyRule",
+      "MiscellaneousPrivilegeRule",
+      "OrganizationSettingRule",
+      "HideForTabletExperienceRule",
+      "RelationshipTypeRule",
+      "ReferencingAttributeRequiredRule",
+      "PageRule",
+    ],
+  );
+  assert.strictEqual(steps[0].kind === "FormTypeRule" ? steps[0].type : undefined, "Main");
+  assert.strictEqual(
+    steps[1].kind === "EntityPropertyRule" ? steps[1].propertyName : undefined,
+    "HasNotes",
+  );
+  assert.strictEqual(
+    steps[1].kind === "EntityPropertyRule" ? steps[1].propertyValue : undefined,
+    true,
+  );
+  assert.strictEqual(
+    steps[2].kind === "MiscellaneousPrivilegeRule" ? steps[2].privilegeName : undefined,
+    "ExportToExcel",
+  );
+  assert.strictEqual(
+    steps[3].kind === "OrganizationSettingRule" ? steps[3].setting : undefined,
+    "IsSharepointEnabled",
+  );
+  assert.strictEqual(
+    steps[4].kind === "HideForTabletExperienceRule" ? steps[4].invertResult : undefined,
+    true,
+  );
+  assert.strictEqual(
+    steps[5].kind === "RelationshipTypeRule" ? steps[5].type : undefined,
+    "OneToMany",
+  );
+  assert.strictEqual(
+    steps[6].kind === "ReferencingAttributeRequiredRule" ? steps[6].default : undefined,
+    true,
+  );
+  assert.strictEqual(
+    steps[7].kind === "PageRule" ? steps[7].address : undefined,
+    "/dashboards/dashboard.aspx",
+  );
+});
+
+test("reads nested display rule steps", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <OrRule>
+          <FormStateRule State="Create" />
+          <FormStateRule State="Existing" />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Application" },
+  );
+
+  const step = document.views[0].displayRules[0].steps[0];
+
+  assert.strictEqual(step.kind, "OrRule");
+  assert.deepStrictEqual(step.kind === "OrRule" ? step.children.map((child) => child.kind) : [], [
+    "FormStateRule",
+    "FormStateRule",
+  ]);
+  assert.strictEqual(
+    step.kind === "OrRule" && step.children[0].kind === "FormStateRule"
+      ? step.children[0].state
+      : undefined,
+    "Create",
+  );
 });
 
 test("projects entity ribbon nodes into scoped views", () => {
@@ -220,7 +405,7 @@ test("ranges can drive surgical patches while unknown XML stays byte-identical",
     .slice(action.range.start, action.range.end)
     .replace(`Sequence="10"`, `Sequence="20"`);
 
-  const patched = applyRibbonPatches(ribbonXml, [
+  const patched = applyRibbonPatchSequence(ribbonXml, [
     { kind: "replace", range: action.range, text: replacement },
   ]);
 

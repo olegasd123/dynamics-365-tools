@@ -1,7 +1,8 @@
-import * as vscode from "vscode";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
 import { EnvironmentConfig } from "../config/domain/models";
 import { AuthService } from "../auth/authService";
 import { EnvironmentCredentials, SecretService } from "../auth/secretService";
+import { DataverseClient } from "./dataverseClient";
 
 export interface EnvironmentConnection {
   env: EnvironmentConfig;
@@ -19,6 +20,8 @@ export class EnvironmentConnectionService {
   constructor(
     private readonly auth: AuthService,
     private readonly secrets: SecretService,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
+    private readonly defaultUserAgent = "Dynamics365Tools-VSCode/dev",
   ) {}
 
   async createConnection(
@@ -28,7 +31,7 @@ export class EnvironmentConnectionService {
     const userAgent = this.buildUserAgent(env);
     const token = await this.resolveToken(env, authContext, userAgent);
     if (!token) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `No credentials available for ${env.name}. Sign in interactively or set client credentials first.`,
       );
       return undefined;
@@ -40,6 +43,14 @@ export class EnvironmentConnectionService {
       token,
       userAgent,
     };
+  }
+
+  async createClient(
+    env: EnvironmentConfig,
+    authContext: EnvironmentAuthContext = {},
+  ): Promise<DataverseClient | undefined> {
+    const connection = await this.createConnection(env, authContext);
+    return connection ? new DataverseClient(connection) : undefined;
   }
 
   private async resolveToken(
@@ -87,9 +98,7 @@ export class EnvironmentConnectionService {
     if (env.userAgent?.trim()) {
       return env.userAgent.trim();
     }
-    const extension = vscode.extensions.getExtension("dynamics365tools.dynamics-365-tools");
-    const version = (extension?.packageJSON as { version?: string })?.version || "dev";
-    return `Dynamics365Tools-VSCode/${version}`;
+    return this.defaultUserAgent;
   }
 
   private async acquireTokenWithClientCredentials(

@@ -1,6 +1,15 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as vscode from "vscode";
+import {
+  ImmediateProgress,
+  MemoryWorkspaceFiles,
+  RecordingClipboard,
+  RecordingFileDialogs,
+  RecordingNotifications,
+  RecordingTextInput,
+} from "../../../testSupport/fakes";
+import type { NotificationPort } from "@app/ports/notifications";
+import { DataverseClient } from "@features/dataverse/dataverseClient";
 import {
   AssemblyIdentityValidationError,
   extractToken,
@@ -11,11 +20,43 @@ import {
   validateAssemblyUpdateTarget,
 } from "../commands/pluginCommands";
 
-function clearMessages(): void {
-  const messages = (vscode.window as any).__messages;
-  messages.info.length = 0;
-  messages.warn.length = 0;
-  messages.error.length = 0;
+function createNotifications(): RecordingNotifications {
+  return new RecordingNotifications();
+}
+
+function createPluginFiles(fsPaths = ["/workspace/Contoso.Plugins.dll"]): MemoryWorkspaceFiles {
+  const files = new MemoryWorkspaceFiles("/workspace");
+  for (const fsPath of fsPaths) {
+    files.addFile(fsPath, "dll");
+  }
+  return files;
+}
+
+function legacyContext<T extends Record<string, any>>(ctx: T): T {
+  return {
+    ...ctx,
+    core: {
+      ...(ctx.core ?? {}),
+      configuration: ctx.configuration,
+      ui: ctx.ui,
+      auth: ctx.auth,
+      secrets: ctx.secrets,
+      notifications: ctx.notifications,
+      fileDialogs: ctx.fileDialogs,
+      files: ctx.files,
+      input: ctx.input,
+      progress: ctx.progress,
+      clipboard: ctx.clipboard,
+      lastSelection: ctx.lastSelection,
+      connections: ctx.connections,
+      assemblyStatusBar: ctx.assemblyStatusBar,
+    },
+    plugins: {
+      ...(ctx.plugins ?? {}),
+      explorer: ctx.pluginExplorer,
+      registration: ctx.pluginRegistration,
+    },
+  };
 }
 
 test("validateAssemblyIdentity blocks a different assembly name", () => {
@@ -61,7 +102,7 @@ test("validateAssemblyIdentity blocks a different culture", () => {
 });
 
 test("validateAssemblyUpdateTarget warns but allows version changes", async () => {
-  clearMessages();
+  const notifications = new RecordingNotifications();
   const service = {
     getAssembly: async () => ({
       id: "assembly-id",
@@ -81,45 +122,33 @@ test("validateAssemblyUpdateTarget warns but allows version changes", async () =
 
   const result = await validateAssemblyUpdateTarget({
     assemblyId: "assembly-id",
-    assemblyUri: vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
+    assemblyUri: { fsPath: "/workspace/Contoso.Plugins.dll" },
     pluginService: service as any,
     pluginRegistration: registration as any,
+    notifications,
   });
 
-  const messages = (vscode.window as any).__messages;
   assert.strictEqual(result, true);
   assert.ok(
-    messages.warn.some((message: string) =>
+    notifications.warnings.some((message) =>
       message.includes("version will change from 1.0.0.0 to 1.1.0.0"),
     ),
   );
 });
 
 test("updateAssemblyFromFileDialog shows a modal error and asks for the file again on assembly mismatch", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
-
-  const selectedFiles = [
-    vscode.Uri.file("/workspace/Fabrikam.Plugins.dll"),
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [
+    ["/workspace/Fabrikam.Plugins.dll"],
+    ["/workspace/Contoso.Plugins.dll"],
   ];
-  const modalErrors: Array<{ message: string; modal?: boolean }> = [];
+  const notifications = createNotifications();
+  const files = createPluginFiles([
+    "/workspace/Fabrikam.Plugins.dll",
+    "/workspace/Contoso.Plugins.dll",
+  ]);
   let updateCount = 0;
   let lastPath = "";
-
-  (vscode.window as any).showOpenDialog = async () => {
-    const selected = selectedFiles.shift();
-    return selected ? [selected] : undefined;
-  };
-  (vscode.window as any).showErrorMessage = async (
-    message: string,
-    options?: { modal?: boolean },
-  ) => {
-    modalErrors.push({ message, modal: options?.modal });
-    return undefined;
-  };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -144,108 +173,154 @@ test("updateAssemblyFromFileDialog shows a modal error and asks for the file aga
     }),
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
-      manageMissingComponents: true,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async (_envName: string, _assemblyId: string, path: string) => {
-          lastPath = path;
-        },
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+    manageMissingComponents: true,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async (_envName: string, _assemblyId: string, path: string) => {
+        lastPath = path;
+      },
+    } as any,
+  });
 
-  assert.strictEqual(selectedFiles.length, 0);
+  assert.strictEqual(fileDialogs.nextOpenSelections.length, 0);
   assert.strictEqual(updateCount, 1);
   assert.strictEqual(lastPath, "/workspace/Contoso.Plugins.dll");
-  assert.strictEqual(modalErrors.length, 1);
-  assert.strictEqual(modalErrors[0].modal, true);
-  assert.match(modalErrors[0].message, /Selected CRM assembly is "Contoso\.Plugins"/);
+  assert.strictEqual(notifications.errorPrompts.length, 1);
+  assert.strictEqual(notifications.errorPrompts[0].options?.modal, true);
+  assert.match(
+    notifications.errorPrompts[0].message,
+    /Selected CRM assembly is "Contoso\.Plugins"/,
+  );
 });
 
 test("updatePluginAssembly opens file dialog in the last DLL folder", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  let dialogOptions: { defaultUri?: vscode.Uri } | undefined;
-
-  (vscode.window as any).showOpenDialog = async (options: { defaultUri?: vscode.Uri }) => {
-    dialogOptions = options;
-    return undefined;
-  };
-
+  const fileDialogs = new RecordingFileDialogs();
   const env = { name: "Dev", url: "https://dev.crm.dynamics.com" };
   const lastPath = "/workspace/bin/Debug/net462/Contoso.Plugins.dll";
 
-  try {
-    await updatePluginAssembly(
-      {
-        configuration: {
-          loadConfiguration: async () => ({ environments: [env] }),
-          workspaceRoot: "/workspace",
-        },
-        ui: {},
-        secrets: {
-          getCredentials: async () => undefined,
-        },
-        auth: {
-          getAccessToken: async () => "token",
-        },
-        lastSelection: {
-          setLastEnvironment: async () => undefined,
-          getLastAssemblyDllPath: () => lastPath,
-        },
-        connections: {
-          createConnection: async () => ({
+  await updatePluginAssembly(
+    legacyContext({
+      configuration: {
+        loadConfiguration: async () => ({ environments: [env] }),
+        workspaceRoot: "/workspace",
+      },
+      ui: {},
+      secrets: {
+        getCredentials: async () => undefined,
+      },
+      auth: {
+        getAccessToken: async () => "token",
+      },
+      lastSelection: {
+        setLastEnvironment: async () => undefined,
+        getLastAssemblyDllPath: () => lastPath,
+      },
+      connections: {
+        createConnection: async () => ({
+          env,
+          apiRoot: "https://dev.crm.dynamics.com/api/data/v9.2",
+          token: "token",
+        }),
+        createClient: async () =>
+          new DataverseClient({
             env,
             apiRoot: "https://dev.crm.dynamics.com/api/data/v9.2",
             token: "token",
           }),
-        },
-        pluginRegistration: {},
-        pluginExplorer: {},
-        assemblyStatusBar: {},
-      } as any,
-      {
-        env,
-        assembly: { id: "assembly-id", name: "Contoso.Plugins" },
-      } as any,
-    );
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-  }
+      },
+      pluginRegistration: {},
+      pluginExplorer: {},
+      assemblyStatusBar: {},
+      fileDialogs,
+      progress: new ImmediateProgress(),
+    } as any),
+    {
+      env,
+      assembly: { id: "assembly-id", name: "Contoso.Plugins" },
+    } as any,
+  );
 
-  assert.strictEqual(dialogOptions?.defaultUri?.fsPath, "/workspace/bin/Debug/net462");
+  assert.strictEqual(fileDialogs.openDialogOptions[0]?.defaultPath, "/workspace/bin/Debug/net462");
+});
+
+test("updatePluginAssembly selects assembly through input port", async () => {
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [undefined];
+  const input = new RecordingTextInput();
+  const env = { name: "Dev", url: "https://dev.crm.dynamics.com" };
+  const assemblyPick = {
+    label: "Contoso.Plugins",
+    description: "1.0.0.0",
+    assembly: { id: "assembly-id", name: "Contoso.Plugins" },
+  };
+  input.nextQuickPickValues = [assemblyPick];
+
+  await updatePluginAssembly(
+    legacyContext({
+      configuration: {
+        loadConfiguration: async () => ({ environments: [env] }),
+        workspaceRoot: "/workspace",
+      },
+      ui: {
+        pickEnvironment: async () => env,
+      },
+      secrets: {
+        getCredentials: async () => undefined,
+      },
+      auth: {
+        getAccessToken: async () => "token",
+      },
+      lastSelection: {
+        getLastEnvironment: () => undefined,
+        setLastEnvironment: async () => undefined,
+        getLastAssemblyDllPath: () => undefined,
+      },
+      connections: {
+        createClient: async () =>
+          ({
+            get: async () => ({
+              value: [
+                {
+                  pluginassemblyid: "assembly-id",
+                  name: "Contoso.Plugins",
+                  version: "1.0.0.0",
+                },
+              ],
+            }),
+          }) as any,
+      },
+      pluginRegistration: {},
+      pluginExplorer: {},
+      assemblyStatusBar: {},
+      notifications: createNotifications(),
+      files: createPluginFiles(),
+      fileDialogs,
+      input,
+      progress: new ImmediateProgress(),
+    } as any),
+  );
+
+  assert.strictEqual(input.quickPicks[0].options?.placeHolder, "Select plugin assembly to update");
+  assert.strictEqual(fileDialogs.openDialogOptions[0]?.defaultPath, "/workspace");
 });
 
 test("updateAssemblyFromFileDialog removes missing plugin types before patching assembly", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [["/workspace/Contoso.Plugins.dll"]];
+  const notifications = createNotifications();
+  notifications.nextWarningAction = "Remove and Update";
+  const files = createPluginFiles();
   const calls: string[] = [];
-  let warning = "";
-  let warningDetail = "";
-
-  (vscode.window as any).showOpenDialog = async () => [
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
-  ];
-  (vscode.window as any).showWarningMessage = async (
-    message: string,
-    options?: { detail?: string },
-  ) => {
-    warning = message;
-    warningDetail = options?.detail ?? "";
-    return "Remove and Update";
-  };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -277,43 +352,36 @@ test("updateAssemblyFromFileDialog removes missing plugin types before patching 
     },
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
-      manageMissingComponents: true,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async () => undefined,
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+    manageMissingComponents: true,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async () => undefined,
+    } as any,
+  });
 
-  assert.match(warning, /sync 1 plugin type change/);
-  assert.match(warningDetail, /Related steps and images/);
-  assert.match(warningDetail, /Removed from DLL/);
-  assert.match(warningDetail, /Contoso\.Plugins\.Old/);
+  assert.match(notifications.warningPrompts[0].message, /sync 1 plugin type change/);
+  assert.match(notifications.warningPrompts[0].options?.detail ?? "", /Related steps and images/);
+  assert.match(notifications.warningPrompts[0].options?.detail ?? "", /Removed from DLL/);
+  assert.match(notifications.warningPrompts[0].options?.detail ?? "", /Contoso\.Plugins\.Old/);
   assert.deepStrictEqual(calls, ["deletePluginTypeCascade", "updateAssembly", "syncPluginTypes"]);
 });
 
 test("updateAssemblyFromFileDialog cancels update when missing plugin removal is rejected", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [["/workspace/Contoso.Plugins.dll"]];
+  const notifications = createNotifications();
+  const files = createPluginFiles();
   const calls: string[] = [];
-
-  (vscode.window as any).showOpenDialog = async () => [
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
-  ];
-  (vscode.window as any).showWarningMessage = async () => undefined;
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -345,45 +413,33 @@ test("updateAssemblyFromFileDialog cancels update when missing plugin removal is
     },
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
-      manageMissingComponents: true,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async () => undefined,
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+    manageMissingComponents: true,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async () => undefined,
+    } as any,
+  });
 
   assert.deepStrictEqual(calls, []);
 });
 
 test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one delete fails", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [["/workspace/Contoso.Plugins.dll"]];
+  const notifications = createNotifications();
+  notifications.nextWarningAction = "Remove and Update";
+  const files = createPluginFiles();
   const calls: string[] = [];
-  let error = "";
-
-  (vscode.window as any).showOpenDialog = async () => [
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
-  ];
-  (vscode.window as any).showWarningMessage = async () => "Remove and Update";
-  (vscode.window as any).showErrorMessage = async (message: string) => {
-    error = message;
-    return undefined;
-  };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -419,27 +475,25 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
     },
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
-      manageMissingComponents: true,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async () => undefined,
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+    manageMissingComponents: true,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async () => undefined,
+    } as any,
+  });
 
   assert.deepStrictEqual(calls, ["delete:blocked-type", "delete:old-type"]);
+  const error = notifications.errors[0] ?? "";
   assert.match(error, /Failed to update plugin assembly/);
   assert.match(error, /Assembly was not updated/);
   assert.match(error, /Contoso\.Plugins\.Blocked/);
@@ -447,25 +501,11 @@ test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one
 });
 
 test("updateAssemblyFromFileDialog blocks deleted plugin types when missing management is disabled", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowErrorMessage = vscode.window.showErrorMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [["/workspace/Contoso.Plugins.dll"]];
+  const notifications = createNotifications();
+  const files = createPluginFiles();
   const calls: string[] = [];
-  let error = "";
-  let errorDetail = "";
-
-  (vscode.window as any).showOpenDialog = async () => [
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
-  ];
-  (vscode.window as any).showErrorMessage = async (
-    message: string,
-    options?: { detail?: string },
-  ) => {
-    error = message;
-    errorDetail = options?.detail ?? "";
-    return undefined;
-  };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -497,54 +537,39 @@ test("updateAssemblyFromFileDialog blocks deleted plugin types when missing mana
     },
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Prod", url: "https://prod.crm.dynamics.com" } as any,
-      manageMissingComponents: false,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async () => undefined,
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showErrorMessage = originalShowErrorMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Prod", url: "https://prod.crm.dynamics.com" } as any,
+    manageMissingComponents: false,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async () => undefined,
+    } as any,
+  });
 
-  assert.match(error, /cannot be updated/);
-  assert.match(error, /manageMissingComponents is false/);
-  assert.match(errorDetail, /Removed from DLL/);
-  assert.match(errorDetail, /Contoso\.Plugins\.Old/);
-  assert.match(errorDetail, /New in DLL/);
-  assert.match(errorDetail, /Contoso\.Plugins\.New/);
+  assert.match(notifications.errorPrompts[0].message, /cannot be updated/);
+  assert.match(notifications.errorPrompts[0].message, /manageMissingComponents is false/);
+  assert.match(notifications.errorPrompts[0].options?.detail ?? "", /Removed from DLL/);
+  assert.match(notifications.errorPrompts[0].options?.detail ?? "", /Contoso\.Plugins\.Old/);
+  assert.match(notifications.errorPrompts[0].options?.detail ?? "", /New in DLL/);
+  assert.match(notifications.errorPrompts[0].options?.detail ?? "", /Contoso\.Plugins\.New/);
   assert.deepStrictEqual(calls, []);
 });
 
 test("updateAssemblyFromFileDialog warns and skips new plugin creation when missing management is disabled", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [["/workspace/Contoso.Plugins.dll"]];
+  const notifications = createNotifications();
+  notifications.nextWarningAction = "Update Assembly";
+  const files = createPluginFiles();
   const calls: string[] = [];
-  let warning = "";
-  let warningDetail = "";
-
-  (vscode.window as any).showOpenDialog = async () => [
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
-  ];
-  (vscode.window as any).showWarningMessage = async (
-    message: string,
-    options?: { detail?: string },
-  ) => {
-    warning = message;
-    warningDetail = options?.detail ?? "";
-    return "Update Assembly";
-  };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -572,51 +597,39 @@ test("updateAssemblyFromFileDialog warns and skips new plugin creation when miss
     },
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Prod", url: "https://prod.crm.dynamics.com" } as any,
-      manageMissingComponents: false,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async () => undefined,
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Prod", url: "https://prod.crm.dynamics.com" } as any,
+    manageMissingComponents: false,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async () => undefined,
+    } as any,
+  });
 
-  assert.match(warning, /without creating 1 new plugin type/);
-  assert.match(warningDetail, /New plugin types will not be created/);
-  assert.match(warningDetail, /Contoso\.Plugins\.New/);
+  assert.match(notifications.warningPrompts[0].message, /without creating 1 new plugin type/);
+  assert.match(
+    notifications.warningPrompts[0].options?.detail ?? "",
+    /New plugin types will not be created/,
+  );
+  assert.match(notifications.warningPrompts[0].options?.detail ?? "", /Contoso\.Plugins\.New/);
   assert.deepStrictEqual(calls, ["updateAssembly", "syncPluginTypes"]);
 });
 
 test("updateAssemblyFromFileDialog asks before creating new plugin types when missing management is enabled", async () => {
-  const originalShowOpenDialog = vscode.window.showOpenDialog;
-  const originalShowWarningMessage = vscode.window.showWarningMessage;
-  const originalReadFile = vscode.workspace.fs.readFile;
+  const fileDialogs = new RecordingFileDialogs();
+  fileDialogs.nextOpenSelections = [["/workspace/Contoso.Plugins.dll"]];
+  const notifications = createNotifications();
+  notifications.nextWarningAction = "Update Assembly";
+  const files = createPluginFiles();
   const calls: string[] = [];
-  let warning = "";
-  let warningDetail = "";
-
-  (vscode.window as any).showOpenDialog = async () => [
-    vscode.Uri.file("/workspace/Contoso.Plugins.dll"),
-  ];
-  (vscode.window as any).showWarningMessage = async (
-    message: string,
-    options?: { detail?: string },
-  ) => {
-    warning = message;
-    warningDetail = options?.detail ?? "";
-    return "Update Assembly";
-  };
-  (vscode.workspace.fs as any).readFile = async () => Buffer.from("dll");
 
   const service = {
     getAssembly: async () => ({ id: "assembly-id", name: "Contoso.Plugins" }),
@@ -644,61 +657,67 @@ test("updateAssemblyFromFileDialog asks before creating new plugin types when mi
     },
   };
 
-  try {
-    await updateAssemblyFromFileDialog({
-      assemblyId: "assembly-id",
-      assemblyName: "Contoso.Plugins",
-      env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
-      manageMissingComponents: true,
-      pluginService: service as any,
-      pluginRegistration: registration as any,
-      assemblyStatusBar: { setLastPublish: () => undefined } as any,
-      lastSelection: {
-        setLastAssemblyDllPath: async () => undefined,
-      } as any,
-    });
-  } finally {
-    (vscode.window as any).showOpenDialog = originalShowOpenDialog;
-    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.workspace.fs as any).readFile = originalReadFile;
-  }
+  await updateAssemblyFromFileDialog({
+    assemblyId: "assembly-id",
+    assemblyName: "Contoso.Plugins",
+    env: { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+    manageMissingComponents: true,
+    pluginService: service as any,
+    pluginRegistration: registration as any,
+    notifications,
+    files,
+    fileDialogs,
+    progress: new ImmediateProgress(),
+    assemblyStatusBar: { setLastPublish: () => undefined } as any,
+    lastSelection: {
+      setLastAssemblyDllPath: async () => undefined,
+    } as any,
+  });
 
-  assert.match(warning, /sync 1 plugin type change/);
-  assert.match(warningDetail, /New in DLL/);
-  assert.match(warningDetail, /Contoso\.Plugins\.New/);
+  assert.match(notifications.warningPrompts[0].message, /sync 1 plugin type change/);
+  assert.match(notifications.warningPrompts[0].options?.detail ?? "", /New in DLL/);
+  assert.match(notifications.warningPrompts[0].options?.detail ?? "", /Contoso\.Plugins\.New/);
   assert.deepStrictEqual(calls, ["updateAssembly", "syncPluginTypes"]);
 });
 
 test("showPublicKeyTokenResult does not wait for notification selection", () => {
-  const originalShowInformationMessage = vscode.window.showInformationMessage;
   let shownMessage = "";
-  (vscode.window as any).showInformationMessage = (message: string) => {
-    shownMessage = message;
-    return new Promise(() => {});
-  };
+  const notifications = {
+    info: async () => undefined,
+    warning: async () => undefined,
+    error: async () => undefined,
+    askInfo: (message: string) => {
+      shownMessage = message;
+      return new Promise(() => {});
+    },
+    askWarning: async () => undefined,
+    askError: async () => undefined,
+  } as NotificationPort;
 
-  try {
-    showPublicKeyTokenResult("Strong name key created.", "abcdef1234567890");
-  } finally {
-    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
-  }
+  showPublicKeyTokenResult(
+    notifications,
+    new RecordingClipboard(),
+    "Strong name key created.",
+    "abcdef1234567890",
+  );
 
   assert.strictEqual(shownMessage, "Strong name key created.");
 });
 
 test("showPublicKeyTokenResult copies token when action is selected", async () => {
-  const originalShowInformationMessage = vscode.window.showInformationMessage;
-  (vscode.window as any).showInformationMessage = async () => "Copy token";
-  (vscode.env.clipboard as any).value = "";
+  const notifications = new RecordingNotifications();
+  notifications.nextInfoAction = "Copy token";
+  const clipboard = new RecordingClipboard();
 
-  try {
-    showPublicKeyTokenResult("Strong name key created.", "abcdef1234567890");
-    await new Promise((resolve) => setImmediate(resolve));
-  } finally {
-    (vscode.window as any).showInformationMessage = originalShowInformationMessage;
-  }
+  showPublicKeyTokenResult(
+    notifications,
+    clipboard,
+    "Strong name key created.",
+    "abcdef1234567890",
+  );
+  await new Promise((resolve) => setImmediate(resolve));
 
-  assert.strictEqual((vscode.env.clipboard as any).value, "abcdef1234567890");
+  assert.deepStrictEqual(clipboard.values, ["abcdef1234567890"]);
 });
 
 test("extractToken reads Mono strong name output", () => {

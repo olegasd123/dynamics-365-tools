@@ -1,6 +1,14 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import {
+  DiagnosticEntry,
+  DiagnosticSeverity,
+  NoopDiagnosticPort,
+  type DiagnosticPort,
+} from "@app/ports/diagnostics";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { PcfBuildStatus, PcfControlProject } from "./models";
 import { NpmRunner } from "./npmRunner";
 import { PcfStatusBarService } from "./pcfStatusBar";
@@ -9,7 +17,7 @@ import { RunningProcess } from "./processRunner";
 
 export interface PcfBuildOptions {
   production?: boolean;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
 }
 
 interface WatchEntry {
@@ -17,19 +25,22 @@ interface WatchEntry {
   process: RunningProcess;
 }
 
-export class PcfBuildService implements vscode.Disposable {
+export class PcfBuildService {
   private readonly statuses = new Map<string, PcfBuildStatus>();
-  private readonly outputChannels = new Map<string, vscode.OutputChannel>();
+  private readonly outputChannels = new Map<string, OutputChannelPort>();
   private readonly watches = new Map<string, WatchEntry>();
   private readonly diagnosticFilesByProject = new Map<string, string[]>();
-  private readonly diagnostics = vscode.languages.createDiagnosticCollection("d365-pcf");
-  private readonly onDidChangeStatusEmitter = new vscode.EventEmitter<void>();
+  private readonly onDidChangeStatusEmitter = new SimpleEventEmitter<void>();
   readonly onDidChangeStatus = this.onDidChangeStatusEmitter.event;
 
   constructor(
     private readonly npmRunner: NpmRunner,
     private readonly statusBar: PcfStatusBarService,
+    private readonly files: WorkspaceFilesPort,
+    private readonly diagnostics: DiagnosticPort = new NoopDiagnosticPort(),
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
+    private readonly output: OutputPort = new NoopOutputPort(),
   ) {}
 
   getBuildStatus(project: PcfControlProject): PcfBuildStatus {
@@ -52,7 +63,7 @@ export class PcfBuildService implements vscode.Disposable {
 
     const packageInfo = await this.readPackageInfo(project);
     if (!packageInfo.scripts.build) {
-      vscode.window.showErrorMessage(`PCF project ${project.fullName} has no build script.`);
+      await this.notifications.error(`PCF project ${project.fullName} has no build script.`);
       return false;
     }
 
@@ -93,13 +104,13 @@ export class PcfBuildService implements vscode.Disposable {
 
   async startWatch(project: PcfControlProject): Promise<boolean> {
     if (this.watches.has(project.rootUri)) {
-      vscode.window.showInformationMessage(`PCF watch is already running for ${project.fullName}.`);
+      await this.notifications.info(`PCF watch is already running for ${project.fullName}.`);
       return true;
     }
 
     const packageInfo = await this.readPackageInfo(project);
     if (!isPcfStartScript(packageInfo.scripts.start)) {
-      vscode.window.showErrorMessage(
+      await this.notifications.error(
         `PCF project ${project.fullName} needs a start script like "pcf-scripts start".`,
       );
       return false;
@@ -162,17 +173,16 @@ export class PcfBuildService implements vscode.Disposable {
 
   private async ensureNodeModules(
     project: PcfControlProject,
-    output: vscode.OutputChannel,
-    token?: vscode.CancellationToken,
+    output: OutputChannelPort,
+    token?: CancellationTokenLike,
   ): Promise<boolean> {
-    if (await exists(path.join(project.rootUri, "node_modules"))) {
+    if (await this.files.exists(path.join(project.rootUri, "node_modules"))) {
       return true;
     }
 
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await this.notifications.askWarning(
       `Dependencies are missing for ${project.fullName}. Run npm install now?`,
-      "Install",
-      "Skip",
+      ["Install", "Skip"],
     );
     if (choice !== "Install") {
       output.appendLine("Build cancelled because dependencies are missing.");
@@ -188,7 +198,7 @@ export class PcfBuildService implements vscode.Disposable {
 
     if (result.exitCode !== 0) {
       output.appendLine(`npm install failed with exit code ${result.exitCode}.`);
-      vscode.window.showErrorMessage(`npm install failed for ${project.fullName}.`);
+      await this.notifications.error(`npm install failed for ${project.fullName}.`);
       return false;
     }
 
@@ -203,13 +213,13 @@ export class PcfBuildService implements vscode.Disposable {
     }
   }
 
-  private getOutput(project: PcfControlProject): vscode.OutputChannel {
+  private getOutput(project: PcfControlProject): OutputChannelPort {
     const existing = this.outputChannels.get(project.rootUri);
     if (existing) {
       return existing;
     }
 
-    const created = vscode.window.createOutputChannel(`PCF: ${project.fullName}`);
+    const created = this.output.createChannel(`PCF: ${project.fullName}`);
     this.outputChannels.set(project.rootUri, created);
     return created;
   }
@@ -220,7 +230,7 @@ export class PcfBuildService implements vscode.Disposable {
   }
 
   private updateDiagnostics(project: PcfControlProject, output: string): void {
-    const byFile = new Map<string, vscode.Diagnostic[]>();
+    const byFile = new Map<string, DiagnosticEntry[]>();
 
     for (const line of output.split(/\r?\n/)) {
       const parsed = parseTypeScriptDiagnostic(project.rootUri, line);
@@ -229,31 +239,52 @@ export class PcfBuildService implements vscode.Disposable {
       }
 
       const diagnostics = byFile.get(parsed.filePath) ?? [];
-      diagnostics.push(
-        new vscode.Diagnostic(
-          new vscode.Range(
-            new vscode.Position(parsed.line - 1, parsed.character - 1),
-            new vscode.Position(parsed.line - 1, parsed.character),
-          ),
-          `${parsed.code}: ${parsed.message}`,
-          vscode.DiagnosticSeverity.Error,
-        ),
-      );
+      diagnostics.push({
+        range: {
+          start: { line: parsed.line - 1, character: parsed.character - 1 },
+          end: { line: parsed.line - 1, character: parsed.character },
+        },
+        message: `${parsed.code}: ${parsed.message}`,
+        severity: DiagnosticSeverity.Error,
+      });
       byFile.set(parsed.filePath, diagnostics);
     }
 
     this.clearProjectDiagnostics(project);
     this.diagnosticFilesByProject.set(project.rootUri, [...byFile.keys()]);
     for (const [filePath, diagnostics] of byFile.entries()) {
-      this.diagnostics.set(vscode.Uri.file(filePath), diagnostics);
+      this.diagnostics.set(filePath, diagnostics);
     }
   }
 
   private clearProjectDiagnostics(project: PcfControlProject): void {
     for (const filePath of this.diagnosticFilesByProject.get(project.rootUri) ?? []) {
-      this.diagnostics.delete(vscode.Uri.file(filePath));
+      this.diagnostics.delete(filePath);
     }
     this.diagnosticFilesByProject.delete(project.rootUri);
+  }
+}
+
+type EventListener<T> = (event: T) => void;
+
+class SimpleEventEmitter<T> {
+  private readonly listeners = new Set<EventListener<T>>();
+
+  readonly event = (listener: EventListener<T>) => {
+    this.listeners.add(listener);
+    return {
+      dispose: () => this.listeners.delete(listener),
+    };
+  };
+
+  fire(value: T): void {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+
+  dispose(): void {
+    this.listeners.clear();
   }
 }
 
@@ -274,13 +305,4 @@ function parseTypeScriptDiagnostic(projectRoot: string, line: string) {
     code: match[4],
     message: match[5],
   };
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await fs.stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }

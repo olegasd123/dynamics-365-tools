@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import * as path from "path";
+import { MemoryWorkspaceFiles, RecordingTextInput } from "../../../testSupport/fakes";
 import { PcfControlProject } from "../models";
 import { PcfPushService, validatePublisherPrefix } from "../pcfPushService";
 
@@ -13,6 +14,7 @@ test("validatePublisherPrefix enforces pac publisher prefix rules", () => {
 });
 
 test("PcfPushService pushes with selected environment and persists prefix", async () => {
+  const files = new MemoryWorkspaceFiles("/workspace");
   const calls: Array<{ environmentUrl: string; publisherPrefix: string; cwd: string }> = [];
   const updates: unknown[] = [];
   const pac = {
@@ -31,7 +33,7 @@ test("PcfPushService pushes with selected environment and persists prefix", asyn
       updates.push(update);
     },
   };
-  const service = new PcfPushService(pac as any, settings as any);
+  const service = new PcfPushService(pac as any, settings as any, files);
   const project = createProject("/tmp/control");
 
   const ok = await service.push(
@@ -52,6 +54,7 @@ test("PcfPushService pushes with selected environment and persists prefix", asyn
 });
 
 test("PcfPushService syncs pac auth when the profile targets another environment", async () => {
+  const files = new MemoryWorkspaceFiles("/workspace");
   const authCreates: unknown[] = [];
   const pac = {
     whoami: async () => ({ url: "https://other.crm.dynamics.com" }),
@@ -65,7 +68,7 @@ test("PcfPushService syncs pac auth when the profile targets another environment
       };
     },
   };
-  const service = new PcfPushService(pac as any, {} as any);
+  const service = new PcfPushService(pac as any, {} as any, files);
 
   const ok = await service.warnForAuthMismatch({
     name: "dev",
@@ -79,6 +82,7 @@ test("PcfPushService syncs pac auth when the profile targets another environment
 });
 
 test("PcfPushService does not sync pac auth when profile matches selected environment", async () => {
+  const files = new MemoryWorkspaceFiles("/workspace");
   let authCreateCalls = 0;
   const pac = {
     whoami: async () => ({ url: "https://dev.crm.dynamics.com/" }),
@@ -92,7 +96,7 @@ test("PcfPushService does not sync pac auth when profile matches selected enviro
       };
     },
   };
-  const service = new PcfPushService(pac as any, {} as any);
+  const service = new PcfPushService(pac as any, {} as any, files);
 
   const ok = await service.warnForAuthMismatch({
     name: "dev",
@@ -101,6 +105,42 @@ test("PcfPushService does not sync pac auth when profile matches selected enviro
 
   assert.strictEqual(ok, true);
   assert.strictEqual(authCreateCalls, 0);
+});
+
+test("PcfPushService resolves publisher prefix from cds solution metadata", async () => {
+  const files = new MemoryWorkspaceFiles("/workspace");
+  const cdsProjectUri = "/workspace/solution/Contoso.cdsproj";
+  files.addFile(cdsProjectUri, "<Project />");
+  files.addFile(
+    "/workspace/solution/src/Other/Solution.xml",
+    "<ImportExportXml><SolutionManifest><Publisher><CustomizationPrefix>contoso</CustomizationPrefix></Publisher></SolutionManifest></ImportExportXml>",
+  );
+  const updates: unknown[] = [];
+  const input = new RecordingTextInput();
+  const settings = {
+    updateProjectSettings: async (_project: PcfControlProject, update: unknown) => {
+      updates.push(update);
+    },
+    getProjectSettings: async () => ({}),
+  };
+  const service = new PcfPushService(
+    {} as any,
+    settings as any,
+    files,
+    undefined,
+    undefined,
+    undefined,
+    input,
+  );
+
+  const prefix = await service.resolvePublisherPrefix({
+    ...createProject("/workspace/controls/LinearInput"),
+    cdsProjectUri,
+  });
+
+  assert.strictEqual(prefix, "contoso");
+  assert.deepStrictEqual(updates, [{ publisherPrefix: "contoso" }]);
+  assert.deepStrictEqual(input.prompts, []);
 });
 
 function createProject(rootUri: string): PcfControlProject {

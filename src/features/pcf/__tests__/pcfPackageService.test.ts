@@ -1,10 +1,8 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as fs from "fs/promises";
-import * as os from "os";
 import * as path from "path";
-import * as vscode from "vscode";
-import { ConfigurationService } from "../../config/configurationService";
+import { MemoryWorkspaceFiles, RecordingOutput } from "../../../testSupport/fakes";
+import { ConfigurationService } from "@features/config/configurationService";
 import { PcfControlProject } from "../models";
 import { PcfPackageService, parseSolutionZipPath } from "../pcfPackageService";
 import { PcfWorkspaceSettingsService } from "../pcfWorkspaceSettings";
@@ -23,22 +21,20 @@ test("parseSolutionZipPath resolves the last zip mentioned in build output", () 
 });
 
 test("PcfPackageService reuses an existing cdsproj and persists the packaged zip", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-pcf-package-"));
-  const previousFolders = vscode.workspace.workspaceFolders;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const workspaceRoot = "/workspace";
+  const files = new MemoryWorkspaceFiles(workspaceRoot);
+  const output = new RecordingOutput();
 
   const controlRoot = path.join(workspaceRoot, "controls", "LinearInput");
   const solutionRoot = path.join(workspaceRoot, "solution");
   const pcfProject = path.join(controlRoot, "LinearInput.pcfproj");
   const cdsProject = path.join(solutionRoot, "ContosoSolution.cdsproj");
-  await fs.mkdir(controlRoot, { recursive: true });
-  await fs.mkdir(path.join(solutionRoot, "src", "Other"), { recursive: true });
-  await fs.writeFile(pcfProject, "<Project />");
-  await fs.writeFile(
+  files.addFile(pcfProject, "<Project />");
+  files.addFile(
     cdsProject,
     `<Project><ItemGroup><ProjectReference Include="../controls/LinearInput/LinearInput.pcfproj" /></ItemGroup></Project>`,
   );
-  await fs.writeFile(
+  files.addFile(
     path.join(solutionRoot, "src", "Other", "Solution.xml"),
     "<ImportExportXml><SolutionManifest><Publisher><CustomizationPrefix>contoso</CustomizationPrefix></Publisher></SolutionManifest></ImportExportXml>",
   );
@@ -61,33 +57,41 @@ test("PcfPackageService reuses an existing cdsproj and persists the packaged zip
     solutionAddReference: async () => ({ exitCode: 0, stdout: "", stderr: "", durationMs: 1 }),
   };
 
-  try {
-    const configuration = new ConfigurationService();
-    const settings = new PcfWorkspaceSettingsService(configuration);
-    const service = new PcfPackageService(pac as any, runner as any, settings, configuration);
-    const project = createProject(controlRoot, cdsProject);
+  const configuration = new ConfigurationService(files);
+  const settings = new PcfWorkspaceSettingsService(configuration, files);
+  const service = new PcfPackageService(
+    pac as any,
+    runner as any,
+    settings,
+    configuration,
+    files,
+    undefined,
+    undefined,
+    output,
+  );
+  const project = createProject(controlRoot, cdsProject);
 
-    const result = await service.packageControl(project, { managed: true });
+  const result = await service.packageControl(project, { managed: true });
 
-    assert.strictEqual(
-      result?.zipPath,
-      path.join(solutionRoot, "bin", "Release", "ContosoSolution.zip"),
-    );
-    assert.deepStrictEqual(runnerCalls, [
-      {
-        command: "dotnet",
-        args: ["build", cdsProject, "/p:configuration=Release", "/p:managed=true"],
-        cwd: solutionRoot,
-      },
-    ]);
-    const stored = await settings.getProjectSettings(project);
-    assert.strictEqual(stored.lastPackagedZip, "solution/bin/Release/ContosoSolution.zip");
-    assert.strictEqual(stored.publisherPrefix, "contoso");
-    service.dispose();
-  } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
-  }
+  assert.strictEqual(
+    result?.zipPath,
+    path.join(solutionRoot, "bin", "Release", "ContosoSolution.zip"),
+  );
+  assert.deepStrictEqual(runnerCalls, [
+    {
+      command: "dotnet",
+      args: ["build", cdsProject, "/p:configuration=Release", "/p:managed=true"],
+      cwd: solutionRoot,
+    },
+  ]);
+  assert.deepStrictEqual(
+    output.channels.map((channel) => channel.name),
+    ["PCF Package"],
+  );
+  const stored = await settings.getProjectSettings(project);
+  assert.strictEqual(stored.lastPackagedZip, "solution/bin/Release/ContosoSolution.zip");
+  assert.strictEqual(stored.publisherPrefix, "contoso");
+  service.dispose();
 });
 
 function createProject(rootUri: string, cdsProjectUri: string): PcfControlProject {

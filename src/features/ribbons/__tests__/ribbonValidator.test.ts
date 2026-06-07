@@ -98,3 +98,109 @@ test("warns about unknown CRM parameters", () => {
 
   assert.ok(messages.includes("Unknown CRM parameter 'ASD'."));
 });
+
+test("allows known built-in enable rule references", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Command">
+      <EnableRules>
+        <EnableRule Id="Mscrm.SelectionCountExactlyOne" />
+        <EnableRule Id="Mscrm.ShowOnGrid" />
+      </EnableRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(
+    !messages.includes(
+      "CommandDefinition references missing EnableRule 'Mscrm.SelectionCountExactlyOne'.",
+    ),
+  );
+  assert.ok(
+    !messages.includes("CommandDefinition references missing EnableRule 'Mscrm.ShowOnGrid'."),
+  );
+});
+
+test("validates required typed rule step attributes", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="new.account.Enable">
+        <SelectionCountRule />
+        <RecordPrivilegeRule />
+        <ValueRule />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("SelectionCountRule minimum or maximum is required."));
+  assert.ok(messages.includes("RecordPrivilegeRule privilege type is required."));
+  assert.ok(messages.includes("ValueRule field is required."));
+  assert.ok(messages.includes("ValueRule value is required."));
+});
+
+test("validates required flat display rule attributes", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <FormTypeRule />
+        <EntityPropertyRule />
+        <MiscellaneousPrivilegeRule />
+        <OrganizationSettingRule />
+        <HideForTabletExperienceRule />
+        <RelationshipTypeRule />
+        <ReferencingAttributeRequiredRule />
+        <PageRule />
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("FormTypeRule type is required."));
+  assert.ok(messages.includes("EntityPropertyRule property name is required."));
+  assert.ok(messages.includes("EntityPropertyRule property value is required."));
+  assert.ok(messages.includes("MiscellaneousPrivilegeRule privilege name is required."));
+  assert.ok(messages.includes("OrganizationSettingRule setting is required."));
+  assert.ok(messages.includes("RelationshipTypeRule type is required."));
+  assert.ok(messages.includes("PageRule address is required."));
+});
+
+test("validates nested display rule steps", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <RuleDefinitions>
+    <DisplayRules>
+      <DisplayRule Id="new.account.Display">
+        <OrRule />
+        <OrRule>
+          <FormStateRule />
+        </OrRule>
+      </DisplayRule>
+    </DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("OrRule child rule step is required."));
+  assert.ok(messages.includes("FormStateRule state is required."));
+});

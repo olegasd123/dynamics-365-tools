@@ -4,8 +4,18 @@ import {
   CommandDefinition,
   HideAction,
   LocLabelTitle,
+  RibbonEntityPropertyName,
+  RibbonCommandClientType,
   RibbonDocument,
   RibbonPatch,
+  RibbonOrganizationSetting,
+  RibbonPageRuleAddress,
+  RibbonRelationshipType,
+  RibbonRuleAppliesTo,
+  RibbonRuleFormType,
+  RibbonRuleFormState,
+  RibbonRulePrivilegeDepth,
+  RibbonRulePrivilegeType,
   RuleStep,
   TextRange,
   XmlElementRange,
@@ -27,6 +37,10 @@ export type NewCommandActionInput =
   | {
       kind: "Url";
       address: string;
+      passParams?: boolean;
+      winMode?: number;
+      winParams?: string;
+      parameters?: ActionParameter[];
     };
 
 export interface NewLocLabelInput {
@@ -56,24 +70,107 @@ export type NewRuleStepInput =
   | {
       kind: "EntityPrivilegeRule";
       entityName?: string;
-      privilegeType: string;
-      privilegeDepth?: string;
+      privilegeType: RibbonRulePrivilegeType;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      appliesTo?: RibbonRuleAppliesTo;
+      default?: boolean;
       invertResult?: boolean;
     }
   | {
       kind: "ValueRule";
       field: string;
       value: string;
+      default?: boolean;
       invertResult?: boolean;
     }
   | {
       kind: "FormStateRule";
-      state: string;
+      state: RibbonRuleFormState;
+      default?: boolean;
       invertResult?: boolean;
     }
   | {
       kind: "CommandClientTypeRule";
-      type: "Modern" | "Refresh";
+      type: RibbonCommandClientType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "FormTypeRule";
+      type: RibbonRuleFormType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "EntityPropertyRule";
+      propertyName: RibbonEntityPropertyName;
+      propertyValue: boolean;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "MiscellaneousPrivilegeRule";
+      privilegeName: string;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "OrganizationSettingRule";
+      setting: RibbonOrganizationSetting;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "HideForTabletExperienceRule";
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "RelationshipTypeRule";
+      type: RibbonRelationshipType;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "ReferencingAttributeRequiredRule";
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "PageRule";
+      address: RibbonPageRuleAddress;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "OrRule";
+      children?: NewRuleStepInput[];
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "SelectionCountRule";
+      appliesTo?: RibbonRuleAppliesTo;
+      minimum?: number;
+      maximum?: number;
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "RecordPrivilegeRule";
+      privilegeType: RibbonRulePrivilegeType;
+      appliesTo?: "PrimaryEntity";
+      default?: boolean;
+      invertResult?: boolean;
+    }
+  | {
+      kind: "EntityRule";
+      entityName?: string;
+      appliesTo?: RibbonRuleAppliesTo;
+      context?: string;
+      default?: boolean;
+      invertResult?: boolean;
     };
 
 export interface NewRuleInput {
@@ -90,8 +187,12 @@ export interface NewCustomButtonInput {
   sequence?: number;
   labelLocId?: string;
   labelText?: string;
+  alt?: string;
+  toolTipTitle?: string;
+  toolTipDescription?: string;
   image16x16?: string;
   image32x32?: string;
+  modernImage?: string;
   templateAlias?: string;
   enableRuleIds?: string[];
   displayRuleIds?: string[];
@@ -353,6 +454,46 @@ export function createRuleStepReplacePatch(
   input: NewRuleStepInput,
 ): RibbonPatch {
   return createReplaceNodePatch(sourceText, step.range, renderRuleStep(input));
+}
+
+export function createRuleChildStepPatch(
+  sourceText: string,
+  parent: RuleStep,
+  input: NewRuleStepInput,
+): RibbonPatch {
+  if (parent.kind !== "OrRule") {
+    throw new Error("Rule child steps can only be added to OrRule.");
+  }
+
+  const parentElement = findElementByRange(sourceText, parent.range);
+  if (parentElement.name !== "OrRule") {
+    throw new Error("OrRule range was not found in the current document text.");
+  }
+
+  const parentIndent = indentationBefore(sourceText, parentElement.range.start);
+  const childIndent = findChildIndent(sourceText, parentElement) ?? `${parentIndent}  `;
+  const stepText = indentBlock(renderRuleStep(input), childIndent);
+
+  if (parentElement.selfClosing) {
+    const attributes = renderAttributes([
+      ["Default", optionalBoolean(parent.default)],
+      ["InvertResult", optionalBoolean(parent.invertResult)],
+    ]);
+    const name = attributes ? `OrRule ${attributes}` : "OrRule";
+    return {
+      kind: "replace",
+      range: parentElement.range,
+      text: `<${name}>\n${stepText}\n${parentIndent}</OrRule>`,
+    };
+  }
+
+  return {
+    kind: "insert",
+    offset: parentElement.children.length
+      ? parentElement.innerRange.end
+      : parentElement.startTagRange.end,
+    text: `\n${stepText}\n${parentIndent}`,
+  };
 }
 
 export function createLocLabelTitleReplacePatch(
@@ -684,9 +825,13 @@ function renderCustomButtonAction(input: NewCustomButtonInput): string {
     ["Id", input.buttonId],
     ["Command", input.commandId],
     ["LabelText", labelText],
-    ["Sequence", input.sequence],
+    ["Alt", input.alt],
+    ["ToolTipTitle", input.toolTipTitle],
+    ["ToolTipDescription", input.toolTipDescription],
     ["Image16by16", webResourceValue(input.image16x16)],
     ["Image32by32", webResourceValue(input.image32x32)],
+    ["ModernImage", webResourceValue(input.modernImage)],
+    ["Sequence", input.sequence],
     ["TemplateAlias", input.templateAlias],
   ];
 
@@ -737,7 +882,16 @@ function renderCommandAction(action: NewCommandActionInput): string {
     );
   }
 
-  return `<Url Address="${escapeXmlAttribute(action.address)}" />`;
+  return renderJavaScriptNode(
+    "Url",
+    [
+      ["Address", action.address],
+      ["PassParams", action.passParams === undefined ? undefined : String(action.passParams)],
+      ["WinMode", action.winMode],
+      ["WinParams", action.winParams],
+    ],
+    action.parameters,
+  );
 }
 
 function renderLocLabel(input: NewLocLabelInput): string {
@@ -834,26 +988,119 @@ function renderRuleStep(step: NewRuleStepInput): string {
         ["EntityName", step.entityName],
         ["PrivilegeType", step.privilegeType],
         ["PrivilegeDepth", step.privilegeDepth],
+        ["AppliesTo", step.appliesTo],
+        ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
     case "ValueRule":
       return `<ValueRule ${renderAttributes([
         ["Field", step.field],
         ["Value", step.value],
+        ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
     case "FormStateRule":
       return `<FormStateRule ${renderAttributes([
         ["State", step.state],
+        ["Default", optionalBoolean(step.default)],
         ["InvertResult", optionalBoolean(step.invertResult)],
       ])} />`;
     case "CommandClientTypeRule":
-      return `<CommandClientTypeRule Type="${escapeXmlAttribute(step.type)}" />`;
+      return `<CommandClientTypeRule ${renderAttributes([
+        ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "FormTypeRule":
+      return `<FormTypeRule ${renderAttributes([
+        ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "EntityPropertyRule":
+      return `<EntityPropertyRule ${renderAttributes([
+        ["PropertyName", step.propertyName],
+        ["PropertyValue", optionalBoolean(step.propertyValue)],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "MiscellaneousPrivilegeRule":
+      return `<MiscellaneousPrivilegeRule ${renderAttributes([
+        ["PrivilegeName", step.privilegeName],
+        ["PrivilegeDepth", step.privilegeDepth],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "OrganizationSettingRule":
+      return `<OrganizationSettingRule ${renderAttributes([
+        ["Setting", step.setting],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "HideForTabletExperienceRule":
+      return `<HideForTabletExperienceRule ${renderAttributes([
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "RelationshipTypeRule":
+      return `<RelationshipTypeRule ${renderAttributes([
+        ["Type", step.type],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "ReferencingAttributeRequiredRule":
+      return `<ReferencingAttributeRequiredRule ${renderAttributes([
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "PageRule":
+      return `<PageRule ${renderAttributes([
+        ["Address", step.address],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "OrRule": {
+      const attributes = renderAttributes([
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ]);
+      const name = attributes ? `OrRule ${attributes}` : "OrRule";
+      if (!step.children?.length) {
+        return `<${name} />`;
+      }
+
+      return `<${name}>
+${indentBlock(step.children.map(renderRuleStep).join("\n"), "  ")}
+</OrRule>`;
+    }
+    case "SelectionCountRule":
+      return `<SelectionCountRule ${renderAttributes([
+        ["AppliesTo", step.appliesTo],
+        ["Minimum", step.minimum],
+        ["Maximum", step.maximum],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "RecordPrivilegeRule":
+      return `<RecordPrivilegeRule ${renderAttributes([
+        ["PrivilegeType", step.privilegeType],
+        ["AppliesTo", step.appliesTo],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
+    case "EntityRule":
+      return `<EntityRule ${renderAttributes([
+        ["EntityName", step.entityName],
+        ["AppliesTo", step.appliesTo],
+        ["Context", step.context],
+        ["Default", optionalBoolean(step.default)],
+        ["InvertResult", optionalBoolean(step.invertResult)],
+      ])} />`;
   }
 }
 
 function renderJavaScriptNode(
-  name: "JavaScriptFunction" | "CustomRule",
+  name: "JavaScriptFunction" | "CustomRule" | "Url",
   attributes: Array<[string, string | number | undefined]>,
   parameters: ActionParameter[] | undefined,
 ): string {
@@ -868,7 +1115,11 @@ ${indentBlock(parameters.map(renderActionParameter).join("\n"), "  ")}
 }
 
 function renderActionParameter(parameter: ActionParameter): string {
-  return `<${parameter.kind}Parameter Value="${escapeXmlAttribute(parameter.value)}" />`;
+  const attributes = renderAttributes([
+    ["Name", parameter.name],
+    ["Value", parameter.value],
+  ]);
+  return `<${parameter.kind}Parameter ${attributes} />`;
 }
 
 function createReplaceNodePatch(sourceText: string, range: TextRange, text: string): RibbonPatch {

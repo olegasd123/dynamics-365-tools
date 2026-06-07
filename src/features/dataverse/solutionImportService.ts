@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { XMLParser } from "fast-xml-parser";
-import type * as vscode from "vscode";
+import type { CancellationTokenLike } from "@app/ports/progress";
 
 export interface SolutionImportClient {
   get<T>(path: string): Promise<T>;
@@ -15,7 +15,7 @@ export interface SolutionImportOptions {
   publishWorkflows?: boolean;
   timeoutMs?: number;
   pollIntervalMs?: number;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
   onStatus?: (message: string) => void;
 }
 
@@ -130,6 +130,10 @@ export class SolutionImportService {
     });
   }
 
+  async queueRibbonClientMetadataUpdate(): Promise<void> {
+    await this.client.post("QueueUpdateRibbonClientMetadata");
+  }
+
   private async pollImport(
     importJobId: string,
     asyncOperationId: string | undefined,
@@ -201,7 +205,7 @@ export class SolutionImportService {
     }
   }
 
-  private throwIfCancelled(token?: vscode.CancellationToken): void {
+  private throwIfCancelled(token?: CancellationTokenLike): void {
     if (token?.isCancellationRequested) {
       throw new Error("Solution import cancelled.");
     }
@@ -227,7 +231,9 @@ export function buildPublishRibbonsXml(
     .map((entity) => `<entity>${escapeXml(entity)}</entity>`)
     .join("");
   const entitiesXml = entityXml ? `<entities>${entityXml}</entities>` : "";
-  const ribbonXml = includeApplicationRibbon ? "<ribbon />" : "";
+  const ribbonXml = includeApplicationRibbon
+    ? "<ribbons><ribbon>ApplicationRibbon</ribbon></ribbons>"
+    : "";
   return `<importexportxml>${entitiesXml}${ribbonXml}</importexportxml>`;
 }
 

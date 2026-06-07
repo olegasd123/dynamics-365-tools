@@ -87,12 +87,9 @@ test("undoes and redoes pending ribbon edits across the working set", async () =
     }),
   );
 
-  assert.strictEqual(state.canUndo(), true);
-  assert.strictEqual(state.canRedo(), false);
   assert.strictEqual((await state.loadSource(source))[0].views[0].hideActions.length, 2);
 
   assert.strictEqual(state.undo(), true);
-  assert.strictEqual(state.canRedo(), true);
   assert.strictEqual((await state.loadSource(source))[0].views[0].hideActions.length, 1);
 
   assert.strictEqual(state.redo(), true);
@@ -100,8 +97,6 @@ test("undoes and redoes pending ribbon edits across the working set", async () =
 
   await state.saveSource(source.id);
 
-  assert.strictEqual(state.canUndo(), false);
-  assert.strictEqual(state.canRedo(), false);
   assert.strictEqual(state.undo(), false);
   assert.match(await fs.readFile(filePath, "utf8"), /SaveAndClosePrimary/);
 });

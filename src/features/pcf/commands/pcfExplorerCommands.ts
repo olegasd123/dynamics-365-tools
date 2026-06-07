@@ -1,21 +1,21 @@
-import * as fs from "fs/promises";
+import * as path from "path";
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
+import { CommandContext } from "@app/commandContext";
 import { PcfDeployedControlNode } from "../pcfExplorer";
 
 export async function togglePcfSolutionFilter(ctx: CommandContext): Promise<void> {
-  await ctx.pcfExplorer.toggleSolutionFilter();
+  await ctx.pcf.explorer.toggleSolutionFilter();
 }
 
 export async function setPcfSolutionFilter(ctx: CommandContext, enabled: boolean): Promise<void> {
-  await ctx.pcfExplorer.setSolutionFilter(enabled);
+  await ctx.pcf.explorer.setSolutionFilter(enabled);
 }
 
 export async function setPcfWorkspaceFolderFilter(ctx: CommandContext): Promise<void> {
-  const folders = vscode.workspace.workspaceFolders ?? [];
+  const folders = ctx.core.files.workspaceFolders;
   if (folders.length <= 1) {
-    vscode.window.showInformationMessage("Only one workspace folder is open.");
-    await ctx.pcfExplorer.setWorkspaceFolderFilter(undefined);
+    await ctx.core.notifications.info("Only one workspace folder is open.");
+    await ctx.pcf.explorer.setWorkspaceFolderFilter(undefined);
     return;
   }
 
@@ -27,10 +27,10 @@ export async function setPcfWorkspaceFolderFilter(ctx: CommandContext): Promise<
   const pick = await vscode.window.showQuickPick(
     [
       all,
-      ...folders.map((folder) => ({
-        label: folder.name,
-        description: folder.uri.fsPath,
-        rootUri: folder.uri.fsPath,
+      ...folders.map((folderPath) => ({
+        label: path.basename(folderPath),
+        description: folderPath,
+        rootUri: folderPath,
       })),
     ],
     { placeHolder: "Filter PCF controls by workspace folder" },
@@ -39,7 +39,7 @@ export async function setPcfWorkspaceFolderFilter(ctx: CommandContext): Promise<
     return;
   }
 
-  await ctx.pcfExplorer.setWorkspaceFolderFilter(pick.rootUri);
+  await ctx.pcf.explorer.setWorkspaceFolderFilter(pick.rootUri);
 }
 
 export async function updatePcfFromLocal(
@@ -47,31 +47,33 @@ export async function updatePcfFromLocal(
   node?: PcfDeployedControlNode,
 ): Promise<void> {
   if (!(node instanceof PcfDeployedControlNode) || !node.control.workspaceMatch) {
-    vscode.window.showWarningMessage("Select a deployed PCF control that matches the workspace.");
+    await ctx.core.notifications.warning(
+      "Select a deployed PCF control that matches the workspace.",
+    );
     return;
   }
 
-  const pac = await ctx.pacCli.detect();
+  const pac = await ctx.pcf.pacCli.detect();
   if (!pac.available) {
-    const action = await vscode.window.showErrorMessage(
+    const action = await ctx.core.notifications.askError(
       `Power Platform CLI is required for PCF commands: ${pac.error ?? "pac not found"}.`,
-      "Install pac CLI",
+      ["Install pac CLI"],
     );
     if (action === "Install pac CLI") {
-      await vscode.env.openExternal(
-        vscode.Uri.parse("https://learn.microsoft.com/power-platform/developer/cli/introduction"),
+      await ctx.core.workbench.openExternal(
+        "https://learn.microsoft.com/power-platform/developer/cli/introduction",
       );
     }
     return;
   }
 
   const project = node.control.workspaceMatch;
-  const publisherPrefix = await ctx.pcfPushService.resolvePublisherPrefix(project);
+  const publisherPrefix = await ctx.pcf.pushService.resolvePublisherPrefix(project);
   if (!publisherPrefix) {
     return;
   }
 
-  await ctx.lastSelection.setLastEnvironment(node.env.name);
+  await ctx.core.lastSelection.setLastEnvironment(node.env.name);
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -79,28 +81,31 @@ export async function updatePcfFromLocal(
       cancellable: true,
     },
     async (_progress, token) => {
-      const canContinue = await ctx.pcfPushService.warnForAuthMismatch(node.env, token);
+      const canContinue = await ctx.pcf.pushService.warnForAuthMismatch(node.env, token);
       if (!canContinue) {
         return;
       }
 
-      const ok = await ctx.pcfPushService.push(project, node.env, publisherPrefix, token);
+      const ok = await ctx.pcf.pushService.push(project, node.env, publisherPrefix, token);
       if (ok) {
-        await ctx.pcfProjectLocator.refresh();
-        ctx.pcfExplorer.refresh();
+        await ctx.pcf.projectLocator.refresh();
+        ctx.pcf.explorer.refresh();
       }
     },
   );
 }
 
-export async function copyPcfDeployedControlId(node?: PcfDeployedControlNode): Promise<void> {
+export async function copyPcfDeployedControlId(
+  ctx: CommandContext,
+  node?: PcfDeployedControlNode,
+): Promise<void> {
   if (!(node instanceof PcfDeployedControlNode)) {
-    vscode.window.showWarningMessage("Select a deployed PCF control first.");
+    await ctx.core.notifications.warning("Select a deployed PCF control first.");
     return;
   }
 
-  await vscode.env.clipboard.writeText(node.control.customControlId);
-  vscode.window.showInformationMessage(`Copied PCF control ID for ${node.control.name}.`);
+  await ctx.core.clipboard.writeText(node.control.customControlId);
+  await ctx.core.notifications.info(`Copied PCF control ID for ${node.control.name}.`);
 }
 
 export async function syncPcfManifestVersionFromEnvironment(
@@ -108,29 +113,31 @@ export async function syncPcfManifestVersionFromEnvironment(
   node?: PcfDeployedControlNode,
 ): Promise<void> {
   if (!(node instanceof PcfDeployedControlNode) || !node.control.workspaceMatch) {
-    vscode.window.showWarningMessage("Select a deployed PCF control that matches the workspace.");
+    await ctx.core.notifications.warning(
+      "Select a deployed PCF control that matches the workspace.",
+    );
     return;
   }
 
   if (!node.control.version) {
-    vscode.window.showWarningMessage("The deployed PCF control has no version to sync.");
+    await ctx.core.notifications.warning("The deployed PCF control has no version to sync.");
     return;
   }
 
   const project = node.control.workspaceMatch;
-  const content = await fs.readFile(project.manifestUri, "utf8");
+  const content = Buffer.from(await ctx.core.files.readFile(project.manifestUri)).toString("utf8");
   const updated = updateControlVersionInManifest(content, node.control.version);
   if (updated === content) {
-    vscode.window.showInformationMessage(
+    await ctx.core.notifications.info(
       `ControlManifest.Input.xml already uses version ${node.control.version}.`,
     );
     return;
   }
 
-  await fs.writeFile(project.manifestUri, updated, "utf8");
-  await ctx.pcfProjectLocator.refresh();
-  ctx.pcfExplorer.refresh();
-  vscode.window.showInformationMessage(
+  await ctx.core.files.writeFile(project.manifestUri, Buffer.from(updated, "utf8"));
+  await ctx.pcf.projectLocator.refresh();
+  ctx.pcf.explorer.refresh();
+  await ctx.core.notifications.info(
     `Updated ${project.fullName} manifest version to ${node.control.version}.`,
   );
 }

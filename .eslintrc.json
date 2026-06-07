@@ -19,5 +19,24 @@
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
     "no-constant-condition": ["error", { "checkLoops": false }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/features/**/*.ts"],
+      "excludedFiles": ["src/features/**/__tests__/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@platform/*"],
+                "message": "Features must use app ports, not platform implementations directly."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

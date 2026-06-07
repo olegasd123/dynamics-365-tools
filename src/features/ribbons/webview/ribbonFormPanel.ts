@@ -236,16 +236,8 @@ function ribbonAddActions(): PanelAction[] {
 function sectionActions(node: RibbonSectionNode): PanelAction[] {
   switch (node.kind) {
     case "customActions":
-      return [
-        { command: "dynamics365Tools.ribbons.addCustomButton", label: "Add Button" },
-        { command: "dynamics365Tools.ribbons.hideOobButton", label: "Hide OOB" },
-        { command: "dynamics365Tools.ribbons.hideAndStubOobButtons", label: "Hide + Stub" },
-      ];
     case "hideActions":
-      return [
-        { command: "dynamics365Tools.ribbons.hideOobButton", label: "Hide OOB" },
-        { command: "dynamics365Tools.ribbons.hideAndStubOobButtons", label: "Hide + Stub" },
-      ];
+      return [];
     case "commandDefinitions":
       return [
         { command: "dynamics365Tools.ribbons.addCommandDefinition", label: "Add Command" },
@@ -283,9 +275,14 @@ function itemActions(node: RibbonItemNode): PanelAction[] {
       { command: "dynamics365Tools.ribbons.moveDown", label: "Move Down" },
     );
   }
+  if (
+    node.contextValue === "d365RibbonCommandDefinition" ||
+    node.contextValue === "d365RibbonActions"
+  ) {
+    actions.push({ command: "dynamics365Tools.ribbons.addCommandAction", label: "Add Action" });
+  }
   if (node.contextValue === "d365RibbonCommandDefinition") {
     actions.push(
-      { command: "dynamics365Tools.ribbons.addCommandAction", label: "Add Action" },
       { command: "dynamics365Tools.ribbons.addCommandEnableRuleRef", label: "Add Enable Ref" },
       { command: "dynamics365Tools.ribbons.addCommandDisplayRuleRef", label: "Add Display Ref" },
     );
@@ -313,6 +310,7 @@ function canEdit(node: RibbonItemNode): boolean {
     node.contextValue === "d365RibbonLocLabel" ||
     node.contextValue === "d365RibbonJavaScriptAction" ||
     node.contextValue === "d365RibbonUrlAction" ||
+    node.contextValue === "d365RibbonParameter" ||
     node.contextValue === "d365RibbonLocLabelTitle" ||
     node.contextValue.startsWith("d365RibbonRuleStep")
   );
@@ -325,6 +323,7 @@ function canMove(node: RibbonItemNode): boolean {
     node.contextValue === "d365RibbonCommandDefinition" ||
     node.contextValue === "d365RibbonEnableRule" ||
     node.contextValue === "d365RibbonDisplayRule" ||
+    node.contextValue === "d365RibbonRuleRef" ||
     node.contextValue === "d365RibbonLocLabel" ||
     node.contextValue === "d365RibbonJavaScriptAction" ||
     node.contextValue === "d365RibbonUrlAction" ||
@@ -335,15 +334,16 @@ function canMove(node: RibbonItemNode): boolean {
 
 function canDelete(node: RibbonItemNode): boolean {
   return (
-    node.contextValue.includes("d365RibbonCustomAction") ||
-    node.contextValue.includes("d365RibbonHideAction") ||
-    node.contextValue.includes("d365RibbonCommandDefinition") ||
-    node.contextValue.includes("d365RibbonEnableRule") ||
-    node.contextValue.includes("d365RibbonDisplayRule") ||
-    node.contextValue.includes("d365RibbonLocLabel") ||
-    node.contextValue.includes("d365RibbonJavaScriptAction") ||
-    node.contextValue.includes("d365RibbonUrlAction") ||
-    node.contextValue.includes("d365RibbonRuleStep")
+    node.contextValue === "d365RibbonCustomAction" ||
+    node.contextValue === "d365RibbonHideAction" ||
+    node.contextValue === "d365RibbonCommandDefinition" ||
+    node.contextValue === "d365RibbonEnableRule" ||
+    node.contextValue === "d365RibbonDisplayRule" ||
+    node.contextValue === "d365RibbonLocLabel" ||
+    node.contextValue === "d365RibbonJavaScriptAction" ||
+    node.contextValue === "d365RibbonUrlAction" ||
+    node.contextValue === "d365RibbonLocLabelTitle" ||
+    node.contextValue.startsWith("d365RibbonRuleStep")
   );
 }
 

@@ -1,5 +1,10 @@
-import * as vscode from "vscode";
 import * as path from "path";
+import { ClipboardPort, NoopClipboard } from "@app/ports/clipboard";
+import { WorkspaceFilesPort, WorkspaceFileType, type FsPathTarget } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
+import { formatErrorDetails } from "@shared/errorDetails";
 import { BindingEntry, EnvironmentConfig } from "../config/domain/models";
 import { DataverseClient, isDefaultSolution } from "../dataverse/dataverseClient";
 import {
@@ -29,7 +34,7 @@ export interface PublishOptions {
   isFirst?: boolean;
   /** Optional cache used to skip unchanged files during folder publish. */
   cache?: PublishCacheService;
-  cancellationToken?: vscode.CancellationToken;
+  cancellationToken?: CancellationTokenLike;
 }
 
 export interface PublishResult {
@@ -42,19 +47,25 @@ export interface PublishResult {
 }
 
 export class WebResourcePublisher {
-  private readonly output: vscode.OutputChannel;
+  private readonly output: OutputChannelPort;
   // CRM backend rejects concurrent PublishXml calls; serialize them with a queue.
   private publishQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly connections: EnvironmentConnectionService) {
-    this.output = vscode.window.createOutputChannel("Dynamics 365 Tools Publisher");
+  constructor(
+    private readonly connections: EnvironmentConnectionService,
+    private readonly files: WorkspaceFilesPort,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
+    output: OutputPort = new NoopOutputPort(),
+    private readonly clipboard: ClipboardPort = new NoopClipboard(),
+  ) {
+    this.output = output.createChannel("Dynamics 365 Tools Publisher");
   }
 
   async publish(
     binding: BindingEntry,
     env: EnvironmentConfig,
     auth: PublishAuth = {},
-    targetUri?: vscode.Uri,
+    targetUri?: FsPathTarget,
     options: PublishOptions = {},
   ): Promise<PublishResult> {
     const result: PublishResult = { created: 0, updated: 0, skipped: 0, failed: 0 };
@@ -74,7 +85,7 @@ export class WebResourcePublisher {
     try {
       this.throwIfCancelled(cancellationToken);
       const { localPath, remotePath } = await this.resolvePaths(binding, targetUri);
-      const fileStat = await vscode.workspace.fs.stat(vscode.Uri.file(localPath));
+      const fileStat = await this.files.stat(localPath);
       let content: Buffer | undefined;
       let hash: string | undefined;
 
@@ -89,14 +100,13 @@ export class WebResourcePublisher {
       }
 
       this.throwIfCancelled(cancellationToken);
-      const connection = await this.connections.createConnection(env, auth);
-      if (!connection) {
+      const client = await this.connections.createClient(env, auth);
+      if (!client) {
         throw new Error(
           "No credentials available. Sign in interactively or set client credentials first.",
         );
       }
 
-      const client = new DataverseClient(connection);
       const solutionComponents = new SolutionComponentService(client);
 
       this.throwIfCancelled(cancellationToken);
@@ -177,13 +187,11 @@ export class WebResourcePublisher {
       if (envName) {
         const summary = parts.join(", ");
         if (result.failed || cancelled) {
-          vscode.window.showWarningMessage(
+          void this.notifications.warning(
             `Dynamics 365 Tools publish to ${envName}: ${cancelled ? "cancelled, " : ""}${summary} (check output for errors)`,
           );
         } else {
-          vscode.window.showInformationMessage(
-            `Dynamics 365 Tools publish to ${envName}: ${summary}`,
-          );
+          void this.notifications.info(`Dynamics 365 Tools publish to ${envName}: ${summary}`);
         }
       }
     }
@@ -191,12 +199,12 @@ export class WebResourcePublisher {
 
   private async resolvePaths(
     binding: BindingEntry,
-    targetUri?: vscode.Uri,
+    targetUri?: FsPathTarget,
   ): Promise<{ localPath: string; remotePath: string }> {
     const bindingRoot = this.resolveLocalPath(binding.relativeLocalPath);
     const targetPath = targetUri?.fsPath ?? bindingRoot;
-    const targetStat = await vscode.workspace.fs.stat(vscode.Uri.file(targetPath));
-    if (targetStat.type === vscode.FileType.Directory) {
+    const targetStat = await this.files.stat(targetPath);
+    if (targetStat.type === WorkspaceFileType.Directory) {
       throw new Error("Select a file inside the bound folder to publish.");
     }
 
@@ -222,7 +230,7 @@ export class WebResourcePublisher {
       return path.normalize(bindingPath);
     }
 
-    const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspace = this.files.workspaceRoot;
     if (!workspace) {
       throw new Error("No workspace folder detected; cannot resolve binding path.");
     }
@@ -243,8 +251,7 @@ export class WebResourcePublisher {
   }
 
   private async readFile(localPath: string): Promise<Buffer> {
-    const uri = vscode.Uri.file(localPath);
-    return Buffer.from(await vscode.workspace.fs.readFile(uri));
+    return Buffer.from(await this.files.readFile(localPath));
   }
 
   private hashContent(content: Buffer): string {
@@ -263,7 +270,6 @@ export class WebResourcePublisher {
       case ".ts":
         return 3;
       case ".xml":
-      case ".resx":
       case ".json":
         return 4;
       case ".png":
@@ -275,10 +281,12 @@ export class WebResourcePublisher {
         return 7;
       case ".xsl":
       case ".xslt":
-        return 10;
+        return 9;
       case ".ico":
-        return 11;
+        return 10;
       case ".svg":
+        return 11;
+      case ".resx":
         return 12;
       default:
         return 3;
@@ -364,7 +372,7 @@ export class WebResourcePublisher {
   private async publishWebResource(
     client: DataverseClient,
     webResourceId: string,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: CancellationTokenLike,
   ): Promise<void> {
     this.throwIfCancelled(cancellationToken);
     const parameterXml = `<importexportxml><webresources><webresource>${webResourceId}</webresource></webresources></importexportxml>`;
@@ -375,7 +383,7 @@ export class WebResourcePublisher {
     client: DataverseClient,
     webResourceId: string,
     remotePath: string,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: CancellationTokenLike,
   ): Promise<void> {
     const run = async () => {
       this.throwIfCancelled(cancellationToken);
@@ -388,7 +396,7 @@ export class WebResourcePublisher {
     await next;
   }
 
-  private throwIfCancelled(token?: vscode.CancellationToken): void {
+  private throwIfCancelled(token?: CancellationTokenLike): void {
     if (this.isCancelled(token)) {
       const error = new Error("Publish cancelled");
       (error as any).cancelled = true;
@@ -396,7 +404,7 @@ export class WebResourcePublisher {
     }
   }
 
-  private isCancelled(token?: vscode.CancellationToken): boolean {
+  private isCancelled(token?: CancellationTokenLike): boolean {
     return token?.isCancellationRequested ?? false;
   }
 
@@ -416,54 +424,20 @@ export class WebResourcePublisher {
 
   private async notifyError(message: string, error?: unknown): Promise<void> {
     const copyAction = "Copy error details";
-    const selection = await vscode.window.showErrorMessage(
+    const selection = await this.notifications.askError(
       `Dynamics 365 Tools publish failed: ${message}`,
-      copyAction,
+      [copyAction],
     );
     if (selection !== copyAction) {
       return;
     }
 
-    const details = this.formatErrorDetails(error);
+    const details = formatErrorDetails(error);
     try {
-      await vscode.env.clipboard.writeText(details);
+      await this.clipboard.writeText(details);
       this.output.appendLine("  ↳ Error details copied to clipboard");
     } catch {
       // Clipboard failures should not crash publish flow.
     }
-  }
-
-  private formatErrorDetails(error: unknown): string {
-    const base = error instanceof Error ? error.message : String(error);
-    const code = (error as any)?.code as string | undefined;
-    const correlationId = (error as any)?.correlationId as string | undefined;
-    const status = (error as any)?.status as number | undefined;
-    const rawBody = (error as any)?.rawBody as string | undefined;
-    const requestMethod = (error as any)?.requestMethod as string | undefined;
-    const requestPath = (error as any)?.requestPath as string | undefined;
-    const requestUrl = (error as any)?.requestUrl as string | undefined;
-    const causeName = (error as any)?.causeName as string | undefined;
-    const causeMessage = (error as any)?.causeMessage as string | undefined;
-    const causeCode = (error as any)?.causeCode as string | undefined;
-    const causeChain = (error as any)?.causeChain as string | undefined;
-    const causeStack = (error as any)?.causeStack as string | undefined;
-    const request = requestMethod
-      ? `${requestMethod}${requestPath ? ` ${requestPath}` : ""}`
-      : requestPath;
-    const causeLabel = [causeName, causeMessage].filter(Boolean).join(": ");
-    const sections = [
-      `Message: ${base}`,
-      code ? `Code: ${code}` : undefined,
-      status ? `Status: ${status}` : undefined,
-      correlationId ? `CorrelationId: ${correlationId}` : undefined,
-      request ? `Request: ${request}` : undefined,
-      requestUrl ? `Url: ${requestUrl}` : undefined,
-      causeCode ? `CauseCode: ${causeCode}` : undefined,
-      causeLabel ? `Cause: ${causeLabel}` : undefined,
-      causeChain ? `CauseChain: ${causeChain}` : undefined,
-      causeStack ? `CauseStack: ${causeStack}` : undefined,
-      rawBody ? `Response: ${rawBody}` : undefined,
-    ].filter(Boolean);
-    return sections.join("\n");
   }
 }

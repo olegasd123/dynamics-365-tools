@@ -2,7 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import * as vscode from "vscode";
 import { RibbonDocument } from "../models";
-import { RibbonDocumentNode, RibbonItemNode } from "../ribbonExplorer";
+import { RibbonDocumentNode, RibbonItemNode, RibbonSectionNode } from "../ribbonExplorer";
 import { RibbonFormPanel } from "../webview/ribbonFormPanel";
 
 test("renders selected ribbon document details with edit actions", () => {
@@ -38,6 +38,70 @@ test("renders selected ribbon document details with edit actions", () => {
   assert.match(panel.webview.html, /RibbonDiffXml\.xml/);
   assert.doesNotMatch(panel.webview.html, /Open XML/);
   assert.match(panel.webview.html, /Save/);
+  formPanel.dispose();
+});
+
+test("does not render custom button actions for ribbon sections", () => {
+  const formPanel = new RibbonFormPanel();
+  const document: RibbonDocument = {
+    id: "doc",
+    sourceId: "source",
+    kind: "Entity",
+    entityLogicalName: "account",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    sourceText: "<RibbonDiffXml />",
+    ribbonRange: { start: 0, end: 17 },
+    sections: {},
+    views: [
+      {
+        scope: "Form",
+        customActions: [],
+        hideActions: [],
+        commandDefinitions: [],
+        enableRules: [],
+        displayRules: [],
+        locLabels: [],
+        unknownNodeRanges: [],
+      },
+    ],
+  };
+  const [view] = document.views;
+
+  formPanel.show(new RibbonSectionNode(document, view, "hideActions", 0));
+
+  const panel = (vscode.window as any).__lastWebviewPanel;
+  assert.doesNotMatch(panel.webview.html, /Add Button/);
+  assert.doesNotMatch(panel.webview.html, /Hide OOB/);
+  formPanel.dispose();
+});
+
+test("does not render delete action for rule reference groups", () => {
+  const formPanel = new RibbonFormPanel();
+  const node = new RibbonItemNode(
+    "EnableRules",
+    "0",
+    "d365RibbonEnableRuleRefs",
+    "references",
+    [],
+    [],
+  );
+
+  formPanel.show(node);
+
+  const panel = (vscode.window as any).__lastWebviewPanel;
+  assert.doesNotMatch(panel.webview.html, /Delete/);
+  formPanel.dispose();
+});
+
+test("renders add action for command action groups", () => {
+  const formPanel = new RibbonFormPanel();
+  const node = new RibbonItemNode("Actions", "1", "d365RibbonActions", "run", [], []);
+
+  formPanel.show(node);
+
+  const panel = (vscode.window as any).__lastWebviewPanel;
+  assert.match(panel.webview.html, /Add Action/);
+  assert.doesNotMatch(panel.webview.html, /Add Enable Ref/);
   formPanel.dispose();
 });
 

@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { CommandContext } from "./commandContext";
 
 export interface CommandRunOptions {
@@ -25,6 +24,7 @@ const OPEN_BINDINGS_ACTION = "Open Bindings";
 const RESET_CONFIG_ACTION = "Reset Config";
 const RESET_BINDINGS_ACTION = "Reset Bindings";
 const RESET_CONFIRM_ACTION = "Reset";
+const SHOW_DETAILS_ACTION = "Show Details";
 
 export async function runCommandWithHealthCheck(
   ctx: CommandContext,
@@ -44,15 +44,15 @@ export async function runCommandWithHealthCheck(
   }
 
   if (!normalizedOptions.allowConcurrent && RUNNING_COMMANDS.has(commandId)) {
-    void vscode.window
-      .showWarningMessage(
+    void ctx.core.notifications
+      .askWarning(
         `${commandLabel} is already running. Wait for completion, or reload VS Code if it looks stuck.`,
-        RELOAD_WINDOW_ACTION,
+        [RELOAD_WINDOW_ACTION],
       )
       .then(
         async (action) => {
           if (action === RELOAD_WINDOW_ACTION) {
-            await vscode.commands.executeCommand("workbench.action.reloadWindow");
+            await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
           }
         },
         () => undefined,
@@ -62,7 +62,7 @@ export async function runCommandWithHealthCheck(
 
   RUNNING_COMMANDS.add(commandId);
   const execution = (async () => handler())();
-  vscode.window.setStatusBarMessage(
+  ctx.core.workbench.setStatusBarMessage(
     `$(sync~spin) Dynamics 365 Tools: ${commandLabel}`,
     execution.then(
       () => undefined,
@@ -73,13 +73,18 @@ export async function runCommandWithHealthCheck(
   try {
     return await execution;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    void vscode.window
-      .showErrorMessage(`${commandLabel} failed. ${message}`, RELOAD_WINDOW_ACTION)
+    ctx.core.logger.error(`${commandLabel} failed`, error, { commandId });
+    void ctx.core.notifications
+      .askError(`${commandLabel} failed. See the Dynamics 365 Tools output for details.`, [
+        SHOW_DETAILS_ACTION,
+        RELOAD_WINDOW_ACTION,
+      ])
       .then(
         async (action) => {
-          if (action === RELOAD_WINDOW_ACTION) {
-            await vscode.commands.executeCommand("workbench.action.reloadWindow");
+          if (action === SHOW_DETAILS_ACTION) {
+            ctx.core.logger.show();
+          } else if (action === RELOAD_WINDOW_ACTION) {
+            await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
           }
         },
         () => undefined,
@@ -94,16 +99,15 @@ async function runPreCommandHealthChecks(
   ctx: CommandContext,
   options: RequiredCommandRunOptions,
 ): Promise<boolean> {
-  if (options.requiresWorkspace && !vscode.workspace.workspaceFolders?.length) {
-    const action = await vscode.window.showErrorMessage(
+  if (options.requiresWorkspace && !ctx.core.workbench.hasWorkspace) {
+    const action = await ctx.core.notifications.askError(
       "Open a project folder first, then run the command again.",
-      OPEN_FOLDER_ACTION,
-      RELOAD_WINDOW_ACTION,
+      [OPEN_FOLDER_ACTION, RELOAD_WINDOW_ACTION],
     );
     if (action === OPEN_FOLDER_ACTION) {
-      await vscode.commands.executeCommand("vscode.openFolder");
+      await ctx.core.workbench.executeCommand("vscode.openFolder");
     } else if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
     }
     return false;
   }
@@ -127,36 +131,34 @@ async function runPreCommandHealthChecks(
 
 async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
   try {
-    await ctx.configuration.loadExistingConfiguration();
+    await ctx.core.configuration.loadExistingConfiguration();
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const action = await vscode.window.showErrorMessage(
+    const action = await ctx.core.notifications.askError(
       `Configuration check failed. Fix .vscode/dynamics365tools.config.json and run the command again. ${message}`,
-      OPEN_CONFIG_ACTION,
-      RESET_CONFIG_ACTION,
-      RELOAD_WINDOW_ACTION,
+      [OPEN_CONFIG_ACTION, RESET_CONFIG_ACTION, RELOAD_WINDOW_ACTION],
     );
 
     if (action === OPEN_CONFIG_ACTION) {
-      await openWorkspaceFile("dynamics365tools.config.json");
+      await ctx.core.workbench.openWorkspaceFile(".vscode/dynamics365tools.config.json");
     } else if (action === RESET_CONFIG_ACTION) {
-      const confirmed = await vscode.window.showWarningMessage(
+      const confirmed = await ctx.core.notifications.askWarning(
         "Reset config file to an empty template? This overwrites the current file.",
+        [RESET_CONFIRM_ACTION],
         { modal: true },
-        RESET_CONFIRM_ACTION,
       );
       if (confirmed === RESET_CONFIRM_ACTION) {
-        await ctx.configuration.saveConfiguration({
+        await ctx.core.configuration.saveConfiguration({
           environments: [],
           solutions: [],
         });
-        vscode.window.showInformationMessage(
+        await ctx.core.notifications.info(
           "Configuration file was reset. Add environments and solutions again if needed.",
         );
       }
     } else if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
     }
 
     return false;
@@ -165,47 +167,35 @@ async function validateConfiguration(ctx: CommandContext): Promise<boolean> {
 
 async function validateBindings(ctx: CommandContext): Promise<boolean> {
   try {
-    await ctx.configuration.loadExistingBindings();
+    await ctx.core.configuration.loadExistingBindings();
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const action = await vscode.window.showErrorMessage(
+    const action = await ctx.core.notifications.askError(
       `Bindings check failed. Fix .vscode/dynamics365tools.bindings.json and run the command again. ${message}`,
-      OPEN_BINDINGS_ACTION,
-      RESET_BINDINGS_ACTION,
-      RELOAD_WINDOW_ACTION,
+      [OPEN_BINDINGS_ACTION, RESET_BINDINGS_ACTION, RELOAD_WINDOW_ACTION],
     );
 
     if (action === OPEN_BINDINGS_ACTION) {
-      await openWorkspaceFile("dynamics365tools.bindings.json");
+      await ctx.core.workbench.openWorkspaceFile(".vscode/dynamics365tools.bindings.json");
     } else if (action === RESET_BINDINGS_ACTION) {
-      const confirmed = await vscode.window.showWarningMessage(
+      const confirmed = await ctx.core.notifications.askWarning(
         "Reset bindings file to an empty template? This overwrites the current file.",
+        [RESET_CONFIRM_ACTION],
         { modal: true },
-        RESET_CONFIRM_ACTION,
       );
       if (confirmed === RESET_CONFIRM_ACTION) {
-        await ctx.configuration.saveBindings({ bindings: [] });
-        vscode.window.showInformationMessage(
+        await ctx.core.configuration.saveBindings({ bindings: [] });
+        await ctx.core.notifications.info(
           "Bindings file was reset. Create bindings again before publishing.",
         );
       }
     } else if (action === RELOAD_WINDOW_ACTION) {
-      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      await ctx.core.workbench.executeCommand("workbench.action.reloadWindow");
     }
 
     return false;
   }
-}
-
-async function openWorkspaceFile(filename: string): Promise<void> {
-  const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-  if (!workspaceUri) {
-    return;
-  }
-
-  const fileUri = vscode.Uri.joinPath(workspaceUri, ".vscode", filename);
-  await vscode.window.showTextDocument(fileUri);
 }
 
 function toCommandLabel(commandId: string): string {

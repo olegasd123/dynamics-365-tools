@@ -1,5 +1,5 @@
 import * as path from "path";
-import type * as vscode from "vscode";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import {
   PacAuthCreateOptions,
   PacAuthProfile,
@@ -30,11 +30,6 @@ export class PacCli {
     return this.detection;
   }
 
-  async help(args: string[]): Promise<string> {
-    const result = await this.run([...args, "--help"]);
-    return result.stdout || result.stderr;
-  }
-
   async whoami(): Promise<PacAuthProfile | null> {
     const result = await this.run(["auth", "who", "--json"]);
     if (result.exitCode !== 0) {
@@ -47,7 +42,7 @@ export class PacCli {
   async authCreate(
     opts: PacAuthCreateOptions,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<PacRunResult> {
     return this.run(
       ["auth", "create", "--url", opts.url, "--name", opts.name],
@@ -61,7 +56,7 @@ export class PacCli {
     opts: PcfInitOptions,
     cwd: string,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<PacRunResult> {
     const args = [
       "pcf",
@@ -87,7 +82,7 @@ export class PacCli {
     opts: PcfPushOptions,
     cwd: string,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<PacRunResult> {
     return this.run(
       [
@@ -108,7 +103,7 @@ export class PacCli {
     opts: SolutionInitOptions,
     cwd: string,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<PacRunResult> {
     return this.run(
       [
@@ -129,7 +124,7 @@ export class PacCli {
     opts: SolutionAddReferenceOptions,
     cwd: string,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<PacRunResult> {
     return this.run(["solution", "add-reference", "--path", opts.path], cwd, onLine, token);
   }
@@ -138,7 +133,7 @@ export class PacCli {
     args: string[],
     cwd?: string,
     onLine?: (line: string, stream: "stdout" | "stderr") => void,
-    token?: vscode.CancellationToken,
+    token?: CancellationTokenLike,
   ): Promise<PacRunResult> {
     const command = await this.resolveCommand();
     const result = await this.runner.run(command, args, {

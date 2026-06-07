@@ -1,31 +1,28 @@
-import * as vscode from "vscode";
-import { pickEnvironmentAndAuth } from "../../../platform/vscode/commandUtils";
-import { CommandContext } from "../../../app/commandContext";
-import { ConfigurationService } from "../../config/configurationService";
-import { SolutionPicker } from "../../../platform/vscode/ui/solutionPicker";
-import { SecretService } from "../../auth/secretService";
-import { AuthService } from "../../auth/authService";
-import { LastSelectionService } from "../../../platform/vscode/lastSelectionStore";
-import { EnvironmentConnectionService } from "../../dataverse/environmentConnectionService";
+import { pickEnvironmentAndAuth } from "@app/commandUtils";
+import { CommandContext } from "@app/commandContext";
+import { ConfigurationService } from "@features/config/configurationService";
+import { SolutionPicker } from "@app/solutionPicker";
+import { SecretService } from "@features/auth/secretService";
+import { AuthService } from "@features/auth/authService";
+import { LastSelectionService } from "@app/lastSelectionService";
+import { EnvironmentConnectionService } from "@features/dataverse/environmentConnectionService";
 import { PluginTypeNode } from "../pluginExplorer";
-import { DataverseClient } from "../../dataverse/dataverseClient";
-import { SolutionComponentService } from "../../dataverse/solutionComponentService";
+import { SolutionComponentService } from "@features/dataverse/solutionComponentService";
 import { PluginService } from "../pluginService";
+import type { NotificationPort } from "@app/ports/notifications";
 
 export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNode): Promise<void> {
-  const { configuration, ui, secrets, auth, lastSelection, connections, pluginExplorer } = ctx;
-  const explorer = pluginExplorer;
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications } = ctx.core;
+  const { explorer } = ctx.plugins;
   if (!node) {
-    void vscode.window.showInformationMessage(
-      "Run this command from a plugin in the Plugins explorer.",
-    );
+    void notifications.info("Run this command from a plugin in the Plugins explorer.");
     return;
   }
 
-  const confirmation = await vscode.window.showWarningMessage(
+  const confirmation = await notifications.askWarning(
     `Remove plugin '${node.pluginType.name}' from ${node.env.name}? All steps and images will also be removed.`,
+    ["Delete"],
     { modal: true },
-    "Delete",
   );
   if (confirmation !== "Delete") {
     return;
@@ -40,6 +37,7 @@ export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNod
     lastSelection,
     connections,
     node.env.name,
+    notifications,
   );
   if (!service) {
     return;
@@ -48,11 +46,9 @@ export async function deletePluginType(ctx: CommandContext, node?: PluginTypeNod
   try {
     await service.deletePluginTypeCascade(node.pluginType.id);
     explorer.refresh();
-    void vscode.window.showInformationMessage(`Plugin ${node.pluginType.name} removed.`);
+    void notifications.info(`Plugin ${node.pluginType.name} removed.`);
   } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Failed to remove plugin ${node.pluginType.name}: ${String(error)}`,
-    );
+    void notifications.error(`Failed to remove plugin ${node.pluginType.name}: ${String(error)}`);
   }
 }
 
@@ -65,6 +61,7 @@ async function resolvePluginService(
   lastSelection: LastSelectionService,
   connections: EnvironmentConnectionService,
   preferredEnv: string,
+  notifications: NotificationPort,
 ): Promise<PluginService | undefined> {
   const config = await configuration.loadConfiguration();
   const selection = await pickEnvironmentAndAuth(
@@ -76,13 +73,13 @@ async function resolvePluginService(
     config,
     preferredEnv,
     { placeHolder },
+    notifications,
   );
   if (!selection) return undefined;
 
-  const connection = await connections.createConnection(selection.env, selection.auth);
-  if (!connection) return undefined;
+  const client = await connections.createClient(selection.env, selection.auth);
+  if (!client) return undefined;
 
-  const client = new DataverseClient(connection);
   const solutionComponents = new SolutionComponentService(client);
   return new PluginService(client, solutionComponents);
 }

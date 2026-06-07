@@ -2,6 +2,67 @@ export type RibbonScope = "Application" | "Form" | "HomepageGrid" | "SubGrid";
 
 export type RibbonSourceKind = "unpacked" | "flat" | "zip";
 
+export type RibbonRuleAppliesTo = "PrimaryEntity" | "SelectedEntity";
+
+export type RibbonRulePrivilegeType =
+  | "Create"
+  | "Read"
+  | "Write"
+  | "Delete"
+  | "Assign"
+  | "Share"
+  | "Append"
+  | "AppendTo";
+
+export type RibbonRulePrivilegeDepth = "None" | "Basic" | "Local" | "Deep" | "Global";
+
+export type RibbonRuleFormState = "Create" | "Existing" | "ReadOnly" | "Disabled" | "BulkEdit";
+
+export type RibbonRuleFormType =
+  | "Main"
+  | "Preview"
+  | "AppointmentBook"
+  | "Dashboard"
+  | "Quick"
+  | "QuickCreate"
+  | "Card"
+  | "MainInteractionCentric"
+  | string;
+
+export type RibbonRelationshipType = "OneToMany" | "ManyToMany" | string;
+
+export type RibbonPageRuleAddress = string;
+
+export type RibbonEntityPropertyName =
+  | "DuplicateDetectionEnabled"
+  | "GridFiltersEnabled"
+  | "HasStateCode"
+  | "IsConnectionsEnabled"
+  | "MailMergeEnabled"
+  | "WorksWithQueue"
+  | "HasActivities"
+  | "IsActivity"
+  | "HasNotes"
+  | "IsActivityParty"
+  | "HasEmailAddresses"
+  | "IsChildEntity"
+  | "IsImportable"
+  | "IsEnabledForCharts"
+  | "IsBusinessProcessEnabled"
+  | "HasFeedback"
+  | "IsBPFEntity"
+  | string;
+
+export type RibbonOrganizationSetting =
+  | "IsSharepointEnabled"
+  | "IsSOPIntegrationEnabled"
+  | "IsFiscalCalendarDefined"
+  | "IsReadFormModeDefined"
+  | "IsBPFEntityCustomizationFeatureEnabled"
+  | string;
+
+export type RibbonCommandClientType = "Modern" | "Refresh" | "Legacy";
+
 export interface RibbonSource {
   id: string;
   kind: RibbonSourceKind;
@@ -92,10 +153,14 @@ export interface ButtonNode {
   command: string;
   labelLocId?: string;
   labelText?: string;
+  alt?: string;
+  toolTipTitle?: string;
+  toolTipDescription?: string;
   toolTipTitleLocId?: string;
   toolTipDescriptionLocId?: string;
   image16x16?: ImageRef;
   image32x32?: ImageRef;
+  modernImage?: ImageRef;
   templateAlias?: string;
   sequence?: number;
   range: TextRange;
@@ -159,7 +224,15 @@ export type CommandAction =
       parameters: ActionParameter[];
       range: TextRange;
     }
-  | { kind: "Url"; address: string; range: TextRange }
+  | {
+      kind: "Url";
+      address: string;
+      passParams?: boolean;
+      winMode?: number;
+      winParams?: string;
+      parameters: ActionParameter[];
+      range: TextRange;
+    }
   | { kind: "Unknown"; raw: string; range: TextRange };
 
 export interface WebResourceRef {
@@ -170,6 +243,7 @@ export interface WebResourceRef {
 export interface ActionParameter {
   kind: "Crm" | "Bool" | "Int" | "Float" | "String" | "Decimal";
   value: string;
+  name?: string;
   range?: TextRange;
 }
 
@@ -198,14 +272,124 @@ export type RuleStep =
   | {
       kind: "EntityPrivilegeRule";
       entityName?: string;
-      privilegeType?: string;
-      privilegeDepth?: string;
+      privilegeType?: RibbonRulePrivilegeType;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      appliesTo?: RibbonRuleAppliesTo;
+      default?: boolean;
       invertResult?: boolean;
       range: TextRange;
     }
-  | { kind: "ValueRule"; field?: string; value?: string; invertResult?: boolean; range: TextRange }
-  | { kind: "FormStateRule"; state?: string; invertResult?: boolean; range: TextRange }
-  | { kind: "CommandClientTypeRule"; type?: "Modern" | "Refresh"; range: TextRange }
+  | {
+      kind: "ValueRule";
+      field?: string;
+      value?: string;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "FormStateRule";
+      state?: RibbonRuleFormState;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "CommandClientTypeRule";
+      type?: RibbonCommandClientType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "FormTypeRule";
+      type?: RibbonRuleFormType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "EntityPropertyRule";
+      propertyName?: RibbonEntityPropertyName;
+      propertyValue?: boolean;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "MiscellaneousPrivilegeRule";
+      privilegeName?: string;
+      privilegeDepth?: RibbonRulePrivilegeDepth;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "OrganizationSettingRule";
+      setting?: RibbonOrganizationSetting;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "HideForTabletExperienceRule";
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "RelationshipTypeRule";
+      type?: RibbonRelationshipType;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "ReferencingAttributeRequiredRule";
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "PageRule";
+      address?: RibbonPageRuleAddress;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "OrRule";
+      children: RuleStep[];
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "SelectionCountRule";
+      appliesTo?: RibbonRuleAppliesTo;
+      minimum?: number;
+      maximum?: number;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "RecordPrivilegeRule";
+      privilegeType?: RibbonRulePrivilegeType;
+      appliesTo?: "PrimaryEntity";
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
+  | {
+      kind: "EntityRule";
+      entityName?: string;
+      appliesTo?: RibbonRuleAppliesTo;
+      context?: string;
+      default?: boolean;
+      invertResult?: boolean;
+      range: TextRange;
+    }
   | { kind: "Unknown"; raw: string; range: TextRange };
 
 export interface LocLabel {

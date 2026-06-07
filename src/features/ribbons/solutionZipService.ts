@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import JSZip from "jszip";
+import type * as vscode from "vscode";
 import type { DataverseClient } from "../dataverse/dataverseClient";
 import { RibbonSource, RibbonSourceFile } from "./models";
 
@@ -27,6 +28,15 @@ interface DataverseSolutionsResponse {
 interface ExportSolutionResponse {
   ExportSolutionFile?: string;
   exportsolutionfile?: string;
+}
+
+export class SolutionExportCancelledError extends Error {
+  readonly cancelled = true;
+
+  constructor() {
+    super("Solution export cancelled.");
+    this.name = "SolutionExportCancelledError";
+  }
 }
 
 export class SolutionZipService {
@@ -119,11 +129,37 @@ export class SolutionZipService {
       .filter((solution) => solution.uniqueName.length > 0);
   }
 
-  async downloadSolutionZip(client: DataverseClient, uniqueName: string): Promise<Buffer> {
-    const response = await client.post<ExportSolutionResponse>("ExportSolution", {
-      SolutionName: uniqueName,
-      Managed: false,
-    });
+  async downloadSolutionZip(
+    client: DataverseClient,
+    uniqueName: string,
+    token?: vscode.CancellationToken,
+  ): Promise<Buffer> {
+    throwIfExportCancelled(token);
+
+    const controller = new AbortController();
+    const cancellationListener = token?.onCancellationRequested(() => controller.abort());
+
+    let response: ExportSolutionResponse;
+    try {
+      response = await client.post<ExportSolutionResponse>(
+        "ExportSolution",
+        {
+          SolutionName: uniqueName,
+          Managed: false,
+        },
+        { signal: controller.signal },
+      );
+    } catch (error) {
+      if (isAbortError(error) || token?.isCancellationRequested) {
+        throw new SolutionExportCancelledError();
+      }
+      throw error;
+    } finally {
+      cancellationListener?.dispose();
+    }
+
+    throwIfExportCancelled(token);
+
     const base64 = response.ExportSolutionFile ?? response.exportsolutionfile;
     if (!base64) {
       throw new Error("Dataverse did not return a solution zip.");
@@ -137,6 +173,20 @@ export class SolutionZipService {
     await fs.mkdir(parent, { recursive: true });
     return fs.mkdtemp(path.join(parent, `${slug(sourceName)}-`));
   }
+}
+
+export function isSolutionExportCancelledError(error: unknown): boolean {
+  return error instanceof SolutionExportCancelledError || Boolean((error as any)?.cancelled);
+}
+
+function throwIfExportCancelled(token?: vscode.CancellationToken): void {
+  if (token?.isCancellationRequested) {
+    throw new SolutionExportCancelledError();
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (error as any)?.name === "AbortError";
 }
 
 async function findRibbonSourceFiles(root: string, entries: string[]): Promise<RibbonSourceFile[]> {

@@ -1,35 +1,5 @@
 import { RibbonPatch, TextRange } from "./models";
 
-export function applyRibbonPatches(sourceText: string, patches: RibbonPatch[]): string {
-  if (!patches.length) {
-    return sourceText;
-  }
-
-  const orderedPatches = patches
-    .slice()
-    .sort((a, b) => patchStart(b) - patchStart(a) || patchRange(b).end - patchRange(a).end);
-  let result = sourceText;
-  let previousStart = sourceText.length + 1;
-
-  for (const patch of orderedPatches) {
-    const range = patchRange(patch);
-    validateRange(range, result.length);
-
-    if (range.end > previousStart) {
-      throw new Error("Ribbon patches overlap or are not independent.");
-    }
-
-    result = result.slice(0, range.start) + patchText(patch) + result.slice(range.end);
-    previousStart = range.start;
-  }
-
-  return result;
-}
-
-export function hasRibbonChanges(sourceText: string, patches: RibbonPatch[]): boolean {
-  return applyRibbonPatches(sourceText, patches) !== sourceText;
-}
-
 export function applyRibbonPatchSequence(sourceText: string, patches: RibbonPatch[]): string {
   let result = sourceText;
 
@@ -40,10 +10,6 @@ export function applyRibbonPatchSequence(sourceText: string, patches: RibbonPatc
   }
 
   return result;
-}
-
-function patchStart(patch: RibbonPatch): number {
-  return patch.kind === "insert" ? patch.offset : patch.range.start;
 }
 
 function patchRange(patch: RibbonPatch): TextRange {

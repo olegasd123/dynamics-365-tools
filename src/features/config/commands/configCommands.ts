@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { CommandContext } from "../../../app/commandContext";
-import { buildDefaultEnvironmentUrl } from "../../../shared/environmentUrl";
-import { DataverseClient, isDefaultSolution } from "../../dataverse/dataverseClient";
+import { CommandContext, CoreServices } from "@app/commandContext";
+import { buildDefaultEnvironmentUrl } from "@shared/environmentUrl";
+import { isDefaultSolution, type DataverseClient } from "@features/dataverse/dataverseClient";
 import {
   Dynamics365Configuration,
   NormalizedEnvironmentConfig,
@@ -9,7 +9,7 @@ import {
 } from "../domain/models";
 
 export async function editConfiguration(ctx: CommandContext): Promise<void> {
-  const { configuration } = ctx;
+  const { configuration } = ctx.core;
   const config = await configuration.loadConfiguration();
   await configuration.saveConfiguration(config);
   const uri = vscode.Uri.joinPath(
@@ -18,7 +18,7 @@ export async function editConfiguration(ctx: CommandContext): Promise<void> {
     "dynamics365tools.config.json",
   );
   await vscode.window.showTextDocument(uri);
-  ctx.pluginExplorer.refresh();
+  ctx.plugins.explorer.refresh();
 }
 
 type SolutionPickItem = vscode.QuickPickItem & {
@@ -30,7 +30,8 @@ type SolutionPickItem = vscode.QuickPickItem & {
 };
 
 export async function addEnvironment(ctx: CommandContext): Promise<void> {
-  const { configuration, pluginExplorer } = ctx;
+  const { configuration, notifications } = ctx.core;
+  const { explorer: pluginExplorer } = ctx.plugins;
   const current = await loadOrCreateEmptyConfig(configuration);
 
   const name = await vscode.window.showInputBox({
@@ -108,21 +109,22 @@ export async function addEnvironment(ctx: CommandContext): Promise<void> {
     environments: nextEnvironments,
   });
   pluginExplorer.refresh();
-  vscode.window.showInformationMessage(`Environment ${normalizedName} ${action} in config.`);
+  await notifications.info(`Environment ${normalizedName} ${action} in config.`);
 }
 
 export async function addSolution(ctx: CommandContext): Promise<void> {
-  const { configuration, ui, connections, lastSelection, pluginExplorer } = ctx;
+  const { configuration, ui, connections, lastSelection, notifications } = ctx.core;
+  const { explorer: pluginExplorer } = ctx.plugins;
   const config = await configuration.loadExistingConfiguration();
   if (!config) {
-    vscode.window.showErrorMessage(
+    await notifications.error(
       "No configuration found. Run 'Dynamics 365 Tools: Add Environment' first.",
     );
     return;
   }
 
   if (!config.environments.length) {
-    vscode.window.showErrorMessage(
+    await notifications.error(
       "No environments configured. Run 'Dynamics 365 Tools: Add Environment' first.",
     );
     return;
@@ -137,23 +139,22 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
 
   await lastSelection.setLastEnvironment(env.name);
 
-  const connection = await connections.createConnection(env);
-  if (!connection) {
+  const client = await connections.createClient(env);
+  if (!client) {
     return;
   }
-  const client = new DataverseClient(connection);
 
   let unmanaged: Array<{ uniqueName: string; friendlyName?: string; publisherPrefix?: string }>;
   try {
     unmanaged = await listUnmanagedSolutions(client);
   } catch (error) {
-    vscode.window.showErrorMessage(
+    await notifications.error(
       `Failed to load unmanaged solutions from ${env.name}: ${String(error)}`,
     );
     return;
   }
   if (!unmanaged.length) {
-    vscode.window.showInformationMessage(`No unmanaged solutions found in ${env.name}.`);
+    await notifications.info(`No unmanaged solutions found in ${env.name}.`);
     return;
   }
 
@@ -219,7 +220,7 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
   }
 
   if (!added && !updated) {
-    vscode.window.showInformationMessage("All selected solutions are already up to date.");
+    await notifications.info("All selected solutions are already up to date.");
     return;
   }
 
@@ -234,7 +235,7 @@ export async function addSolution(ctx: CommandContext): Promise<void> {
   if (usedFallbackPrefix) {
     summary.push(`fallback prefix used: ${usedFallbackPrefix}`);
   }
-  vscode.window.showInformationMessage(`Solutions saved (${summary.join(", ")}).`);
+  await notifications.info(`Solutions saved (${summary.join(", ")}).`);
 }
 
 async function listUnmanagedSolutions(client: DataverseClient): Promise<
@@ -287,7 +288,7 @@ async function listUnmanagedSolutions(client: DataverseClient): Promise<
 }
 
 function loadOrCreateEmptyConfig(
-  configuration: CommandContext["configuration"],
+  configuration: CoreServices["configuration"],
 ): Promise<Dynamics365Configuration> {
   return configuration
     .loadExistingConfiguration()

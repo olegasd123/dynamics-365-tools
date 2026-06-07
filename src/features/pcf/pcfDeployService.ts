@@ -1,9 +1,11 @@
-import * as fs from "fs/promises";
 import * as path from "path";
-import * as vscode from "vscode";
+import type { WorkspaceFilesPort } from "@app/ports/files";
+import { NoopNotificationService, NotificationPort } from "@app/ports/notifications";
+import { NoopOutputPort, OutputChannelPort, OutputPort } from "@app/ports/output";
+import type { CancellationTokenLike } from "@app/ports/progress";
 import { ConfigurationService } from "../config/configurationService";
 import { EnvironmentConfig } from "../config/domain/models";
-import { DataverseClient } from "../dataverse/dataverseClient";
+import type { DataverseClient } from "../dataverse/dataverseClient";
 import { EnvironmentConnectionService } from "../dataverse/environmentConnectionService";
 import { SolutionImportError, SolutionImportService } from "../dataverse/solutionImportService";
 import { PcfControlProject } from "./models";
@@ -15,7 +17,7 @@ export interface PcfDeployOptions {
   publishWorkflows?: boolean;
   timeoutMs?: number;
   pollIntervalMs?: number;
-  token?: vscode.CancellationToken;
+  token?: CancellationTokenLike;
 }
 
 export interface PcfDeployResult {
@@ -34,15 +36,20 @@ interface CustomControlListResponse {
   }>;
 }
 
-export class PcfDeployService implements vscode.Disposable {
-  private readonly output = vscode.window.createOutputChannel("PCF Deploy");
+export class PcfDeployService {
+  private readonly output: OutputChannelPort;
 
   constructor(
     private readonly connections: EnvironmentConnectionService,
     private readonly settings: PcfWorkspaceSettingsService,
     private readonly configuration: ConfigurationService,
+    private readonly files: WorkspaceFilesPort,
+    private readonly notifications: NotificationPort = new NoopNotificationService(),
     private readonly telemetry?: PcfTelemetryService,
-  ) {}
+    output: OutputPort = new NoopOutputPort(),
+  ) {
+    this.output = output.createChannel("PCF Deploy");
+  }
 
   async deployLastPackage(
     project: PcfControlProject,
@@ -51,27 +58,26 @@ export class PcfDeployService implements vscode.Disposable {
   ): Promise<PcfDeployResult | undefined> {
     const stored = (await this.settings.getProjectSettings(project)).lastPackagedZip;
     if (!stored) {
-      vscode.window.showWarningMessage(
+      await this.notifications.warning(
         `No packaged solution is saved for ${project.fullName}. Package it first.`,
       );
       return undefined;
     }
 
     const zipPath = this.configuration.resolveLocalPath(stored);
-    let zipBytes: Buffer;
+    let zipBytes: Uint8Array;
     try {
-      zipBytes = await fs.readFile(zipPath);
+      zipBytes = await this.files.readFile(zipPath);
     } catch {
-      vscode.window.showErrorMessage(`Packaged solution was not found: ${zipPath}.`);
+      await this.notifications.error(`Packaged solution was not found: ${zipPath}.`);
       return undefined;
     }
 
-    const connection = await this.connections.createConnection(env);
-    if (!connection) {
+    const client = await this.connections.createClient(env);
+    if (!client) {
       return undefined;
     }
 
-    const client = new DataverseClient(connection);
     const importer = new SolutionImportService(client);
     this.output.show(true);
     this.output.appendLine("");
@@ -104,7 +110,7 @@ export class PcfDeployService implements vscode.Disposable {
 
       await this.settings.updateProjectSettings(project, { lastDeployedEnv: env.name });
       this.telemetry?.deploy(project, true, importResult.durationMs);
-      vscode.window.showInformationMessage(
+      await this.notifications.info(
         `PCF solution ${path.basename(zipPath)} deployed to ${env.name}.`,
       );
 
@@ -119,7 +125,7 @@ export class PcfDeployService implements vscode.Disposable {
       const message = describeDeployError(error);
       this.output.appendLine(`Deploy failed: ${message}`);
       this.telemetry?.deploy(project, false);
-      vscode.window.showErrorMessage(`PCF deploy failed for ${project.fullName}: ${message}`);
+      await this.notifications.error(`PCF deploy failed for ${project.fullName}: ${message}`);
       return undefined;
     }
   }

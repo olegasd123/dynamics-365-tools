@@ -1,23 +1,21 @@
 import assert from "node:assert";
 import test from "node:test";
-import * as fs from "fs/promises";
-import * as os from "os";
 import * as path from "path";
-import * as vscode from "vscode";
-import { ConfigurationService } from "../../config/configurationService";
+import { MemoryWorkspaceFiles, RecordingOutput } from "../../../testSupport/fakes";
+import { ConfigurationService } from "@features/config/configurationService";
+import { DataverseClient } from "@features/dataverse/dataverseClient";
 import { PcfControlProject } from "../models";
 import { PcfDeployService } from "../pcfDeployService";
 import { PcfWorkspaceSettingsService } from "../pcfWorkspaceSettings";
 
 test("PcfDeployService imports last packaged zip and publishes deployed custom control", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-pcf-deploy-"));
-  const previousFolders = vscode.workspace.workspaceFolders;
+  const workspaceRoot = "/workspace";
   const originalFetch = globalThis.fetch;
-  (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(workspaceRoot) }];
+  const files = new MemoryWorkspaceFiles(workspaceRoot);
+  const output = new RecordingOutput();
 
   const zipPath = path.join(workspaceRoot, "solution", "bin", "Release", "Contoso.zip");
-  await fs.mkdir(path.dirname(zipPath), { recursive: true });
-  await fs.writeFile(zipPath, "zip");
+  files.addFile(zipPath, "zip");
 
   const requests: Array<{ method: string; url: string; body?: any }> = [];
   (globalThis as any).fetch = async (url: string, init?: RequestInit) => {
@@ -46,8 +44,8 @@ test("PcfDeployService imports last packaged zip and publishes deployed custom c
   };
 
   try {
-    const configuration = new ConfigurationService();
-    const settings = new PcfWorkspaceSettingsService(configuration);
+    const configuration = new ConfigurationService(files);
+    const settings = new PcfWorkspaceSettingsService(configuration, files);
     const project = createProject(path.join(workspaceRoot, "controls", "LinearInput"));
     await settings.updateProjectSettings(project, {
       lastPackagedZip: "solution/bin/Release/Contoso.zip",
@@ -59,8 +57,22 @@ test("PcfDeployService imports last packaged zip and publishes deployed custom c
         apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
         token: "token",
       }),
+      createClient: async (env: any) =>
+        new DataverseClient({
+          env,
+          apiRoot: "https://org.crm.dynamics.com/api/data/v9.2",
+          token: "token",
+        }),
     };
-    const service = new PcfDeployService(connections as any, settings, configuration);
+    const service = new PcfDeployService(
+      connections as any,
+      settings,
+      configuration,
+      files,
+      undefined,
+      undefined,
+      output,
+    );
     const result = await service.deployLastPackage(
       project,
       { name: "test", url: "https://org.crm.dynamics.com" },
@@ -76,13 +88,15 @@ test("PcfDeployService imports last packaged zip and publishes deployed custom c
     assert.strictEqual(requests[0].body.CustomizationFile, Buffer.from("zip").toString("base64"));
     assert.strictEqual(requests[4].url, "https://org.crm.dynamics.com/api/data/v9.2/PublishXml");
     assert.match(requests[4].body.ParameterXml, /11111111-2222-3333-4444-555555555555/);
+    assert.deepStrictEqual(
+      output.channels.map((channel) => channel.name),
+      ["PCF Deploy"],
+    );
     const stored = await settings.getProjectSettings(project);
     assert.strictEqual(stored.lastDeployedEnv, "test");
     service.dispose();
   } finally {
-    (vscode.workspace as any).workspaceFolders = previousFolders;
     globalThis.fetch = originalFetch;
-    await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
 
