@@ -1329,28 +1329,40 @@ test("deletes a nested child rule step", async () => {
   const orRule = document.views[0].displayRules[0].steps[0];
   assert.strictEqual(orRule.kind, "OrRule");
   let patches: RibbonPatch[] = [];
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
 
-  await deleteRibbonNode(
-    legacyContext({
-      ribbonEditorState: {
-        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
-          patches = queuedPatches;
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    _options: { detail?: string },
+    action: string,
+  ) => action;
+
+  try {
+    await deleteRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
         },
-      },
-      ribbonExplorer: {
-        refresh: () => undefined,
-      },
-    } as any),
-    new RibbonItemNode(
-      "1. FormStateRule",
-      "Create",
-      "d365RibbonRuleStep:FormStateRule",
-      "symbol-property",
-      [],
-      [],
-      { document, range: orRule.children[0].range },
-    ),
-  );
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+        notifications: createNotifications(),
+      } as any),
+      new RibbonItemNode(
+        "1. FormStateRule",
+        "Create",
+        "d365RibbonRuleStep:FormStateRule",
+        "symbol-property",
+        [],
+        [],
+        { document, range: orRule.children[0].range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
 
   const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
     sourceId: "source",
@@ -1796,25 +1808,37 @@ test("deletes command rule references", async () => {
   const displayRuleRef = findXmlElement(source, "DisplayRule", "new.Visible");
   let patches: RibbonPatch[] = [];
   let refreshed = false;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
 
-  await deleteRibbonNode(
-    legacyContext({
-      ribbonEditorState: {
-        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
-          patches = queuedPatches;
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    _options: { detail?: string },
+    action: string,
+  ) => action;
+
+  try {
+    await deleteRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
         },
-      },
-      ribbonExplorer: {
-        refresh: () => {
-          refreshed = true;
+        ribbonExplorer: {
+          refresh: () => {
+            refreshed = true;
+          },
         },
-      },
-    } as any),
-    new RibbonItemNode("new.Enabled", "EnableRule", "d365RibbonRuleRef", "symbol-key", [], [], {
-      document,
-      range: enableRuleRef.range,
-    }),
-  );
+        notifications: createNotifications(),
+      } as any),
+      new RibbonItemNode("new.Enabled", "EnableRule", "d365RibbonRuleRef", "symbol-key", [], [], {
+        document,
+        range: enableRuleRef.range,
+      }),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
 
   const withoutEnableRef = applyRibbonPatchSequence(source, patches);
   const [documentWithoutEnableRef] = readRibbonDocuments(withoutEnableRef, {
@@ -1832,22 +1856,33 @@ test("deletes command rule references", async () => {
     "new.Visible",
   ]);
 
-  await deleteRibbonNode(
-    legacyContext({
-      ribbonEditorState: {
-        queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
-          patches = queuedPatches;
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    _options: { detail?: string },
+    action: string,
+  ) => action;
+
+  try {
+    await deleteRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
         },
-      },
-      ribbonExplorer: {
-        refresh: () => undefined,
-      },
-    } as any),
-    new RibbonItemNode("new.Visible", "DisplayRule", "d365RibbonRuleRef", "symbol-key", [], [], {
-      document,
-      range: displayRuleRef.range,
-    }),
-  );
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+        notifications: createNotifications(),
+      } as any),
+      new RibbonItemNode("new.Visible", "DisplayRule", "d365RibbonRuleRef", "symbol-key", [], [], {
+        document,
+        range: displayRuleRef.range,
+      }),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
 
   const withoutDisplayRef = applyRibbonPatchSequence(source, patches);
   const [documentWithoutDisplayRef] = readRibbonDocuments(withoutDisplayRef, {
@@ -1862,6 +1897,150 @@ test("deletes command rule references", async () => {
   assert.deepStrictEqual(
     documentWithoutDisplayRef.views[0].commandDefinitions[0].displayRuleRefs,
     [],
+  );
+});
+
+test("deletes enable rule references when enable rule definitions are removed", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules><EnableRule Id="new.Enabled" /><EnableRule Id="new.Other" /></EnableRules>
+      <DisplayRules><DisplayRule Id="new.Visible" /></DisplayRules>
+    </CommandDefinition>
+    <CommandDefinition Id="new.Second">
+      <EnableRules>
+        <EnableRule Id="new.Enabled" />
+      </EnableRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules><EnableRule Id="new.Enabled" /><EnableRule Id="new.Other" /></EnableRules>
+    <DisplayRules><DisplayRule Id="new.Visible" /></DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const enableRule = document.views[0].enableRules.find((rule) => rule.id === "new.Enabled");
+  let patches: RibbonPatch[] = [];
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  assert.ok(enableRule);
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    _options: { detail?: string },
+    action: string,
+  ) => action;
+
+  try {
+    await deleteRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+        notifications: createNotifications(),
+      } as any),
+      new RibbonItemNode(enableRule.id, undefined, "d365RibbonEnableRule", "symbol-key", [], [], {
+        document,
+        range: enableRule.range,
+      }),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
+    "new.Other",
+  ]);
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[1].enableRuleRefs, []);
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].displayRuleRefs, [
+    "new.Visible",
+  ]);
+  assert.deepStrictEqual(
+    updatedDocument.views[0].enableRules.map((rule) => rule.id),
+    ["new.Other"],
+  );
+});
+
+test("deletes display rule references when display rule definitions are removed", async () => {
+  const source = `<RibbonDiffXml>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <EnableRules><EnableRule Id="new.Enabled" /></EnableRules>
+      <DisplayRules><DisplayRule Id="new.Visible" /><DisplayRule Id="new.OtherVisible" /></DisplayRules>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules><EnableRule Id="new.Enabled" /></EnableRules>
+    <DisplayRules><DisplayRule Id="new.Visible" /><DisplayRule Id="new.OtherVisible" /></DisplayRules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const displayRule = document.views[0].displayRules.find((rule) => rule.id === "new.Visible");
+  let patches: RibbonPatch[] = [];
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+  assert.ok(displayRule);
+  (vscode.window as any).showWarningMessage = async (
+    _message: string,
+    _options: { detail?: string },
+    action: string,
+  ) => action;
+
+  try {
+    await deleteRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+        notifications: createNotifications(),
+      } as any),
+      new RibbonItemNode(displayRule.id, undefined, "d365RibbonDisplayRule", "eye", [], [], {
+        document,
+        range: displayRule.range,
+      }),
+    );
+  } finally {
+    (vscode.window as any).showWarningMessage = originalShowWarningMessage;
+  }
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].enableRuleRefs, [
+    "new.Enabled",
+  ]);
+  assert.deepStrictEqual(updatedDocument.views[0].commandDefinitions[0].displayRuleRefs, [
+    "new.OtherVisible",
+  ]);
+  assert.deepStrictEqual(
+    updatedDocument.views[0].displayRules.map((rule) => rule.id),
+    ["new.OtherVisible"],
   );
 });
 

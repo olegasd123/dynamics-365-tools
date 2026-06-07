@@ -117,9 +117,10 @@ export async function deleteRibbonNode(ctx: CommandContext, node?: RibbonItemNod
         return;
       }
     }
-    ctx.ribbon.editorState.queuePatches(document, [
-      createDeleteNodePatch(document.sourceText, range),
-    ]);
+    ctx.ribbon.editorState.queuePatches(
+      document,
+      plan?.patches ?? [createDeleteNodePatch(document.sourceText, range)],
+    );
     ctx.ribbon.explorer.refresh();
     return;
   }

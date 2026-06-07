@@ -52,10 +52,11 @@ export function createRibbonCascadeDeletePlan(
   }
 
   const related = findRelatedDeleteItems(document, inventory, primary);
-  const patches = [primary, ...related]
-    .slice()
-    .sort((left, right) => right.range.start - left.range.start)
-    .map((item) => createDeleteNodePatch(document.sourceText, item.range));
+  const deleteItems = [primary, ...related];
+  const patches = [
+    ...deleteItems.map((item) => createDeleteNodePatch(document.sourceText, item.range)),
+    ...createDeletedRuleReferencePatches(document, inventory.commandDefinitions, deleteItems),
+  ].sort((left, right) => patchStart(right) - patchStart(left));
 
   return { primary, related, patches };
 }
@@ -279,6 +280,54 @@ function countCommandReferences(customActions: CustomAction[]): Map<string, numb
   return counts;
 }
 
+function createDeletedRuleReferencePatches(
+  document: RibbonDocument,
+  commands: CommandDefinition[],
+  deleteItems: RibbonCascadeDeleteItem[],
+): RibbonPatch[] {
+  const deletedCommandRanges = new Set(
+    deleteItems
+      .filter((item) => item.kind === "CommandDefinition")
+      .map((item) => rangeKey(item.range)),
+  );
+  const deletedEnableRuleIds = idsForKindFromItems(deleteItems, "EnableRule");
+  const deletedDisplayRuleIds = idsForKindFromItems(deleteItems, "DisplayRule");
+
+  if (!deletedEnableRuleIds.size && !deletedDisplayRuleIds.size) {
+    return [];
+  }
+
+  return commands
+    .filter((command) => !deletedCommandRanges.has(rangeKey(command.range)))
+    .flatMap((command) => [
+      ...findCommandRuleRefRanges(document, command, "EnableRules", "EnableRule").filter((ref) =>
+        deletedEnableRuleIds.has(ref.id),
+      ),
+      ...findCommandRuleRefRanges(document, command, "DisplayRules", "DisplayRule").filter((ref) =>
+        deletedDisplayRuleIds.has(ref.id),
+      ),
+    ])
+    .map((ref) => createDeleteNodePatch(document.sourceText, ref.range));
+}
+
+function findCommandRuleRefRanges(
+  document: RibbonDocument,
+  command: CommandDefinition,
+  containerName: "EnableRules" | "DisplayRules",
+  refName: "EnableRule" | "DisplayRule",
+): Array<{ id: string; range: TextRange }> {
+  const commandElement = collectElements(scanXmlElements(document.sourceText)).find(
+    (node) => node.name === "CommandDefinition" && sameRange(node.range, command.range),
+  );
+  const container = commandElement?.children.find((child) => child.name === containerName);
+
+  return (
+    container?.children
+      .filter((child) => child.name === refName)
+      .map((child) => ({ id: attr(child, "Id"), range: child.range })) ?? []
+  );
+}
+
 function countRuleReferences(
   commands: CommandDefinition[],
   kind: "enable" | "display",
@@ -352,8 +401,27 @@ function idsForKind(
   );
 }
 
+function idsForKindFromItems(
+  items: RibbonCascadeDeleteItem[],
+  kind: RibbonCascadeDeleteKind,
+): Set<string> {
+  return new Set(items.filter((item) => item.kind === kind).map((item) => item.id));
+}
+
 function itemKey(item: RibbonCascadeDeleteItem): string {
   return `${item.kind}:${item.range.start}:${item.range.end}`;
+}
+
+function rangeKey(range: TextRange): string {
+  return `${range.start}:${range.end}`;
+}
+
+function attr(node: XmlElementRange, name: string): string {
+  return node.attributes.find((attribute) => attribute.name === name)?.value ?? "";
+}
+
+function patchStart(patch: RibbonPatch): number {
+  return patch.kind === "insert" ? patch.offset : patch.range.start;
 }
 
 function increment(counts: Map<string, number>, key: string): void {
