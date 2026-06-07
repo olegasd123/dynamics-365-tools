@@ -1,39 +1,71 @@
-## Dynamics 365 Tools VS Code Extension
+# Dynamics 365 Tools — VS Code Extension
 
-Publish Dynamics 365 web resources straight from VS Code. Bind local files or folders to CRM web resources, then push updates to one or many environments without leaving the editor.
+[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/oleg-verhoglyad.dynamics-365-tools?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/oleg-verhoglyad.dynamics-365-tools?label=Installs)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-### Why use it
+Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web resources, manage plugins, build and deploy PCF controls, and edit ribbons. You bind local files to CRM components once, then push updates to one or many environments with a few clicks.
 
-- Publish from Explorer with a couple of clicks, no DevOps pipeline needed.
-- Reuse the same bindings across the team via `.vscode/dynamics365tools.bindings.json`.
-- Speed up folder publishes with caching, parallel uploads, and cancellation support.
-- Keep credentials safe (Secret Storage) while still supporting client secrets.
-- See quick status bar shortcuts to republish the last resource or plugin assembly in seconds.
+<!-- Screenshot: the Dynamics 365 Tools activity bar with the Plugins, PCF Controls, and Ribbons views open. -->
 
-### Main features
+## Table of contents
 
-- **Multi-environment config** stored in `.vscode/dynamics365tools.config.json`, with optional custom resource/audience and opt-in user agent header.
-- **Solution-aware bindings** for files or folders saved in `.vscode/dynamics365tools.bindings.json`; file bindings override folder bindings when both exist.
-- **Explorer context menu** `Dynamics 365 Tools` → `Publish Resource` / `Bind Resource`; bound folders publish all supported files inside.
-- **Open in Power Apps** directly from the Explorer `Dynamics 365 Tools` menu to jump to the Web Resources list for the bound solution.
-- **Publish last resource** from the status bar (file code icon) or via `Dynamics 365 Tools: Publish Last Resource`; remembers the last environment used.
-- **Folder publish extras**: up to 4 files publish in parallel, unchanged files are skipped using `.vscode/dynamics365tools.publishCache.json`, and you can cancel from the progress notification.
-- **Auth options**: interactive sign-in (default) or client credentials stored securely; per-environment `authType` control.
-- **Output channel logging** with clear summaries and a “copy error details” action when something fails.
-- **Plugin explorer & assemblies**: browse plugin assemblies, plugin types, steps, and images in VS Code. Register new assemblies or update existing ones directly from the explorer; plugins inside the assembly are auto-discovered and synced.
-  - Quick publish plugin assemblies from the status bar (package icon) or via `Dynamics 365 Tools: Publish Last Plugin Assembly`; reuses the last environment and assembly you uploaded.
-- **Ribbon explorer**: open ribbon XML from a solution zip or local files, add command rule references, and create common rule steps. Built-in enable references include `Mscrm.SelectionCountExactlyOne`, `Mscrm.ShowOnQuickAction`, `Mscrm.ShowOnGrid`, and `Mscrm.ShowOnGridAndQuickAction`. Custom enable rules can use JavaScript, form state, field value, selection count, record privilege, entity, and command client type checks. Custom display rules can also use entity privilege, form type, entity property, miscellaneous privilege, organization setting, tablet experience, relationship type, required referencing attribute, page address, and nested Or checks.
+- [Features](#features)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Views](#views)
+- [Configure environments and solutions](#configure-environments-and-solutions)
+- [Authenticate](#authenticate)
+- [Web resources](#web-resources)
+- [Plugins](#plugins)
+- [PCF controls](#pcf-controls)
+- [Ribbons](#ribbons)
+- [All commands](#all-commands)
+- [Contributing](#contributing)
+- [License](#license)
 
-### Install
+## Features
 
-- Install the extension from the VS Code Marketplace (search for “Dynamics 365 Tools”) or load the packaged `.vsix`.
+- **Publish web resources** from the Explorer with a couple of clicks. No DevOps pipeline needed.
+- **Manage plugins** in a tree view: assemblies, plugin types, steps, and images. Register or update assemblies straight from VS Code.
+- **Build and deploy PCF controls**: create a new control, build or watch it, push it to an environment, or package it as a solution.
+- **Edit ribbons**: add custom buttons, hide or reorder out-of-the-box buttons, add commands and rules, then publish to an environment.
+- **Multiple environments**: keep dev, test, and prod side by side and pick the target when you publish.
+- **Share settings with the team** through small JSON files in `.vscode/`.
+- **Safe credentials**: secrets are kept in VS Code Secret Storage. Interactive sign-in and client secrets are both supported.
+- **Fast folder publish**: up to 4 files at a time, unchanged files are skipped, and you can cancel any run.
+- **Status bar shortcuts** to republish the last web resource or plugin assembly in seconds.
 
-### Configure environments and solutions
+## Requirements
 
-Create config by running `Dynamics 365 Tools: Add Environment` or `Dynamics 365 Tools: Sign In (Interactive)`, then edit `.vscode/dynamics365tools.config.json` if needed.
+- **VS Code 1.84** or newer.
+- **.NET SDK** — needed to register or update plugin assemblies (a small helper reads the plugin types from your `.dll`), to generate a strong name key (uses the `sn` tool), and to package PCF solutions. The `dotnet` command must be on your `PATH`.
+- **Power Platform CLI (`pac`)** — needed for PCF commands such as _New PCF Control_ and _Push PCF Control_. See the [install guide](https://learn.microsoft.com/power-platform/developer/cli/introduction).
+- **Node.js and npm** — needed to build and watch PCF controls.
 
-- Quick add environment: `Dynamics 365 Tools: Add Environment`.
-- Quick add solution from Dataverse: `Dynamics 365 Tools: Add Solution` (loads unmanaged solutions from selected environment and uses publisher prefix automatically).
+You only need the tools for the features you use. For example, web resource publishing works without any of them.
+
+## Install
+
+- Open the **VS Code Marketplace**, search for **“Dynamics 365 Tools”**, and click _Install_.
+- Or install a packaged `.vsix` file with _Extensions: Install from VSIX…_.
+
+## Views
+
+The extension adds its own **Dynamics 365 Tools** icon to the Activity Bar. It holds three views:
+
+- **Plugins** — browse and manage plugin assemblies, types, steps, and images.
+- **PCF Controls** — see PCF controls in your workspace and the ones deployed to each environment.
+- **Ribbons** — open ribbon XML, edit it, and publish it.
+
+Web resource actions (bind, publish, open in Power Apps) live in the **Explorer right-click menu** instead, under `Dynamics 365 Tools`.
+
+## Configure environments and solutions
+
+Create the config by running `Dynamics 365 Tools: Add Environment` or `Dynamics 365 Tools: Sign In (Interactive)`. After that you can edit `.vscode/dynamics365tools.config.json` by hand if you want.
+
+- Add an environment quickly: `Dynamics 365 Tools: Add Environment`.
+- Add a solution from Dataverse: `Dynamics 365 Tools: Add Solution`. It loads the unmanaged solutions from the chosen environment and fills in the publisher prefix for you.
 
 ```jsonc
 {
@@ -63,39 +95,49 @@ Create config by running `Dynamics 365 Tools: Add Environment` or `Dynamics 365 
 
 Config parameters:
 
-- `environments` (optional, defaults to `[]`): list of Dataverse environments you can publish to.
-  - `name` (required): short label shown in VS Code pickers (for example `dev`, `test`, `prod`).
-  - `url` (required): org base URL (for example `https://contoso.crm.dynamics.com`).
-  - `authType` (optional): `interactive` or `clientSecret`. If missing, interactive sign-in is used first.
-  - `resource` (optional): custom token audience/scope base. Use this only when your auth setup needs a different audience than `url`.
-  - `manageMissingComponents` (optional, default `false`): when `true`, publish can create missing web resources and plugin components, and plugin sync can delete plugin types that are not in the assembly. When `false`, only existing components are updated.
-  - `userAgentEnabled` (optional, default `false`): enables `User-Agent` header on Dataverse and token HTTP calls.
-  - `userAgent` (optional): custom `User-Agent` value. If empty and `userAgentEnabled` is `true`, the extension uses `Dynamics365Tools-VSCode/<version>`.
-- `solutions` (optional, defaults to `[]`): list of Dataverse solutions used during bind/publish/plugin actions.
-  - `name` (required): solution unique name in Dataverse (for example `CoreWebResources`).
-  - `prefix` (required): web resource prefix for path defaults (for example `new_`, `cmp_`). `Add Solution` saves this from publisher prefix and normalizes it to end with `_`.
-  - `solutionName` (legacy optional alias): old key still accepted and mapped to `name`.
+- `environments` (optional, default `[]`): the Dataverse environments you can publish to.
+  - `name` (required): a short label shown in the VS Code pickers (for example `dev`, `test`, `prod`).
+  - `url` (required): the org base URL (for example `https://contoso.crm.dynamics.com`).
+  - `authType` (optional): `interactive` or `clientSecret`. If it is missing, interactive sign-in is tried first.
+  - `resource` (optional): a custom token audience or scope base. Use it only when your auth setup needs a different audience than `url`.
+  - `manageMissingComponents` (optional, default `false`): when `true`, publishing can create missing web resources and plugin components, and plugin sync can delete plugin types that are not in the assembly. When `false`, only existing components are updated.
+  - `userAgentEnabled` (optional, default `false`): adds a `User-Agent` header to the Dataverse and token HTTP calls.
+  - `userAgent` (optional): a custom `User-Agent` value. If it is empty and `userAgentEnabled` is `true`, the extension uses `Dynamics365Tools-VSCode/<version>`.
+- `solutions` (optional, default `[]`): the Dataverse solutions used for bind, publish, and plugin actions.
+  - `name` (required): the solution unique name in Dataverse (for example `CoreWebResources`).
+  - `prefix` (required): the web resource prefix used for default paths (for example `new_`, `cmp_`). `Add Solution` saves this from the publisher prefix and makes it end with `_`.
+  - `solutionName` (legacy alias): the old key is still accepted and mapped to `name`.
 
-Notes:
+Tips:
 
-- Keep `authType: "interactive"` for local developer work. Use `authType: "clientSecret"` for CI or service accounts.
-- If `authType` is not `clientSecret`, the extension still can use stored client credentials as a fallback when interactive sign-in is unavailable.
-- `manageMissingComponents: false` is safer for production: no new web resources or plugin assemblies are created by mistake, while still allowing them to be updated. Use `manageMissingComponents: true` for development environment only.
+- Use `authType: "interactive"` for local work. Use `authType: "clientSecret"` for CI or service accounts.
+- If `authType` is not `clientSecret`, the extension can still use stored client credentials as a fallback when interactive sign-in is not available.
+- `manageMissingComponents: false` is safer for production: nothing new is created by mistake, but existing components are still updated. Use `true` only for development environments.
 - Turn on `userAgentEnabled` only if your proxy, gateway, or audit policy needs a custom client header.
 
-### Authenticate
+## Authenticate
 
-- **Interactive (default)**: run `Dynamics 365 Tools: Sign In (Interactive)`, then pick a saved authorization or create a new one. The command can create `.vscode/dynamics365tools.config.json` with the selected environment when the file does not exist.
-- **Client credentials**: run `Dynamics 365 Tools: Set Environment Credentials`, then pick a saved authorization or create a new one. The command stores `clientId`, `clientSecret`, and optional `tenantId` in Secret Storage.
-- **Sign out**: run `Dynamics 365 Tools: Sign Out` to clear the interactive session for an environment; you can also choose to remove any stored client credentials for it.
+- **Interactive (default)**: run `Dynamics 365 Tools: Sign In (Interactive)`, then pick a saved authorization or create a new one. The command can create `.vscode/dynamics365tools.config.json` with the selected environment if the file does not exist.
+- **Client credentials**: run `Dynamics 365 Tools: Set Environment Credentials`, then pick or create an authorization. The command stores `clientId`, `clientSecret`, and an optional `tenantId` in Secret Storage.
+- **Sign out**: run `Dynamics 365 Tools: Sign Out` to clear the interactive session for an environment. You can also remove any stored client credentials for it.
+
+## Web resources
+
+Bind a local file or folder to a CRM web resource once, then publish it whenever you want.
+
+### Supported file types
+
+`.js`, `.css`, `.htm`, `.html`, `.xml`, `.json`, `.resx`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.xsl`, `.xslt`, `.ico`, `.svg`.
+
+The Explorer `Dynamics 365 Tools` menu shows up on these file types and on folders.
 
 ### Bind resources
 
-- From Explorer: right-click a file or folder → `Dynamics 365 Tools` → `Bind Resource`.
-- From Command Palette: `Dynamics 365 Tools: Bind Resource` (uses the active file/folder).
-- The default remote path uses the publisher prefix from the selected solution when it matches the local path; you can overwrite it.
-- For folder bindings, the extension asks for an environment and compares supported local files with CRM web resources under the target `remotePath`. If counts differ, you get a short warning before the binding is saved.
-- Bindings are saved to `.vscode/dynamics365tools.bindings.json` for team sharing. Example:
+- **From the Explorer**: right-click a file or folder → `Dynamics 365 Tools` → `Bind Resource`.
+- **From the Command Palette**: `Dynamics 365 Tools: Bind Resource` (it uses the active file or folder).
+- The default remote path uses the publisher prefix of the chosen solution when it matches the local path. You can change it.
+- For a folder binding, the extension asks for an environment and compares the local files with the CRM web resources under the target `remotePath`. If the counts are different, you get a short warning before the binding is saved.
+- Bindings are saved to `.vscode/dynamics365tools.bindings.json` so the team can share them. Example:
 
 ```jsonc
 {
@@ -116,31 +158,134 @@ Notes:
 }
 ```
 
-File bindings win over folder bindings when both cover the same file.
+A file binding wins over a folder binding when both cover the same file.
 
 ### Publish resources
 
-- In Explorer, right-click any bound file/folder → `Dynamics 365 Tools` → `Publish Resource` (or run `Dynamics 365 Tools: Publish Resource` from the Command Palette). Pick an environment when asked.
-- For bound folders, supported files inside are published (file bindings are used when present). Up to 4 files publish at once. The progress dialog can be cancelled.
-- Unchanged files in a folder publish are skipped using `.vscode/dynamics365tools.publishCache.json` (based on content hash, size, and mtime).
-- Quick publish: click the status bar item (cloud upload) or run `Dynamics 365 Tools: Publish Last Resource` to republish the most recent file or folder with the same environment and binding.
-- Open a published web resource in classic CRM: right-click the bound file → `Dynamics 365 Tools` → `Open in Power Apps`, choose the environment, and the extension opens the classic web resource editor URL for that solution and resource.
+- In the Explorer, right-click a bound file or folder → `Dynamics 365 Tools` → `Publish Resource` (or run `Dynamics 365 Tools: Publish Resource`). Pick an environment when asked.
+- For a bound folder, all supported files inside are published. Up to 4 files go at once, and you can cancel from the progress dialog.
+- Unchanged files in a folder publish are skipped, using `.vscode/dynamics365tools.publishCache.json` (based on content hash, size, and modified time).
+- **Quick publish**: click the status bar item (cloud upload icon) or run `Dynamics 365 Tools: Publish Last Resource` to publish the most recent file or folder again, with the same environment and binding.
+- **Open in Power Apps**: right-click a bound file → `Dynamics 365 Tools` → `Open in Power Apps`, pick the environment, and the extension opens the classic web resource editor for that solution and resource.
 
-### Resources supported file types
+## Plugins
 
-Supported: `.js`, `.css`, `.htm`, `.html`, `.xml`, `.json`, `.resx`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.xsl`, `.xslt`, `.ico`, `.svg`. The Explorer `Dynamics 365 Tools` menu is visible on those types or folder.
+Open the **Plugins** view in the Dynamics 365 Tools Activity Bar to browse assemblies → plugin types → steps → images for any configured environment.
 
-### Manage plugins
+<!-- Screenshot: the Plugins view expanded to show an assembly, its types, and steps. -->
 
-- Open the **Dynamics 365 Plugins** view in the Explorer to browse assemblies → plugin types → steps → images for any configured environment.
-- Use the view title actions (refresh/register) or the Command Palette commands:
-  - `Dynamics 365 Tools: Generate Strong Name Key (Public Key Token)` creates a `.snk` using the local `sn` tool and shows the public key token for signing your assemblies.
-  - `Dynamics 365 Tools: Register Plugin Assembly` uploads a `.dll` to the selected environment and adds it to your chosen solution.
-  - `Dynamics 365 Tools: Update Plugin Assembly` replaces the content of an existing assembly with a new `.dll`.
-  - Plugin and CodeActivity classes are auto-discovered via `System.Reflection.MetadataLoadContext` when you register or update an assembly. New plugin types are created only when `manageMissingComponents` is `true`, existing ones are updated, and types removed from the assembly are deleted only when `manageMissingComponents` is `true`. Missing plugin types are deleted before an assembly update, because CRM blocks the update while the old type still points to the assembly.
-  - Use the trash icon next to a plugin type in the Plugins explorer to remove it (steps and images are deleted with the type).
-- Step and image commands (context menu or palette):
-  - Create/edit/enable/disable/delete plugin steps; creation prompts for message, entity, stage, mode, rank, attributes, and solution. Deleting a step now also deletes all of its images first.
-  - Create/edit/delete plugin images for a step; defaults include sensible aliases and message property names.
-  - Copy plugin step/image info straight from the Plugins explorer inline actions to get the formatted details on your clipboard.
-- Toggle “Show Configured Solutions Only” in the Plugins view title to filter plugin assemblies/types by the solutions listed in your config (skipping the default solution automatically).
+**Assemblies**
+
+- `Dynamics 365 Tools: Generate Strong Name Key (Public Key Token)` creates a `.snk` file with the local `sn` tool and shows the public key token for signing.
+- `Dynamics 365 Tools: Register Plugin Assembly` uploads a `.dll` to the chosen environment and adds it to your solution.
+- `Dynamics 365 Tools: Update Plugin Assembly` replaces the content of an existing assembly with a new `.dll`.
+- Plugin and CodeActivity classes are found for you when you register or update an assembly. New plugin types are created only when `manageMissingComponents` is `true`. Existing types are always updated. Types that were removed from the assembly are deleted only when `manageMissingComponents` is `true`. Missing types are deleted before an update, because CRM blocks the update while the old type still points to the assembly.
+- **Quick publish**: click the status bar item (package icon) or run `Dynamics 365 Tools: Publish Last Plugin Assembly` to upload the last assembly again, reusing the last environment.
+- Use the trash icon next to a plugin type to remove it. Its steps and images are deleted with it.
+
+**Steps and images** (right-click menu or Command Palette)
+
+- Create, edit, enable, disable, or delete plugin steps. Creating a step asks for message, entity, stage, mode, rank, attributes, and solution. Deleting a step also deletes its images first.
+- Create, edit, or delete plugin images for a step. The defaults include sensible aliases and message property names.
+- Copy step or image details to the clipboard with the inline copy actions.
+
+**Filter**
+
+- Turn on **Show Configured Solutions Only** in the view title to show only the assemblies and types from the solutions in your config. The default solution is skipped automatically.
+
+## PCF controls
+
+Open the **PCF Controls** view to work with PowerApps Component Framework controls. The view shows the controls in your workspace and the controls already deployed to each environment.
+
+<!-- Screenshot: the PCF Controls view showing local controls and deployed controls. -->
+
+> Needs the Power Platform CLI (`pac`) and Node.js/npm. Packaging a solution also needs the .NET SDK. See [Requirements](#requirements).
+
+**Create and build**
+
+- `Dynamics 365 Tools: New PCF Control` scaffolds a new control with `pac`. It asks for the namespace, control name, template (`field` or `dataset`), and framework (TypeScript or React), and can run `npm install` for you. The main source file opens when it is ready.
+- `Dynamics 365 Tools: Build PCF Control` runs the production build.
+- `Dynamics 365 Tools: Watch PCF Control` rebuilds on every change. Stop it with `Dynamics 365 Tools: Stop PCF Watch`.
+
+**Deploy**
+
+- `Dynamics 365 Tools: Push PCF Control to Environment` does a fast developer deploy with `pac pcf push`. This is the quickest way to test a change.
+- `Dynamics 365 Tools: Package PCF Solution (Managed)` or `(Unmanaged)` builds a solution `.zip` you can import or ship.
+- `Dynamics 365 Tools: Deploy Last PCF Solution Package` imports the last package you built into a chosen environment.
+
+**From the view (deployed controls)**
+
+- **Update PCF Control from Local Project** pushes your local control that matches the deployed one.
+- **Use Deployed PCF Version in Manifest** copies the deployed version number into your `ControlManifest.Input.xml`.
+- **Copy PCF Control ID** puts the control ID on the clipboard.
+
+**Filter**
+
+- Filter the deployed controls by your configured solutions, or filter the local controls by workspace folder, from the view title.
+
+## Ribbons
+
+Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it back. You can open a single ribbon XML file, or open the ribbons from a solution `.zip`, or pull them straight from an environment.
+
+<!-- Screenshot: the Ribbons view with a command tree and the edit menu open. -->
+
+**Open and save**
+
+- `Open Ribbon XML` opens a local ribbon XML file.
+- `Open Ribbons from Solution...` opens the ribbons inside a solution `.zip`.
+- `Pull Ribbons from Environment...` downloads the ribbons from a connected environment.
+- `Save Ribbon Changes`, `Undo Ribbon Edit`, and `Redo Ribbon Edit` manage your edits.
+- `Save Solution Zip...` writes the changes back to a solution `.zip`.
+- `Publish Ribbons to Environment...` sends your changes to an environment.
+- `Clean Up Generated Ribbon Solutions...` removes the temporary solutions the publish step creates.
+
+**Edit buttons**
+
+- `Add Custom Button` adds your own button to a ribbon.
+- `Hide OOB Button` hides an out-of-the-box button. `Hide OOB Buttons and Create Stubs` also creates command stubs you can fill in.
+- `Reorder OOB Buttons` changes the order of the built-in buttons.
+
+**Edit commands and rules**
+
+- `Add Command Definition`, `Override OOB Command`, and `Add Command Action` set up what a button does.
+- `Add Enable Rule` / `Add Display Rule` create new rules. `Add Enable Rule Reference` / `Add Display Rule Reference` link a command to an existing rule. `Add Rule Step` adds a step inside a rule.
+- `Add Loc Label` and `Add Loc Label Language` manage localized labels.
+- `Move Ribbon Item Up` / `Down`, `Edit Ribbon Item`, and `Delete Ribbon Item` work on any node in the tree.
+
+**Built-in rules**
+
+The extension ships with common enable rule references: `Mscrm.SelectionCountExactlyOne`, `Mscrm.ShowOnQuickAction`, `Mscrm.ShowOnGrid`, and `Mscrm.ShowOnGridAndQuickAction`.
+
+You can also build custom rules:
+
+- **Enable rules** can check: JavaScript, form state, field value, selection count, record privilege, entity, and command client type.
+- **Display rules** can check the same things plus: entity privilege, form type, entity property, miscellaneous privilege, organization setting, tablet experience, relationship type, required referencing attribute, page address, and nested _Or_ groups.
+
+## All commands
+
+Every command is under the `Dynamics 365 Tools:` prefix in the Command Palette (`Ctrl/Cmd + Shift + P`). Many of them also appear in the Explorer right-click menu or in the view title and item menus, so you rarely need to type them.
+
+## Contributing
+
+Issues and pull requests are welcome on [GitHub](https://github.com/olegasd123/dynamics-365-tools).
+
+To build from source:
+
+```bash
+npm install
+npm run compile   # type-check and bundle
+npm test          # run the tests
+npm run package   # build the production bundle
+```
+
+Before you send a change, please run:
+
+```bash
+npm run format
+npm run lint
+npm test
+```
+
+## License
+
+[MIT](LICENSE)
