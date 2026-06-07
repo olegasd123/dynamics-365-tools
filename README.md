@@ -6,8 +6,6 @@
 
 Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web resources, manage plugins, build and deploy PCF controls, and edit ribbons. You bind local files to CRM components once, then push updates to one or many environments with a few clicks.
 
-<!-- Screenshot: the Dynamics 365 Tools activity bar with the Plugins, PCF Controls, and Ribbons views open. -->
-
 ## Table of contents
 
 - [Features](#features)
@@ -33,7 +31,7 @@ Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web 
 - **Multiple environments**: keep dev, test, and prod side by side and pick the target when you publish.
 - **Share settings with the team** through small JSON files in `.vscode/`.
 - **Safe credentials**: secrets are kept in VS Code Secret Storage. Interactive sign-in and client secrets are both supported.
-- **Fast folder publish**: up to 4 files at a time, unchanged files are skipped, and you can cancel any run.
+- **Fast folder publish**: all supported child files are published, up to 4 at a time. Unchanged files are skipped, and you can cancel any run.
 - **Status bar shortcuts** to republish the last web resource or plugin assembly in seconds.
 
 ## Requirements
@@ -131,6 +129,8 @@ Bind a local file or folder to a CRM web resource once, then publish it whenever
 
 The Explorer `Dynamics 365 Tools` menu shows up on these file types and on folders.
 
+![Right-click a file and choose Dynamics 365 Tools to publish or bind it](assets/publish-web-resource-file.png)
+
 ### Bind resources
 
 - **From the Explorer**: right-click a file or folder → `Dynamics 365 Tools` → `Bind Resource`.
@@ -162,6 +162,8 @@ A file binding wins over a folder binding when both cover the same file.
 
 ### Publish resources
 
+![Right-click a folder to publish every supported file inside](assets/publish-web-resource-folder.png)
+
 - In the Explorer, right-click a bound file or folder → `Dynamics 365 Tools` → `Publish Resource` (or run `Dynamics 365 Tools: Publish Resource`). Pick an environment when asked.
 - For a bound folder, all supported files inside are published. Up to 4 files go at once, and you can cancel from the progress dialog.
 - Unchanged files in a folder publish are skipped, using `.vscode/dynamics365tools.publishCache.json` (based on content hash, size, and modified time).
@@ -172,7 +174,7 @@ A file binding wins over a folder binding when both cover the same file.
 
 Open the **Plugins** view in the Dynamics 365 Tools Activity Bar to browse assemblies → plugin types → steps → images for any configured environment.
 
-<!-- Screenshot: the Plugins view expanded to show an assembly, its types, and steps. -->
+![The Plugins view showing assemblies, plugin types, steps, and images per environment](assets/assemblies-explorer.png)
 
 **Assemblies**
 
@@ -197,7 +199,7 @@ Open the **Plugins** view in the Dynamics 365 Tools Activity Bar to browse assem
 
 Open the **PCF Controls** view to work with PowerApps Component Framework controls. The view shows the controls in your workspace and the controls already deployed to each environment.
 
-<!-- Screenshot: the PCF Controls view showing local controls and deployed controls. -->
+![The PCF Controls view showing the toolchain, workspace controls, and deployed controls per environment](assets/pcf-controls-explorer.png)
 
 > Needs the Power Platform CLI (`pac`) and Node.js/npm. Packaging a solution also needs the .NET SDK. See [Requirements](#requirements).
 
@@ -227,7 +229,7 @@ Open the **PCF Controls** view to work with PowerApps Component Framework contro
 
 Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it back. You can open a single ribbon XML file, or open the ribbons from a solution `.zip`, or pull them straight from an environment.
 
-<!-- Screenshot: the Ribbons view with a command tree and the edit menu open. -->
+![The Ribbons view showing entities, custom actions, command definitions, and rules](assets/ribbon-explorer.png)
 
 **Open and save**
 
@@ -264,6 +266,8 @@ You can also build custom rules:
 ## All commands
 
 Every command is under the `Dynamics 365 Tools:` prefix in the Command Palette (`Ctrl/Cmd + Shift + P`). Many of them also appear in the Explorer right-click menu or in the view title and item menus, so you rarely need to type them.
+
+![The Command Palette filtered to the Dynamics 365 Tools commands](assets/palette.png)
 
 ## Contributing
 
