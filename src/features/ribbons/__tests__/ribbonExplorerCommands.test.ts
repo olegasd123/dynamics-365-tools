@@ -1728,7 +1728,15 @@ test("does not queue patches when enable rule creation is cancelled", async () =
   );
   let queued = false;
 
+  const originalShowQuickPick = vscode.window.showQuickPick;
   const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) =>
+    options.placeHolder === "First rule step"
+      ? items.find((item) => item.label === "No step")
+      : undefined;
   (vscode.window as any).showInputBox = async () => undefined;
 
   try {
@@ -1746,6 +1754,7 @@ test("does not queue patches when enable rule creation is cancelled", async () =
       new RibbonDocumentNode(document),
     );
   } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
 
@@ -1819,6 +1828,98 @@ test("prefills enable rule ids from the ribbon scope", async () => {
     updatedDocument.views[0].enableRules.map((rule) => rule.id),
     ["d365tools.account.Form.EnableRule", "d365tools.account.Form.EnableRule.2"],
   );
+});
+
+test("prefills rule ids with the selected rule step name", async () => {
+  const source = `<RibbonDiffXml>
+</RibbonDiffXml>`;
+  const inputValues: string[] = [];
+  let nextStep: "SelectionCountRule" | "FormTypeRule" = "SelectionCountRule";
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[] | string[],
+    options: { placeHolder?: string },
+  ) => {
+    const labels = new Map([
+      ["First rule step", nextStep],
+      ["Applies to", "SelectedEntity"],
+      ["Selected row condition", "Equal to"],
+      ["Form type", "Main"],
+      ["Invert result?", "No"],
+    ]);
+    const label = labels.get(options.placeHolder ?? "");
+    return typeof items[0] === "string"
+      ? label
+      : (items as vscode.QuickPickItem[]).find((item) => item.label === label);
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt === "Selected rows") {
+      return "1";
+    }
+
+    inputValues.push(options.value ?? "");
+    return options.value;
+  };
+
+  try {
+    const [enableDocument] = readRibbonDocuments(source, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Entity",
+      entityLogicalName: "account",
+    });
+    await addRibbonEnableRule(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: () => undefined,
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonSectionNode(
+        enableDocument,
+        enableDocument.views.find((view) => view.scope === "Form") ?? enableDocument.views[0],
+        "enableRules",
+        enableDocument.views[0].enableRules.length,
+      ),
+    );
+
+    nextStep = "FormTypeRule";
+    const [displayDocument] = readRibbonDocuments(source, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Entity",
+      entityLogicalName: "account",
+    });
+    await addRibbonDisplayRule(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: () => undefined,
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonSectionNode(
+        displayDocument,
+        displayDocument.views.find((view) => view.scope === "Form") ?? displayDocument.views[0],
+        "displayRules",
+        displayDocument.views[0].displayRules.length,
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(inputValues, [
+    "d365tools.account.Form.SelectionCountRule.EnableRule",
+    "d365tools.account.Form.FormTypeRule.DisplayRule",
+  ]);
 });
 
 test("prefills manual command rule reference ids from the command id", async () => {
