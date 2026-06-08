@@ -1,7 +1,7 @@
 # Dynamics 365 Tools — VS Code Extension
 
-[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/oleg-verhoglyad.dynamics-365-tools?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/oleg-verhoglyad.dynamics-365-tools?label=Installs)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
+[![Marketplace](https://vsmarketplacebadges.dev/version/oleg-verhoglyad.dynamics-365-tools.svg)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
+[![Installs](https://vsmarketplacebadges.dev/installs/oleg-verhoglyad.dynamics-365-tools.svg)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web resources, manage plugins, build and deploy PCF controls, and edit ribbons. You bind local files to CRM components once, then push updates to one or many environments with a few clicks.
