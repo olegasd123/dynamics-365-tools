@@ -69,7 +69,7 @@ async function addRibbonRule(
     return;
   }
 
-  const step = await promptRuleStep(ctx, kind);
+  const step = await promptRuleStep(ctx, kind, target.document);
   if (step === undefined) {
     return;
   }
@@ -217,7 +217,7 @@ async function promptNewEnableRuleRef(
     return undefined;
   }
 
-  const step = await promptRuleStep(ctx, "Enable");
+  const step = await promptRuleStep(ctx, "Enable", document);
   if (step === undefined) {
     return undefined;
   }

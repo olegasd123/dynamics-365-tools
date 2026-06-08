@@ -287,7 +287,7 @@ export async function addRibbonRuleChildStep(
     return;
   }
 
-  const step = await promptRuleStep(ctx, target.ruleKind);
+  const step = await promptRuleStep(ctx, target.ruleKind, target.document);
   if (!step) {
     return;
   }
@@ -1224,7 +1224,7 @@ async function editRuleStep(
   ruleKind: "Enable" | "Display",
   step: RuleStep,
 ): Promise<void> {
-  const input = await promptRuleStep(ctx, ruleKind);
+  const input = await promptRuleStep(ctx, ruleKind, document);
   if (!input) {
     return;
   }

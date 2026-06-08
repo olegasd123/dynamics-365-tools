@@ -47,6 +47,7 @@ import {
   RibbonItemNode,
   RibbonSectionNode,
   RibbonSourceNode,
+  RibbonViewNode,
 } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
@@ -945,6 +946,7 @@ test("creates common enable rules from prompts", async () => {
       ]),
       pickByPlaceHolder: new Map([
         ["First rule step", "EntityRule"],
+        ["Entity logical name", "Type logical name manually"],
         ["Applies to", "SelectedEntity"],
         ["Invert result?", "No"],
       ]),
@@ -996,6 +998,135 @@ test("creates common enable rules from prompts", async () => {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
+});
+
+test("creates value rules from environment field metadata", async () => {
+  const source = `<RibbonDiffXml>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+  const requestedPaths: string[] = [];
+  let fieldPickItems: vscode.QuickPickItem[] = [];
+  let fieldPromptCount = 0;
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    picks: vscode.QuickPickItem[] | string[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "First rule step") {
+      return (picks as vscode.QuickPickItem[]).find((pick) => pick.label === "ValueRule");
+    }
+
+    if (options.placeHolder === "Field name") {
+      fieldPromptCount += 1;
+      if (fieldPromptCount === 1) {
+        return (picks as vscode.QuickPickItem[]).find((pick) => pick.label === "Pick from account");
+      }
+
+      fieldPickItems = picks as vscode.QuickPickItem[];
+      return fieldPickItems.find((pick) => pick.label === "statuscode");
+    }
+
+    if (options.placeHolder === "Invert result?") {
+      return typeof picks[0] === "string"
+        ? "No"
+        : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === "No");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) => {
+    switch (options.prompt) {
+      case "Enable rule id":
+        return "new.Value";
+      case "Value":
+        return "1";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addRibbonEnableRule(
+      legacyContext({
+        configuration: {
+          loadConfiguration: async () => ({
+            environments: [{ name: "Dev", url: "https://org.crm.dynamics.com" }],
+            solutions: [],
+          }),
+        },
+        ui: {
+          pickEnvironment: async (environments: unknown[]) => environments[0],
+        },
+        auth: {
+          getAccessToken: async () => "token",
+        },
+        secrets: {
+          getCredentials: async () => undefined,
+        },
+        lastSelection: {
+          getLastEnvironment: () => undefined,
+          setLastEnvironment: async () => undefined,
+        },
+        connections: {
+          createClient: async () => ({
+            get: async (path: string) => {
+              requestedPaths.push(path);
+              return {
+                value: [
+                  {
+                    LogicalName: "statuscode",
+                    DisplayName: { UserLocalizedLabel: { Label: "Status Reason" } },
+                  },
+                  { LogicalName: "name" },
+                ],
+              };
+            },
+          }),
+        },
+        notifications: createNotifications(),
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(requestedPaths, [
+    "/EntityDefinitions(LogicalName='account')/Attributes?$select=LogicalName,DisplayName",
+  ]);
+  assert.strictEqual(
+    fieldPickItems.find((item) => item.label === "statuscode")?.description,
+    "Status Reason",
+  );
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const step = updatedDocument.views[0].enableRules[0].steps[0];
+
+  assert.strictEqual(step.kind, "ValueRule");
+  assert.strictEqual(step.kind === "ValueRule" ? step.field : undefined, "statuscode");
 });
 
 test("creates flat display rules from prompts", async () => {
