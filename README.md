@@ -236,6 +236,7 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 - `Open Ribbon XML` opens a local ribbon XML file.
 - `Open Ribbons from Solution...` opens the ribbons inside a solution `.zip`.
 - `Pull Ribbons from Environment...` downloads the ribbons from a connected environment.
+- The view also finds flat `customizations.xml` files in the workspace, including child folders up to 4 levels deep, for example `Ribbons/new_/account/customizations.xml`.
 - `Save Ribbon Changes`, `Undo Ribbon Edit`, and `Redo Ribbon Edit` manage your edits.
 - `Save Solution Zip...` writes the changes back to a solution `.zip`.
 - `Publish Ribbons to Environment...` sends your changes to an environment.
