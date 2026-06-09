@@ -1016,29 +1016,40 @@ async function editCustomAction(
     return;
   }
   const labelDefault = getButtonLabelDefault(document, labelLocId, labelText);
-  const inlineLabelText = getEditedInlineButtonLabelText(
+  const inlineLabelText = getEditedInlineLocText(
     document,
     labelLocId,
     labelText,
     action.commandUI.labelText,
   );
 
-  const alt = await promptOptional("Alt", action.commandUI.alt || labelDefault);
+  const altLocDefault = getButtonLabelDefault(document, action.commandUI.altLocId ?? "", "");
+  const alt = await promptOptional("Alt", action.commandUI.alt || altLocDefault || labelDefault);
   if (alt === undefined) {
     return;
   }
 
+  const toolTipTitleLocDefault = getButtonLabelDefault(
+    document,
+    action.commandUI.toolTipTitleLocId ?? "",
+    "",
+  );
   const toolTipTitle = await promptOptional(
     "Tool tip title",
-    action.commandUI.toolTipTitle || labelDefault,
+    action.commandUI.toolTipTitle || toolTipTitleLocDefault || labelDefault,
   );
   if (toolTipTitle === undefined) {
     return;
   }
 
+  const toolTipDescriptionLocDefault = getButtonLabelDefault(
+    document,
+    action.commandUI.toolTipDescriptionLocId ?? "",
+    "",
+  );
   const toolTipDescription = await promptOptional(
     "Tool tip description",
-    action.commandUI.toolTipDescription || labelDefault,
+    action.commandUI.toolTipDescription || toolTipDescriptionLocDefault || labelDefault,
   );
   if (toolTipDescription === undefined) {
     return;
@@ -1094,9 +1105,27 @@ async function editCustomAction(
     action: { kind: "Url", address: "" },
     labelLocId: labelLocId.trim() || undefined,
     labelText: inlineLabelText,
-    alt: alt.trim() || undefined,
-    toolTipTitle: toolTipTitle.trim() || undefined,
-    toolTipDescription: toolTipDescription.trim() || undefined,
+    altLocId: action.commandUI.altLocId,
+    alt: getEditedInlineLocText(
+      document,
+      action.commandUI.altLocId ?? "",
+      alt,
+      action.commandUI.alt,
+    ),
+    toolTipTitleLocId: action.commandUI.toolTipTitleLocId,
+    toolTipTitle: getEditedInlineLocText(
+      document,
+      action.commandUI.toolTipTitleLocId ?? "",
+      toolTipTitle,
+      action.commandUI.toolTipTitle,
+    ),
+    toolTipDescriptionLocId: action.commandUI.toolTipDescriptionLocId,
+    toolTipDescription: getEditedInlineLocText(
+      document,
+      action.commandUI.toolTipDescriptionLocId ?? "",
+      toolTipDescription,
+      action.commandUI.toolTipDescription,
+    ),
     image16x16: image16x16.trim() || undefined,
     image32x32: image32x32.trim() || undefined,
     modernImage: modernImage.trim() || undefined,
@@ -1136,7 +1165,7 @@ function getButtonLabelDefault(
   return undefined;
 }
 
-function getEditedInlineButtonLabelText(
+function getEditedInlineLocText(
   document: RibbonDocument,
   labelLocId: string,
   labelText: string,

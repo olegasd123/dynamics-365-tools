@@ -122,11 +122,22 @@ export async function addCustomRibbonButton(
 
   const ids = makeCustomButtonIds(target.document, target.view.scope, label);
   const labelLocId = ids.labelLocId ?? `${ids.buttonId}.Label`;
+  const altLocId = ids.altLocId ?? `${ids.buttonId}.Alt`;
+  const toolTipTitleLocId = ids.toolTipTitleLocId ?? `${ids.buttonId}.ToolTipTitle`;
+  const toolTipDescriptionLocId =
+    ids.toolTipDescriptionLocId ?? `${ids.buttonId}.ToolTipDescription`;
   const action =
     actionKind.label === "URL" ? await promptUrlAction() : await promptJavaScriptAction(ctx);
   if (!action) {
     return;
   }
+
+  const locLabels = [
+    newLocLabel(labelLocId, labelValue),
+    optionalLocLabel(altLocId, alt),
+    optionalLocLabel(toolTipTitleLocId, toolTipTitle),
+    optionalLocLabel(toolTipDescriptionLocId, toolTipDescription),
+  ].filter((label): label is ReturnType<typeof newLocLabel> => Boolean(label));
 
   ctx.ribbon.editorState.queuePatches(
     target.document,
@@ -136,21 +147,33 @@ export async function addCustomRibbonButton(
       action,
       sequence: sequenceText.trim() ? Number(sequenceText.trim()) : undefined,
       labelLocId,
-      alt: alt.trim() || undefined,
-      toolTipTitle: toolTipTitle.trim() || undefined,
-      toolTipDescription: toolTipDescription.trim() || undefined,
+      altLocId: locLabels.some((label) => label.id === altLocId) ? altLocId : undefined,
+      toolTipTitleLocId: locLabels.some((label) => label.id === toolTipTitleLocId)
+        ? toolTipTitleLocId
+        : undefined,
+      toolTipDescriptionLocId: locLabels.some((label) => label.id === toolTipDescriptionLocId)
+        ? toolTipDescriptionLocId
+        : undefined,
       image16x16: image16x16?.trim() || undefined,
       image32x32: image32x32?.trim() || undefined,
       modernImage: modernImage.trim() || undefined,
       templateAlias: "o1",
-      locLabel: {
-        id: labelLocId,
-        languageCode: 1033,
-        description: labelValue,
-      },
+      locLabels,
     }),
   );
   ctx.ribbon.explorer.refresh();
+}
+
+function newLocLabel(id: string, description: string) {
+  return {
+    id,
+    languageCode: 1033,
+    description: description.trim(),
+  };
+}
+
+function optionalLocLabel(id: string, description: string) {
+  return description.trim() ? newLocLabel(id, description) : undefined;
 }
 
 export async function hideOobRibbonButton(

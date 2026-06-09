@@ -500,6 +500,7 @@ function filterEntityView(
       action.commandUI?.kind === "Button"
         ? [
             action.commandUI.labelLocId,
+            action.commandUI.altLocId,
             action.commandUI.toolTipTitleLocId,
             action.commandUI.toolTipDescriptionLocId,
           ].filter(isDefined)
@@ -608,6 +609,7 @@ function readCommandUINode(
   switch (node.name) {
     case "Button": {
       const labelText = optionalAttr(node, "LabelText");
+      const alt = optionalAttr(node, "Alt");
       const toolTipTitle = optionalAttr(node, "ToolTipTitle");
       const toolTipDescription = optionalAttr(node, "ToolTipDescription");
 
@@ -617,7 +619,8 @@ function readCommandUINode(
         command: attr(node, "Command"),
         labelLocId: optionalAttr(node, "LabelLocId") ?? locLabelIdFromReference(labelText),
         labelText: isLocLabelReference(labelText) ? undefined : labelText,
-        alt: optionalAttr(node, "Alt"),
+        altLocId: locLabelIdFromReference(alt),
+        alt: isLocLabelReference(alt) ? undefined : alt,
         toolTipTitle: isLocLabelReference(toolTipTitle) ? undefined : toolTipTitle,
         toolTipDescription: isLocLabelReference(toolTipDescription)
           ? undefined

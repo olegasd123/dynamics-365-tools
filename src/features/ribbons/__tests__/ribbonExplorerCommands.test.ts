@@ -238,9 +238,27 @@ test("prefills custom button text metadata from the label", async () => {
   assert.strictEqual(defaultsByPrompt.get("Tool tip description"), label);
 
   const updated = applyRibbonPatchSequence(source, patches);
-  assert.match(updated, /Alt="Validate and save"/);
-  assert.match(updated, /ToolTipTitle="Validate and save"/);
-  assert.match(updated, /ToolTipDescription="Validate and save"/);
+  assert.match(
+    updated,
+    /Alt="\$LocLabels:d365tools\.application\.[^"]+\.Validate\.and\.save\.Alt"/,
+  );
+  assert.match(
+    updated,
+    /ToolTipTitle="\$LocLabels:d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipTitle"/,
+  );
+  assert.match(
+    updated,
+    /ToolTipDescription="\$LocLabels:d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipDescription"/,
+  );
+  assert.match(updated, /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.Alt">/);
+  assert.match(
+    updated,
+    /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipTitle">/,
+  );
+  assert.match(
+    updated,
+    /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipDescription">/,
+  );
 });
 
 test("prefills empty custom button text metadata from loc label while editing", async () => {

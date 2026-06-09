@@ -110,6 +110,84 @@ test("creates a custom button with command action and label", () => {
   assert.match(updated, /<CrmParameter Value="PrimaryControl" \/>/);
 });
 
+test("adds custom button text metadata as loc labels", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomButtonPatches(document, {
+      customActionId: "d365tools.account.Form.Send.CustomAction",
+      location: "Mscrm.Form.account.MainTab.Save.Controls._children",
+      buttonId: "d365tools.account.Form.Send.Button",
+      commandId: "d365tools.account.Form.Send.Command",
+      labelLocId: "d365tools.account.Form.Send.Label",
+      altLocId: "d365tools.account.Form.Send.Alt",
+      toolTipTitleLocId: "d365tools.account.Form.Send.ToolTipTitle",
+      toolTipDescriptionLocId: "d365tools.account.Form.Send.ToolTipDescription",
+      action: { kind: "Url", address: "https://contoso.example/send" },
+      locLabels: [
+        {
+          id: "d365tools.account.Form.Send.Label",
+          languageCode: 1033,
+          description: "Send",
+        },
+        {
+          id: "d365tools.account.Form.Send.Alt",
+          languageCode: 1033,
+          description: "Send",
+        },
+        {
+          id: "d365tools.account.Form.Send.ToolTipTitle",
+          languageCode: 1033,
+          description: "Send",
+        },
+        {
+          id: "d365tools.account.Form.Send.ToolTipDescription",
+          languageCode: 1033,
+          description: "Send to service",
+        },
+      ],
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const button = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(
+    button?.kind === "Button" ? button.altLocId : undefined,
+    "d365tools.account.Form.Send.Alt",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipTitleLocId : undefined,
+    "d365tools.account.Form.Send.ToolTipTitle",
+  );
+  assert.strictEqual(
+    button?.kind === "Button" ? button.toolTipDescriptionLocId : undefined,
+    "d365tools.account.Form.Send.ToolTipDescription",
+  );
+  assert.match(updated, /Alt="\$LocLabels:d365tools\.account\.Form\.Send\.Alt"/);
+  assert.match(updated, /ToolTipTitle="\$LocLabels:d365tools\.account\.Form\.Send\.ToolTipTitle"/);
+  assert.match(
+    updated,
+    /ToolTipDescription="\$LocLabels:d365tools\.account\.Form\.Send\.ToolTipDescription"/,
+  );
+  assert.strictEqual(updatedDocument.views[0].locLabels.length, 4);
+});
+
 test("adds a custom button to existing self-closing sections", () => {
   const source = `<RibbonDiffXml>
   <CustomActions />

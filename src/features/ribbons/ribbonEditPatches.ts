@@ -187,8 +187,11 @@ export interface NewCustomButtonInput {
   sequence?: number;
   labelLocId?: string;
   labelText?: string;
+  altLocId?: string;
   alt?: string;
+  toolTipTitleLocId?: string;
   toolTipTitle?: string;
+  toolTipDescriptionLocId?: string;
   toolTipDescription?: string;
   image16x16?: string;
   image32x32?: string;
@@ -197,6 +200,7 @@ export interface NewCustomButtonInput {
   enableRuleIds?: string[];
   displayRuleIds?: string[];
   locLabel?: NewLocLabelInput;
+  locLabels?: NewLocLabelInput[];
 }
 
 export interface NewOobStubReplacementInput extends NewCustomButtonInput {
@@ -236,10 +240,11 @@ export function createCustomButtonPatches(
     },
   ];
 
-  if (input.locLabel) {
+  const locLabels = newLocLabels(input);
+  if (locLabels.length) {
     sectionEdits.push({
       sectionName: "LocLabels",
-      childText: renderLocLabel(input.locLabel),
+      childText: locLabels.map((label) => renderLocLabel(label)).join("\n"),
     });
   }
 
@@ -273,9 +278,7 @@ export function createOobStubReplacementPatches(
     },
   ];
 
-  const locLabels = inputs
-    .map((input) => input.locLabel)
-    .filter((input): input is NewLocLabelInput => Boolean(input));
+  const locLabels = inputs.flatMap((input) => newLocLabels(input));
   if (locLabels.length) {
     sectionEdits.push({
       sectionName: "LocLabels",
@@ -309,9 +312,7 @@ export function createOobButtonReorderPatches(
     },
   ];
 
-  const locLabels = inputs
-    .map((input) => input.locLabel)
-    .filter((input): input is NewLocLabelInput => Boolean(input));
+  const locLabels = inputs.flatMap((input) => newLocLabels(input));
   if (locLabels.length) {
     sectionEdits.push({
       sectionName: "LocLabels",
@@ -585,7 +586,16 @@ export function makeCustomButtonIds(
   document: RibbonDocument,
   scope: string,
   label: string,
-): Pick<NewCustomButtonInput, "customActionId" | "buttonId" | "commandId" | "labelLocId"> {
+): Pick<
+  NewCustomButtonInput,
+  | "customActionId"
+  | "buttonId"
+  | "commandId"
+  | "labelLocId"
+  | "altLocId"
+  | "toolTipTitleLocId"
+  | "toolTipDescriptionLocId"
+> {
   const owner = document.entityLogicalName ?? "application";
   const base = `d365tools.${sanitizeIdPart(owner)}.${sanitizeIdPart(scope)}.${sanitizeIdPart(label)}`;
 
@@ -594,6 +604,9 @@ export function makeCustomButtonIds(
     buttonId: nextRibbonId(document, `${base}.Button`),
     commandId: nextRibbonId(document, `${base}.Command`),
     labelLocId: nextRibbonId(document, `${base}.Label`),
+    altLocId: nextRibbonId(document, `${base}.Alt`),
+    toolTipTitleLocId: nextRibbonId(document, `${base}.ToolTipTitle`),
+    toolTipDescriptionLocId: nextRibbonId(document, `${base}.ToolTipDescription`),
   };
 }
 
@@ -821,13 +834,17 @@ function renderCustomButtonAction(input: NewCustomButtonInput): string {
     ["Sequence", input.sequence],
   ];
   const labelText = input.labelText ?? locLabelReference(input.labelLocId);
+  const alt = input.alt ?? locLabelReference(input.altLocId);
+  const toolTipTitle = input.toolTipTitle ?? locLabelReference(input.toolTipTitleLocId);
+  const toolTipDescription =
+    input.toolTipDescription ?? locLabelReference(input.toolTipDescriptionLocId);
   const buttonAttributes: Array<[string, string | number | undefined]> = [
     ["Id", input.buttonId],
     ["Command", input.commandId],
     ["LabelText", labelText],
-    ["Alt", input.alt],
-    ["ToolTipTitle", input.toolTipTitle],
-    ["ToolTipDescription", input.toolTipDescription],
+    ["Alt", alt],
+    ["ToolTipTitle", toolTipTitle],
+    ["ToolTipDescription", toolTipDescription],
     ["Image16by16", webResourceValue(input.image16x16)],
     ["Image32by32", webResourceValue(input.image32x32)],
     ["ModernImage", webResourceValue(input.modernImage)],
@@ -1280,4 +1297,10 @@ function webResourceValue(value: string | undefined): string | undefined {
 
 function locLabelReference(value: string | undefined): string | undefined {
   return value ? `$LocLabels:${value}` : undefined;
+}
+
+function newLocLabels(input: NewCustomButtonInput): NewLocLabelInput[] {
+  return [input.locLabel, ...(input.locLabels ?? [])].filter((label): label is NewLocLabelInput =>
+    Boolean(label),
+  );
 }

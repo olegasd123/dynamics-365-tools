@@ -154,6 +154,7 @@ function validateButton(
 
   for (const labelId of [
     button.labelLocId,
+    button.altLocId,
     button.toolTipTitleLocId,
     button.toolTipDescriptionLocId,
   ]) {

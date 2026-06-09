@@ -396,9 +396,9 @@ function commandUiDetails(commandUI: NonNullable<CustomAction["commandUI"]>) {
 
 function optionalButtonDetails(button: ButtonNode): Array<[string, RibbonDetailValue]> {
   return [
-    ["Alt", button.alt],
-    ["Tool tip title", button.toolTipTitle],
-    ["Tool tip description", button.toolTipDescription],
+    ["Alt", button.alt ?? button.altLocId],
+    ["Tool tip title", button.toolTipTitle ?? button.toolTipTitleLocId],
+    ["Tool tip description", button.toolTipDescription ?? button.toolTipDescriptionLocId],
     ["Image 16", button.image16x16?.webResourceUniqueName],
     ["Image 32", button.image32x32?.webResourceUniqueName],
     ["Modern image", button.modernImage?.webResourceUniqueName],
