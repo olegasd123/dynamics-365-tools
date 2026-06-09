@@ -407,10 +407,21 @@ export function createLocLabelPatches(
   document: RibbonDocument,
   input: NewLocLabelInput,
 ): RibbonPatch[] {
+  return createLocLabelsPatches(document, [input]);
+}
+
+export function createLocLabelsPatches(
+  document: RibbonDocument,
+  inputs: NewLocLabelInput[],
+): RibbonPatch[] {
+  if (!inputs.length) {
+    return [];
+  }
+
   return createSectionChildPatches(document, [
     {
       sectionName: "LocLabels",
-      childText: renderLocLabel(input),
+      childText: inputs.map((input) => renderLocLabel(input)).join("\n"),
     },
   ]);
 }

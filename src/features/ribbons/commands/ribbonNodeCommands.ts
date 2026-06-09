@@ -4,6 +4,7 @@ import {
   createCustomButtonReplacePatch,
   createDeleteNodePatch,
   createHideActionReplacePatch,
+  createLocLabelsPatches,
   createLocLabelTitlePatch,
   createLocLabelTitleReplacePatch,
   createNodeAttributeValuePatch,
@@ -11,6 +12,7 @@ import {
   createRuleStepReplacePatch,
   createSwapNodePatches,
   NewCustomButtonInput,
+  NewLocLabelInput,
 } from "../ribbonEditPatches";
 import { RibbonExplorerNode, RibbonItemNode } from "../ribbonExplorer";
 import {
@@ -39,7 +41,7 @@ import {
   promptRequired,
   validateOptionalNumber,
 } from "./ribbonActionPrompts";
-import { sameRange, validateUniqueId } from "./ribbonCommandSupport";
+import { collectRibbonIds, sameRange, validateUniqueId } from "./ribbonCommandSupport";
 import { promptRibbonLanguageCode } from "./ribbonLanguagePrompts";
 import { showRibbonInputBox } from "./ribbonPromptUi";
 import { pickImageWebResource } from "./ribbonResourcePrompts";
@@ -1014,7 +1016,6 @@ async function editCustomAction(
   if (labelText === undefined) {
     return;
   }
-  const labelDefault = getButtonLabelDefault(document, labelLocId, labelText);
   const inlineLabelText = getEditedInlineLocText(
     inputLocId(labelLocId),
     labelText,
@@ -1022,7 +1023,7 @@ async function editCustomAction(
   );
 
   const altLocDefault = getButtonLabelDefault(document, action.commandUI.altLocId ?? "", "");
-  const alt = await promptOptional("Alt", action.commandUI.alt || altLocDefault || labelDefault);
+  const alt = await promptOptional("Alt", action.commandUI.alt || altLocDefault);
   if (alt === undefined) {
     return;
   }
@@ -1034,7 +1035,7 @@ async function editCustomAction(
   );
   const toolTipTitle = await promptOptional(
     "Tool tip title",
-    action.commandUI.toolTipTitle || toolTipTitleLocDefault || labelDefault,
+    action.commandUI.toolTipTitle || toolTipTitleLocDefault,
   );
   if (toolTipTitle === undefined) {
     return;
@@ -1047,11 +1048,42 @@ async function editCustomAction(
   );
   const toolTipDescription = await promptOptional(
     "Tool tip description",
-    action.commandUI.toolTipDescription || toolTipDescriptionLocDefault || labelDefault,
+    action.commandUI.toolTipDescription || toolTipDescriptionLocDefault,
   );
   if (toolTipDescription === undefined) {
     return;
   }
+
+  const usedIds = collectRibbonIds(document);
+  const locLabelBaseId = editedButtonLocLabelBase(labelLocId, action.commandUI.id);
+  const newLocLabels: NewLocLabelInput[] = [];
+  const altLocId = resolveEditedMetadataLocLabelId({
+    currentLocId: action.commandUI.altLocId,
+    existingInlineText: action.commandUI.alt,
+    text: alt,
+    baseId: locLabelBaseId,
+    suffix: "Alt",
+    usedIds,
+    newLocLabels,
+  });
+  const toolTipTitleLocId = resolveEditedMetadataLocLabelId({
+    currentLocId: action.commandUI.toolTipTitleLocId,
+    existingInlineText: action.commandUI.toolTipTitle,
+    text: toolTipTitle,
+    baseId: locLabelBaseId,
+    suffix: "ToolTipTitle",
+    usedIds,
+    newLocLabels,
+  });
+  const toolTipDescriptionLocId = resolveEditedMetadataLocLabelId({
+    currentLocId: action.commandUI.toolTipDescriptionLocId,
+    existingInlineText: action.commandUI.toolTipDescription,
+    text: toolTipDescription,
+    baseId: locLabelBaseId,
+    suffix: "ToolTipDescription",
+    usedIds,
+    newLocLabels,
+  });
 
   const image16x16 = await pickImageWebResource(
     ctx,
@@ -1103,17 +1135,17 @@ async function editCustomAction(
     action: { kind: "Url", address: "" },
     labelLocId: labelLocId.trim() || undefined,
     labelText: inlineLabelText,
-    altLocId: action.commandUI.altLocId,
-    alt: getEditedInlineLocText(action.commandUI.altLocId, alt, action.commandUI.alt),
-    toolTipTitleLocId: action.commandUI.toolTipTitleLocId,
+    altLocId,
+    alt: getEditedInlineLocText(altLocId, alt, action.commandUI.alt),
+    toolTipTitleLocId,
     toolTipTitle: getEditedInlineLocText(
-      action.commandUI.toolTipTitleLocId,
+      toolTipTitleLocId,
       toolTipTitle,
       action.commandUI.toolTipTitle,
     ),
-    toolTipDescriptionLocId: action.commandUI.toolTipDescriptionLocId,
+    toolTipDescriptionLocId,
     toolTipDescription: getEditedInlineLocText(
-      action.commandUI.toolTipDescriptionLocId,
+      toolTipDescriptionLocId,
       toolTipDescription,
       action.commandUI.toolTipDescription,
     ),
@@ -1123,7 +1155,7 @@ async function editCustomAction(
     templateAlias: templateAlias.trim() || undefined,
   };
 
-  ctx.ribbon.editorState.queuePatches(document, [
+  const patches = sortRibbonPatchesForApply([
     createCustomButtonReplacePatch(document.sourceText, action.range, input),
     ...createEditedButtonLocLabelPatches(document, [
       { locLabelId: input.labelLocId, text: labelText },
@@ -1131,7 +1163,9 @@ async function editCustomAction(
       { locLabelId: input.toolTipTitleLocId, text: toolTipTitle },
       { locLabelId: input.toolTipDescriptionLocId, text: toolTipDescription },
     ]),
+    ...createLocLabelsPatches(document, newLocLabels),
   ]);
+  ctx.ribbon.editorState.queuePatches(document, patches);
   ctx.ribbon.explorer.refresh();
 }
 
@@ -1177,6 +1211,70 @@ function getEditedInlineLocText(
   }
 
   return locLabelId?.trim() ? undefined : inlineLabel;
+}
+
+function resolveEditedMetadataLocLabelId(input: {
+  currentLocId: string | undefined;
+  existingInlineText: string | undefined;
+  text: string;
+  baseId: string;
+  suffix: string;
+  usedIds: Set<string>;
+  newLocLabels: NewLocLabelInput[];
+}): string | undefined {
+  const currentLocId = input.currentLocId?.trim();
+  if (currentLocId) {
+    return currentLocId;
+  }
+
+  const description = input.text.trim();
+  if (!description || input.existingInlineText !== undefined) {
+    return undefined;
+  }
+
+  const id = nextAvailableRibbonId(input.usedIds, `${input.baseId}.${input.suffix}`);
+  input.newLocLabels.push({
+    id,
+    languageCode: 1033,
+    description,
+  });
+  return id;
+}
+
+function editedButtonLocLabelBase(labelLocId: string, buttonId: string): string {
+  const labelId = labelLocId.trim();
+  if (labelId.endsWith(".Label")) {
+    return labelId.slice(0, -".Label".length);
+  }
+  if (labelId) {
+    return labelId;
+  }
+
+  const id = buttonId.trim();
+  return id.endsWith(".Button") ? id.slice(0, -".Button".length) : id;
+}
+
+function nextAvailableRibbonId(usedIds: Set<string>, id: string): string {
+  if (!usedIds.has(id)) {
+    usedIds.add(id);
+    return id;
+  }
+
+  for (let index = 2; ; index += 1) {
+    const candidate = `${id}.${index}`;
+    if (!usedIds.has(candidate)) {
+      usedIds.add(candidate);
+      return candidate;
+    }
+  }
+}
+
+function sortRibbonPatchesForApply(patches: RibbonPatch[]): RibbonPatch[] {
+  return [...patches].sort((left, right) => patchStart(right) - patchStart(left));
+}
+
+function patchStart(patch: RibbonPatch): number {
+  return patch.kind === "insert" ? patch.offset : patch.range.start;
 }
 
 function inputLocId(value: string): string | undefined {

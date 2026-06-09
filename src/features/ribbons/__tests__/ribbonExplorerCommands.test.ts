@@ -261,7 +261,7 @@ test("prefills custom button text metadata from the label", async () => {
   );
 });
 
-test("prefills empty custom button text metadata from loc label while editing", async () => {
+test("does not prefill empty custom button text metadata from label while editing", async () => {
   const source = `<RibbonDiffXml>
   <CustomActions>
     <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
@@ -343,16 +343,127 @@ test("prefills empty custom button text metadata from loc label while editing", 
 
   assert.strictEqual(defaultsByPrompt.get("Button label"), "Run report");
   assert.strictEqual(defaultsByPrompt.has("Button label Id"), false);
-  assert.strictEqual(defaultsByPrompt.get("Alt"), "Run report");
-  assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "Run report");
-  assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "Run report");
+  assert.strictEqual(defaultsByPrompt.get("Alt"), "");
+  assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "");
+  assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "");
 
   const updated = applyRibbonPatchSequence(source, patches);
   assert.match(updated, /LabelText="\$LocLabels:new\.Label"/);
   assert.doesNotMatch(updated, /LabelText="Run report"/);
-  assert.match(updated, /Alt="Run report"/);
-  assert.match(updated, /ToolTipTitle="Run report"/);
-  assert.match(updated, /ToolTipDescription="Run report"/);
+  assert.doesNotMatch(updated, /Alt=/);
+  assert.doesNotMatch(updated, /ToolTipTitle=/);
+  assert.doesNotMatch(updated, /ToolTipDescription=/);
+});
+
+test("creates missing custom button metadata loc labels while editing", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <LocLabels>
+    <LocLabel Id="new.Label">
+      <Titles>
+        <Title languagecode="1033" description="Run report" />
+      </Titles>
+    </LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    "CustomAction: new.Action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-event",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
+
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt === "Alt") {
+      return "Run report";
+    }
+    if (options.prompt === "Tool tip description") {
+      return "Run the report";
+    }
+
+    return options.value ?? "";
+  };
+
+  try {
+    await editRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedButton = updatedDocument.views[0].customActions[0].commandUI;
+  assert.strictEqual(updatedButton?.kind, "Button");
+  assert.strictEqual(
+    updatedButton.kind === "Button" ? updatedButton.labelLocId : undefined,
+    "new.Label",
+  );
+  assert.strictEqual(
+    updatedButton.kind === "Button" ? updatedButton.altLocId : undefined,
+    "new.Alt",
+  );
+  assert.strictEqual(
+    updatedButton.kind === "Button" ? updatedButton.toolTipDescriptionLocId : undefined,
+    "new.ToolTipDescription",
+  );
+  assert.deepStrictEqual(
+    updatedDocument.views[0].locLabels.map((label) => label.id),
+    ["new.Label", "new.Alt", "new.ToolTipDescription"],
+  );
+  assert.strictEqual(updatedDocument.views[0].locLabels[1].titles[0].description, "Run report");
+  assert.strictEqual(updatedDocument.views[0].locLabels[2].titles[0].description, "Run the report");
+  assert.doesNotMatch(updated, /ToolTipTitle=/);
 });
 
 test("edits custom button loc label text from custom action", async () => {
