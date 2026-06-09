@@ -1005,10 +1005,7 @@ async function editCustomAction(
     return;
   }
 
-  const labelLocId = await promptOptional("Button label Id", action.commandUI.labelLocId);
-  if (labelLocId === undefined) {
-    return;
-  }
+  const labelLocId = action.commandUI.labelLocId ?? "";
 
   const labelText = await promptOptional(
     "Button label",

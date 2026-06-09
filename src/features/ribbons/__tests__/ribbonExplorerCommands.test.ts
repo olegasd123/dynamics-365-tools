@@ -342,6 +342,7 @@ test("prefills empty custom button text metadata from loc label while editing", 
   }
 
   assert.strictEqual(defaultsByPrompt.get("Button label"), "Run report");
+  assert.strictEqual(defaultsByPrompt.has("Button label Id"), false);
   assert.strictEqual(defaultsByPrompt.get("Alt"), "Run report");
   assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "Run report");
   assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "Run report");
