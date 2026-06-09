@@ -27,6 +27,7 @@ import {
   LocLabelTitle,
   RibbonDocument,
   RibbonPatch,
+  RibbonScope,
   RuleStep,
   TextRange,
 } from "../models";
@@ -41,6 +42,7 @@ import {
   promptRequired,
   validateOptionalNumber,
 } from "./ribbonActionPrompts";
+import { pickLocation } from "./ribbonButtonCommands";
 import { collectRibbonIds, sameRange, validateUniqueId } from "./ribbonCommandSupport";
 import { promptRibbonLanguageCode } from "./ribbonLanguagePrompts";
 import { showRibbonInputBox } from "./ribbonPromptUi";
@@ -992,7 +994,9 @@ async function editCustomAction(
     return;
   }
 
-  const location = await promptRequired("Location", action.location);
+  const location = await pickLocation(document, inferRibbonScope(action.location), {
+    currentValue: action.location,
+  });
   if (location === undefined) {
     return;
   }
@@ -1334,6 +1338,11 @@ function findLocLabel(document: RibbonDocument, id: string): LocLabel | undefine
   return undefined;
 }
 
+function inferRibbonScope(location: string): RibbonScope | undefined {
+  const match = /^Mscrm\.(Form|HomepageGrid|SubGrid)\./.exec(location);
+  return match ? (match[1] as RibbonScope) : undefined;
+}
+
 async function editHideAction(
   ctx: CommandContext,
   document: RibbonDocument,
@@ -1344,7 +1353,9 @@ async function editHideAction(
     return;
   }
 
-  const location = await promptRequired("Location", action.location);
+  const location = await pickLocation(document, inferRibbonScope(action.location), {
+    currentValue: action.location,
+  });
   if (location === undefined) {
     return;
   }

@@ -10,7 +10,7 @@ import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { DataverseClient } from "@features/dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
-import { addCustomRibbonButton } from "../commands/ribbonButtonCommands";
+import { addCustomRibbonButton, pickLocation } from "../commands/ribbonButtonCommands";
 import { addRibbonCommandAction } from "../commands/ribbonCommandDefinitionCommands";
 import { addRibbonLocLabelTitle } from "../commands/ribbonLabelCommands";
 import {
@@ -261,6 +261,50 @@ test("prefills custom button text metadata from the label", async () => {
   );
 });
 
+test("presents OOB ribbon locations with their buttons and sequences", async () => {
+  const source = `<RibbonDiffXml>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "Save");
+    }
+
+    return undefined;
+  };
+
+  let location: string | undefined;
+  try {
+    location = await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  assert.strictEqual(location, "Mscrm.Form.account.MainTab.Save.Controls._children");
+
+  const save = locationItems.find((item) => item.label === "Save");
+  assert.strictEqual(save?.description, "Save (10), Save and close (20), Save and new (30)");
+  assert.strictEqual(save?.detail, "Mscrm.Form.account.MainTab.Save.Controls._children");
+
+  const collaborate = locationItems.find((item) => item.label === "Collaborate");
+  assert.strictEqual(collaborate?.description, "Share (10), Email link (20), Copy link (30)");
+
+  assert.ok(locationItems.some((item) => (item as { manual?: boolean }).manual));
+});
+
 test("does not prefill empty custom button text metadata from label while editing", async () => {
   const source = `<RibbonDiffXml>
   <CustomActions>
@@ -303,6 +347,10 @@ test("does not prefill empty custom button text metadata from label while editin
     items: vscode.QuickPickItem[],
     options: { placeHolder?: string },
   ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items.find((item) => (item as { manual?: boolean }).manual);
+    }
+
     if (
       options.placeHolder === "Image 16 web resource" ||
       options.placeHolder === "Image 32 web resource" ||
@@ -396,6 +444,10 @@ test("creates missing custom button metadata loc labels while editing", async ()
     items: vscode.QuickPickItem[],
     options: { placeHolder?: string },
   ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items.find((item) => (item as { manual?: boolean }).manual);
+    }
+
     if (
       options.placeHolder === "Image 16 web resource" ||
       options.placeHolder === "Image 32 web resource" ||
@@ -506,6 +558,10 @@ test("edits custom button loc label text from custom action", async () => {
     items: vscode.QuickPickItem[],
     options: { placeHolder?: string },
   ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items.find((item) => (item as { manual?: boolean }).manual);
+    }
+
     if (
       options.placeHolder === "Image 16 web resource" ||
       options.placeHolder === "Image 32 web resource" ||

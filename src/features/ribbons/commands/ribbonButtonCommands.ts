@@ -10,12 +10,13 @@ import {
   nextHideActionId,
 } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
-import { RibbonDocument, RibbonView } from "../models";
+import { RibbonDocument, RibbonScope, RibbonView } from "../models";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
   listOobRibbonLocations,
   OobRibbonCommand,
+  OobRibbonLocation,
 } from "../oobCatalog";
 import {
   promptJavaScriptAction,
@@ -33,6 +34,11 @@ import { pickImageWebResource } from "./ribbonResourcePrompts";
 
 interface OobCommandPick extends vscode.QuickPickItem {
   command?: OobRibbonCommand;
+  manual?: boolean;
+}
+
+interface LocationPick extends vscode.QuickPickItem {
+  location?: string;
   manual?: boolean;
 }
 
@@ -104,7 +110,7 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view);
+  const location = await pickLocation(target.document, target.view.scope);
   if (!location) {
     return;
   }
@@ -224,7 +230,7 @@ export async function hideAndStubOobRibbonButtons(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view);
+  const location = await pickLocation(target.document, target.view.scope);
   if (!location) {
     return;
   }
@@ -300,7 +306,7 @@ export async function reorderOobRibbonButtons(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view);
+  const location = await pickLocation(target.document, target.view.scope);
   if (!location) {
     return;
   }
@@ -493,40 +499,68 @@ async function pickOobCommandOrder(
   return ordered;
 }
 
-async function pickLocation(
+export async function pickLocation(
   document: RibbonDocument,
-  view: RibbonView,
-  command?: OobRibbonCommand,
+  scope: RibbonScope | undefined,
+  options: { command?: OobRibbonCommand; currentValue?: string } = {},
 ): Promise<string | undefined> {
-  const suggestedLocations = (command?.locationIds ?? [])
+  const suggestedLocations = (options.command?.locationIds ?? [])
     .map((id) => findOobRibbonLocation(id, document.entityLogicalName))
     .filter((location): location is NonNullable<typeof location> => !!location);
-  const fallbackLocations = listOobRibbonLocations(view.scope, document.entityLogicalName);
+  const fallbackLocations = listOobRibbonLocations(scope, document.entityLogicalName);
   const locations = suggestedLocations.length ? suggestedLocations : fallbackLocations;
-  const pick = await showRibbonQuickPick(
+  const commands = listOobRibbonCommands(scope, document.entityLogicalName);
+  const pick = await showRibbonQuickPick<LocationPick>(
     [
       ...locations.map((location) => ({
-        label: location.location,
-        description: location.label,
+        label: location.group,
+        description: describeLocationContents(location, commands) || location.label,
+        detail: location.location,
+        location: location.location,
       })),
-      { label: "Type location", description: "Use a custom location id" },
+      { label: "Type location", description: "Use a custom location id", manual: true },
     ],
-    { placeHolder: "Ribbon location" },
+    { placeHolder: "Ribbon location", matchOnDescription: true, matchOnDetail: true },
   );
 
   if (!pick) {
     return undefined;
   }
 
-  if (pick.label !== "Type location") {
-    return pick.label;
+  if (!pick.manual && pick.location) {
+    return pick.location;
   }
 
   return showRibbonInputBox({
     prompt: "Ribbon location",
+    value: options.currentValue,
     placeHolder: "Mscrm.Form.account.MainTab.Save.Controls._children",
     validateInput: (value) => (value.trim() ? undefined : "Location is required."),
   });
+}
+
+function describeLocationContents(
+  location: OobRibbonLocation,
+  commands: OobRibbonCommand[],
+): string {
+  const seen = new Set<string>();
+  return commands
+    .filter((command) => command.locationIds.includes(location.id))
+    .slice()
+    .sort(
+      (a, b) => (a.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sequence ?? Number.MAX_SAFE_INTEGER),
+    )
+    .filter((command) => {
+      if (seen.has(command.label)) {
+        return false;
+      }
+      seen.add(command.label);
+      return true;
+    })
+    .map((command) =>
+      command.sequence === undefined ? command.label : `${command.label} (${command.sequence})`,
+    )
+    .join(", ");
 }
 
 async function pickHideLocation(
@@ -538,7 +572,7 @@ async function pickHideLocation(
     return command.controlId;
   }
 
-  return pickLocation(document, view, command);
+  return pickLocation(document, view.scope, { command });
 }
 
 export function getOobCommandId(command: OobRibbonCommand): string {
