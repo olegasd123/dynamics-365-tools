@@ -305,6 +305,51 @@ test("presents OOB ribbon locations with their buttons and sequences", async () 
   assert.ok(locationItems.some((item) => (item as { manual?: boolean }).manual));
 });
 
+test("includes existing custom buttons in the location contents", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.Validate.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="15">
+      <CommandUIDefinition>
+        <Button Id="new.account.Form.Validate.Button" Command="new.account.Form.Validate.Command" LabelText="Validate" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "Save");
+    }
+
+    return undefined;
+  };
+
+  try {
+    await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const save = locationItems.find((item) => item.label === "Save");
+  assert.strictEqual(
+    save?.description,
+    "Save (10), Validate (15), Save and close (20), Save and new (30)",
+  );
+});
+
 test("does not prefill empty custom button text metadata from label while editing", async () => {
   const source = `<RibbonDiffXml>
   <CustomActions>

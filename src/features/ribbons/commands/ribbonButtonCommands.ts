@@ -10,7 +10,7 @@ import {
   nextHideActionId,
 } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
-import { RibbonDocument, RibbonScope, RibbonView } from "../models";
+import { ButtonNode, RibbonDocument, RibbonScope, RibbonView } from "../models";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
@@ -514,7 +514,7 @@ export async function pickLocation(
     [
       ...locations.map((location) => ({
         label: location.group,
-        description: describeLocationContents(location, commands) || location.label,
+        description: describeLocationContents(document, location, commands) || location.label,
         detail: location.location,
         location: location.location,
       })),
@@ -540,27 +540,73 @@ export async function pickLocation(
 }
 
 function describeLocationContents(
+  document: RibbonDocument,
   location: OobRibbonLocation,
   commands: OobRibbonCommand[],
 ): string {
+  const entries: Array<{ label: string; sequence?: number }> = [
+    ...commands
+      .filter((command) => command.locationIds.includes(location.id))
+      .map((command) => ({ label: command.label, sequence: command.sequence })),
+    ...listCustomButtonsAtLocation(document, location.location),
+  ];
   const seen = new Set<string>();
-  return commands
-    .filter((command) => command.locationIds.includes(location.id))
-    .slice()
+  return entries
     .sort(
       (a, b) => (a.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sequence ?? Number.MAX_SAFE_INTEGER),
     )
-    .filter((command) => {
-      if (seen.has(command.label)) {
+    .filter((entry) => {
+      if (seen.has(entry.label)) {
         return false;
       }
-      seen.add(command.label);
+      seen.add(entry.label);
       return true;
     })
-    .map((command) =>
-      command.sequence === undefined ? command.label : `${command.label} (${command.sequence})`,
+    .map((entry) =>
+      entry.sequence === undefined ? entry.label : `${entry.label} (${entry.sequence})`,
     )
     .join(", ");
+}
+
+function listCustomButtonsAtLocation(
+  document: RibbonDocument,
+  location: string,
+): Array<{ label: string; sequence?: number }> {
+  const buttons: Array<{ label: string; sequence?: number }> = [];
+  for (const view of document.views) {
+    for (const action of view.customActions) {
+      const button = action.commandUI;
+      if (action.location !== location || button?.kind !== "Button") {
+        continue;
+      }
+      buttons.push({
+        label: resolveCustomButtonLabel(document, button),
+        sequence: action.sequence ?? button.sequence,
+      });
+    }
+  }
+  return buttons;
+}
+
+function resolveCustomButtonLabel(document: RibbonDocument, button: ButtonNode): string {
+  const inline = button.labelText?.trim();
+  if (inline) {
+    return inline;
+  }
+
+  const locLabelId = button.labelLocId?.trim();
+  if (locLabelId) {
+    for (const view of document.views) {
+      const title = view.locLabels
+        .find((label) => label.id === locLabelId)
+        ?.titles.find((item) => item.description.trim());
+      if (title) {
+        return title.description.trim();
+      }
+    }
+  }
+
+  return button.id;
 }
 
 async function pickHideLocation(
