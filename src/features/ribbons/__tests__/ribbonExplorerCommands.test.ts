@@ -354,6 +354,101 @@ test("prefills empty custom button text metadata from loc label while editing", 
   assert.match(updated, /ToolTipDescription="Run report"/);
 });
 
+test("edits custom button loc label text from custom action", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" Alt="$LocLabels:new.Alt" ToolTipTitle="$LocLabels:new.ToolTipTitle" ToolTipDescription="$LocLabels:new.ToolTipDescription" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+    <LocLabel Id="new.Alt"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+    <LocLabel Id="new.ToolTipTitle"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+    <LocLabel Id="new.ToolTipDescription"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    "CustomAction: new.Action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-event",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
+
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Button label":
+        return "Send to Service";
+      case "Alt":
+        return "Send to service";
+      case "Tool tip title":
+        return "Send to service";
+      case "Tool tip description":
+        return "Send account to service";
+      default:
+        return options.value ?? "";
+    }
+  };
+
+  try {
+    await editRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /LabelText="\$LocLabels:new\.Label"/);
+  assert.match(updated, /Alt="\$LocLabels:new\.Alt"/);
+  assert.match(updated, /ToolTipTitle="\$LocLabels:new\.ToolTipTitle"/);
+  assert.match(updated, /ToolTipDescription="\$LocLabels:new\.ToolTipDescription"/);
+  assert.match(updated, /<Title languagecode="1033" description="Send to Service" \/>/);
+  assert.match(updated, /<Title languagecode="1033" description="Send to service" \/>/);
+  assert.match(updated, /<Title languagecode="1033" description="Send account to service" \/>/);
+});
+
 test("opens ribbon source location in the OS", async () => {
   const source: RibbonSource = {
     id: "zip:/tmp/core",

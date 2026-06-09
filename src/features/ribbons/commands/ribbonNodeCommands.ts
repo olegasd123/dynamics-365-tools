@@ -4,6 +4,7 @@ import {
   createCustomButtonReplacePatch,
   createDeleteNodePatch,
   createHideActionReplacePatch,
+  createLocLabelTitlePatch,
   createLocLabelTitleReplacePatch,
   createNodeAttributeValuePatch,
   createRuleChildStepPatch,
@@ -23,6 +24,7 @@ import {
   LocLabel,
   LocLabelTitle,
   RibbonDocument,
+  RibbonPatch,
   RuleStep,
   TextRange,
 } from "../models";
@@ -1017,8 +1019,7 @@ async function editCustomAction(
   }
   const labelDefault = getButtonLabelDefault(document, labelLocId, labelText);
   const inlineLabelText = getEditedInlineLocText(
-    document,
-    labelLocId,
+    inputLocId(labelLocId),
     labelText,
     action.commandUI.labelText,
   );
@@ -1106,23 +1107,16 @@ async function editCustomAction(
     labelLocId: labelLocId.trim() || undefined,
     labelText: inlineLabelText,
     altLocId: action.commandUI.altLocId,
-    alt: getEditedInlineLocText(
-      document,
-      action.commandUI.altLocId ?? "",
-      alt,
-      action.commandUI.alt,
-    ),
+    alt: getEditedInlineLocText(action.commandUI.altLocId, alt, action.commandUI.alt),
     toolTipTitleLocId: action.commandUI.toolTipTitleLocId,
     toolTipTitle: getEditedInlineLocText(
-      document,
-      action.commandUI.toolTipTitleLocId ?? "",
+      action.commandUI.toolTipTitleLocId,
       toolTipTitle,
       action.commandUI.toolTipTitle,
     ),
     toolTipDescriptionLocId: action.commandUI.toolTipDescriptionLocId,
     toolTipDescription: getEditedInlineLocText(
-      document,
-      action.commandUI.toolTipDescriptionLocId ?? "",
+      action.commandUI.toolTipDescriptionLocId,
       toolTipDescription,
       action.commandUI.toolTipDescription,
     ),
@@ -1134,6 +1128,12 @@ async function editCustomAction(
 
   ctx.ribbon.editorState.queuePatches(document, [
     createCustomButtonReplacePatch(document.sourceText, action.range, input),
+    ...createEditedButtonLocLabelPatches(document, [
+      { locLabelId: input.labelLocId, text: labelText },
+      { locLabelId: input.altLocId, text: alt },
+      { locLabelId: input.toolTipTitleLocId, text: toolTipTitle },
+      { locLabelId: input.toolTipDescriptionLocId, text: toolTipDescription },
+    ]),
   ]);
   ctx.ribbon.explorer.refresh();
 }
@@ -1166,8 +1166,7 @@ function getButtonLabelDefault(
 }
 
 function getEditedInlineLocText(
-  document: RibbonDocument,
-  labelLocId: string,
+  locLabelId: string | undefined,
   labelText: string,
   existingInlineLabelText: string | undefined,
 ): string | undefined {
@@ -1180,8 +1179,64 @@ function getEditedInlineLocText(
     return inlineLabel;
   }
 
-  const locLabelDefault = getButtonLabelDefault(document, labelLocId, "")?.trim();
-  return locLabelDefault === inlineLabel ? undefined : inlineLabel;
+  return locLabelId?.trim() ? undefined : inlineLabel;
+}
+
+function inputLocId(value: string): string | undefined {
+  return value.trim() || undefined;
+}
+
+function createEditedButtonLocLabelPatches(
+  document: RibbonDocument,
+  inputs: Array<{ locLabelId: string | undefined; text: string }>,
+): RibbonPatch[] {
+  const patches: RibbonPatch[] = [];
+
+  for (const input of inputs) {
+    const locLabelId = input.locLabelId?.trim();
+    const description = input.text.trim();
+    if (!locLabelId || !description) {
+      continue;
+    }
+
+    const label = findLocLabel(document, locLabelId);
+    if (!label) {
+      continue;
+    }
+
+    const title = label.titles.find((item) => item.description.trim()) ?? label.titles[0];
+    if (!title) {
+      patches.push(
+        createLocLabelTitlePatch(document, label.range, {
+          languageCode: 1033,
+          description,
+        }),
+      );
+      continue;
+    }
+
+    if (title.description !== description) {
+      patches.push(
+        createLocLabelTitleReplacePatch(document.sourceText, title, {
+          languageCode: title.languageCode,
+          description,
+        }),
+      );
+    }
+  }
+
+  return patches;
+}
+
+function findLocLabel(document: RibbonDocument, id: string): LocLabel | undefined {
+  for (const view of document.views) {
+    const label = view.locLabels.find((item) => item.id === id);
+    if (label) {
+      return label;
+    }
+  }
+
+  return undefined;
 }
 
 async function editHideAction(
