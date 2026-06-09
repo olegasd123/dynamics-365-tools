@@ -644,7 +644,7 @@ function listCustomButtonsAtLocation(
 function resolveCustomButtonLabel(document: RibbonDocument, button: ButtonNode): string {
   const inline = button.labelText?.trim();
   if (inline) {
-    return inline;
+    return displayLabel(inline);
   }
 
   const locLabelId = button.labelLocId?.trim();
@@ -660,6 +660,16 @@ function resolveCustomButtonLabel(document: RibbonDocument, button: ButtonNode):
   }
 
   return button.id;
+}
+
+function displayLabel(value: string): string {
+  const reference = /^\$[A-Za-z]+:(.+)$/.exec(value);
+  if (!reference) {
+    return value;
+  }
+
+  const lastSegment = reference[1].split(".").pop()?.trim();
+  return lastSegment || value;
 }
 
 async function pickHideLocation(

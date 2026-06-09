@@ -405,6 +405,53 @@ test("surfaces non-catalog group locations already used by the document", async 
   );
 });
 
+test("shows the last segment of $Resources button labels", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="mso.Activate.CustomAction" Location="Mscrm.Form.account.MainTab.ModernClient.Controls._children" Sequence="50">
+      <CommandUIDefinition>
+        <Button Id="mso.Activate.Button" Command="mso.Activate.Command" LabelText="$Resources:Ribbon.HomepageGrid.account.Record.Status.Activate" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="mso.Deactivate.CustomAction" Location="Mscrm.Form.account.MainTab.ModernClient.Controls._children" Sequence="60">
+      <CommandUIDefinition>
+        <Button Id="mso.Deactivate.Button" Command="mso.Deactivate.Command" LabelText="$Resources:Ribbon.HomepageGrid.account.Record.Status.Deactivate" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "ModernClient");
+    }
+
+    return undefined;
+  };
+
+  try {
+    await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const modernClient = locationItems.find((item) => item.label === "ModernClient");
+  assert.strictEqual(modernClient?.description, "Activate (50), Deactivate (60)");
+});
+
 test("does not prefill empty custom button text metadata from label while editing", async () => {
   const source = `<RibbonDiffXml>
   <CustomActions>
