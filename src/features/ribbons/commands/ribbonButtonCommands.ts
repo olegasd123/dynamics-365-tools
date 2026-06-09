@@ -25,6 +25,7 @@ import {
 } from "./ribbonActionPrompts";
 import {
   collectRibbonIds,
+  inferRibbonScope,
   nextBatchId,
   nextCustomActionSequence,
   resolveRibbonTarget,
@@ -507,8 +508,10 @@ export async function pickLocation(
   const suggestedLocations = (options.command?.locationIds ?? [])
     .map((id) => findOobRibbonLocation(id, document.entityLogicalName))
     .filter((location): location is NonNullable<typeof location> => !!location);
-  const fallbackLocations = listOobRibbonLocations(scope, document.entityLogicalName);
-  const locations = suggestedLocations.length ? suggestedLocations : fallbackLocations;
+  const catalogLocations = listOobRibbonLocations(scope, document.entityLogicalName);
+  const locations = suggestedLocations.length
+    ? suggestedLocations
+    : [...catalogLocations, ...listDocumentGroupLocations(document, scope, catalogLocations)];
   const commands = listOobRibbonCommands(scope, document.entityLogicalName);
   const pick = await showRibbonQuickPick<LocationPick>(
     [
@@ -566,6 +569,56 @@ function describeLocationContents(
       entry.sequence === undefined ? entry.label : `${entry.label} (${entry.sequence})`,
     )
     .join(", ");
+}
+
+function listDocumentGroupLocations(
+  document: RibbonDocument,
+  scope: RibbonScope | undefined,
+  catalogLocations: OobRibbonLocation[],
+): OobRibbonLocation[] {
+  const known = new Set(catalogLocations.map((location) => location.location));
+  const discovered = new Map<string, OobRibbonLocation>();
+  for (const view of document.views) {
+    for (const action of view.customActions) {
+      const location = action.location;
+      if (
+        action.commandUI?.kind !== "Button" ||
+        known.has(location) ||
+        discovered.has(location) ||
+        !isGroupChildrenLocation(location) ||
+        !locationMatchesScope(location, scope)
+      ) {
+        continue;
+      }
+
+      const group = groupNameFromLocation(location) ?? location;
+      discovered.set(location, {
+        id: location,
+        scope: inferRibbonScope(location) ?? scope ?? "Application",
+        label: group,
+        group,
+        location,
+      });
+    }
+  }
+
+  return [...discovered.values()];
+}
+
+function isGroupChildrenLocation(location: string): boolean {
+  return /\.Controls\._children$/.test(location);
+}
+
+function groupNameFromLocation(location: string): string | undefined {
+  return /\.([^.]+)\.Controls\._children$/.exec(location)?.[1];
+}
+
+function locationMatchesScope(location: string, scope: RibbonScope | undefined): boolean {
+  if (!scope || scope === "Application") {
+    return true;
+  }
+
+  return inferRibbonScope(location) === scope;
 }
 
 function listCustomButtonsAtLocation(

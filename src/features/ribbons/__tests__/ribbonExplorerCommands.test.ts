@@ -302,6 +302,12 @@ test("presents OOB ribbon locations with their buttons and sequences", async () 
   const collaborate = locationItems.find((item) => item.label === "Collaborate");
   assert.strictEqual(collaborate?.description, "Share (10), Email link (20), Copy link (30)");
 
+  const modernClient = locationItems.find((item) => item.label === "ModernClient");
+  assert.strictEqual(
+    modernClient?.detail,
+    "Mscrm.Form.account.MainTab.ModernClient.Controls._children",
+  );
+
   assert.ok(locationItems.some((item) => (item as { manual?: boolean }).manual));
 });
 
@@ -347,6 +353,55 @@ test("includes existing custom buttons in the location contents", async () => {
   assert.strictEqual(
     save?.description,
     "Save (10), Validate (15), Save and close (20), Save and new (30)",
+  );
+});
+
+test("surfaces non-catalog group locations already used by the document", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="mso.OpenCv.CustomAction" Location="Mscrm.Form.account.MainTab.Management.Controls._children" Sequence="10">
+      <CommandUIDefinition>
+        <Button Id="mso.OpenCv.Button" Command="mso.OpenCv.Command" LabelText="Open CV" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "Management");
+    }
+
+    return undefined;
+  };
+
+  let location: string | undefined;
+  try {
+    location = await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  assert.strictEqual(location, "Mscrm.Form.account.MainTab.Management.Controls._children");
+
+  const management = locationItems.find((item) => item.label === "Management");
+  assert.strictEqual(management?.description, "Open CV (10)");
+  assert.strictEqual(
+    management?.detail,
+    "Mscrm.Form.account.MainTab.Management.Controls._children",
   );
 });
 

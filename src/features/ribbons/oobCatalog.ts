@@ -110,6 +110,13 @@ const LOCATION_TEMPLATES: OobRibbonLocationTemplate[] = [
     locationTemplate: "Mscrm.Form.{entity}.MainTab.Navigation.Controls._children",
   },
   {
+    id: "form-modernclient",
+    scope: "Form",
+    label: "Form Modern command bar",
+    group: "ModernClient",
+    locationTemplate: "Mscrm.Form.{entity}.MainTab.ModernClient.Controls._children",
+  },
+  {
     id: "homepagegrid-management",
     scope: "HomepageGrid",
     label: "Grid Management",
@@ -166,6 +173,13 @@ const LOCATION_TEMPLATES: OobRibbonLocationTemplate[] = [
     locationTemplate: "Mscrm.HomepageGrid.{entity}.MainTab.Import.Controls._children",
   },
   {
+    id: "homepagegrid-modernclient",
+    scope: "HomepageGrid",
+    label: "Grid Modern command bar",
+    group: "ModernClient",
+    locationTemplate: "Mscrm.HomepageGrid.{entity}.MainTab.ModernClient.Controls._children",
+  },
+  {
     id: "subgrid-standard",
     scope: "SubGrid",
     label: "Subgrid Standard",
@@ -185,6 +199,13 @@ const LOCATION_TEMPLATES: OobRibbonLocationTemplate[] = [
     label: "Subgrid Management",
     group: "Management",
     locationTemplate: "Mscrm.SubGrid.{entity}.MainTab.Management.Controls._children",
+  },
+  {
+    id: "subgrid-modernclient",
+    scope: "SubGrid",
+    label: "Subgrid Modern command bar",
+    group: "ModernClient",
+    locationTemplate: "Mscrm.SubGrid.{entity}.MainTab.ModernClient.Controls._children",
   },
 ];
 
