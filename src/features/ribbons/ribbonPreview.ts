@@ -21,6 +21,7 @@ export interface RibbonPreviewGroup {
   id: string;
   label: string;
   location: string;
+  sequence: number;
   items: RibbonPreviewItem[];
 }
 
@@ -35,6 +36,8 @@ export interface RibbonPreviewModel {
 const DEFAULT_LANGUAGE_CODE = 1033;
 const DEFAULT_ENTITY_TOKEN = "{entity}";
 const HIDDEN_GROUP_KEY = "__hidden__";
+const CUSTOM_GROUP_SEQUENCE_BASE = 100000;
+const HIDDEN_GROUP_SEQUENCE = Number.MAX_SAFE_INTEGER;
 const LOCATION_STOP_WORDS = new Set(["Controls", "_children", "Menu", "MenuSection"]);
 
 export function buildRibbonPreview(
@@ -43,11 +46,17 @@ export function buildRibbonPreview(
 ): RibbonPreviewModel {
   const entity = entityLogicalName || DEFAULT_ENTITY_TOKEN;
   const groups = new Map<string, RibbonPreviewGroup>();
+  let customGroupCount = 0;
 
-  const ensureGroup = (location: string, id: string, label: string): RibbonPreviewGroup => {
+  const ensureGroup = (
+    location: string,
+    id: string,
+    label: string,
+    sequence: number,
+  ): RibbonPreviewGroup => {
     let group = groups.get(location);
     if (!group) {
-      group = { id, label, location, items: [] };
+      group = { id, label, location, sequence, items: [] };
       groups.set(location, group);
     }
     return group;
@@ -56,7 +65,7 @@ export function buildRibbonPreview(
   const oobLocations = listOobRibbonLocations(view.scope, entity);
   const oobByLocationId = new Map(oobLocations.map((location) => [location.id, location]));
   for (const location of oobLocations) {
-    ensureGroup(location.location, location.id, location.group);
+    ensureGroup(location.location, location.id, location.group, groupSequence(location.sequence));
   }
   for (const command of listOobRibbonCommands(view.scope, entity)) {
     for (const locationId of command.locationIds) {
@@ -64,7 +73,12 @@ export function buildRibbonPreview(
       if (!location) {
         continue;
       }
-      ensureGroup(location.location, location.id, location.group).items.push({
+      ensureGroup(
+        location.location,
+        location.id,
+        location.group,
+        groupSequence(location.sequence),
+      ).items.push({
         id: command.id,
         label: command.label,
         kind: "Button",
@@ -79,12 +93,17 @@ export function buildRibbonPreview(
   }
 
   for (const action of view.customActions) {
+    const matched = oobLocations.find((location) => location.location === action.location);
+    const existed = groups.has(action.location);
     const group = ensureGroup(
       action.location,
       action.location,
-      oobLocations.find((location) => location.location === action.location)?.group ??
-        locationLabel(action.location),
+      matched?.group ?? locationLabel(action.location),
+      matched ? groupSequence(matched.sequence) : CUSTOM_GROUP_SEQUENCE_BASE + customGroupCount,
     );
+    if (!existed && !matched) {
+      customGroupCount += 1;
+    }
     group.items.push(customItem(action, view.locLabels));
   }
 
@@ -96,7 +115,9 @@ export function buildRibbonPreview(
     group.items = sortBySequence(group.items);
   }
 
-  const ordered = [...groups.values()].filter((group) => group.items.length > 0);
+  const ordered = [...groups.values()]
+    .filter((group) => group.items.length > 0)
+    .sort((left, right) => left.sequence - right.sequence);
 
   return {
     scope: view.scope,
@@ -105,6 +126,10 @@ export function buildRibbonPreview(
     hasCustomizations: view.customActions.length > 0 || view.hideActions.length > 0,
     isEmpty: ordered.length === 0,
   };
+}
+
+function groupSequence(sequence: number | undefined): number {
+  return sequence ?? CUSTOM_GROUP_SEQUENCE_BASE;
 }
 
 function customItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewItem {
@@ -116,7 +141,7 @@ function customItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewI
     return {
       ...base,
       id: ui.id || action.id,
-      label: buttonLabel(ui, locLabels) ?? ui.command ?? ui.id ?? action.id,
+      label: cleanLabel(buttonLabel(ui, locLabels) ?? ui.command ?? ui.id ?? action.id),
       kind: "Button",
       commandId: ui.command || undefined,
       tooltip: buttonTooltip(ui, locLabels),
@@ -131,7 +156,7 @@ function customItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewI
     return {
       ...base,
       id: ui.id || action.id,
-      label: ui.title || ui.id || action.id,
+      label: cleanLabel(ui.title || ui.id || action.id),
       kind: "Group",
       commandId: ui.command || undefined,
     };
@@ -141,27 +166,35 @@ function customItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewI
     return {
       ...base,
       id: ui.id || action.id,
-      label: ui.title || ui.id || action.id,
+      label: cleanLabel(ui.title || ui.id || action.id),
       kind: "Tab",
       commandId: ui.command || undefined,
     };
   }
 
   if (ui?.kind === "MenuSection") {
-    return { ...base, id: ui.id || action.id, label: ui.id || action.id, kind: "MenuSection" };
+    return {
+      ...base,
+      id: ui.id || action.id,
+      label: cleanLabel(ui.id || action.id),
+      kind: "MenuSection",
+    };
   }
 
-  return { ...base, id: action.id, label: action.id || "(custom action)", kind: "Unknown" };
+  return {
+    ...base,
+    id: action.id,
+    label: cleanLabel(action.id || "(custom action)"),
+    kind: "Unknown",
+  };
 }
 
 function applyHide(groups: Map<string, RibbonPreviewGroup>, hide: HideAction): void {
+  const targets = [hide.hideActionId, hide.location].filter(Boolean);
   let matched = false;
   for (const group of groups.values()) {
     for (const item of group.items) {
-      if (
-        item.source === "oob" &&
-        (item.id === hide.hideActionId || item.controlId === hide.hideActionId)
-      ) {
+      if (targets.includes(item.id) || (item.controlId && targets.includes(item.controlId))) {
         item.hidden = true;
         matched = true;
       }
@@ -172,37 +205,25 @@ function applyHide(groups: Map<string, RibbonPreviewGroup>, hide: HideAction): v
     return;
   }
 
-  const placeholder: RibbonPreviewItem = {
+  let hiddenGroup = groups.get(HIDDEN_GROUP_KEY);
+  if (!hiddenGroup) {
+    hiddenGroup = {
+      id: HIDDEN_GROUP_KEY,
+      label: "Hidden",
+      location: "",
+      sequence: HIDDEN_GROUP_SEQUENCE,
+      items: [],
+    };
+    groups.set(HIDDEN_GROUP_KEY, hiddenGroup);
+  }
+  hiddenGroup.items.push({
     id: hide.hideActionId,
-    label: lastSegment(hide.hideActionId),
+    label: lastSegment(hide.location || hide.hideActionId.replace(/\.Hide$/, "")),
     kind: "Button",
     source: "oob",
     hidden: true,
-    controlId: hide.hideActionId,
-  };
-
-  const location = hide.location || "";
-  if (location) {
-    const group = groups.get(location);
-    if (group) {
-      group.items.push(placeholder);
-    } else {
-      groups.set(location, {
-        id: location,
-        label: locationLabel(location),
-        location,
-        items: [placeholder],
-      });
-    }
-    return;
-  }
-
-  let hiddenGroup = groups.get(HIDDEN_GROUP_KEY);
-  if (!hiddenGroup) {
-    hiddenGroup = { id: HIDDEN_GROUP_KEY, label: "Hidden", location: "", items: [] };
-    groups.set(HIDDEN_GROUP_KEY, hiddenGroup);
-  }
-  hiddenGroup.items.push(placeholder);
+    controlId: hide.location || hide.hideActionId,
+  });
 }
 
 function buttonLabel(button: ButtonNode, locLabels: LocLabel[]): string | undefined {
@@ -272,4 +293,15 @@ function locationLabel(location: string): string {
 function lastSegment(id: string): string {
   const parts = id.split(".").filter(Boolean);
   return parts.length ? parts[parts.length - 1] : id;
+}
+
+function cleanLabel(value: string): string {
+  if (value.startsWith("$Resources:") || value.startsWith("$LocLabels:")) {
+    const token = value.slice(value.indexOf(":") + 1).replace(/\.(LabelText|Title|Text)$/i, "");
+    return lastSegment(token);
+  }
+  if (value.startsWith("mso.") || /\.CustomAction$/i.test(value)) {
+    return lastSegment(value.replace(/\.CustomAction$/i, ""));
+  }
+  return value;
 }

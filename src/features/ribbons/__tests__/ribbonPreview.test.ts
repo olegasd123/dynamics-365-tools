@@ -37,6 +37,16 @@ test("renders the standard command bar even without customizations", () => {
   assert.ok(record.items.some((item) => item.label === "Delete"));
 });
 
+test("orders groups by the standard ribbon group sequence", () => {
+  const labels = buildRibbonPreview(viewWith({}), "account").groups.map((group) => group.label);
+
+  assert.ok(labels.indexOf("Save") < labels.indexOf("Record"), "Save precedes Record");
+  assert.ok(
+    labels.indexOf("Record") < labels.indexOf("Collaborate"),
+    "Record precedes Collaborate",
+  );
+});
+
 test("slots a custom button into the matching group by sequence", () => {
   const view = viewWith({
     customActions: [
@@ -78,6 +88,86 @@ test("marks a hidden out-of-the-box button", () => {
 
   assert.ok(remove);
   assert.strictEqual(remove.hidden, true);
+});
+
+test("places the ModernClient group right after Record", () => {
+  const view = viewWith({
+    customActions: [
+      {
+        id: "ca.modern",
+        location: "Mscrm.Form.account.MainTab.ModernClient.Controls._children",
+        sequence: 5,
+        commandUI: {
+          kind: "Button",
+          id: "btn.modern",
+          command: "new.cmd.modern",
+          labelText: "Modern",
+          range,
+        },
+        range,
+      },
+    ],
+  });
+
+  const labels = buildRibbonPreview(view, "account").groups.map((group) => group.label);
+  assert.ok(
+    labels.indexOf("Record") < labels.indexOf("ModernClient"),
+    "Record precedes ModernClient",
+  );
+  assert.ok(
+    labels.indexOf("ModernClient") < labels.indexOf("Collaborate"),
+    "ModernClient precedes Collaborate",
+  );
+});
+
+test("cleans up unresolved resource labels", () => {
+  const view = viewWith({
+    customActions: [
+      {
+        id: "ca.refresh",
+        location: "Mscrm.Form.account.MainTab.Save.Controls._children",
+        sequence: 46,
+        commandUI: {
+          kind: "Button",
+          id: "btn.refresh",
+          command: "cmd",
+          labelText: "$Resources:MobileClient.Commands.Refresh",
+          range,
+        },
+        range,
+      },
+    ],
+  });
+
+  const save = groupByLabel(buildRibbonPreview(view, "account").groups, "Save");
+  assert.ok(save.items.some((item) => item.source === "custom" && item.label === "Refresh"));
+});
+
+test("collapses unmatched hidden controls into one group", () => {
+  const view = viewWith({
+    hideActions: [
+      {
+        hideActionId: "mso.Mscrm.Form.mso_candidat.FollowButton.Hide",
+        location: "Mscrm.Form.mso_candidat.FollowButton",
+        range,
+      },
+      {
+        hideActionId: "mso.Mscrm.Form.mso_candidat.WordTemplate.Hide",
+        location: "Mscrm.Form.mso_candidat.WordTemplate",
+        range,
+      },
+    ],
+  });
+
+  const model = buildRibbonPreview(view, "account");
+  const hidden = groupByLabel(model.groups, "Hidden");
+
+  assert.strictEqual(model.groups[model.groups.length - 1].label, "Hidden");
+  assert.deepStrictEqual(hidden.items.map((item) => item.label).sort(), [
+    "FollowButton",
+    "WordTemplate",
+  ]);
+  assert.ok(hidden.items.every((item) => item.hidden));
 });
 
 test("keeps custom-only locations as their own group", () => {

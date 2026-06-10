@@ -12,6 +12,7 @@ export interface OobRibbonLocation {
   label: string;
   location: string;
   group: string;
+  sequence?: number;
   versions?: OobRibbonCatalogVersion[];
 }
 
@@ -587,6 +588,31 @@ const COMMAND_TEMPLATES: OobRibbonCommandTemplate[] = [
   },
 ];
 
+const GROUP_SEQUENCE: Record<string, number> = {
+  "application-global-new": 10,
+  "form-save": 10,
+  "form-record": 20,
+  "form-modernclient": 30,
+  "form-collaborate": 40,
+  "form-process": 50,
+  "form-actions": 60,
+  "form-data": 70,
+  "form-navigation": 80,
+  "homepagegrid-management": 10,
+  "homepagegrid-records": 20,
+  "homepagegrid-modernclient": 30,
+  "homepagegrid-actions": 40,
+  "homepagegrid-collaborate": 50,
+  "homepagegrid-process": 60,
+  "homepagegrid-view": 70,
+  "homepagegrid-data": 80,
+  "homepagegrid-import": 90,
+  "subgrid-standard": 10,
+  "subgrid-management": 20,
+  "subgrid-modernclient": 30,
+  "subgrid-actions": 40,
+};
+
 export function listOobRibbonLocations(
   scope?: RibbonScope,
   entityLogicalName = "{entity}",
@@ -599,6 +625,7 @@ export function listOobRibbonLocations(
     scope: location.scope,
     label: location.label,
     group: location.group,
+    sequence: GROUP_SEQUENCE[location.id],
     location: applyEntity(location.locationTemplate, entityLogicalName),
     versions: location.versions,
   }));
