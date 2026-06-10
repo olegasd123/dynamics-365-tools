@@ -201,12 +201,12 @@ function actionsForNode(node: RibbonExplorerNode): PanelAction[] {
 
   if (node instanceof RibbonDocumentNode) {
     return node.document.kind === "Application"
-      ? [openFileAction(), saveAction(), ...ribbonAddActions()]
-      : [saveAction()];
+      ? [openFileAction(), previewAction(), saveAction(), ...ribbonAddActions()]
+      : [previewAction(), saveAction()];
   }
 
   if (node instanceof RibbonViewNode) {
-    return [...ribbonAddActions(), saveAction()];
+    return [previewAction(), ...ribbonAddActions(), saveAction()];
   }
 
   if (node instanceof RibbonSectionNode) {
@@ -353,6 +353,10 @@ function openFileAction(): PanelAction {
 
 function saveAction(): PanelAction {
   return { command: "dynamics365Tools.ribbons.save", label: "Save" };
+}
+
+function previewAction(): PanelAction {
+  return { command: "dynamics365Tools.ribbons.preview", label: "Preview" };
 }
 
 function detailRows(node: RibbonExplorerNode): Array<[string, RibbonDetailValue]> {
