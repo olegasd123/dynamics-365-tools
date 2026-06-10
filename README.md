@@ -244,7 +244,7 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 **Preview**
 
-- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document, in the style of the classic Ribbon Workbench. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar: the standard out-of-the-box buttons come from a built-in catalog, your custom buttons are highlighted and slotted in at their sequence, and hidden buttons are struck through. The action is on the view and document items (inline icon and right-click menu) and on the details panel.
+- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar: the standard out-of-the-box buttons come from a built-in catalog, your custom buttons are highlighted and slotted in at their sequence, and hidden buttons are struck through. The action is on the view and document items (inline icon and right-click menu) and on the details panel.
 
 **Edit buttons**
 
