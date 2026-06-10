@@ -483,6 +483,12 @@
         "title": "Edit Ribbon Item",
         "category": "Dynamics 365 Tools",
         "icon": "$(edit)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.preview",
+        "title": "Preview Ribbon",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(preview)"
       }
     ],
     "submenus": [
@@ -924,6 +930,16 @@
           "command": "dynamics365Tools.ribbons.pullFromEnvironment",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/ || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/ || viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/)",
           "group": "navigation@0"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.preview",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
+          "group": "inline@0"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.preview",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
+          "group": "navigation@1"
         },
         {
           "command": "dynamics365Tools.ribbons.addCustomButton",

@@ -29,6 +29,7 @@ import { RibbonRepository } from "@features/ribbons/ribbonRepository";
 import { RibbonSourceLocator } from "@features/ribbons/ribbonSourceLocator";
 import { SolutionZipService } from "@features/ribbons/solutionZipService";
 import { RibbonFormPanel } from "@features/ribbons/webview/ribbonFormPanel";
+import { RibbonPreviewPanel } from "@features/ribbons/webview/ribbonPreviewPanel";
 import { BindingService } from "@features/webResources/bindingService";
 import { PublishCacheService } from "@features/webResources/publishCacheService";
 import { WebResourceStatusBarService } from "@features/webResources/webResourceStatusBar";
@@ -128,6 +129,7 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     );
   });
   const ribbonFormPanel = lazyDisposable(() => new RibbonFormPanel(), disposables);
+  const ribbonPreviewPanel = lazyDisposable(() => new RibbonPreviewPanel(), disposables);
 
   const pcfProcessRunner = lazyDisposable(() => new ProcessRunner(), disposables);
   const pacCli = lazy(() => {
@@ -324,6 +326,9 @@ export function createServices(extensionContext: vscode.ExtensionContext): Comma
     },
     get formPanel() {
       return ribbonFormPanel();
+    },
+    get previewPanel() {
+      return ribbonPreviewPanel();
     },
   };
 

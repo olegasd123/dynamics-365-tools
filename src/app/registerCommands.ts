@@ -57,6 +57,7 @@ import {
   moveRibbonNodeDown,
   moveRibbonNodeUp,
 } from "@features/ribbons/commands/ribbonNodeCommands";
+import { previewRibbon } from "@features/ribbons/commands/ribbonPreviewCommands";
 import {
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
@@ -319,6 +320,9 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.ribbons.editNode", (node) => editRibbonNode(ctx, node), {
+      validateConfiguration: false,
+    }),
+    register("dynamics365Tools.ribbons.preview", (node) => previewRibbon(ctx, node), {
       validateConfiguration: false,
     }),
     register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),
