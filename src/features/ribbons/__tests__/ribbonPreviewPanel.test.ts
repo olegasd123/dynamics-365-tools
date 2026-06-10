@@ -23,8 +23,8 @@ function documentWith(): RibbonDocument {
         customActions: [
           {
             id: "ca",
-            location: "Mscrm.Form.account.MainTab.Save.Controls._children",
-            sequence: 10,
+            location: "Mscrm.Form.account.MainTab.Record.Controls._children",
+            sequence: 35,
             commandUI: {
               kind: "Button",
               id: "btn",
@@ -46,7 +46,7 @@ function documentWith(): RibbonDocument {
   };
 }
 
-test("renders a command bar preview for a ribbon view", () => {
+test("renders standard and custom buttons inline in one command bar", () => {
   const panel = new RibbonPreviewPanel();
   const document = documentWith();
   const [view] = document.views;
@@ -57,19 +57,22 @@ test("renders a command bar preview for a ribbon view", () => {
   const rendered = (vscode.window as any).__lastWebviewPanel;
   assert.strictEqual(rendered.title, "Ribbon Preview — Form");
   assert.match(rendered.webview.html, /Approve/);
-  assert.match(rendered.webview.html, /MainTab › Save/);
+  assert.match(rendered.webview.html, /Delete/);
+  assert.match(rendered.webview.html, /class="ribbon"/);
+  assert.match(rendered.webview.html, /Mscrm\.Form\.account\.MainTab/);
   panel.dispose();
 });
 
-test("renders an empty state when a view has no buttons", () => {
+test("renders an empty state for a command bar without buttons", () => {
   const panel = new RibbonPreviewPanel();
   const document = documentWith();
+  document.views[0].scope = "Application";
   document.views[0].customActions = [];
 
   panel.show(new RibbonViewNode(document, document.views[0]));
 
   const rendered = (vscode.window as any).__lastWebviewPanel;
-  assert.match(rendered.webview.html, /No custom buttons/);
+  assert.match(rendered.webview.html, /Nothing to preview/);
   panel.dispose();
 });
 

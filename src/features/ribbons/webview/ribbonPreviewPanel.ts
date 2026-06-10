@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import { RibbonDocument } from "../models";
 import {
   buildRibbonPreview,
+  RibbonPreviewGroup,
   RibbonPreviewItem,
-  RibbonPreviewLocation,
   RibbonPreviewModel,
 } from "../ribbonPreview";
 import { RibbonDocumentNode, RibbonExplorerNode, RibbonViewNode } from "../ribbonExplorer";
@@ -57,14 +57,16 @@ function resolveTarget(node: RibbonExplorerNode): PreviewTarget | undefined {
   if (node instanceof RibbonViewNode) {
     return {
       title: `Ribbon Preview — ${node.view.scope}`,
-      models: [buildRibbonPreview(node.view)],
+      models: [buildRibbonPreview(node.view, node.document.entityLogicalName)],
     };
   }
 
   if (node instanceof RibbonDocumentNode) {
     return {
       title: `Ribbon Preview — ${documentTitle(node.document)}`,
-      models: node.document.views.map(buildRibbonPreview),
+      models: node.document.views.map((view) =>
+        buildRibbonPreview(view, node.document.entityLogicalName),
+      ),
     };
   }
 
@@ -93,80 +95,127 @@ function renderHtml(title: string, models: RibbonPreviewModel[]): string {
     h1 {
       font-size: 18px;
       font-weight: 600;
-      margin: 0 0 18px;
+      margin: 0 0 6px;
     }
-    h2 {
-      font-size: 14px;
-      font-weight: 600;
-      margin: 22px 0 10px;
+    .note {
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 14px;
+    }
+    .legend {
+      color: var(--vscode-descriptionForeground);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .legend span {
+      align-items: center;
+      display: inline-flex;
+      gap: 6px;
+    }
+    .swatch {
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      height: 12px;
+      width: 12px;
+    }
+    .swatch.custom {
+      border-color: var(--vscode-focusBorder);
+      box-shadow: inset 0 0 0 1px var(--vscode-focusBorder);
+    }
+    .swatch.hidden {
+      border-style: dashed;
+      opacity: 0.5;
+    }
+    .view {
+      margin-bottom: 22px;
+    }
+    .view-head {
+      align-items: baseline;
+      display: flex;
+      gap: 10px;
+      margin-bottom: 6px;
     }
     .scope {
-      color: var(--vscode-descriptionForeground);
-      font-weight: 400;
-    }
-    .location {
-      margin-bottom: 16px;
-    }
-    .location-label {
       font-weight: 600;
-      margin-bottom: 4px;
     }
-    .location-path {
+    .tab {
       color: var(--vscode-descriptionForeground);
       font-family: var(--vscode-editor-font-family);
       font-size: var(--vscode-editor-font-size);
-      margin-bottom: 8px;
-      overflow-wrap: anywhere;
     }
-    .bar {
+    .ribbon {
       align-items: stretch;
       background: var(--vscode-editorWidget-background);
       border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
       border-radius: 4px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px;
+      overflow-x: auto;
+      padding: 6px 2px;
     }
-    .chip {
+    .group {
+      display: flex;
+      flex: 0 0 auto;
+      flex-direction: column;
+      padding: 2px 12px;
+    }
+    .group:not(:last-child) {
+      border-right: 1px solid var(--vscode-panel-border);
+    }
+    .group-items {
+      align-items: stretch;
+      display: flex;
+      flex: 1 1 auto;
+      gap: 4px;
+    }
+    .group-label {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.78em;
+      margin-top: 8px;
+      text-align: center;
+    }
+    .tile {
       align-items: center;
-      background: var(--vscode-button-secondaryBackground, var(--vscode-editor-background));
-      border: 1px solid var(--vscode-panel-border);
+      border: 1px solid transparent;
       border-radius: 3px;
-      color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
       display: inline-flex;
       gap: 6px;
-      max-width: 240px;
-      padding: 5px 10px;
-    }
-    .chip .glyph {
-      flex: 0 0 auto;
-    }
-    .chip .label {
-      overflow: hidden;
-      text-overflow: ellipsis;
+      padding: 4px 8px;
       white-space: nowrap;
     }
-    .chip.group {
-      background: transparent;
-      border-style: dashed;
+    .tile .icon {
+      background: var(--vscode-descriptionForeground);
+      border-radius: 2px;
+      color: var(--vscode-editorWidget-background);
+      display: inline-flex;
+      flex: 0 0 auto;
+      font-size: 11px;
+      height: 18px;
+      justify-content: center;
+      line-height: 18px;
+      text-align: center;
+      width: 18px;
+    }
+    .tile .caption {
+      font-size: 0.88em;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .tile.custom {
+      background: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+    }
+    .tile.custom .icon {
+      background: var(--vscode-focusBorder);
+    }
+    .tile.custom .caption {
       font-weight: 600;
     }
-    .chip.tab {
-      background: transparent;
-      border-bottom: 2px solid var(--vscode-focusBorder);
-      font-weight: 600;
+    .tile.hidden {
+      opacity: 0.45;
     }
-    .chip.hidden {
-      border-style: dashed;
-      opacity: 0.6;
-    }
-    .chip.hidden .label {
+    .tile.hidden .caption {
       text-decoration: line-through;
-    }
-    .badge {
-      color: var(--vscode-descriptionForeground);
-      font-size: 0.85em;
     }
     .empty {
       color: var(--vscode-descriptionForeground);
@@ -175,50 +224,52 @@ function renderHtml(title: string, models: RibbonPreviewModel[]): string {
 </head>
 <body>
   <h1>${escapeHtml(title)}</h1>
+  <div class="note">Standard buttons are drawn from the built-in catalog; your custom buttons are highlighted and slotted in by sequence.</div>
+  <div class="legend">
+    <span><span class="swatch"></span> Standard button</span>
+    <span><span class="swatch custom"></span> Custom button</span>
+    <span><span class="swatch hidden"></span> Hidden</span>
+  </div>
   ${models.map(renderModel).join("")}
 </body>
 </html>`;
 }
 
 function renderModel(model: RibbonPreviewModel): string {
-  const heading = `<h2>${escapeHtml(model.scope)} <span class="scope">command bar</span></h2>`;
+  const head = `<div class="view-head"><span class="scope">${escapeHtml(model.scope)}</span><span class="tab">${escapeHtml(model.tabLabel)}</span></div>`;
+
   if (model.isEmpty) {
-    return `${heading}<div class="empty">No custom buttons or hidden buttons in this view.</div>`;
+    return `<div class="view">${head}<div class="empty">Nothing to preview for this command bar.</div></div>`;
   }
-  return `${heading}${model.locations.map(renderLocation).join("")}`;
+
+  return `<div class="view">${head}<div class="ribbon">${model.groups.map(renderGroup).join("")}</div></div>`;
 }
 
-function renderLocation(location: RibbonPreviewLocation): string {
-  const chips = [
-    ...location.items.map(renderItemChip),
-    ...location.hidden.map((item) => renderHiddenChip(item.id)),
-  ].join("");
-
-  return `<div class="location">
-    <div class="location-label">${escapeHtml(location.label)}</div>
-    <div class="location-path">${escapeHtml(location.location || "(no location)")}</div>
-    <div class="bar">${chips}</div>
+function renderGroup(group: RibbonPreviewGroup): string {
+  return `<div class="group">
+    <div class="group-items">${group.items.map(renderTile).join("")}</div>
+    <div class="group-label">${escapeHtml(group.label)}</div>
   </div>`;
 }
 
-function renderItemChip(item: RibbonPreviewItem): string {
-  const classes = `chip ${item.kind.toLowerCase()}`;
-  const tooltip = chipTooltip(item);
-  const image = item.imageName ? `<span class="badge" title="Icon web resource">◧</span>` : "";
-  return `<span class="${classes}" title="${escapeHtml(tooltip)}">${image}<span class="glyph">${glyph(item.kind)}</span><span class="label">${escapeHtml(item.label)}</span></span>`;
+function renderTile(item: RibbonPreviewItem): string {
+  const classes = ["tile", item.source, item.hidden ? "hidden" : ""].filter(Boolean).join(" ");
+  return `<span class="${classes}" title="${escapeHtml(tileTooltip(item))}"><span class="icon">${glyph(item.kind)}</span><span class="caption">${escapeHtml(item.label)}</span></span>`;
 }
 
-function renderHiddenChip(id: string): string {
-  return `<span class="chip hidden" title="${escapeHtml(`Hidden: ${id}`)}"><span class="glyph">⊘</span><span class="label">${escapeHtml(id)}</span></span>`;
-}
-
-function chipTooltip(item: RibbonPreviewItem): string {
-  const lines = [item.label];
+function tileTooltip(item: RibbonPreviewItem): string {
+  const lines = [item.hidden ? `${item.label} (hidden)` : item.label];
   if (item.commandId) {
     lines.push(`Command: ${item.commandId}`);
   }
+  if (item.controlId && item.controlId !== item.commandId) {
+    lines.push(`Control: ${item.controlId}`);
+  }
   if (item.tooltip && item.tooltip !== item.label) {
     lines.push(item.tooltip);
+  }
+  if (typeof item.sequence === "number") {
+    lines.push(`Sequence: ${item.sequence}`);
   }
   if (item.imageName) {
     lines.push(`Icon: ${item.imageName}`);

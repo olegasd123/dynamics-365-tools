@@ -1,9 +1,10 @@
 import assert from "node:assert";
 import test from "node:test";
 import { RibbonView } from "../models";
-import { buildRibbonPreview } from "../ribbonPreview";
+import { buildRibbonPreview, RibbonPreviewGroup } from "../ribbonPreview";
 
 const range = { start: 0, end: 1 };
+const recordLocation = "Mscrm.Form.account.MainTab.Record.Controls._children";
 
 function viewWith(overrides: Partial<RibbonView>): RibbonView {
   return {
@@ -19,57 +20,84 @@ function viewWith(overrides: Partial<RibbonView>): RibbonView {
   };
 }
 
-test("groups buttons by location and sorts them by sequence", () => {
-  const location = "Mscrm.Form.account.MainTab.Save.Controls._children";
+function groupByLabel(groups: RibbonPreviewGroup[], label: string): RibbonPreviewGroup {
+  const group = groups.find((entry) => entry.label === label);
+  assert.ok(group, `expected a "${label}" group`);
+  return group;
+}
+
+test("renders the standard command bar even without customizations", () => {
+  const model = buildRibbonPreview(viewWith({}), "account");
+
+  assert.strictEqual(model.isEmpty, false);
+  assert.strictEqual(model.hasCustomizations, false);
+  assert.strictEqual(model.tabLabel, "Mscrm.Form.account.MainTab");
+  const record = groupByLabel(model.groups, "Record");
+  assert.ok(record.items.every((item) => item.source === "oob"));
+  assert.ok(record.items.some((item) => item.label === "Delete"));
+});
+
+test("slots a custom button into the matching group by sequence", () => {
   const view = viewWith({
     customActions: [
       {
-        id: "ca.beta",
-        location,
-        sequence: 20,
+        id: "ca.approve",
+        location: recordLocation,
+        sequence: 35,
         commandUI: {
           kind: "Button",
-          id: "btn.beta",
-          command: "new.cmd.beta",
-          labelText: "Beta",
+          id: "btn.approve",
+          command: "new.cmd.approve",
+          labelText: "Approve",
           range,
         },
-        range,
-      },
-      {
-        id: "ca.alpha",
-        location,
-        sequence: 10,
-        commandUI: {
-          kind: "Button",
-          id: "btn.alpha",
-          command: "new.cmd.alpha",
-          labelLocId: "$LocLabels:alpha",
-          range,
-        },
-        range,
-      },
-    ],
-    locLabels: [
-      {
-        id: "$LocLabels:alpha",
-        titles: [{ languageCode: 1033, description: "Alpha", range }],
         range,
       },
     ],
   });
 
-  const model = buildRibbonPreview(view);
+  const model = buildRibbonPreview(view, "account");
+  const record = groupByLabel(model.groups, "Record");
+  const labels = record.items.map((item) => item.label);
+  const approveIndex = labels.indexOf("Approve");
 
-  assert.strictEqual(model.isEmpty, false);
-  assert.strictEqual(model.locations.length, 1);
-  const [group] = model.locations;
-  assert.strictEqual(group.label, "MainTab › Save");
-  assert.deepStrictEqual(
-    group.items.map((item) => item.label),
-    ["Alpha", "Beta"],
-  );
-  assert.strictEqual(group.items[0].commandId, "new.cmd.alpha");
+  assert.strictEqual(model.hasCustomizations, true);
+  assert.ok(approveIndex > labels.indexOf("New"), "custom button sits after the New button");
+  assert.ok(approveIndex < labels.indexOf("Delete"), "custom button sits before the Delete button");
+  assert.strictEqual(record.items[approveIndex].source, "custom");
+});
+
+test("marks a hidden out-of-the-box button", () => {
+  const view = viewWith({
+    hideActions: [{ hideActionId: "Mscrm.Form.account.Delete", location: recordLocation, range }],
+  });
+
+  const model = buildRibbonPreview(view, "account");
+  const record = groupByLabel(model.groups, "Record");
+  const remove = record.items.find((item) => item.label === "Delete");
+
+  assert.ok(remove);
+  assert.strictEqual(remove.hidden, true);
+});
+
+test("keeps custom-only locations as their own group", () => {
+  const location = "Mscrm.Form.account.MainTab.MyGroup.Controls._children";
+  const view = viewWith({
+    customActions: [
+      {
+        id: "ca",
+        location,
+        commandUI: { kind: "Button", id: "btn", command: "new.cmd", labelText: "Custom", range },
+        range,
+      },
+    ],
+  });
+
+  const model = buildRibbonPreview(view, "account");
+  const group = groupByLabel(model.groups, "MainTab › MyGroup");
+
+  assert.strictEqual(group.items.length, 1);
+  assert.strictEqual(group.items[0].source, "custom");
 });
 
 test("prefers explicit label text over a localized label", () => {
@@ -77,7 +105,7 @@ test("prefers explicit label text over a localized label", () => {
     customActions: [
       {
         id: "ca",
-        location: "loc",
+        location: recordLocation,
         commandUI: {
           kind: "Button",
           id: "btn",
@@ -98,41 +126,13 @@ test("prefers explicit label text over a localized label", () => {
     ],
   });
 
-  const [group] = buildRibbonPreview(view).locations;
-  assert.strictEqual(group.items[0].label, "Inline");
+  const record = groupByLabel(buildRibbonPreview(view, "account").groups, "Record");
+  assert.ok(record.items.some((item) => item.source === "custom" && item.label === "Inline"));
 });
 
-test("includes hidden out-of-the-box buttons", () => {
-  const view = viewWith({
-    hideActions: [{ hideActionId: "Mscrm.Form.account.Save", location: "loc", range }],
-  });
+test("reports an empty model for a command bar with no buttons", () => {
+  const model = buildRibbonPreview(viewWith({ scope: "Application" }), "account");
 
-  const model = buildRibbonPreview(view);
-  assert.strictEqual(model.isEmpty, false);
-  assert.deepStrictEqual(
-    model.locations[0].hidden.map((item) => item.id),
-    ["Mscrm.Form.account.Save"],
-  );
-});
-
-test("reports an empty model when the view has no actions", () => {
-  const model = buildRibbonPreview(viewWith({}));
   assert.strictEqual(model.isEmpty, true);
-  assert.strictEqual(model.locations.length, 0);
-});
-
-test("falls back to the command id when no label is available", () => {
-  const view = viewWith({
-    customActions: [
-      {
-        id: "ca",
-        location: "loc",
-        commandUI: { kind: "Button", id: "btn", command: "new.cmd", range },
-        range,
-      },
-    ],
-  });
-
-  const [group] = buildRibbonPreview(view).locations;
-  assert.strictEqual(group.items[0].label, "new.cmd");
+  assert.strictEqual(model.groups.length, 0);
 });

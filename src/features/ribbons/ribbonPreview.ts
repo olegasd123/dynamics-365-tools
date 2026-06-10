@@ -1,77 +1,120 @@
-import { ButtonNode, CustomAction, LocLabel, RibbonScope, RibbonView } from "./models";
+import { ButtonNode, CustomAction, HideAction, LocLabel, RibbonScope, RibbonView } from "./models";
+import { listOobRibbonCommands, listOobRibbonLocations } from "./oobCatalog";
 
 export type RibbonPreviewItemKind = "Button" | "Group" | "Tab" | "MenuSection" | "Unknown";
+export type RibbonPreviewItemSource = "oob" | "custom";
 
 export interface RibbonPreviewItem {
   id: string;
   label: string;
   kind: RibbonPreviewItemKind;
+  source: RibbonPreviewItemSource;
+  hidden: boolean;
   commandId?: string;
+  controlId?: string;
   tooltip?: string;
   imageName?: string;
   sequence?: number;
 }
 
-export interface RibbonPreviewHiddenItem {
+export interface RibbonPreviewGroup {
   id: string;
-}
-
-export interface RibbonPreviewLocation {
-  location: string;
   label: string;
+  location: string;
   items: RibbonPreviewItem[];
-  hidden: RibbonPreviewHiddenItem[];
 }
 
 export interface RibbonPreviewModel {
   scope: RibbonScope;
-  locations: RibbonPreviewLocation[];
+  tabLabel: string;
+  groups: RibbonPreviewGroup[];
+  hasCustomizations: boolean;
   isEmpty: boolean;
 }
 
 const DEFAULT_LANGUAGE_CODE = 1033;
+const DEFAULT_ENTITY_TOKEN = "{entity}";
+const HIDDEN_GROUP_KEY = "__hidden__";
 const LOCATION_STOP_WORDS = new Set(["Controls", "_children", "Menu", "MenuSection"]);
 
-export function buildRibbonPreview(view: RibbonView): RibbonPreviewModel {
-  const locations = new Map<string, RibbonPreviewLocation>();
+export function buildRibbonPreview(
+  view: RibbonView,
+  entityLogicalName?: string,
+): RibbonPreviewModel {
+  const entity = entityLogicalName || DEFAULT_ENTITY_TOKEN;
+  const groups = new Map<string, RibbonPreviewGroup>();
 
-  const ensureLocation = (location: string): RibbonPreviewLocation => {
-    const key = location ?? "";
-    let entry = locations.get(key);
-    if (!entry) {
-      entry = { location: key, label: locationLabel(key), items: [], hidden: [] };
-      locations.set(key, entry);
+  const ensureGroup = (location: string, id: string, label: string): RibbonPreviewGroup => {
+    let group = groups.get(location);
+    if (!group) {
+      group = { id, label, location, items: [] };
+      groups.set(location, group);
     }
-    return entry;
+    return group;
   };
 
+  const oobLocations = listOobRibbonLocations(view.scope, entity);
+  const oobByLocationId = new Map(oobLocations.map((location) => [location.id, location]));
+  for (const location of oobLocations) {
+    ensureGroup(location.location, location.id, location.group);
+  }
+  for (const command of listOobRibbonCommands(view.scope, entity)) {
+    for (const locationId of command.locationIds) {
+      const location = oobByLocationId.get(locationId);
+      if (!location) {
+        continue;
+      }
+      ensureGroup(location.location, location.id, location.group).items.push({
+        id: command.id,
+        label: command.label,
+        kind: "Button",
+        source: "oob",
+        hidden: false,
+        commandId: command.commandId,
+        controlId: command.controlId,
+        imageName: command.image16x16,
+        sequence: command.sequence,
+      });
+    }
+  }
+
   for (const action of view.customActions) {
-    ensureLocation(action.location).items.push(previewItem(action, view.locLabels));
+    const group = ensureGroup(
+      action.location,
+      action.location,
+      oobLocations.find((location) => location.location === action.location)?.group ??
+        locationLabel(action.location),
+    );
+    group.items.push(customItem(action, view.locLabels));
   }
 
   for (const hide of view.hideActions) {
-    ensureLocation(hide.location).hidden.push({ id: hide.hideActionId });
+    applyHide(groups, hide);
   }
 
-  for (const entry of locations.values()) {
-    entry.items = sortBySequence(entry.items);
+  for (const group of groups.values()) {
+    group.items = sortBySequence(group.items);
   }
 
-  const ordered = [...locations.values()];
+  const ordered = [...groups.values()].filter((group) => group.items.length > 0);
 
   return {
     scope: view.scope,
-    locations: ordered,
-    isEmpty: ordered.every((entry) => entry.items.length === 0 && entry.hidden.length === 0),
+    tabLabel: tabLabel(view.scope, entity),
+    groups: ordered,
+    hasCustomizations: view.customActions.length > 0 || view.hideActions.length > 0,
+    isEmpty: ordered.length === 0,
   };
 }
 
-function previewItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewItem {
+function customItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewItem {
   const ui = action.commandUI;
   const sequence = action.sequence ?? (ui && "sequence" in ui ? ui.sequence : undefined);
+  const base = { source: "custom" as const, hidden: false, sequence };
 
   if (ui?.kind === "Button") {
     return {
+      ...base,
       id: ui.id || action.id,
       label: buttonLabel(ui, locLabels) ?? ui.command ?? ui.id ?? action.id,
       kind: "Button",
@@ -81,35 +124,85 @@ function previewItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreview
         ui.modernImage?.webResourceUniqueName ??
         ui.image16x16?.webResourceUniqueName ??
         ui.image32x32?.webResourceUniqueName,
-      sequence,
     };
   }
 
   if (ui?.kind === "Group") {
     return {
+      ...base,
       id: ui.id || action.id,
       label: ui.title || ui.id || action.id,
       kind: "Group",
       commandId: ui.command || undefined,
-      sequence,
     };
   }
 
   if (ui?.kind === "Tab") {
     return {
+      ...base,
       id: ui.id || action.id,
       label: ui.title || ui.id || action.id,
       kind: "Tab",
       commandId: ui.command || undefined,
-      sequence,
     };
   }
 
   if (ui?.kind === "MenuSection") {
-    return { id: ui.id || action.id, label: ui.id || action.id, kind: "MenuSection", sequence };
+    return { ...base, id: ui.id || action.id, label: ui.id || action.id, kind: "MenuSection" };
   }
 
-  return { id: action.id, label: action.id || "(custom action)", kind: "Unknown", sequence };
+  return { ...base, id: action.id, label: action.id || "(custom action)", kind: "Unknown" };
+}
+
+function applyHide(groups: Map<string, RibbonPreviewGroup>, hide: HideAction): void {
+  let matched = false;
+  for (const group of groups.values()) {
+    for (const item of group.items) {
+      if (
+        item.source === "oob" &&
+        (item.id === hide.hideActionId || item.controlId === hide.hideActionId)
+      ) {
+        item.hidden = true;
+        matched = true;
+      }
+    }
+  }
+
+  if (matched) {
+    return;
+  }
+
+  const placeholder: RibbonPreviewItem = {
+    id: hide.hideActionId,
+    label: lastSegment(hide.hideActionId),
+    kind: "Button",
+    source: "oob",
+    hidden: true,
+    controlId: hide.hideActionId,
+  };
+
+  const location = hide.location || "";
+  if (location) {
+    const group = groups.get(location);
+    if (group) {
+      group.items.push(placeholder);
+    } else {
+      groups.set(location, {
+        id: location,
+        label: locationLabel(location),
+        location,
+        items: [placeholder],
+      });
+    }
+    return;
+  }
+
+  let hiddenGroup = groups.get(HIDDEN_GROUP_KEY);
+  if (!hiddenGroup) {
+    hiddenGroup = { id: HIDDEN_GROUP_KEY, label: "Hidden", location: "", items: [] };
+    groups.set(HIDDEN_GROUP_KEY, hiddenGroup);
+  }
+  hiddenGroup.items.push(placeholder);
 }
 
 function buttonLabel(button: ButtonNode, locLabels: LocLabel[]): string | undefined {
@@ -151,6 +244,13 @@ function sortBySequence(items: RibbonPreviewItem[]): RibbonPreviewItem[] {
     .map((entry) => entry.item);
 }
 
+function tabLabel(scope: RibbonScope, entity: string): string {
+  if (scope === "Application") {
+    return "Mscrm.GlobalTab";
+  }
+  return `Mscrm.${scope}.${entity}.MainTab`;
+}
+
 function locationLabel(location: string): string {
   if (!location) {
     return "(no location)";
@@ -167,4 +267,9 @@ function locationLabel(location: string): string {
 
   const tail = (meaningful.length ? meaningful : parts).slice(-2);
   return tail.join(" › ") || location;
+}
+
+function lastSegment(id: string): string {
+  const parts = id.split(".").filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : id;
 }
