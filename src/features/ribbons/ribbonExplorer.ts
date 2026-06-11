@@ -164,6 +164,8 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
   private childrenByNode = new WeakMap<RibbonExplorerNode, RibbonExplorerNode[]>();
   private parentByNode = new WeakMap<RibbonExplorerNode, RibbonExplorerNode>();
   private readonly documentsBySourceId = new Map<string, RibbonDocument[]>();
+  private filterText = "";
+  private filterQuery = "";
 
   constructor(
     private readonly configuration: ConfigurationService,
@@ -190,6 +192,10 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
   }
 
   getTreeItem(element: RibbonExplorerNode): vscode.TreeItem {
+    if (!this.filterQuery && element instanceof RibbonSectionNode) {
+      element.description = String(element.count);
+    }
+
     return element;
   }
 
@@ -197,18 +203,58 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     return this.parentByNode.get(element);
   }
 
+  getFilterText(): string | undefined {
+    return this.filterText || undefined;
+  }
+
+  setFilter(text: string | undefined): void {
+    const next = text?.trim() ?? "";
+    const nextQuery = next.toLowerCase();
+    if (next === this.filterText && nextQuery === this.filterQuery) {
+      return;
+    }
+
+    this.filterText = next;
+    this.filterQuery = nextQuery;
+    this.onDidChangeTreeDataEmitter.fire();
+  }
+
+  clearFilter(): void {
+    this.setFilter(undefined);
+  }
+
   async getChildren(element?: RibbonExplorerNode): Promise<RibbonExplorerNode[]> {
+    const children = await this.getUnfilteredChildren(element);
+    if (!this.filterQuery) {
+      resetFilterDescriptions(children);
+      return children;
+    }
+
+    const filtered = await this.filterChildren(children);
+    if (!element && !filtered.length) {
+      return [new RibbonEmptyNode("No ribbon items match", `Filter: ${this.filterText}`)];
+    }
+
+    return filtered;
+  }
+
+  async searchItems(): Promise<RibbonSearchResult[]> {
+    const results: RibbonSearchResult[] = [];
+    await this.collectSearchResults(undefined, [], results);
+    return results;
+  }
+
+  private async getUnfilteredChildren(element?: RibbonExplorerNode): Promise<RibbonExplorerNode[]> {
     if (!element) {
-      if (this.rootNodes) {
-        return this.rootNodes;
+      if (!this.rootNodes) {
+        const sources = await this.loadSources();
+        this.rootNodes = sources.length
+          ? sources.map(
+              (source) => new RibbonSourceNode(source, this.editorState.isSourceDirty(source.id)),
+            )
+          : [new RibbonEmptyNode()];
       }
 
-      const sources = await this.loadSources();
-      this.rootNodes = sources.length
-        ? sources.map(
-            (source) => new RibbonSourceNode(source, this.editorState.isSourceDirty(source.id)),
-          )
-        : [new RibbonEmptyNode()];
       return this.rootNodes;
     }
 
@@ -240,12 +286,6 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     }
     this.childrenByNode.set(element, children);
     return children;
-  }
-
-  async searchItems(): Promise<RibbonSearchResult[]> {
-    const results: RibbonSearchResult[] = [];
-    await this.collectSearchResults(undefined, [], results);
-    return results;
   }
 
   private async loadSources(): Promise<RibbonSource[]> {
@@ -288,7 +328,7 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     parentPath: string[],
     results: RibbonSearchResult[],
   ): Promise<void> {
-    const children = await this.getChildren(parent);
+    const children = await this.getUnfilteredChildren(parent);
 
     for (const child of children) {
       if (child instanceof RibbonEmptyNode) {
@@ -305,6 +345,57 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
       await this.collectSearchResults(child, path, results);
     }
   }
+
+  private async filterChildren(children: RibbonExplorerNode[]): Promise<RibbonExplorerNode[]> {
+    const filtered: RibbonExplorerNode[] = [];
+
+    for (const child of children) {
+      if (child instanceof RibbonEmptyNode) {
+        continue;
+      }
+
+      const descendants = await this.filterChildren(await this.getUnfilteredChildren(child));
+      if (nodeMatchesFilter(child, this.filterQuery) || descendants.length) {
+        if (child instanceof RibbonSectionNode) {
+          child.description = `${descendants.length} of ${child.count}`;
+        }
+
+        filtered.push(child);
+      }
+    }
+
+    return filtered;
+  }
+}
+
+function resetFilterDescriptions(nodes: RibbonExplorerNode[]): void {
+  for (const node of nodes) {
+    if (node instanceof RibbonSectionNode) {
+      node.description = String(node.count);
+    }
+  }
+}
+
+function nodeMatchesFilter(node: RibbonExplorerNode, query: string): boolean {
+  return nodeSearchText(node).toLowerCase().includes(query);
+}
+
+function nodeSearchText(node: RibbonExplorerNode): string {
+  const values = [
+    treeItemLabelText(node.label),
+    treeItemDescriptionText(node.description),
+    treeItemTooltipText(node.tooltip),
+  ];
+
+  if (node instanceof RibbonItemNode) {
+    values.push(...node.details.flatMap(([, value]) => ribbonDetailText(value) ?? []));
+  }
+
+  return values.filter(Boolean).join(" ");
+}
+
+function treeItemTooltipText(tooltip: string | vscode.MarkdownString | undefined): string {
+  return typeof tooltip === "string" ? tooltip : (tooltip?.value ?? "");
 }
 
 function searchResultForNode(

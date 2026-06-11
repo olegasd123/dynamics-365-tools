@@ -311,6 +311,18 @@
         "icon": "$(search)"
       },
       {
+        "command": "dynamics365Tools.ribbons.filterExplorer",
+        "title": "Filter Ribbons...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.clearFilter",
+        "title": "Clear Ribbon Filter",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter-filled)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.save",
         "title": "Save Ribbon Changes",
         "category": "Dynamics 365 Tools",
@@ -766,34 +778,44 @@
           "group": "navigation@2"
         },
         {
-          "command": "dynamics365Tools.ribbons.openSolutionZip",
+          "command": "dynamics365Tools.ribbons.filterExplorer",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "dynamics365Tools.ribbons.save",
-          "when": "view == dynamics365Tools.ribbonExplorer",
+          "command": "dynamics365Tools.ribbons.clearFilter",
+          "when": "view == dynamics365Tools.ribbonExplorer && d365Tools.ribbons.filterActive",
           "group": "navigation@4"
         },
         {
-          "command": "dynamics365Tools.ribbons.undo",
+          "command": "dynamics365Tools.ribbons.openSolutionZip",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@5"
         },
         {
-          "command": "dynamics365Tools.ribbons.redo",
+          "command": "dynamics365Tools.ribbons.save",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@6"
         },
         {
-          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "command": "dynamics365Tools.ribbons.undo",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@7"
         },
         {
-          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "command": "dynamics365Tools.ribbons.redo",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@8"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@9"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@10"
         }
       ],
       "view/item/context": [

@@ -65,7 +65,9 @@ import {
   addRibbonEnableRule,
 } from "@features/ribbons/commands/ribbonRuleCommands";
 import {
+  clearRibbonExplorerFilter,
   cleanupGeneratedRibbonSolutions,
+  filterRibbonExplorer,
   goToRibbonItem,
   openRibbonFile,
   openRibbonSolutionLocation,
@@ -75,6 +77,7 @@ import {
   redoRibbonEdit,
   refreshRibbonExplorer,
   removeRibbonSolutionSource,
+  ribbonFilterMessage,
   saveRibbonSolutionZip,
   saveRibbonSource,
   undoRibbonEdit,
@@ -433,6 +436,34 @@ function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
     }
   });
 
+  const filterSubscription = vscode.commands.registerCommand(
+    "dynamics365Tools.ribbons.filterExplorer",
+    () =>
+      runCommandWithHealthCheck(
+        ctx,
+        "dynamics365Tools.ribbons.filterExplorer",
+        async () => {
+          await filterRibbonExplorer(ctx);
+          treeView.message = ribbonFilterMessage(ctx);
+        },
+        { validateConfiguration: false },
+      ),
+  );
+
+  const clearFilterSubscription = vscode.commands.registerCommand(
+    "dynamics365Tools.ribbons.clearFilter",
+    () =>
+      runCommandWithHealthCheck(
+        ctx,
+        "dynamics365Tools.ribbons.clearFilter",
+        async () => {
+          await clearRibbonExplorerFilter(ctx);
+          treeView.message = undefined;
+        },
+        { validateConfiguration: false },
+      ),
+  );
+
   const goToSubscription = vscode.commands.registerCommand(
     "dynamics365Tools.ribbons.goToItem",
     () =>
@@ -447,6 +478,8 @@ function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
   return vscode.Disposable.from(
     treeView,
     selectionSubscription,
+    filterSubscription,
+    clearFilterSubscription,
     goToSubscription,
     treeDataProvider,
   );

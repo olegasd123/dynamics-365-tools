@@ -7,6 +7,7 @@ import { NodeWorkspaceFiles } from "../../../testSupport/fakes";
 import { ConfigurationService } from "@features/config/configurationService";
 import {
   RibbonDocumentNode,
+  RibbonEmptyNode,
   RibbonExplorerProvider,
   RibbonItemNode,
   RibbonSectionNode,
@@ -247,6 +248,96 @@ test("indexes ribbon items for quick navigation", async () => {
   const view = results.find((result) => result.label === "Form");
   assert.ok(view);
   assert.ok(view.node instanceof RibbonViewNode);
+});
+
+test("filters ribbon tree while keeping matching item ancestors", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(
+    workspaceRoot,
+    "AppRibbon/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.app.Button.CustomAction" Location="Mscrm.HomepageGrid.account.MainTab.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.app.Button" Command="new.Command" LabelText="Run" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/app.js" FunctionName="runAppCommand" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    createConfiguration(workspaceRoot),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  explorer.setFilter("runAppCommand");
+
+  const roots = await explorer.getChildren();
+  const documents = await explorer.getChildren(roots[0]);
+  const sections = await explorer.getChildren(documents[0]);
+  assert.deepStrictEqual(
+    sections.map((section) => section.label),
+    ["Command Definitions"],
+  );
+  assert.strictEqual(sections[0].description, "1 of 1");
+
+  const commands = await explorer.getChildren(sections[0]);
+  const commandChildren = await explorer.getChildren(commands[0]);
+  const actionGroup = commandChildren.find((child) => child.label === "Actions");
+  assert.ok(actionGroup);
+  const actions = await explorer.getChildren(actionGroup);
+  assert.deepStrictEqual(
+    actions.map((action) => action.label),
+    ["JavaScript: runAppCommand"],
+  );
+
+  assert.ok(
+    (await explorer.searchItems()).some((result) => result.label === "Button: new.app.Button"),
+  );
+
+  explorer.clearFilter();
+  const unfilteredSections = await explorer.getChildren(documents[0]);
+  assert.deepStrictEqual(
+    unfilteredSections.map((section) => section.label),
+    [
+      "Custom Actions",
+      "Hide Actions",
+      "Command Definitions",
+      "Enable Rules",
+      "Display Rules",
+      "Loc Labels",
+    ],
+  );
+  assert.strictEqual(
+    unfilteredSections.find((section) => section.label === "Command Definitions")?.description,
+    "1",
+  );
+});
+
+test("shows an empty filtered ribbon tree when there are no matches", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(workspaceRoot, "AppRibbon/RibbonDiffXml.xml", "<RibbonDiffXml />");
+  const explorer = new RibbonExplorerProvider(
+    createConfiguration(workspaceRoot),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  explorer.setFilter("missing");
+
+  const roots = await explorer.getChildren();
+  assert.strictEqual(roots.length, 1);
+  assert.ok(roots[0] instanceof RibbonEmptyNode);
+  assert.strictEqual(roots[0].label, "No ribbon items match");
+  assert.strictEqual(roots[0].description, "Filter: missing");
 });
 
 test("labels OOB command overrides in the tree", async () => {
