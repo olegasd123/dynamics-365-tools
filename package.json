@@ -779,7 +779,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.filterExplorer",
-          "when": "view == dynamics365Tools.ribbonExplorer",
+          "when": "view == dynamics365Tools.ribbonExplorer && !d365Tools.ribbons.filterActive",
           "group": "navigation@3"
         },
         {
@@ -967,7 +967,7 @@
         {
           "command": "dynamics365Tools.ribbons.preview",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
-          "group": "inline@0"
+          "group": "inline@99"
         },
         {
           "command": "dynamics365Tools.ribbons.preview",
