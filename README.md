@@ -255,12 +255,13 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 **Edit buttons**
 
 - `Add Custom Button` adds your own button to a ribbon.
-- `Hide OOB Button` hides an out-of-the-box button. `Hide OOB Buttons and Create Stubs` also creates command stubs you can fill in.
-- `Reorder OOB Buttons` changes the order of the built-in buttons.
+- `Hide OOB Button` hides an out-of-the-box button.
+- The ribbon view `...` button opens more actions, such as `Hide OOB Buttons and Create Stubs` and `Reorder OOB Buttons`.
 
 **Edit commands and rules**
 
-- `Add Command Definition`, `Override OOB Command`, and `Add Command Action` set up what a button does.
+- The ribbon view `...` button also has `Add Command Definition`, `Override OOB Command`, `Add Enable Rule`, `Add Display Rule`, and `Add Loc Label`.
+- `Add Command Action` sets up what a command does.
 - `Add Enable Rule` / `Add Display Rule` create new rules. `Add Enable Rule Reference` / `Add Display Rule Reference` link a command to an existing rule. `Add Rule Step` adds a step inside a rule.
 - `Add Loc Label` and `Add Loc Label Language` manage localized labels.
 - `Move Ribbon Item Up` / `Down`, `Edit Ribbon Item`, and `Delete Ribbon Item` work on any node in the tree.
