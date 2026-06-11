@@ -11,6 +11,7 @@ import {
   RibbonItemNode,
   RibbonSectionNode,
   RibbonSourceNode,
+  RibbonViewNode,
 } from "../ribbonExplorer";
 import { RibbonEditorState } from "../ribbonEditorState";
 import { RibbonRepository } from "../ribbonRepository";
@@ -196,6 +197,56 @@ test("shows empty button metadata details", async () => {
       ["Modern image", undefined],
     ],
   );
+});
+
+test("indexes ribbon items for quick navigation", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(
+    workspaceRoot,
+    "Entities/account/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.Button.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.Form.Button" Command="new.account.Command" LabelText="Run" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Command">
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/account.js" FunctionName="runAccountCommand" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    createConfiguration(workspaceRoot),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  const results = await explorer.searchItems();
+  const button = results.find((result) => result.label === "Button: new.account.Form.Button");
+  const script = results.find((result) => result.label === "JavaScript: runAccountCommand");
+  assert.ok(button);
+  assert.ok(script);
+  assert.match(button.detail, /Command: new\.account\.Command/);
+  assert.match(button.detail, /Label: Run/);
+  assert.match(script.detail, /Function: runAccountCommand/);
+
+  const buttonParent = explorer.getParent(button.node);
+  assert.ok(buttonParent instanceof RibbonItemNode);
+  assert.strictEqual(buttonParent.label, "new.account.Form.Button.CustomAction");
+  assert.ok(explorer.getParent(buttonParent) instanceof RibbonSectionNode);
+
+  const document = results.find((result) => result.label === "account");
+  assert.ok(document);
+  assert.ok(explorer.getParent(document.node) instanceof RibbonSourceNode);
+  const view = results.find((result) => result.label === "Form");
+  assert.ok(view);
+  assert.ok(view.node instanceof RibbonViewNode);
 });
 
 test("labels OOB command overrides in the tree", async () => {

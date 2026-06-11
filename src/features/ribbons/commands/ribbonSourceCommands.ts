@@ -6,6 +6,7 @@ import { SolutionImportError } from "@features/dataverse/solutionImportService";
 import {
   RibbonDocumentNode,
   RibbonExplorerNode,
+  RibbonSearchResult,
   RibbonItemNode,
   RibbonSectionNode,
   RibbonSourceNode,
@@ -37,11 +38,46 @@ interface GeneratedSolutionPick extends vscode.QuickPickItem {
   solutionId: string;
 }
 
+interface RibbonSearchPick extends vscode.QuickPickItem {
+  result: RibbonSearchResult;
+}
+
 const SAVE_EXPORT_BACKUP = "Save Backup";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
   ctx.ribbon.explorer.refresh();
+}
+
+export async function goToRibbonItem(
+  ctx: CommandContext,
+  treeView: vscode.TreeView<RibbonExplorerNode>,
+): Promise<void> {
+  const results = await ctx.ribbon.explorer.searchItems();
+  if (!results.length) {
+    await ctx.core.notifications.warning("No ribbon items found.");
+    return;
+  }
+
+  const pick = await showRibbonQuickPick<RibbonSearchPick>(
+    results.map((result) => ({
+      label: result.label,
+      description: result.description,
+      detail: result.detail,
+      result,
+    })),
+    { placeHolder: "Go to ribbon item" },
+  );
+  if (!pick) {
+    return;
+  }
+
+  await treeView.reveal(pick.result.node, {
+    select: true,
+    focus: true,
+    expand: true,
+  });
+  ctx.ribbon.formPanel.show(pick.result.node);
 }
 
 export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void> {

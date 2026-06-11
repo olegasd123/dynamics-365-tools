@@ -66,6 +66,7 @@ import {
 } from "@features/ribbons/commands/ribbonRuleCommands";
 import {
   cleanupGeneratedRibbonSolutions,
+  goToRibbonItem,
   openRibbonFile,
   openRibbonSolutionLocation,
   openRibbonsFromSolution,
@@ -432,7 +433,23 @@ function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
     }
   });
 
-  return vscode.Disposable.from(treeView, selectionSubscription, treeDataProvider);
+  const goToSubscription = vscode.commands.registerCommand(
+    "dynamics365Tools.ribbons.goToItem",
+    () =>
+      runCommandWithHealthCheck(
+        ctx,
+        "dynamics365Tools.ribbons.goToItem",
+        () => goToRibbonItem(ctx, treeView),
+        { validateConfiguration: false },
+      ),
+  );
+
+  return vscode.Disposable.from(
+    treeView,
+    selectionSubscription,
+    goToSubscription,
+    treeDataProvider,
+  );
 }
 
 function registerLazyTreeDataProvider<T>(
@@ -464,6 +481,12 @@ class LazyTreeDataProvider<T> implements vscode.TreeDataProvider<T>, vscode.Disp
   async getChildren(element?: T): Promise<T[]> {
     const provider = await this.getProvider();
     return (await provider.getChildren?.(element)) ?? [];
+  }
+
+  async getParent(element: T): Promise<T | undefined> {
+    const provider = await this.getProvider();
+    const parent = await provider.getParent?.(element);
+    return parent ?? undefined;
   }
 
   dispose(): void {

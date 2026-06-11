@@ -305,6 +305,12 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "dynamics365Tools.ribbons.goToItem",
+        "title": "Go to Ribbon Item...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(search)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.save",
         "title": "Save Ribbon Changes",
         "category": "Dynamics 365 Tools",
@@ -755,34 +761,39 @@
           "group": "navigation@1"
         },
         {
-          "command": "dynamics365Tools.ribbons.openSolutionZip",
+          "command": "dynamics365Tools.ribbons.goToItem",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "dynamics365Tools.ribbons.save",
+          "command": "dynamics365Tools.ribbons.openSolutionZip",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "dynamics365Tools.ribbons.undo",
+          "command": "dynamics365Tools.ribbons.save",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@4"
         },
         {
-          "command": "dynamics365Tools.ribbons.redo",
+          "command": "dynamics365Tools.ribbons.undo",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@5"
         },
         {
-          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "command": "dynamics365Tools.ribbons.redo",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@6"
         },
         {
-          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@7"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@8"
         }
       ],
       "view/item/context": [
