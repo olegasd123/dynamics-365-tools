@@ -27,7 +27,7 @@ Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web 
 - **Publish web resources** from the Explorer with a couple of clicks. No DevOps pipeline needed.
 - **Manage plugins** in a tree view: assemblies, plugin types, steps, and images. Register or update assemblies straight from VS Code.
 - **Build and deploy PCF controls**: create a new control, build or watch it, push it to an environment, or package it as a solution.
-- **Edit ribbons**: add custom buttons, hide or reorder out-of-the-box buttons, add commands and rules, then publish to an environment.
+- **Edit ribbons**: find and filter ribbon items, add custom buttons, hide or reorder out-of-the-box buttons, add commands and rules, then publish to an environment.
 - **Multiple environments**: keep dev, test, and prod side by side and pick the target when you publish.
 - **Share settings with the team** through small JSON files in `.vscode/`.
 - **Safe credentials**: secrets are kept in VS Code Secret Storage. Interactive sign-in and client secrets are both supported.
@@ -241,6 +241,12 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 - `Save Solution Zip...` writes the changes back to a solution `.zip`.
 - `Publish Ribbons to Environment...` sends your changes to an environment.
 - `Clean Up Generated Ribbon Solutions...` removes the temporary solutions the publish step creates.
+
+**Find and filter**
+
+- `Go to Ribbon Item...` opens a quick pick for ribbon documents, views, buttons, commands, rules, actions, and labels. It searches by id, label, command, rule, and action details, then selects the item in the tree.
+- `Filter Ribbons...` filters the tree by the same kind of text. Matching items stay visible with their parent nodes, so you can still see where each match is.
+- `Clear Ribbon Filter` removes the active filter. While a filter is active, the filter button is hidden and only the clear button is shown.
 
 **Preview**
 
