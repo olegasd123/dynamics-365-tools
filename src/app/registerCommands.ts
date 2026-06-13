@@ -32,6 +32,7 @@ import {
   disablePluginStep,
   editPluginImage,
   editPluginStep,
+  editPluginStepAdditionalInfo,
   enablePluginStep,
 } from "@features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "@features/plugins/commands/pluginTypeCommands";
@@ -331,6 +332,9 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     }),
     register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),
     register("dynamics365Tools.plugins.editStep", (node) => editPluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.editStepAdditionalInfo", (node) =>
+      editPluginStepAdditionalInfo(ctx, node),
+    ),
     register("dynamics365Tools.plugins.enableStep", (node) => enablePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.disableStep", (node) => disablePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.deleteStep", (node) => deletePluginStep(ctx, node)),

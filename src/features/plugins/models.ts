@@ -20,6 +20,10 @@ export interface PluginType {
 export interface PluginStep {
   id: string;
   name: string;
+  description?: string;
+  configuration?: string;
+  secureConfiguration?: string;
+  secureConfigId?: string;
   mode?: number;
   stage?: number;
   rank?: number;

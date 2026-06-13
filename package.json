@@ -161,6 +161,12 @@
         "icon": "$(edit)"
       },
       {
+        "command": "dynamics365Tools.plugins.editStepAdditionalInfo",
+        "title": "Edit Additional Info",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(note)"
+      },
+      {
         "command": "dynamics365Tools.plugins.enableStep",
         "title": "Enable Plugin Step",
         "category": "Dynamics 365 Tools",
@@ -639,6 +645,9 @@
           "command": "dynamics365Tools.plugins.editStep"
         },
         {
+          "command": "dynamics365Tools.plugins.editStepAdditionalInfo"
+        },
+        {
           "command": "dynamics365Tools.plugins.enableStep"
         },
         {
@@ -850,24 +859,29 @@
           "group": "inline@1"
         },
         {
-          "command": "dynamics365Tools.plugins.createImage",
+          "command": "dynamics365Tools.plugins.editStepAdditionalInfo",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
           "group": "inline@2"
         },
         {
+          "command": "dynamics365Tools.plugins.createImage",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
+          "group": "inline@3"
+        },
+        {
           "command": "dynamics365Tools.plugins.enableStep",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep:disabled",
-          "group": "inline@3"
+          "group": "inline@4"
         },
         {
           "command": "dynamics365Tools.plugins.disableStep",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep:enabled",
-          "group": "inline@3"
+          "group": "inline@4"
         },
         {
           "command": "dynamics365Tools.plugins.deleteStep",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
-          "group": "inline@4"
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.plugins.copyImageDescription",

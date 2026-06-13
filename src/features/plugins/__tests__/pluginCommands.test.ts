@@ -19,6 +19,8 @@ import {
   validateAssemblyIdentity,
   validateAssemblyUpdateTarget,
 } from "../commands/pluginCommands";
+import { copyStepDescription } from "../commands/pluginStepCommands";
+import { PluginStepNode } from "../pluginExplorer";
 
 function createNotifications(): RecordingNotifications {
   return new RecordingNotifications();
@@ -431,6 +433,35 @@ test("updateAssemblyFromFileDialog cancels update when missing plugin removal is
   });
 
   assert.deepStrictEqual(calls, []);
+});
+
+test("copyStepDescription includes plugin step additional info", async () => {
+  const clipboard = new RecordingClipboard();
+  const notifications = new RecordingNotifications();
+  const node = new PluginStepNode(
+    { name: "Dev", url: "https://dev.crm.dynamics.com" } as any,
+    { id: "type-id", name: "Plugin", typeName: "Contoso.Plugin" },
+    {
+      id: "step-id",
+      name: "Step",
+      description: "Step description",
+      configuration: "plain config",
+      secureConfiguration: "secret config",
+      messageName: "Create",
+    },
+  );
+
+  await copyStepDescription(
+    legacyContext({
+      clipboard,
+      notifications,
+    } as any),
+    node,
+  );
+
+  assert.match(clipboard.values[0], /Description: Step description/);
+  assert.match(clipboard.values[0], /Unsecure configuration: plain config/);
+  assert.match(clipboard.values[0], /Secure configuration: secret config/);
 });
 
 test("updateAssemblyFromFileDialog keeps deleting missing plugin types after one delete fails", async () => {
