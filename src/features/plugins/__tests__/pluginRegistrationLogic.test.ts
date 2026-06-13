@@ -10,6 +10,7 @@ import {
   buildStepDefaultName,
   getDefaultMessagePropertyName,
   getImageTypeOptions,
+  markCurrentPickItems,
   parseFilteringAttributes,
 } from "../commands/pluginRegistrationLogic";
 import type { PluginStep } from "../models";
@@ -27,26 +28,38 @@ test("buildStepDefaultName uses the selected entity or global fallback", () => {
 
 test("buildMessageNamePickItems deduplicates names and preserves missing current value", () => {
   assert.deepStrictEqual(buildMessageNamePickItems(["Update", "Create", "Update"], "Delete"), [
+    { label: "Delete", description: "Current value", picked: true },
     {
       label: "Enter custom message name...",
       description: "Type a message name manually",
       isCustom: true,
     },
-    { label: "Delete", description: "Current value", picked: true },
     { label: "Update", picked: false },
+    { label: "Create", picked: false },
+  ]);
+});
+
+test("buildMessageNamePickItems moves existing current value first", () => {
+  assert.deepStrictEqual(buildMessageNamePickItems(["Update", "Create"], "Update"), [
+    { label: "Update", picked: true, description: "Current value" },
+    {
+      label: "Enter custom message name...",
+      description: "Type a message name manually",
+      isCustom: true,
+    },
     { label: "Create", picked: false },
   ]);
 });
 
 test("buildPrimaryEntityPickItems sorts entities and keeps orphan current value", () => {
   assert.deepStrictEqual(buildPrimaryEntityPickItems(["contact", "account", "contact"], "lead"), [
+    { label: "lead", description: "Current value", type: "entity", picked: true },
     {
       label: "Global message (no primary entity)",
       description: "Use for messages without a primary entity",
       type: "none",
       picked: false,
     },
-    { label: "lead", description: "Current value", type: "entity", picked: true },
     { label: "account", type: "entity", picked: false },
     { label: "contact", type: "entity", picked: false },
     {
@@ -68,13 +81,29 @@ test("buildFilteringAttributePickItems sorts attributes and marks defaults", () 
   assert.deepStrictEqual(
     buildFilteringAttributePickItems(["emailaddress1", "", "name"], " name "),
     [
+      { label: "name", pickType: "attribute", picked: true, description: "Current value" },
       {
         label: "Enter custom list...",
         description: "Type attributes manually",
         pickType: "custom",
       },
       { label: "emailaddress1", pickType: "attribute", picked: false },
-      { label: "name", pickType: "attribute", picked: true },
+    ],
+  );
+});
+
+test("buildFilteringAttributePickItems keeps current attributes missing from metadata", () => {
+  assert.deepStrictEqual(
+    buildFilteringAttributePickItems(["emailaddress1", "name"], "telephone1,name"),
+    [
+      { label: "telephone1", description: "Current value", pickType: "attribute", picked: true },
+      { label: "name", pickType: "attribute", picked: true, description: "Current value" },
+      {
+        label: "Enter custom list...",
+        description: "Type attributes manually",
+        pickType: "custom",
+      },
+      { label: "emailaddress1", pickType: "attribute", picked: false },
     ],
   );
 });
@@ -82,6 +111,33 @@ test("buildFilteringAttributePickItems sorts attributes and marks defaults", () 
 test("buildStagePickItems and buildModePickItems mark default choices", () => {
   assert.strictEqual(buildStagePickItems(20).find((item) => item.value === 20)?.picked, true);
   assert.strictEqual(buildModePickItems(1).find((item) => item.value === 1)?.picked, true);
+  assert.deepStrictEqual(buildStagePickItems(20)[0], {
+    label: "Pre-operation",
+    description: "Current value - Before core operation",
+    value: 20,
+    picked: true,
+  });
+  assert.deepStrictEqual(buildModePickItems(1)[0], {
+    label: "Asynchronous",
+    description: "Current value - Background",
+    value: 1,
+    picked: true,
+  });
+});
+
+test("markCurrentPickItems moves the current image type first", () => {
+  assert.deepStrictEqual(
+    markCurrentPickItems([
+      { label: "Pre-image", value: 0, picked: false },
+      { label: "Post-image", value: 1, picked: true },
+      { label: "Both", value: 2, picked: false },
+    ]),
+    [
+      { label: "Post-image", value: 1, picked: true, description: "Current value" },
+      { label: "Pre-image", value: 0, picked: false },
+      { label: "Both", value: 2, picked: false },
+    ],
+  );
 });
 
 test("getImageTypeOptions limits create and delete messages to valid image types", () => {

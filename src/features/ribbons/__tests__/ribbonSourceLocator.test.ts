@@ -63,6 +63,84 @@ test("locates flat customizations XML files at supported paths", async () => {
   );
 });
 
+test("locates flat customizations XML files in child folders", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(
+    workspaceRoot,
+    "Ribbons/hjk_/account/customizations.xml",
+    "<ImportExportXml><RibbonDiffXml /></ImportExportXml>",
+  );
+  await writeFile(
+    workspaceRoot,
+    "Ribbons/hjk_/contact/Customizations.xml",
+    "<ImportExportXml><RibbonDiffXml /></ImportExportXml>",
+  );
+
+  const sources = await new RibbonSourceLocator().locate(workspaceRoot);
+
+  assert.deepStrictEqual(
+    sources.map((source) => ({
+      name: source.name,
+      kind: source.kind,
+      fileKind: source.files[0].kind,
+      relativePath: path.relative(workspaceRoot, source.files[0].fileUri),
+    })),
+    [
+      {
+        name: "Ribbons/hjk_/account/customizations.xml",
+        kind: "flat",
+        fileKind: "Flat",
+        relativePath: "Ribbons/hjk_/account/customizations.xml",
+      },
+      {
+        name: "Ribbons/hjk_/contact/Customizations.xml",
+        kind: "flat",
+        fileKind: "Flat",
+        relativePath: "Ribbons/hjk_/contact/Customizations.xml",
+      },
+    ],
+  );
+});
+
+test("limits child folder flat customizations search depth", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(
+    workspaceRoot,
+    "one/two/three/four/customizations.xml",
+    "<ImportExportXml><RibbonDiffXml /></ImportExportXml>",
+  );
+  await writeFile(
+    workspaceRoot,
+    "one/two/three/four/five/customizations.xml",
+    "<ImportExportXml><RibbonDiffXml /></ImportExportXml>",
+  );
+
+  const sources = await new RibbonSourceLocator().locate(workspaceRoot);
+
+  assert.deepStrictEqual(
+    sources.map((source) => path.relative(workspaceRoot, source.files[0].fileUri)),
+    ["one/two/three/four/customizations.xml"],
+  );
+});
+
+test("skips generated folders when searching flat customizations XML files", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(
+    workspaceRoot,
+    "node_modules/sample/customizations.xml",
+    "<ImportExportXml><RibbonDiffXml /></ImportExportXml>",
+  );
+  await writeFile(
+    workspaceRoot,
+    "dist/customizations.xml",
+    "<ImportExportXml><RibbonDiffXml /></ImportExportXml>",
+  );
+
+  const sources = await new RibbonSourceLocator().locate(workspaceRoot);
+
+  assert.deepStrictEqual(sources, []);
+});
+
 test("keeps imported zip sources with workspace sources", async () => {
   const workspaceRoot = await makeWorkspace();
   const locator = new RibbonSourceLocator();

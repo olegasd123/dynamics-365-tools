@@ -5,7 +5,7 @@ import {
   RibbonSectionNode,
   RibbonViewNode,
 } from "../ribbonExplorer";
-import { CommandDefinition, LocLabel, RibbonDocument, RibbonView } from "../models";
+import { CommandDefinition, LocLabel, RibbonDocument, RibbonScope, RibbonView } from "../models";
 
 export function resolveRibbonTarget(
   node: RibbonExplorerNode | undefined,
@@ -82,6 +82,11 @@ export function resolveLocLabelTarget(
   }
 
   return undefined;
+}
+
+export function inferRibbonScope(location: string): RibbonScope | undefined {
+  const match = /^Mscrm\.(Form|HomepageGrid|SubGrid)\./.exec(location);
+  return match ? (match[1] as RibbonScope) : undefined;
 }
 
 export function sameRange(

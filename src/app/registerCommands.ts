@@ -32,6 +32,7 @@ import {
   disablePluginStep,
   editPluginImage,
   editPluginStep,
+  editPluginStepAdditionalInfo,
   enablePluginStep,
 } from "@features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "@features/plugins/commands/pluginTypeCommands";
@@ -57,6 +58,7 @@ import {
   moveRibbonNodeDown,
   moveRibbonNodeUp,
 } from "@features/ribbons/commands/ribbonNodeCommands";
+import { previewRibbon } from "@features/ribbons/commands/ribbonPreviewCommands";
 import {
   addRibbonCommandDisplayRuleRef,
   addRibbonCommandEnableRuleRef,
@@ -64,7 +66,10 @@ import {
   addRibbonEnableRule,
 } from "@features/ribbons/commands/ribbonRuleCommands";
 import {
+  clearRibbonExplorerFilter,
   cleanupGeneratedRibbonSolutions,
+  filterRibbonExplorer,
+  goToRibbonItem,
   openRibbonFile,
   openRibbonSolutionLocation,
   openRibbonsFromSolution,
@@ -73,6 +78,7 @@ import {
   redoRibbonEdit,
   refreshRibbonExplorer,
   removeRibbonSolutionSource,
+  ribbonFilterMessage,
   saveRibbonSolutionZip,
   saveRibbonSource,
   undoRibbonEdit,
@@ -321,8 +327,14 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.editNode", (node) => editRibbonNode(ctx, node), {
       validateConfiguration: false,
     }),
+    register("dynamics365Tools.ribbons.preview", (node) => previewRibbon(ctx, node), {
+      validateConfiguration: false,
+    }),
     register("dynamics365Tools.plugins.createStep", (node) => createPluginStep(ctx, node)),
     register("dynamics365Tools.plugins.editStep", (node) => editPluginStep(ctx, node)),
+    register("dynamics365Tools.plugins.editStepAdditionalInfo", (node) =>
+      editPluginStepAdditionalInfo(ctx, node),
+    ),
     register("dynamics365Tools.plugins.enableStep", (node) => enablePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.disableStep", (node) => disablePluginStep(ctx, node)),
     register("dynamics365Tools.plugins.deleteStep", (node) => deletePluginStep(ctx, node)),
@@ -428,7 +440,53 @@ function createRibbonTreeView(ctx: CommandContext): vscode.Disposable {
     }
   });
 
-  return vscode.Disposable.from(treeView, selectionSubscription, treeDataProvider);
+  const filterSubscription = vscode.commands.registerCommand(
+    "dynamics365Tools.ribbons.filterExplorer",
+    () =>
+      runCommandWithHealthCheck(
+        ctx,
+        "dynamics365Tools.ribbons.filterExplorer",
+        async () => {
+          await filterRibbonExplorer(ctx);
+          treeView.message = ribbonFilterMessage(ctx);
+        },
+        { validateConfiguration: false },
+      ),
+  );
+
+  const clearFilterSubscription = vscode.commands.registerCommand(
+    "dynamics365Tools.ribbons.clearFilter",
+    () =>
+      runCommandWithHealthCheck(
+        ctx,
+        "dynamics365Tools.ribbons.clearFilter",
+        async () => {
+          await clearRibbonExplorerFilter(ctx);
+          treeView.message = undefined;
+        },
+        { validateConfiguration: false },
+      ),
+  );
+
+  const goToSubscription = vscode.commands.registerCommand(
+    "dynamics365Tools.ribbons.goToItem",
+    () =>
+      runCommandWithHealthCheck(
+        ctx,
+        "dynamics365Tools.ribbons.goToItem",
+        () => goToRibbonItem(ctx, treeView),
+        { validateConfiguration: false },
+      ),
+  );
+
+  return vscode.Disposable.from(
+    treeView,
+    selectionSubscription,
+    filterSubscription,
+    clearFilterSubscription,
+    goToSubscription,
+    treeDataProvider,
+  );
 }
 
 function registerLazyTreeDataProvider<T>(
@@ -460,6 +518,12 @@ class LazyTreeDataProvider<T> implements vscode.TreeDataProvider<T>, vscode.Disp
   async getChildren(element?: T): Promise<T[]> {
     const provider = await this.getProvider();
     return (await provider.getChildren?.(element)) ?? [];
+  }
+
+  async getParent(element: T): Promise<T | undefined> {
+    const provider = await this.getProvider();
+    const parent = await provider.getParent?.(element);
+    return parent ?? undefined;
   }
 
   dispose(): void {

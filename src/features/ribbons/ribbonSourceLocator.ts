@@ -1,6 +1,17 @@
+import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { RibbonSource, RibbonSourceFile } from "./models";
+
+const MAX_FLAT_CUSTOMIZATIONS_DEPTH = 4;
+const IGNORED_FLAT_CUSTOMIZATIONS_DIRS = new Set([
+  "bin",
+  "build",
+  "dist",
+  "node_modules",
+  "obj",
+  "out",
+]);
 
 export class RibbonSourceLocator {
   private readonly importedSources = new Map<string, RibbonSource>();
@@ -91,14 +102,29 @@ export class RibbonSourceLocator {
     const seen = new Set<string>();
 
     for (const candidate of candidates) {
-      const realPath = await realFilePath(candidate);
-      if (realPath && !seen.has(realPath.toLowerCase())) {
-        seen.add(realPath.toLowerCase());
-        files.push(candidate);
-      }
+      await addFlatCustomizationFile(candidate, files, seen);
+    }
+
+    for (const candidate of await findNestedFlatCustomizationFiles(root)) {
+      await addFlatCustomizationFile(candidate, files, seen);
     }
 
     return files.sort((a, b) => a.localeCompare(b));
+  }
+}
+
+async function addFlatCustomizationFile(
+  candidate: string,
+  files: string[],
+  seen: Set<string>,
+): Promise<void> {
+  const realPath = await realFilePath(candidate);
+  if (realPath) {
+    const key = realPath.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      files.push(candidate);
+    }
   }
 }
 
@@ -136,4 +162,44 @@ async function realFilePath(fsPath: string): Promise<string | undefined> {
 async function readDirectoryNames(fsPath: string): Promise<string[]> {
   const entries = await fs.readdir(fsPath, { withFileTypes: true });
   return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+}
+
+async function findNestedFlatCustomizationFiles(root: string): Promise<string[]> {
+  const files: string[] = [];
+  await collectNestedFlatCustomizationFiles(root, 0, files);
+  return files;
+}
+
+async function collectNestedFlatCustomizationFiles(
+  directory: string,
+  depth: number,
+  files: string[],
+): Promise<void> {
+  let entries: Dirent[];
+
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.toLowerCase() === "customizations.xml") {
+      files.push(path.join(directory, entry.name));
+    }
+  }
+
+  if (depth >= MAX_FLAT_CUSTOMIZATIONS_DEPTH) {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (entry.isDirectory() && shouldSearchFlatCustomizationDirectory(entry.name)) {
+      await collectNestedFlatCustomizationFiles(path.join(directory, entry.name), depth + 1, files);
+    }
+  }
+}
+
+function shouldSearchFlatCustomizationDirectory(name: string): boolean {
+  return !name.startsWith(".") && !IGNORED_FLAT_CUSTOMIZATIONS_DIRS.has(name);
 }

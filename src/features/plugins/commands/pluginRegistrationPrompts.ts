@@ -21,6 +21,7 @@ import {
   buildStepDefaultName,
   getDefaultMessagePropertyName,
   getImageTypeOptions,
+  markCurrentPickItems,
   normalizeOptionalInput,
   type FilteringAttributePickItem,
   type MessageNamePickItem,
@@ -239,12 +240,14 @@ export async function pickImageType(
 ): Promise<number | undefined> {
   const options = getImageTypeOptions(step);
   const pick = await vscode.window.showQuickPick(
-    options.map((o) => ({
-      label: o.label,
-      description: o.description,
-      value: o.value,
-      picked: o.value === defaultType,
-    })),
+    markCurrentPickItems(
+      options.map((option) => ({
+        label: option.label,
+        description: option.description,
+        value: option.value,
+        picked: option.value === defaultType,
+      })),
+    ),
     { placeHolder: "Select image type" },
   );
   return pick?.value;

@@ -10,7 +10,7 @@ import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { DataverseClient } from "@features/dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
-import { addCustomRibbonButton } from "../commands/ribbonButtonCommands";
+import { addCustomRibbonButton, pickLocation } from "../commands/ribbonButtonCommands";
 import { addRibbonCommandAction } from "../commands/ribbonCommandDefinitionCommands";
 import { addRibbonLocLabelTitle } from "../commands/ribbonLabelCommands";
 import {
@@ -47,6 +47,7 @@ import {
   RibbonItemNode,
   RibbonSectionNode,
   RibbonSourceNode,
+  RibbonViewNode,
 } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
 import { SolutionZipService } from "../solutionZipService";
@@ -237,12 +238,221 @@ test("prefills custom button text metadata from the label", async () => {
   assert.strictEqual(defaultsByPrompt.get("Tool tip description"), label);
 
   const updated = applyRibbonPatchSequence(source, patches);
-  assert.match(updated, /Alt="Validate and save"/);
-  assert.match(updated, /ToolTipTitle="Validate and save"/);
-  assert.match(updated, /ToolTipDescription="Validate and save"/);
+  assert.match(
+    updated,
+    /Alt="\$LocLabels:d365tools\.application\.[^"]+\.Validate\.and\.save\.Alt"/,
+  );
+  assert.match(
+    updated,
+    /ToolTipTitle="\$LocLabels:d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipTitle"/,
+  );
+  assert.match(
+    updated,
+    /ToolTipDescription="\$LocLabels:d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipDescription"/,
+  );
+  assert.match(updated, /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.Alt">/);
+  assert.match(
+    updated,
+    /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipTitle">/,
+  );
+  assert.match(
+    updated,
+    /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipDescription">/,
+  );
 });
 
-test("prefills empty custom button text metadata from loc label while editing", async () => {
+test("presents OOB ribbon locations with their buttons and sequences", async () => {
+  const source = `<RibbonDiffXml>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "Save");
+    }
+
+    return undefined;
+  };
+
+  let location: string | undefined;
+  try {
+    location = await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  assert.strictEqual(location, "Mscrm.Form.account.MainTab.Save.Controls._children");
+
+  const save = locationItems.find((item) => item.label === "Save");
+  assert.strictEqual(save?.description, "Save (10), Save and close (20), Save and new (30)");
+  assert.strictEqual(save?.detail, "Mscrm.Form.account.MainTab.Save.Controls._children");
+
+  const collaborate = locationItems.find((item) => item.label === "Collaborate");
+  assert.strictEqual(collaborate?.description, "Share (10), Email link (20), Copy link (30)");
+
+  const modernClient = locationItems.find((item) => item.label === "ModernClient");
+  assert.strictEqual(
+    modernClient?.detail,
+    "Mscrm.Form.account.MainTab.ModernClient.Controls._children",
+  );
+
+  assert.ok(locationItems.some((item) => (item as { manual?: boolean }).manual));
+});
+
+test("includes existing custom buttons in the location contents", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.Validate.CustomAction" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="15">
+      <CommandUIDefinition>
+        <Button Id="new.account.Form.Validate.Button" Command="new.account.Form.Validate.Command" LabelText="Validate" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "Save");
+    }
+
+    return undefined;
+  };
+
+  try {
+    await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const save = locationItems.find((item) => item.label === "Save");
+  assert.strictEqual(
+    save?.description,
+    "Save (10), Validate (15), Save and close (20), Save and new (30)",
+  );
+});
+
+test("surfaces non-catalog group locations already used by the document", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="mso.OpenCv.CustomAction" Location="Mscrm.Form.account.MainTab.Management.Controls._children" Sequence="10">
+      <CommandUIDefinition>
+        <Button Id="mso.OpenCv.Button" Command="mso.OpenCv.Command" LabelText="Open CV" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "Management");
+    }
+
+    return undefined;
+  };
+
+  let location: string | undefined;
+  try {
+    location = await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  assert.strictEqual(location, "Mscrm.Form.account.MainTab.Management.Controls._children");
+
+  const management = locationItems.find((item) => item.label === "Management");
+  assert.strictEqual(management?.description, "Open CV (10)");
+  assert.strictEqual(
+    management?.detail,
+    "Mscrm.Form.account.MainTab.Management.Controls._children",
+  );
+});
+
+test("shows the last segment of $Resources button labels", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="mso.Activate.CustomAction" Location="Mscrm.Form.account.MainTab.ModernClient.Controls._children" Sequence="50">
+      <CommandUIDefinition>
+        <Button Id="mso.Activate.Button" Command="mso.Activate.Command" LabelText="$Resources:Ribbon.HomepageGrid.account.Record.Status.Activate" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="mso.Deactivate.CustomAction" Location="Mscrm.Form.account.MainTab.ModernClient.Controls._children" Sequence="60">
+      <CommandUIDefinition>
+        <Button Id="mso.Deactivate.Button" Command="mso.Deactivate.Command" LabelText="$Resources:Ribbon.HomepageGrid.account.Record.Status.Deactivate" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <Templates />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  let locationItems: vscode.QuickPickItem[] = [];
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      locationItems = items;
+      return items.find((item) => item.label === "ModernClient");
+    }
+
+    return undefined;
+  };
+
+  try {
+    await pickLocation(document, "Form");
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const modernClient = locationItems.find((item) => item.label === "ModernClient");
+  assert.strictEqual(modernClient?.description, "Activate (50), Deactivate (60)");
+});
+
+test("does not prefill empty custom button text metadata from label while editing", async () => {
   const source = `<RibbonDiffXml>
   <CustomActions>
     <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
@@ -284,6 +494,10 @@ test("prefills empty custom button text metadata from loc label while editing", 
     items: vscode.QuickPickItem[],
     options: { placeHolder?: string },
   ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items.find((item) => (item as { manual?: boolean }).manual);
+    }
+
     if (
       options.placeHolder === "Image 16 web resource" ||
       options.placeHolder === "Image 32 web resource" ||
@@ -323,16 +537,231 @@ test("prefills empty custom button text metadata from loc label while editing", 
   }
 
   assert.strictEqual(defaultsByPrompt.get("Button label"), "Run report");
-  assert.strictEqual(defaultsByPrompt.get("Alt"), "Run report");
-  assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "Run report");
-  assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "Run report");
+  assert.strictEqual(defaultsByPrompt.has("Button label Id"), false);
+  assert.strictEqual(defaultsByPrompt.get("Alt"), "");
+  assert.strictEqual(defaultsByPrompt.get("Tool tip title"), "");
+  assert.strictEqual(defaultsByPrompt.get("Tool tip description"), "");
 
   const updated = applyRibbonPatchSequence(source, patches);
   assert.match(updated, /LabelText="\$LocLabels:new\.Label"/);
   assert.doesNotMatch(updated, /LabelText="Run report"/);
-  assert.match(updated, /Alt="Run report"/);
-  assert.match(updated, /ToolTipTitle="Run report"/);
-  assert.match(updated, /ToolTipDescription="Run report"/);
+  assert.doesNotMatch(updated, /Alt=/);
+  assert.doesNotMatch(updated, /ToolTipTitle=/);
+  assert.doesNotMatch(updated, /ToolTipDescription=/);
+});
+
+test("creates missing custom button metadata loc labels while editing", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <LocLabels>
+    <LocLabel Id="new.Label">
+      <Titles>
+        <Title languagecode="1033" description="Run report" />
+      </Titles>
+    </LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    "CustomAction: new.Action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-event",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items.find((item) => (item as { manual?: boolean }).manual);
+    }
+
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
+
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt === "Alt") {
+      return "Run report";
+    }
+    if (options.prompt === "Tool tip description") {
+      return "Run the report";
+    }
+
+    return options.value ?? "";
+  };
+
+  try {
+    await editRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const updatedButton = updatedDocument.views[0].customActions[0].commandUI;
+  assert.strictEqual(updatedButton?.kind, "Button");
+  assert.strictEqual(
+    updatedButton.kind === "Button" ? updatedButton.labelLocId : undefined,
+    "new.Label",
+  );
+  assert.strictEqual(
+    updatedButton.kind === "Button" ? updatedButton.altLocId : undefined,
+    "new.Alt",
+  );
+  assert.strictEqual(
+    updatedButton.kind === "Button" ? updatedButton.toolTipDescriptionLocId : undefined,
+    "new.ToolTipDescription",
+  );
+  assert.deepStrictEqual(
+    updatedDocument.views[0].locLabels.map((label) => label.id),
+    ["new.Label", "new.Alt", "new.ToolTipDescription"],
+  );
+  assert.strictEqual(updatedDocument.views[0].locLabels[1].titles[0].description, "Run report");
+  assert.strictEqual(updatedDocument.views[0].locLabels[2].titles[0].description, "Run the report");
+  assert.doesNotMatch(updated, /ToolTipTitle=/);
+});
+
+test("edits custom button loc label text from custom action", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.Action" Location="Mscrm.Form.account.MainTab.Save.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.Button" Command="new.Command" LabelText="$LocLabels:new.Label" Alt="$LocLabels:new.Alt" ToolTipTitle="$LocLabels:new.ToolTipTitle" ToolTipDescription="$LocLabels:new.ToolTipDescription" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <LocLabels>
+    <LocLabel Id="new.Label"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+    <LocLabel Id="new.Alt"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+    <LocLabel Id="new.ToolTipTitle"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+    <LocLabel Id="new.ToolTipDescription"><Titles><Title languagecode="1033" description="Send" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Application",
+  });
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    "CustomAction: new.Action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-event",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon location") {
+      return items.find((item) => (item as { manual?: boolean }).manual);
+    }
+
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
+
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Button label":
+        return "Send to Service";
+      case "Alt":
+        return "Send to service";
+      case "Tool tip title":
+        return "Send to service";
+      case "Tool tip description":
+        return "Send account to service";
+      default:
+        return options.value ?? "";
+    }
+  };
+
+  try {
+    await editRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      node,
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  assert.match(updated, /LabelText="\$LocLabels:new\.Label"/);
+  assert.match(updated, /Alt="\$LocLabels:new\.Alt"/);
+  assert.match(updated, /ToolTipTitle="\$LocLabels:new\.ToolTipTitle"/);
+  assert.match(updated, /ToolTipDescription="\$LocLabels:new\.ToolTipDescription"/);
+  assert.match(updated, /<Title languagecode="1033" description="Send to Service" \/>/);
+  assert.match(updated, /<Title languagecode="1033" description="Send to service" \/>/);
+  assert.match(updated, /<Title languagecode="1033" description="Send account to service" \/>/);
 });
 
 test("opens ribbon source location in the OS", async () => {
@@ -945,6 +1374,7 @@ test("creates common enable rules from prompts", async () => {
       ]),
       pickByPlaceHolder: new Map([
         ["First rule step", "EntityRule"],
+        ["Entity logical name", "Type logical name manually"],
         ["Applies to", "SelectedEntity"],
         ["Invert result?", "No"],
       ]),
@@ -996,6 +1426,135 @@ test("creates common enable rules from prompts", async () => {
     (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
+});
+
+test("creates value rules from environment field metadata", async () => {
+  const source = `<RibbonDiffXml>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+  const requestedPaths: string[] = [];
+  let fieldPickItems: vscode.QuickPickItem[] = [];
+  let fieldPromptCount = 0;
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    picks: vscode.QuickPickItem[] | string[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "First rule step") {
+      return (picks as vscode.QuickPickItem[]).find((pick) => pick.label === "ValueRule");
+    }
+
+    if (options.placeHolder === "Field name") {
+      fieldPromptCount += 1;
+      if (fieldPromptCount === 1) {
+        return (picks as vscode.QuickPickItem[]).find((pick) => pick.label === "Pick from account");
+      }
+
+      fieldPickItems = picks as vscode.QuickPickItem[];
+      return fieldPickItems.find((pick) => pick.label === "statuscode");
+    }
+
+    if (options.placeHolder === "Invert result?") {
+      return typeof picks[0] === "string"
+        ? "No"
+        : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === "No");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) => {
+    switch (options.prompt) {
+      case "Enable rule id":
+        return "new.Value";
+      case "Value":
+        return "1";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addRibbonEnableRule(
+      legacyContext({
+        configuration: {
+          loadConfiguration: async () => ({
+            environments: [{ name: "Dev", url: "https://org.crm.dynamics.com" }],
+            solutions: [],
+          }),
+        },
+        ui: {
+          pickEnvironment: async (environments: unknown[]) => environments[0],
+        },
+        auth: {
+          getAccessToken: async () => "token",
+        },
+        secrets: {
+          getCredentials: async () => undefined,
+        },
+        lastSelection: {
+          getLastEnvironment: () => undefined,
+          setLastEnvironment: async () => undefined,
+        },
+        connections: {
+          createClient: async () => ({
+            get: async (path: string) => {
+              requestedPaths.push(path);
+              return {
+                value: [
+                  {
+                    LogicalName: "statuscode",
+                    DisplayName: { UserLocalizedLabel: { Label: "Status Reason" } },
+                  },
+                  { LogicalName: "name" },
+                ],
+              };
+            },
+          }),
+        },
+        notifications: createNotifications(),
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(requestedPaths, [
+    "/EntityDefinitions(LogicalName='account')/Attributes?$select=LogicalName,DisplayName",
+  ]);
+  assert.strictEqual(
+    fieldPickItems.find((item) => item.label === "statuscode")?.description,
+    "Status Reason",
+  );
+
+  const [updatedDocument] = readRibbonDocuments(applyRibbonPatchSequence(source, patches), {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const step = updatedDocument.views[0].enableRules[0].steps[0];
+
+  assert.strictEqual(step.kind, "ValueRule");
+  assert.strictEqual(step.kind === "ValueRule" ? step.field : undefined, "statuscode");
 });
 
 test("creates flat display rules from prompts", async () => {
@@ -1597,7 +2156,15 @@ test("does not queue patches when enable rule creation is cancelled", async () =
   );
   let queued = false;
 
+  const originalShowQuickPick = vscode.window.showQuickPick;
   const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) =>
+    options.placeHolder === "First rule step"
+      ? items.find((item) => item.label === "No step")
+      : undefined;
   (vscode.window as any).showInputBox = async () => undefined;
 
   try {
@@ -1615,6 +2182,7 @@ test("does not queue patches when enable rule creation is cancelled", async () =
       new RibbonDocumentNode(document),
     );
   } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
     (vscode.window as any).showInputBox = originalShowInputBox;
   }
 
@@ -1688,6 +2256,98 @@ test("prefills enable rule ids from the ribbon scope", async () => {
     updatedDocument.views[0].enableRules.map((rule) => rule.id),
     ["d365tools.account.Form.EnableRule", "d365tools.account.Form.EnableRule.2"],
   );
+});
+
+test("prefills rule ids with the selected rule step name", async () => {
+  const source = `<RibbonDiffXml>
+</RibbonDiffXml>`;
+  const inputValues: string[] = [];
+  let nextStep: "SelectionCountRule" | "FormTypeRule" = "SelectionCountRule";
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[] | string[],
+    options: { placeHolder?: string },
+  ) => {
+    const labels = new Map([
+      ["First rule step", nextStep],
+      ["Applies to", "SelectedEntity"],
+      ["Selected row condition", "Equal to"],
+      ["Form type", "Main"],
+      ["Invert result?", "No"],
+    ]);
+    const label = labels.get(options.placeHolder ?? "");
+    return typeof items[0] === "string"
+      ? label
+      : (items as vscode.QuickPickItem[]).find((item) => item.label === label);
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    if (options.prompt === "Selected rows") {
+      return "1";
+    }
+
+    inputValues.push(options.value ?? "");
+    return options.value;
+  };
+
+  try {
+    const [enableDocument] = readRibbonDocuments(source, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Entity",
+      entityLogicalName: "account",
+    });
+    await addRibbonEnableRule(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: () => undefined,
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonSectionNode(
+        enableDocument,
+        enableDocument.views.find((view) => view.scope === "Form") ?? enableDocument.views[0],
+        "enableRules",
+        enableDocument.views[0].enableRules.length,
+      ),
+    );
+
+    nextStep = "FormTypeRule";
+    const [displayDocument] = readRibbonDocuments(source, {
+      sourceId: "source",
+      fileUri: "/tmp/RibbonDiffXml.xml",
+      kind: "Entity",
+      entityLogicalName: "account",
+    });
+    await addRibbonDisplayRule(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: () => undefined,
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonSectionNode(
+        displayDocument,
+        displayDocument.views.find((view) => view.scope === "Form") ?? displayDocument.views[0],
+        "displayRules",
+        displayDocument.views[0].displayRules.length,
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  assert.deepStrictEqual(inputValues, [
+    "d365tools.account.Form.SelectionCountRule.EnableRule",
+    "d365tools.account.Form.FormTypeRule.DisplayRule",
+  ]);
 });
 
 test("prefills manual command rule reference ids from the command id", async () => {

@@ -193,19 +193,26 @@ export class PluginService {
   async listSteps(pluginTypeId: string): Promise<PluginStep[]> {
     const normalizedPluginTypeId = this.normalizeGuid(pluginTypeId);
     const filter = encodeURIComponent(`_eventhandler_value eq ${normalizedPluginTypeId}`);
-    const url = `/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,statuscode,filteringattributes&$filter=${filter}&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)`;
+    const url = `/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,configuration,stage,mode,rank,statecode,statuscode,filteringattributes,_sdkmessageprocessingstepsecureconfigid_value&$filter=${filter}&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),sdkmessageprocessingstepsecureconfigid($select=sdkmessageprocessingstepsecureconfigid,secureconfig)`;
     const response = await this.client.get<{
       value?: Array<{
         sdkmessageprocessingstepid?: string;
         name?: string;
+        description?: string;
+        configuration?: string;
         stage?: number;
         mode?: number;
         rank?: number;
         statecode?: number;
         statuscode?: number;
         filteringattributes?: string;
+        _sdkmessageprocessingstepsecureconfigid_value?: string;
         sdkmessageid?: { name?: string };
         sdkmessagefilterid?: { primaryobjecttypecode?: string };
+        sdkmessageprocessingstepsecureconfigid?: {
+          sdkmessageprocessingstepsecureconfigid?: string;
+          secureconfig?: string;
+        };
       }>;
     }>(url);
 
@@ -214,6 +221,13 @@ export class PluginService {
       .map((item) => ({
         id: this.normalizeGuid(item.sdkmessageprocessingstepid!),
         name: item.name ?? "",
+        description: item.description,
+        configuration: item.configuration,
+        secureConfiguration: item.sdkmessageprocessingstepsecureconfigid?.secureconfig,
+        secureConfigId: this.normalizeOptionalGuid(
+          item.sdkmessageprocessingstepsecureconfigid?.sdkmessageprocessingstepsecureconfigid ??
+            item._sdkmessageprocessingstepsecureconfigid_value,
+        ),
         mode: item.mode,
         stage: item.stage,
         rank: item.rank,
@@ -424,6 +438,9 @@ export class PluginService {
       rank: number;
       filteringAttributes: string;
       description: string;
+      configuration: string;
+      secureConfiguration: string;
+      secureConfigId: string;
       messageName: string;
       primaryEntity: string;
       status: number;
@@ -440,6 +457,7 @@ export class PluginService {
     if (input.filteringAttributes !== undefined)
       payload.filteringattributes = input.filteringAttributes;
     if (input.description !== undefined) payload.description = input.description;
+    if (input.configuration !== undefined) payload.configuration = input.configuration;
     if (input.status !== undefined) payload.statecode = input.status;
     if (input.statusReason !== undefined) payload.statuscode = input.statusReason;
 
@@ -465,7 +483,13 @@ export class PluginService {
         : null;
     }
 
-    await this.client.patch(`/sdkmessageprocessingsteps(${normalizedStepId})`, payload);
+    if (input.secureConfiguration !== undefined) {
+      await this.applySecureStepConfiguration(normalizedStepId, input, payload);
+    }
+
+    if (Object.keys(payload).length) {
+      await this.client.patch(`/sdkmessageprocessingsteps(${normalizedStepId})`, payload);
+    }
   }
 
   async setStepState(stepId: string, enabled: boolean): Promise<void> {
@@ -627,6 +651,52 @@ export class PluginService {
     const response = await this.client.get<{ sdkmessageid?: { sdkmessageid?: string } }>(url);
     const id = response.sdkmessageid?.sdkmessageid;
     return id ? this.normalizeGuid(id) : undefined;
+  }
+
+  private async applySecureStepConfiguration(
+    stepId: string,
+    input: Partial<{ secureConfiguration: string; secureConfigId: string }>,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const secureConfig = input.secureConfiguration ?? "";
+    const secureConfigId =
+      this.normalizeOptionalGuid(input.secureConfigId) ??
+      (await this.getStepSecureConfigId(stepId));
+
+    if (secureConfigId) {
+      await this.client.patch(`/sdkmessageprocessingstepsecureconfigs(${secureConfigId})`, {
+        secureconfig: secureConfig,
+      });
+      return;
+    }
+
+    if (!secureConfig) {
+      return;
+    }
+
+    const response = await this.client.post<{
+      sdkmessageprocessingstepsecureconfigid?: string;
+    }>("/sdkmessageprocessingstepsecureconfigs", {
+      secureconfig: secureConfig,
+    });
+    const createdId = response.sdkmessageprocessingstepsecureconfigid;
+    if (!createdId) {
+      throw new Error("Secure configuration created but no identifier returned.");
+    }
+    payload["sdkmessageprocessingstepsecureconfigid@odata.bind"] =
+      `/sdkmessageprocessingstepsecureconfigs(${this.normalizeGuid(createdId)})`;
+  }
+
+  private async getStepSecureConfigId(stepId: string): Promise<string | undefined> {
+    const url = `/sdkmessageprocessingsteps(${stepId})?$select=_sdkmessageprocessingstepsecureconfigid_value`;
+    const response = await this.client.get<{
+      _sdkmessageprocessingstepsecureconfigid_value?: string;
+    }>(url);
+    return this.normalizeOptionalGuid(response._sdkmessageprocessingstepsecureconfigid_value);
+  }
+
+  private normalizeOptionalGuid(value?: string): string | undefined {
+    return value ? this.normalizeGuid(value) : undefined;
   }
 
   private normalizeGuid(value: string): string {

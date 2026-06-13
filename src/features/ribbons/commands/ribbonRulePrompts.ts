@@ -13,7 +13,9 @@ import {
   RibbonRulePrivilegeType,
 } from "../models";
 import { NewRuleStepInput } from "../ribbonEditPatches";
+import type { RibbonDocument } from "../models";
 import { promptJavaScriptAction } from "./ribbonActionPrompts";
+import { pickRibbonEntityLogicalName, pickRibbonFieldLogicalName } from "./ribbonMetadataPrompts";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
 
 type SelectionCountCondition =
@@ -75,6 +77,7 @@ const RELATIONSHIP_TYPE_RULE_TYPES = ["OneToMany", "ManyToMany"];
 export async function promptRuleStep(
   ctx: CommandContext,
   ruleKind: "Enable" | "Display",
+  document?: RibbonDocument,
 ): Promise<NewRuleStepInput | null | undefined> {
   const common = [
     { label: "CustomRule", description: "Call a JavaScript function" },
@@ -125,9 +128,9 @@ export async function promptRuleStep(
     case "CommandClientTypeRule":
       return promptCommandClientTypeRuleStep();
     case "ValueRule":
-      return promptValueRuleStep();
+      return promptValueRuleStep(ctx, document);
     case "EntityPrivilegeRule":
-      return promptEntityPrivilegeRuleStep();
+      return promptEntityPrivilegeRuleStep(ctx);
     case "FormTypeRule":
       return promptFormTypeRuleStep();
     case "EntityPropertyRule":
@@ -151,7 +154,7 @@ export async function promptRuleStep(
     case "RecordPrivilegeRule":
       return promptRecordPrivilegeRuleStep();
     case "EntityRule":
-      return promptEntityRuleStep();
+      return promptEntityRuleStep(ctx, document);
     default:
       return undefined;
   }
@@ -201,11 +204,13 @@ async function promptCommandClientTypeRuleStep(): Promise<NewRuleStepInput | und
   return type ? { kind: "CommandClientTypeRule", type } : undefined;
 }
 
-async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const field = await showRibbonInputBox({
+async function promptValueRuleStep(
+  ctx: CommandContext,
+  document: RibbonDocument | undefined,
+): Promise<NewRuleStepInput | undefined> {
+  const field = await pickRibbonFieldLogicalName(ctx, document, {
     prompt: "Field name",
-    placeHolder: "statuscode",
-    validateInput: (value) => (value.trim() ? undefined : "Field name is required."),
+    required: true,
   });
   if (!field) {
     return undefined;
@@ -227,7 +232,9 @@ async function promptValueRuleStep(): Promise<NewRuleStepInput | undefined> {
   return { kind: "ValueRule", field: field.trim(), value: value.trim(), invertResult };
 }
 
-async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undefined> {
+async function promptEntityPrivilegeRuleStep(
+  ctx: CommandContext,
+): Promise<NewRuleStepInput | undefined> {
   const privilegeType = (await showRibbonQuickPick(
     ["Create", "Read", "Write", "Delete", "Append", "AppendTo", "Assign", "Share"],
     { placeHolder: "Privilege type" },
@@ -236,10 +243,13 @@ async function promptEntityPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
     return undefined;
   }
 
-  const entityName = await showRibbonInputBox({
+  const entityName = await pickRibbonEntityLogicalName(ctx, {
     prompt: "Entity logical name",
-    placeHolder: "account",
+    allowEmpty: true,
   });
+  if (entityName === undefined) {
+    return undefined;
+  }
   const privilegeDepth = (await showRibbonQuickPick(["None", "Basic", "Local", "Deep", "Global"], {
     placeHolder: "Privilege depth",
   })) as RibbonRulePrivilegeDepth | undefined;
@@ -524,10 +534,14 @@ async function promptRecordPrivilegeRuleStep(): Promise<NewRuleStepInput | undef
   };
 }
 
-async function promptEntityRuleStep(): Promise<NewRuleStepInput | undefined> {
-  const entityName = await showRibbonInputBox({
+async function promptEntityRuleStep(
+  ctx: CommandContext,
+  document: RibbonDocument | undefined,
+): Promise<NewRuleStepInput | undefined> {
+  const entityName = await pickRibbonEntityLogicalName(ctx, {
     prompt: "Entity logical name",
-    placeHolder: "account",
+    currentValue: document?.entityLogicalName,
+    allowEmpty: true,
   });
   if (entityName === undefined) {
     return undefined;

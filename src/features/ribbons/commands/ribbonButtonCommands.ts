@@ -10,12 +10,13 @@ import {
   nextHideActionId,
 } from "../ribbonEditPatches";
 import { RibbonExplorerNode } from "../ribbonExplorer";
-import { RibbonDocument, RibbonView } from "../models";
+import { ButtonNode, RibbonDocument, RibbonScope, RibbonView } from "../models";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
   listOobRibbonLocations,
   OobRibbonCommand,
+  OobRibbonLocation,
 } from "../oobCatalog";
 import {
   promptJavaScriptAction,
@@ -24,6 +25,7 @@ import {
 } from "./ribbonActionPrompts";
 import {
   collectRibbonIds,
+  inferRibbonScope,
   nextBatchId,
   nextCustomActionSequence,
   resolveRibbonTarget,
@@ -33,6 +35,11 @@ import { pickImageWebResource } from "./ribbonResourcePrompts";
 
 interface OobCommandPick extends vscode.QuickPickItem {
   command?: OobRibbonCommand;
+  manual?: boolean;
+}
+
+interface LocationPick extends vscode.QuickPickItem {
+  location?: string;
   manual?: boolean;
 }
 
@@ -104,7 +111,7 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view);
+  const location = await pickLocation(target.document, target.view.scope);
   if (!location) {
     return;
   }
@@ -122,11 +129,22 @@ export async function addCustomRibbonButton(
 
   const ids = makeCustomButtonIds(target.document, target.view.scope, label);
   const labelLocId = ids.labelLocId ?? `${ids.buttonId}.Label`;
+  const altLocId = ids.altLocId ?? `${ids.buttonId}.Alt`;
+  const toolTipTitleLocId = ids.toolTipTitleLocId ?? `${ids.buttonId}.ToolTipTitle`;
+  const toolTipDescriptionLocId =
+    ids.toolTipDescriptionLocId ?? `${ids.buttonId}.ToolTipDescription`;
   const action =
     actionKind.label === "URL" ? await promptUrlAction() : await promptJavaScriptAction(ctx);
   if (!action) {
     return;
   }
+
+  const locLabels = [
+    newLocLabel(labelLocId, labelValue),
+    optionalLocLabel(altLocId, alt),
+    optionalLocLabel(toolTipTitleLocId, toolTipTitle),
+    optionalLocLabel(toolTipDescriptionLocId, toolTipDescription),
+  ].filter((label): label is ReturnType<typeof newLocLabel> => Boolean(label));
 
   ctx.ribbon.editorState.queuePatches(
     target.document,
@@ -136,21 +154,33 @@ export async function addCustomRibbonButton(
       action,
       sequence: sequenceText.trim() ? Number(sequenceText.trim()) : undefined,
       labelLocId,
-      alt: alt.trim() || undefined,
-      toolTipTitle: toolTipTitle.trim() || undefined,
-      toolTipDescription: toolTipDescription.trim() || undefined,
+      altLocId: locLabels.some((label) => label.id === altLocId) ? altLocId : undefined,
+      toolTipTitleLocId: locLabels.some((label) => label.id === toolTipTitleLocId)
+        ? toolTipTitleLocId
+        : undefined,
+      toolTipDescriptionLocId: locLabels.some((label) => label.id === toolTipDescriptionLocId)
+        ? toolTipDescriptionLocId
+        : undefined,
       image16x16: image16x16?.trim() || undefined,
       image32x32: image32x32?.trim() || undefined,
       modernImage: modernImage.trim() || undefined,
       templateAlias: "o1",
-      locLabel: {
-        id: labelLocId,
-        languageCode: 1033,
-        description: labelValue,
-      },
+      locLabels,
     }),
   );
   ctx.ribbon.explorer.refresh();
+}
+
+function newLocLabel(id: string, description: string) {
+  return {
+    id,
+    languageCode: 1033,
+    description: description.trim(),
+  };
+}
+
+function optionalLocLabel(id: string, description: string) {
+  return description.trim() ? newLocLabel(id, description) : undefined;
 }
 
 export async function hideOobRibbonButton(
@@ -201,7 +231,7 @@ export async function hideAndStubOobRibbonButtons(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view);
+  const location = await pickLocation(target.document, target.view.scope);
   if (!location) {
     return;
   }
@@ -277,7 +307,7 @@ export async function reorderOobRibbonButtons(
     return;
   }
 
-  const location = await pickLocation(target.document, target.view);
+  const location = await pickLocation(target.document, target.view.scope);
   if (!location) {
     return;
   }
@@ -470,40 +500,176 @@ async function pickOobCommandOrder(
   return ordered;
 }
 
-async function pickLocation(
+export async function pickLocation(
   document: RibbonDocument,
-  view: RibbonView,
-  command?: OobRibbonCommand,
+  scope: RibbonScope | undefined,
+  options: { command?: OobRibbonCommand; currentValue?: string } = {},
 ): Promise<string | undefined> {
-  const suggestedLocations = (command?.locationIds ?? [])
+  const suggestedLocations = (options.command?.locationIds ?? [])
     .map((id) => findOobRibbonLocation(id, document.entityLogicalName))
     .filter((location): location is NonNullable<typeof location> => !!location);
-  const fallbackLocations = listOobRibbonLocations(view.scope, document.entityLogicalName);
-  const locations = suggestedLocations.length ? suggestedLocations : fallbackLocations;
-  const pick = await showRibbonQuickPick(
+  const catalogLocations = listOobRibbonLocations(scope, document.entityLogicalName);
+  const locations = suggestedLocations.length
+    ? suggestedLocations
+    : [...catalogLocations, ...listDocumentGroupLocations(document, scope, catalogLocations)];
+  const commands = listOobRibbonCommands(scope, document.entityLogicalName);
+  const pick = await showRibbonQuickPick<LocationPick>(
     [
       ...locations.map((location) => ({
-        label: location.location,
-        description: location.label,
+        label: location.group,
+        description: describeLocationContents(document, location, commands) || location.label,
+        detail: location.location,
+        location: location.location,
       })),
-      { label: "Type location", description: "Use a custom location id" },
+      { label: "Type location", description: "Use a custom location id", manual: true },
     ],
-    { placeHolder: "Ribbon location" },
+    { placeHolder: "Ribbon location", matchOnDescription: true, matchOnDetail: true },
   );
 
   if (!pick) {
     return undefined;
   }
 
-  if (pick.label !== "Type location") {
-    return pick.label;
+  if (!pick.manual && pick.location) {
+    return pick.location;
   }
 
   return showRibbonInputBox({
     prompt: "Ribbon location",
+    value: options.currentValue,
     placeHolder: "Mscrm.Form.account.MainTab.Save.Controls._children",
     validateInput: (value) => (value.trim() ? undefined : "Location is required."),
   });
+}
+
+function describeLocationContents(
+  document: RibbonDocument,
+  location: OobRibbonLocation,
+  commands: OobRibbonCommand[],
+): string {
+  const entries: Array<{ label: string; sequence?: number }> = [
+    ...commands
+      .filter((command) => command.locationIds.includes(location.id))
+      .map((command) => ({ label: command.label, sequence: command.sequence })),
+    ...listCustomButtonsAtLocation(document, location.location),
+  ];
+  const seen = new Set<string>();
+  return entries
+    .sort(
+      (a, b) => (a.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sequence ?? Number.MAX_SAFE_INTEGER),
+    )
+    .filter((entry) => {
+      if (seen.has(entry.label)) {
+        return false;
+      }
+      seen.add(entry.label);
+      return true;
+    })
+    .map((entry) =>
+      entry.sequence === undefined ? entry.label : `${entry.label} (${entry.sequence})`,
+    )
+    .join(", ");
+}
+
+function listDocumentGroupLocations(
+  document: RibbonDocument,
+  scope: RibbonScope | undefined,
+  catalogLocations: OobRibbonLocation[],
+): OobRibbonLocation[] {
+  const known = new Set(catalogLocations.map((location) => location.location));
+  const discovered = new Map<string, OobRibbonLocation>();
+  for (const view of document.views) {
+    for (const action of view.customActions) {
+      const location = action.location;
+      if (
+        action.commandUI?.kind !== "Button" ||
+        known.has(location) ||
+        discovered.has(location) ||
+        !isGroupChildrenLocation(location) ||
+        !locationMatchesScope(location, scope)
+      ) {
+        continue;
+      }
+
+      const group = groupNameFromLocation(location) ?? location;
+      discovered.set(location, {
+        id: location,
+        scope: inferRibbonScope(location) ?? scope ?? "Application",
+        label: group,
+        group,
+        location,
+      });
+    }
+  }
+
+  return [...discovered.values()];
+}
+
+function isGroupChildrenLocation(location: string): boolean {
+  return /\.Controls\._children$/.test(location);
+}
+
+function groupNameFromLocation(location: string): string | undefined {
+  return /\.([^.]+)\.Controls\._children$/.exec(location)?.[1];
+}
+
+function locationMatchesScope(location: string, scope: RibbonScope | undefined): boolean {
+  if (!scope || scope === "Application") {
+    return true;
+  }
+
+  return inferRibbonScope(location) === scope;
+}
+
+function listCustomButtonsAtLocation(
+  document: RibbonDocument,
+  location: string,
+): Array<{ label: string; sequence?: number }> {
+  const buttons: Array<{ label: string; sequence?: number }> = [];
+  for (const view of document.views) {
+    for (const action of view.customActions) {
+      const button = action.commandUI;
+      if (action.location !== location || button?.kind !== "Button") {
+        continue;
+      }
+      buttons.push({
+        label: resolveCustomButtonLabel(document, button),
+        sequence: action.sequence ?? button.sequence,
+      });
+    }
+  }
+  return buttons;
+}
+
+function resolveCustomButtonLabel(document: RibbonDocument, button: ButtonNode): string {
+  const inline = button.labelText?.trim();
+  if (inline) {
+    return displayLabel(inline);
+  }
+
+  const locLabelId = button.labelLocId?.trim();
+  if (locLabelId) {
+    for (const view of document.views) {
+      const title = view.locLabels
+        .find((label) => label.id === locLabelId)
+        ?.titles.find((item) => item.description.trim());
+      if (title) {
+        return title.description.trim();
+      }
+    }
+  }
+
+  return button.id;
+}
+
+function displayLabel(value: string): string {
+  const reference = /^\$[A-Za-z]+:(.+)$/.exec(value);
+  if (!reference) {
+    return value;
+  }
+
+  const lastSegment = reference[1].split(".").pop()?.trim();
+  return lastSegment || value;
 }
 
 async function pickHideLocation(
@@ -515,7 +681,7 @@ async function pickHideLocation(
     return command.controlId;
   }
 
-  return pickLocation(document, view, command);
+  return pickLocation(document, view.scope, { command });
 }
 
 export function getOobCommandId(command: OobRibbonCommand): string {

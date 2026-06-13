@@ -387,6 +387,7 @@ function locLabelIdsFromCustomAction(action: CustomAction): string[] {
 
   return [
     action.commandUI.labelLocId,
+    action.commandUI.altLocId,
     action.commandUI.toolTipTitleLocId,
     action.commandUI.toolTipDescriptionLocId,
   ].filter(isDefined);

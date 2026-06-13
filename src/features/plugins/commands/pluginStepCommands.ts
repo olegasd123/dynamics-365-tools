@@ -190,6 +190,66 @@ export async function editPluginStep(ctx: CommandContext, node?: PluginStepNode)
   }
 }
 
+export async function editPluginStepAdditionalInfo(
+  ctx: CommandContext,
+  node?: PluginStepNode,
+): Promise<void> {
+  const { configuration, ui, secrets, auth, lastSelection, connections, notifications, input } =
+    ctx.core;
+  const { explorer } = ctx.plugins;
+  if (!node) {
+    void notifications.info("Run this command from a plugin step in the Plugins explorer.");
+    return;
+  }
+
+  const service = await resolveServiceForNode(
+    "Select environment to edit plugin step additional info",
+    configuration,
+    ui,
+    secrets,
+    auth,
+    lastSelection,
+    connections,
+    node.env.name,
+    notifications,
+  );
+  if (!service) return;
+
+  const description = await input.showInputBox({
+    prompt: "Step description",
+    value: node.step.description ?? "",
+    ignoreFocusOut: true,
+  });
+  if (description === undefined) return;
+
+  const configurationValue = await input.showInputBox({
+    prompt: "Unsecure configuration",
+    value: node.step.configuration ?? "",
+    ignoreFocusOut: true,
+  });
+  if (configurationValue === undefined) return;
+
+  const secureConfiguration = await input.showInputBox({
+    prompt: "Secure configuration",
+    value: node.step.secureConfiguration ?? "",
+    ignoreFocusOut: true,
+  });
+  if (secureConfiguration === undefined) return;
+
+  try {
+    await service.updateStep(node.step.id, {
+      description,
+      configuration: configurationValue,
+      secureConfiguration,
+      secureConfigId: node.step.secureConfigId,
+    });
+    explorer.refresh();
+    void notifications.info(`Plugin step ${node.step.name} additional info updated.`);
+  } catch (error) {
+    void notifications.error(`Failed to update plugin step additional info: ${String(error)}`);
+  }
+}
+
 export async function enablePluginStep(ctx: CommandContext, node?: PluginStepNode): Promise<void> {
   const { configuration, ui, secrets, auth, lastSelection, connections } = ctx.core;
   await setPluginStepState(

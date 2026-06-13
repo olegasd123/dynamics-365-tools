@@ -377,6 +377,9 @@ function buildStepTooltip(pluginType: PluginType, step: PluginStep): vscode.Mark
     step.mode !== undefined ? `**Mode:** ${formatStepMode(step.mode)}` : undefined,
     step.rank !== undefined ? `**Rank:** ${step.rank}` : undefined,
     step.filteringAttributes ? `**Filtering attributes:** ${step.filteringAttributes}` : undefined,
+    step.description ? `**Description:** ${step.description}` : undefined,
+    step.configuration ? `**Unsecure configuration:** ${step.configuration}` : undefined,
+    step.secureConfiguration ? `**Secure configuration:** ${step.secureConfiguration}` : undefined,
     step.status !== undefined ? `**Status:** ${formatStepStatus(step.status)}` : undefined,
   ].filter(Boolean);
 

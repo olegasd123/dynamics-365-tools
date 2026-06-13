@@ -1,7 +1,7 @@
 # Dynamics 365 Tools — VS Code Extension
 
-[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/oleg-verhoglyad.dynamics-365-tools?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/oleg-verhoglyad.dynamics-365-tools?label=Installs)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
+[![Marketplace](https://vsmarketplacebadges.dev/version/oleg-verhoglyad.dynamics-365-tools.svg)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
+[![Installs](https://vsmarketplacebadges.dev/installs/oleg-verhoglyad.dynamics-365-tools.svg)](https://marketplace.visualstudio.com/items?itemName=oleg-verhoglyad.dynamics-365-tools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web resources, manage plugins, build and deploy PCF controls, and edit ribbons. You bind local files to CRM components once, then push updates to one or many environments with a few clicks.
@@ -27,7 +27,7 @@ Work with Dynamics 365 (Dataverse) without leaving VS Code. You can publish web 
 - **Publish web resources** from the Explorer with a couple of clicks. No DevOps pipeline needed.
 - **Manage plugins** in a tree view: assemblies, plugin types, steps, and images. Register or update assemblies straight from VS Code.
 - **Build and deploy PCF controls**: create a new control, build or watch it, push it to an environment, or package it as a solution.
-- **Edit ribbons**: add custom buttons, hide or reorder out-of-the-box buttons, add commands and rules, then publish to an environment.
+- **Edit ribbons**: find and filter ribbon items, add custom buttons, hide or reorder out-of-the-box buttons, add commands and rules, then publish to an environment.
 - **Multiple environments**: keep dev, test, and prod side by side and pick the target when you publish.
 - **Share settings with the team** through small JSON files in `.vscode/`.
 - **Safe credentials**: secrets are kept in VS Code Secret Storage. Interactive sign-in and client secrets are both supported.
@@ -236,20 +236,32 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 - `Open Ribbon XML` opens a local ribbon XML file.
 - `Open Ribbons from Solution...` opens the ribbons inside a solution `.zip`.
 - `Pull Ribbons from Environment...` downloads the ribbons from a connected environment.
+- The view also finds flat `customizations.xml` files in the workspace, including child folders up to 4 levels deep, for example `Ribbons/new_/account/customizations.xml`.
 - `Save Ribbon Changes`, `Undo Ribbon Edit`, and `Redo Ribbon Edit` manage your edits.
 - `Save Solution Zip...` writes the changes back to a solution `.zip`.
 - `Publish Ribbons to Environment...` sends your changes to an environment.
 - `Clean Up Generated Ribbon Solutions...` removes the temporary solutions the publish step creates.
 
+**Find and filter**
+
+- `Go to Ribbon Item...` opens a quick pick for ribbon documents, views, buttons, commands, rules, actions, and labels. It searches by id, label, command, rule, and action details, then selects the item in the tree.
+- `Filter Ribbons...` filters the tree by the same kind of text. Matching items stay visible with their parent nodes, so you can still see where each match is.
+- `Clear Ribbon Filter` removes the active filter. While a filter is active, the filter button is hidden and only the clear button is shown.
+
+**Preview**
+
+- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar: the standard out-of-the-box buttons come from a built-in catalog, your custom buttons are highlighted and slotted in at their sequence, and hidden buttons are struck through. The action is on the view and document items (inline icon and right-click menu) and on the details panel.
+
 **Edit buttons**
 
 - `Add Custom Button` adds your own button to a ribbon.
-- `Hide OOB Button` hides an out-of-the-box button. `Hide OOB Buttons and Create Stubs` also creates command stubs you can fill in.
-- `Reorder OOB Buttons` changes the order of the built-in buttons.
+- `Hide OOB Button` hides an out-of-the-box button.
+- The ribbon view `...` button opens more actions, such as `Hide OOB Buttons and Create Stubs` and `Reorder OOB Buttons`.
 
 **Edit commands and rules**
 
-- `Add Command Definition`, `Override OOB Command`, and `Add Command Action` set up what a button does.
+- The ribbon view `...` button also has `Add Command Definition`, `Override OOB Command`, `Add Enable Rule`, `Add Display Rule`, and `Add Loc Label`.
+- `Add Command Action` sets up what a command does.
 - `Add Enable Rule` / `Add Display Rule` create new rules. `Add Enable Rule Reference` / `Add Display Rule Reference` link a command to an existing rule. `Add Rule Step` adds a step inside a rule.
 - `Add Loc Label` and `Add Loc Label Language` manage localized labels.
 - `Move Ribbon Item Up` / `Down`, `Edit Ribbon Item`, and `Delete Ribbon Item` work on any node in the tree.

@@ -153,6 +153,7 @@ export interface ButtonNode {
   command: string;
   labelLocId?: string;
   labelText?: string;
+  altLocId?: string;
   alt?: string;
   toolTipTitle?: string;
   toolTipDescription?: string;

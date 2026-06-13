@@ -36,6 +36,13 @@ export type RibbonExplorerNode =
 
 export type RibbonDetailValue = string | number | string[] | undefined;
 
+export interface RibbonSearchResult {
+  node: RibbonExplorerNode;
+  label: string;
+  description?: string;
+  detail: string;
+}
+
 type RibbonSectionKind =
   | "customActions"
   | "hideActions"
@@ -153,7 +160,12 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
   >();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
   private sources?: RibbonSource[];
+  private rootNodes?: RibbonExplorerNode[];
+  private childrenByNode = new WeakMap<RibbonExplorerNode, RibbonExplorerNode[]>();
+  private parentByNode = new WeakMap<RibbonExplorerNode, RibbonExplorerNode>();
   private readonly documentsBySourceId = new Map<string, RibbonDocument[]>();
+  private filterText = "";
+  private filterQuery = "";
 
   constructor(
     private readonly configuration: ConfigurationService,
@@ -166,51 +178,114 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
   refresh(node?: RibbonExplorerNode): void {
     if (!node) {
       this.sources = undefined;
+      this.rootNodes = undefined;
+      this.childrenByNode = new WeakMap<RibbonExplorerNode, RibbonExplorerNode[]>();
+      this.parentByNode = new WeakMap<RibbonExplorerNode, RibbonExplorerNode>();
       this.documentsBySourceId.clear();
       this.editorState.clearCachedDocuments();
       this.diagnostics?.clear();
+    } else {
+      this.childrenByNode.delete(node);
     }
 
     this.onDidChangeTreeDataEmitter.fire(node);
   }
 
   getTreeItem(element: RibbonExplorerNode): vscode.TreeItem {
+    if (!this.filterQuery && element instanceof RibbonSectionNode) {
+      element.description = String(element.count);
+    }
+
     return element;
   }
 
+  getParent(element: RibbonExplorerNode): RibbonExplorerNode | undefined {
+    return this.parentByNode.get(element);
+  }
+
+  getFilterText(): string | undefined {
+    return this.filterText || undefined;
+  }
+
+  setFilter(text: string | undefined): void {
+    const next = text?.trim() ?? "";
+    const nextQuery = next.toLowerCase();
+    if (next === this.filterText && nextQuery === this.filterQuery) {
+      return;
+    }
+
+    this.filterText = next;
+    this.filterQuery = nextQuery;
+    this.onDidChangeTreeDataEmitter.fire();
+  }
+
+  clearFilter(): void {
+    this.setFilter(undefined);
+  }
+
   async getChildren(element?: RibbonExplorerNode): Promise<RibbonExplorerNode[]> {
+    const children = await this.getUnfilteredChildren(element);
+    if (!this.filterQuery) {
+      resetFilterDescriptions(children);
+      return children;
+    }
+
+    const filtered = await this.filterChildren(children);
+    if (!element && !filtered.length) {
+      return [new RibbonEmptyNode("No ribbon items match", `Filter: ${this.filterText}`)];
+    }
+
+    return filtered;
+  }
+
+  async searchItems(): Promise<RibbonSearchResult[]> {
+    const results: RibbonSearchResult[] = [];
+    await this.collectSearchResults(undefined, [], results);
+    return results;
+  }
+
+  private async getUnfilteredChildren(element?: RibbonExplorerNode): Promise<RibbonExplorerNode[]> {
     if (!element) {
-      const sources = await this.loadSources();
-      return sources.length
-        ? sources.map(
-            (source) => new RibbonSourceNode(source, this.editorState.isSourceDirty(source.id)),
-          )
-        : [new RibbonEmptyNode()];
+      if (!this.rootNodes) {
+        const sources = await this.loadSources();
+        this.rootNodes = sources.length
+          ? sources.map(
+              (source) => new RibbonSourceNode(source, this.editorState.isSourceDirty(source.id)),
+            )
+          : [new RibbonEmptyNode()];
+      }
+
+      return this.rootNodes;
     }
 
+    const cached = this.childrenByNode.get(element);
+    if (cached) {
+      return cached;
+    }
+
+    let children: RibbonExplorerNode[];
     if (element instanceof RibbonSourceNode) {
-      return this.loadDocumentNodes(element.source);
+      children = await this.loadDocumentNodes(element.source);
+    } else if (element instanceof RibbonDocumentNode) {
+      children =
+        element.document.kind === "Entity"
+          ? element.document.views.map((view) => new RibbonViewNode(element.document, view))
+          : buildSectionNodes(element.document, element.document.views[0]);
+    } else if (element instanceof RibbonViewNode) {
+      children = buildSectionNodes(element.document, element.view);
+    } else if (element instanceof RibbonSectionNode) {
+      children = buildItemNodes(element);
+    } else if (element instanceof RibbonItemNode) {
+      children = element.children;
+    } else {
+      children = [];
     }
 
-    if (element instanceof RibbonDocumentNode) {
-      return element.document.kind === "Entity"
-        ? element.document.views.map((view) => new RibbonViewNode(element.document, view))
-        : buildSectionNodes(element.document, element.document.views[0]);
+    for (const child of children) {
+      this.parentByNode.set(child, element);
     }
-
-    if (element instanceof RibbonViewNode) {
-      return buildSectionNodes(element.document, element.view);
-    }
-
-    if (element instanceof RibbonSectionNode) {
-      return buildItemNodes(element);
-    }
-
-    if (element instanceof RibbonItemNode) {
-      return element.children;
-    }
-
-    return [];
+    this.childrenByNode.set(element, children);
+    return children;
   }
 
   private async loadSources(): Promise<RibbonSource[]> {
@@ -247,6 +322,127 @@ export class RibbonExplorerProvider implements vscode.TreeDataProvider<RibbonExp
     this.diagnostics?.validateDocuments([...this.documentsBySourceId.values()].flat());
     return documents;
   }
+
+  private async collectSearchResults(
+    parent: RibbonExplorerNode | undefined,
+    parentPath: string[],
+    results: RibbonSearchResult[],
+  ): Promise<void> {
+    const children = await this.getUnfilteredChildren(parent);
+
+    for (const child of children) {
+      if (child instanceof RibbonEmptyNode) {
+        continue;
+      }
+
+      const label = treeItemLabelText(child.label);
+      const path = [...parentPath, label];
+      const result = searchResultForNode(child, path);
+      if (result) {
+        results.push(result);
+      }
+
+      await this.collectSearchResults(child, path, results);
+    }
+  }
+
+  private async filterChildren(children: RibbonExplorerNode[]): Promise<RibbonExplorerNode[]> {
+    const filtered: RibbonExplorerNode[] = [];
+
+    for (const child of children) {
+      if (child instanceof RibbonEmptyNode) {
+        continue;
+      }
+
+      const descendants = await this.filterChildren(await this.getUnfilteredChildren(child));
+      if (nodeMatchesFilter(child, this.filterQuery) || descendants.length) {
+        if (child instanceof RibbonSectionNode) {
+          child.description = `${descendants.length} of ${child.count}`;
+        }
+
+        filtered.push(child);
+      }
+    }
+
+    return filtered;
+  }
+}
+
+function resetFilterDescriptions(nodes: RibbonExplorerNode[]): void {
+  for (const node of nodes) {
+    if (node instanceof RibbonSectionNode) {
+      node.description = String(node.count);
+    }
+  }
+}
+
+function nodeMatchesFilter(node: RibbonExplorerNode, query: string): boolean {
+  return nodeSearchText(node).toLowerCase().includes(query);
+}
+
+function nodeSearchText(node: RibbonExplorerNode): string {
+  const values = [
+    treeItemLabelText(node.label),
+    treeItemDescriptionText(node.description),
+    treeItemTooltipText(node.tooltip),
+  ];
+
+  if (node instanceof RibbonItemNode) {
+    values.push(...node.details.flatMap(([, value]) => ribbonDetailText(value) ?? []));
+  }
+
+  return values.filter(Boolean).join(" ");
+}
+
+function treeItemTooltipText(tooltip: string | vscode.MarkdownString | undefined): string {
+  return typeof tooltip === "string" ? tooltip : (tooltip?.value ?? "");
+}
+
+function searchResultForNode(
+  node: RibbonExplorerNode,
+  path: string[],
+): RibbonSearchResult | undefined {
+  if (node instanceof RibbonSourceNode || node instanceof RibbonSectionNode) {
+    return undefined;
+  }
+
+  const label = treeItemLabelText(node.label);
+  if (!label) {
+    return undefined;
+  }
+
+  const fields = node instanceof RibbonItemNode ? ribbonItemSearchFields(node) : [];
+  return {
+    node,
+    label,
+    description: treeItemDescriptionText(node.description),
+    detail: [path.join(" > "), fields.join(" | ")].filter(Boolean).join(" | "),
+  };
+}
+
+function ribbonItemSearchFields(node: RibbonItemNode): string[] {
+  return node.details
+    .flatMap(([name, value]) => {
+      const text = ribbonDetailText(value);
+      return text ? [`${name}: ${text}`] : [];
+    })
+    .slice(0, 8);
+}
+
+function ribbonDetailText(value: RibbonDetailValue): string | undefined {
+  if (Array.isArray(value)) {
+    return value.length ? value.join(", ") : undefined;
+  }
+
+  return value === undefined ? undefined : String(value);
+}
+
+function treeItemLabelText(label: vscode.TreeItemLabel | string | undefined): string {
+  return typeof label === "string" ? label : (label?.label ?? "");
+}
+
+function treeItemDescriptionText(description: boolean | string | undefined): string | undefined {
+  return typeof description === "string" ? description : undefined;
 }
 
 function buildSectionNodes(document: RibbonDocument, view: RibbonView): RibbonSectionNode[] {
@@ -396,9 +592,9 @@ function commandUiDetails(commandUI: NonNullable<CustomAction["commandUI"]>) {
 
 function optionalButtonDetails(button: ButtonNode): Array<[string, RibbonDetailValue]> {
   return [
-    ["Alt", button.alt],
-    ["Tool tip title", button.toolTipTitle],
-    ["Tool tip description", button.toolTipDescription],
+    ["Alt", button.alt ?? button.altLocId],
+    ["Tool tip title", button.toolTipTitle ?? button.toolTipTitleLocId],
+    ["Tool tip description", button.toolTipDescription ?? button.toolTipDescriptionLocId],
     ["Image 16", button.image16x16?.webResourceUniqueName],
     ["Image 32", button.image32x32?.webResourceUniqueName],
     ["Modern image", button.modernImage?.webResourceUniqueName],

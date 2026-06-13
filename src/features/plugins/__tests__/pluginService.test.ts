@@ -131,6 +131,54 @@ test("createStep binds message and filter and adds to solution", async () => {
   ]);
 });
 
+test("listSteps reads additional info and secure configuration", async () => {
+  const client = new FakeDataverseClient();
+  const filter = encodeURIComponent("_eventhandler_value eq plugin-type");
+  client.addResponse(
+    "GET",
+    `/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,configuration,stage,mode,rank,statecode,statuscode,filteringattributes,_sdkmessageprocessingstepsecureconfigid_value&$filter=${filter}&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),sdkmessageprocessingstepsecureconfigid($select=sdkmessageprocessingstepsecureconfigid,secureconfig)`,
+    {
+      value: [
+        {
+          sdkmessageprocessingstepid: "{step-id}",
+          name: "On Create",
+          description: "Step description",
+          configuration: "plain config",
+          _sdkmessageprocessingstepsecureconfigid_value: "{secure-id}",
+          sdkmessageprocessingstepsecureconfigid: {
+            sdkmessageprocessingstepsecureconfigid: "{secure-id}",
+            secureconfig: "secret config",
+          },
+          sdkmessageid: { name: "Create" },
+          sdkmessagefilterid: { primaryobjecttypecode: "account" },
+        },
+      ],
+    },
+  );
+
+  const service = new PluginService(client as any, new FakeSolutionComponents() as any);
+  const steps = await service.listSteps("plugin-type");
+
+  assert.deepStrictEqual(steps, [
+    {
+      id: "step-id",
+      name: "On Create",
+      description: "Step description",
+      configuration: "plain config",
+      secureConfiguration: "secret config",
+      secureConfigId: "secure-id",
+      mode: undefined,
+      stage: undefined,
+      rank: undefined,
+      status: undefined,
+      statusReason: undefined,
+      messageName: "Create",
+      primaryEntity: "account",
+      filteringAttributes: undefined,
+    },
+  ]);
+});
+
 test("updateStep sets message and filter when primary entity provided", async () => {
   const client = new FakeDataverseClient();
   const components = new FakeSolutionComponents();
@@ -167,6 +215,71 @@ test("updateStep sets message and filter when primary entity provided", async ()
     "sdkmessageid@odata.bind": "/sdkmessages(11111111-1111-1111-1111-111111111111)",
     "sdkmessagefilterid@odata.bind": "/sdkmessagefilters(22222222-2222-2222-2222-222222222222)",
   });
+});
+
+test("updateStep updates existing secure configuration", async () => {
+  const client = new FakeDataverseClient();
+  const service = new PluginService(client as any, new FakeSolutionComponents() as any);
+
+  await service.updateStep("{step-id}", {
+    description: "updated",
+    configuration: "plain",
+    secureConfiguration: "secret",
+    secureConfigId: "{secure-id}",
+  });
+
+  assert.deepStrictEqual(client.calls, [
+    {
+      method: "PATCH",
+      path: "/sdkmessageprocessingstepsecureconfigs(secure-id)",
+      body: { secureconfig: "secret" },
+    },
+    {
+      method: "PATCH",
+      path: "/sdkmessageprocessingsteps(step-id)",
+      body: {
+        description: "updated",
+        configuration: "plain",
+      },
+    },
+  ]);
+});
+
+test("updateStep creates secure configuration when missing", async () => {
+  const client = new FakeDataverseClient();
+  client.addResponse(
+    "GET",
+    "/sdkmessageprocessingsteps(step-id)?$select=_sdkmessageprocessingstepsecureconfigid_value",
+    {},
+  );
+  client.addResponse("POST", "/sdkmessageprocessingstepsecureconfigs", {
+    sdkmessageprocessingstepsecureconfigid: "{secure-id}",
+  });
+  const service = new PluginService(client as any, new FakeSolutionComponents() as any);
+
+  await service.updateStep("{step-id}", {
+    secureConfiguration: "secret",
+  });
+
+  assert.deepStrictEqual(client.calls, [
+    {
+      method: "GET",
+      path: "/sdkmessageprocessingsteps(step-id)?$select=_sdkmessageprocessingstepsecureconfigid_value",
+    },
+    {
+      method: "POST",
+      path: "/sdkmessageprocessingstepsecureconfigs",
+      body: { secureconfig: "secret" },
+    },
+    {
+      method: "PATCH",
+      path: "/sdkmessageprocessingsteps(step-id)",
+      body: {
+        "sdkmessageprocessingstepsecureconfigid@odata.bind":
+          "/sdkmessageprocessingstepsecureconfigs(secure-id)",
+      },
+    },
+  ]);
 });
 
 test("createImage applies default message property name when missing", async () => {
@@ -397,7 +510,7 @@ test("listSteps maps step details", async () => {
   const client = new FakeDataverseClient();
   client.addResponse(
     "GET",
-    "/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,statuscode,filteringattributes&$filter=_eventhandler_value%20eq%20type-id&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
+    "/sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,configuration,stage,mode,rank,statecode,statuscode,filteringattributes,_sdkmessageprocessingstepsecureconfigid_value&$filter=_eventhandler_value%20eq%20type-id&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),sdkmessageprocessingstepsecureconfigid($select=sdkmessageprocessingstepsecureconfigid,secureconfig)",
     {
       value: [
         {
@@ -423,6 +536,10 @@ test("listSteps maps step details", async () => {
     {
       id: "step-1",
       name: "Step",
+      description: undefined,
+      configuration: undefined,
+      secureConfiguration: undefined,
+      secureConfigId: undefined,
       mode: 0,
       stage: 40,
       rank: 1,

@@ -6,6 +6,7 @@ import { SolutionImportError } from "@features/dataverse/solutionImportService";
 import {
   RibbonDocumentNode,
   RibbonExplorerNode,
+  RibbonSearchResult,
   RibbonItemNode,
   RibbonSectionNode,
   RibbonSourceNode,
@@ -15,7 +16,7 @@ import { RibbonDocument, RibbonSource } from "../models";
 import { createRibbonPullPlan } from "../ribbonPullService";
 import type { RibbonPublishSolution } from "../ribbonPublishService";
 import { isSolutionExportCancelledError } from "../solutionZipService";
-import { showRibbonQuickPick } from "./ribbonPromptUi";
+import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
 
 interface SolutionOpenPick extends vscode.QuickPickItem {
   sourceKind: "environment" | "disk";
@@ -37,11 +38,78 @@ interface GeneratedSolutionPick extends vscode.QuickPickItem {
   solutionId: string;
 }
 
+interface RibbonSearchPick extends vscode.QuickPickItem {
+  result: RibbonSearchResult;
+}
+
 const SAVE_EXPORT_BACKUP = "Save Backup";
 const REMOVE_IMPORTED_SOLUTION = "Remove";
 
 export function refreshRibbonExplorer(ctx: CommandContext): void {
   ctx.ribbon.explorer.refresh();
+}
+
+export async function filterRibbonExplorer(ctx: CommandContext): Promise<void> {
+  const text = await showRibbonInputBox({
+    placeHolder: "Filter by id, label, command, rule, or action",
+    prompt: "Leave empty to clear the filter.",
+    value: ctx.ribbon.explorer.getFilterText() ?? "",
+  });
+  if (text === undefined) {
+    return;
+  }
+
+  ctx.ribbon.explorer.setFilter(text);
+  await setRibbonFilterContext(ctx.ribbon.explorer.getFilterText());
+}
+
+export async function clearRibbonExplorerFilter(ctx: CommandContext): Promise<void> {
+  ctx.ribbon.explorer.clearFilter();
+  await setRibbonFilterContext(undefined);
+}
+
+export async function goToRibbonItem(
+  ctx: CommandContext,
+  treeView: vscode.TreeView<RibbonExplorerNode>,
+): Promise<void> {
+  const results = await ctx.ribbon.explorer.searchItems();
+  if (!results.length) {
+    await ctx.core.notifications.warning("No ribbon items found.");
+    return;
+  }
+
+  const pick = await showRibbonQuickPick<RibbonSearchPick>(
+    results.map((result) => ({
+      label: result.label,
+      description: result.description,
+      detail: result.detail,
+      result,
+    })),
+    { placeHolder: "Go to ribbon item" },
+  );
+  if (!pick) {
+    return;
+  }
+
+  await treeView.reveal(pick.result.node, {
+    select: true,
+    focus: true,
+    expand: true,
+  });
+  ctx.ribbon.formPanel.show(pick.result.node);
+}
+
+export function ribbonFilterMessage(ctx: CommandContext): string | undefined {
+  const filterText = ctx.ribbon.explorer.getFilterText();
+  return filterText ? `Filter: ${filterText}` : undefined;
+}
+
+async function setRibbonFilterContext(filterText: string | undefined): Promise<void> {
+  await vscode.commands.executeCommand(
+    "setContext",
+    "d365Tools.ribbons.filterActive",
+    !!filterText,
+  );
 }
 
 export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void> {

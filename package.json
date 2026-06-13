@@ -161,6 +161,12 @@
         "icon": "$(edit)"
       },
       {
+        "command": "dynamics365Tools.plugins.editStepAdditionalInfo",
+        "title": "Edit Additional Info",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(note)"
+      },
+      {
         "command": "dynamics365Tools.plugins.enableStep",
         "title": "Enable Plugin Step",
         "category": "Dynamics 365 Tools",
@@ -303,6 +309,24 @@
         "title": "Refresh Ribbon Explorer",
         "category": "Dynamics 365 Tools",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.goToItem",
+        "title": "Go to Ribbon Item...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(search)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.filterExplorer",
+        "title": "Filter Ribbons...",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.clearFilter",
+        "title": "Clear Ribbon Filter",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(filter-filled)"
       },
       {
         "command": "dynamics365Tools.ribbons.save",
@@ -483,12 +507,23 @@
         "title": "Edit Ribbon Item",
         "category": "Dynamics 365 Tools",
         "icon": "$(edit)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.preview",
+        "title": "Preview Ribbon",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(preview)"
       }
     ],
     "submenus": [
       {
         "id": "dynamics365Tools.resourceMenu",
         "label": "Dynamics 365 Tools"
+      },
+      {
+        "id": "dynamics365Tools.ribbonViewMoreMenu",
+        "label": "...",
+        "icon": "$(ellipsis)"
       }
     ],
     "menus": {
@@ -608,6 +643,9 @@
         },
         {
           "command": "dynamics365Tools.plugins.editStep"
+        },
+        {
+          "command": "dynamics365Tools.plugins.editStepAdditionalInfo"
         },
         {
           "command": "dynamics365Tools.plugins.enableStep"
@@ -749,34 +787,49 @@
           "group": "navigation@1"
         },
         {
-          "command": "dynamics365Tools.ribbons.openSolutionZip",
+          "command": "dynamics365Tools.ribbons.goToItem",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "dynamics365Tools.ribbons.save",
-          "when": "view == dynamics365Tools.ribbonExplorer",
+          "command": "dynamics365Tools.ribbons.filterExplorer",
+          "when": "view == dynamics365Tools.ribbonExplorer && !d365Tools.ribbons.filterActive",
           "group": "navigation@3"
         },
         {
-          "command": "dynamics365Tools.ribbons.undo",
-          "when": "view == dynamics365Tools.ribbonExplorer",
+          "command": "dynamics365Tools.ribbons.clearFilter",
+          "when": "view == dynamics365Tools.ribbonExplorer && d365Tools.ribbons.filterActive",
           "group": "navigation@4"
         },
         {
-          "command": "dynamics365Tools.ribbons.redo",
+          "command": "dynamics365Tools.ribbons.openSolutionZip",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@5"
         },
         {
-          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "command": "dynamics365Tools.ribbons.save",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@6"
         },
         {
-          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "command": "dynamics365Tools.ribbons.undo",
           "when": "view == dynamics365Tools.ribbonExplorer",
           "group": "navigation@7"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.redo",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@8"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.cleanupGeneratedSolutions",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@9"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
+          "when": "view == dynamics365Tools.ribbonExplorer",
+          "group": "navigation@10"
         }
       ],
       "view/item/context": [
@@ -806,24 +859,29 @@
           "group": "inline@1"
         },
         {
-          "command": "dynamics365Tools.plugins.createImage",
+          "command": "dynamics365Tools.plugins.editStepAdditionalInfo",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
           "group": "inline@2"
         },
         {
+          "command": "dynamics365Tools.plugins.createImage",
+          "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
+          "group": "inline@3"
+        },
+        {
           "command": "dynamics365Tools.plugins.enableStep",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep:disabled",
-          "group": "inline@3"
+          "group": "inline@4"
         },
         {
           "command": "dynamics365Tools.plugins.disableStep",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem == d365PluginStep:enabled",
-          "group": "inline@3"
+          "group": "inline@4"
         },
         {
           "command": "dynamics365Tools.plugins.deleteStep",
           "when": "view == dynamics365Tools.pluginExplorer && viewItem =~ /d365PluginStep/",
-          "group": "inline@4"
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.plugins.copyImageDescription",
@@ -926,6 +984,16 @@
           "group": "navigation@0"
         },
         {
+          "command": "dynamics365Tools.ribbons.preview",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
+          "group": "inline@99"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.preview",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
+          "group": "navigation@1"
+        },
+        {
           "command": "dynamics365Tools.ribbons.addCustomButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
           "group": "inline@5"
@@ -936,29 +1004,14 @@
           "group": "inline@6"
         },
         {
+          "submenu": "dynamics365Tools.ribbonViewMoreMenu",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
+          "group": "inline@7"
+        },
+        {
           "command": "dynamics365Tools.ribbons.addHideOobButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:hideActions",
           "group": "inline@5"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.reorderOobButtons",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
-          "group": "navigation@2"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCommandDefinition",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:commandDefinitions)",
-          "group": "navigation@3"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.overrideOobCommand",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:commandDefinitions)",
-          "group": "navigation@4"
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandAction",
@@ -992,18 +1045,8 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addEnableRule",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:enableRules)",
-          "group": "navigation@8"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addEnableRule",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:enableRules",
           "group": "inline@8"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addDisplayRule",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:displayRules)",
-          "group": "navigation@9"
         },
         {
           "command": "dynamics365Tools.ribbons.addDisplayRule",
@@ -1014,11 +1057,6 @@
           "command": "dynamics365Tools.ribbons.addRuleChildStep",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonRuleStep:OrRule",
           "group": "inline@5"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addLocLabel",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonSection:locLabels)",
-          "group": "navigation@10"
         },
         {
           "command": "dynamics365Tools.ribbons.addLocLabelTitle",
@@ -1044,6 +1082,36 @@
           "command": "dynamics365Tools.ribbons.deleteNode",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCustomAction || viewItem == d365RibbonHideAction || viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonRuleRef || viewItem == d365RibbonLocLabel || viewItem == d365RibbonJavaScriptAction || viewItem == d365RibbonUrlAction || viewItem == d365RibbonParameter || viewItem == d365RibbonLocLabelTitle || viewItem =~ /d365RibbonRuleStep/)",
           "group": "inline@9"
+        }
+      ],
+      "dynamics365Tools.ribbonViewMoreMenu": [
+        {
+          "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.reorderOobButtons",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addCommandDefinition",
+          "group": "navigation@3"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.overrideOobCommand",
+          "group": "navigation@4"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addEnableRule",
+          "group": "navigation@5"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addDisplayRule",
+          "group": "navigation@6"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addLocLabel",
+          "group": "navigation@7"
         }
       ]
     },

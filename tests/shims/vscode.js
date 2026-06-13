@@ -189,6 +189,12 @@ class ThemeIcon {
   }
 }
 
+class MarkdownString {
+  constructor(value = "") {
+    this.value = value;
+  }
+}
+
 class Disposable {
   constructor(callOnDispose = () => {}) {
     this.callOnDispose = callOnDispose;
@@ -227,6 +233,7 @@ module.exports = {
   TreeItem,
   TreeItemCollapsibleState,
   ThemeIcon,
+  MarkdownString,
   Disposable,
   ViewColumn,
 };

@@ -56,9 +56,14 @@ async function addRibbonRule(
     return;
   }
 
+  const step = await promptRuleStep(ctx, kind, target.document);
+  if (step === undefined) {
+    return;
+  }
+
   const suggestedId = nextBatchId(
     collectRibbonIds(target.document),
-    `d365tools.${target.document.entityLogicalName ?? "application"}.${target.view.scope}.${kind}Rule`,
+    suggestedRuleId(target.document, target.view.scope, kind, step?.kind),
   );
   const id = await showRibbonInputBox({
     prompt: `${kind} rule id`,
@@ -66,11 +71,6 @@ async function addRibbonRule(
     validateInput: (value) => validateUniqueId(target.document, value, "Rule id is required."),
   });
   if (!id) {
-    return;
-  }
-
-  const step = await promptRuleStep(ctx, kind);
-  if (step === undefined) {
     return;
   }
 
@@ -200,10 +200,16 @@ async function promptNewEnableRuleRef(
   currentRefs: string[],
   suggestedId: string,
 ): Promise<RuleRefSelection | undefined> {
+  const step = await promptRuleStep(ctx, "Enable", document);
+  if (step === undefined) {
+    return undefined;
+  }
+
+  const ruleId = step?.kind ? withRuleStepName(suggestedId, step.kind, "EnableRule") : suggestedId;
   const usedIds = new Set([...collectRibbonIds(document), ...currentRefs]);
   const id = await showRibbonInputBox({
     prompt: "Enable rule id",
-    value: nextBatchId(usedIds, suggestedId),
+    value: nextBatchId(usedIds, ruleId),
     validateInput: (value) => {
       const trimmed = value.trim();
       if (currentRefs.includes(trimmed)) {
@@ -214,11 +220,6 @@ async function promptNewEnableRuleRef(
     },
   });
   if (!id) {
-    return undefined;
-  }
-
-  const step = await promptRuleStep(ctx, "Enable");
-  if (step === undefined) {
     return undefined;
   }
 
@@ -236,6 +237,25 @@ function suggestedCommandRuleRefId(commandId: string, kind: "EnableRule" | "Disp
   return commandId.endsWith(".Command")
     ? `${commandId.slice(0, -".Command".length)}.${kind}`
     : `${commandId}.${kind}`;
+}
+
+function suggestedRuleId(
+  document: RibbonDocument,
+  scope: string,
+  kind: "Enable" | "Display",
+  stepKind?: string,
+): string {
+  const entityName = document.entityLogicalName ?? "application";
+  const ruleKind = `${kind}Rule`;
+  const baseId = `d365tools.${entityName}.${scope}.${ruleKind}`;
+  return stepKind ? withRuleStepName(baseId, stepKind, ruleKind) : baseId;
+}
+
+function withRuleStepName(ruleId: string, stepKind: string, ruleKind: string): string {
+  const suffix = `.${ruleKind}`;
+  return ruleId.endsWith(suffix)
+    ? `${ruleId.slice(0, -suffix.length)}.${stepKind}${suffix}`
+    : `${ruleId}.${stepKind}`;
 }
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {

@@ -28,6 +28,7 @@ import type { RibbonPublishService } from "@features/ribbons/ribbonPublishServic
 import type { RibbonSourceLocator } from "@features/ribbons/ribbonSourceLocator";
 import type { SolutionZipService } from "@features/ribbons/solutionZipService";
 import type { RibbonFormPanel } from "@features/ribbons/webview/ribbonFormPanel";
+import type { RibbonPreviewPanel } from "@features/ribbons/webview/ribbonPreviewPanel";
 import type { BindingService } from "@features/webResources/bindingService";
 import type { PublishCacheService } from "@features/webResources/publishCacheService";
 import type { WebResourceStatusBarService } from "@features/webResources/webResourceStatusBar";
@@ -99,6 +100,7 @@ export interface RibbonServices {
   diagnostics: RibbonDiagnosticsService;
   explorer: RibbonExplorerProvider;
   formPanel: RibbonFormPanel;
+  previewPanel: RibbonPreviewPanel;
 }
 
 export interface PcfServices {
