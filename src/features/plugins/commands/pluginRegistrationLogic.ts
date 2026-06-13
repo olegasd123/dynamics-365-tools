@@ -60,7 +60,7 @@ export function buildMessageNamePickItems(
     description: "Type a message name manually",
     isCustom: true,
   });
-  return items;
+  return withCurrentItemFirst(items);
 }
 
 export function buildPrimaryEntityPickItems(
@@ -96,7 +96,7 @@ export function buildPrimaryEntityPickItems(
     description: "Type a logical name manually",
     type: "custom",
   });
-  return items;
+  return withCurrentItemFirst(items);
 }
 
 export function normalizeOptionalInput(value: string): string | undefined {
@@ -119,21 +119,44 @@ export function buildFilteringAttributePickItems(
   defaultValue?: string,
 ): FilteringAttributePickItem[] {
   const defaults = parseFilteringAttributes(defaultValue);
-  const items: FilteringAttributePickItem[] = attributes
+  const sortedAttributes = attributes
     .filter(Boolean)
+    .filter((attr, index, list) => list.indexOf(attr) === index)
     .sort((a, b) => a.localeCompare(b))
     .map((attr) => ({
       label: attr,
       pickType: "attribute" as const,
       picked: defaults.has(attr),
     }));
+  const currentItems = sortedAttributes
+    .filter((item) => item.picked)
+    .map((item) => ({
+      ...item,
+      description: "Current value",
+    }));
+  const knownAttributes = new Set(sortedAttributes.map((item) => item.label));
+  const missingCurrentItems = [...defaults]
+    .filter((attr) => !knownAttributes.has(attr))
+    .map((attr) => ({
+      label: attr,
+      description: "Current value",
+      pickType: "attribute" as const,
+      picked: true,
+    }));
+  const otherItems = sortedAttributes.filter((item) => !item.picked);
 
-  items.unshift({
+  const currentItemsWithMissing: FilteringAttributePickItem[] = [
+    ...missingCurrentItems,
+    ...currentItems,
+  ];
+  const customItem: FilteringAttributePickItem = {
     label: "Enter custom list...",
     description: "Type attributes manually",
     pickType: "custom",
-  });
-  return items;
+  };
+  return currentItemsWithMissing.length
+    ? [...currentItemsWithMissing, customItem, ...otherItems]
+    : [customItem, ...otherItems];
 }
 
 export const PLUGIN_STAGE_OPTIONS: ReadonlyArray<Omit<NumericPickItem, "picked">> = [
@@ -148,17 +171,21 @@ export const PLUGIN_MODE_OPTIONS: ReadonlyArray<Omit<NumericPickItem, "picked">>
 ];
 
 export function buildStagePickItems(defaultStage?: number): NumericPickItem[] {
-  return PLUGIN_STAGE_OPTIONS.map((option) => ({
-    ...option,
-    picked: option.value === defaultStage,
-  }));
+  return withCurrentItemFirst(
+    PLUGIN_STAGE_OPTIONS.map((option) => ({
+      ...option,
+      picked: option.value === defaultStage,
+    })),
+  );
 }
 
 export function buildModePickItems(defaultMode?: number): NumericPickItem[] {
-  return PLUGIN_MODE_OPTIONS.map((option) => ({
-    ...option,
-    picked: option.value === defaultMode,
-  }));
+  return withCurrentItemFirst(
+    PLUGIN_MODE_OPTIONS.map((option) => ({
+      ...option,
+      picked: option.value === defaultMode,
+    })),
+  );
 }
 
 export function getImageTypeOptions(step: PluginStep): NumericPickItem[] {
@@ -184,6 +211,12 @@ export function getDefaultMessagePropertyName(step: PluginStep): string {
   return "Target";
 }
 
+export function markCurrentPickItems<T extends { description?: string; picked?: boolean }>(
+  items: T[],
+): T[] {
+  return withCurrentItemFirst(items);
+}
+
 export function asTooltipString(
   tooltip: string | { value?: string } | undefined,
 ): string | undefined {
@@ -191,4 +224,26 @@ export function asTooltipString(
   const raw = typeof tooltip === "string" ? tooltip : (tooltip.value ?? "");
   const cleaned = raw.replace(/\*\*/g, "").trim();
   return cleaned || undefined;
+}
+
+function withCurrentItemFirst<T extends { description?: string; picked?: boolean }>(
+  items: T[],
+): T[] {
+  const currentIndex = items.findIndex((item) => item.picked);
+  if (currentIndex < 0) {
+    return items;
+  }
+
+  const current = {
+    ...items[currentIndex],
+    description: formatCurrentDescription(items[currentIndex].description),
+  };
+  return [current, ...items.slice(0, currentIndex), ...items.slice(currentIndex + 1)];
+}
+
+function formatCurrentDescription(description?: string): string {
+  if (description?.startsWith("Current value")) {
+    return description;
+  }
+  return description ? `Current value - ${description}` : "Current value";
 }
