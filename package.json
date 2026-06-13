@@ -991,19 +991,9 @@
           "group": "inline@99"
         },
         {
-          "command": "dynamics365Tools.ribbons.pullFromEnvironment",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource/ || viewItem =~ /d365RibbonDocument/ || viewItem == d365RibbonView || viewItem =~ /d365RibbonSection/ || viewItem =~ /d365RibbonCustomAction/ || viewItem =~ /d365RibbonHideAction/ || viewItem =~ /d365RibbonCommandDefinition/ || viewItem =~ /d365RibbonEnableRule/ || viewItem =~ /d365RibbonDisplayRule/ || viewItem =~ /d365RibbonLocLabel/)",
-          "group": "navigation@0"
-        },
-        {
           "command": "dynamics365Tools.ribbons.preview",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
           "group": "inline@99"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.preview",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonView || viewItem =~ /d365RibbonDocument/)",
-          "group": "navigation@1"
         },
         {
           "command": "dynamics365Tools.ribbons.addCustomButton",
@@ -1027,28 +1017,13 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandAction",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonActions)",
-          "group": "navigation@5"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCommandAction",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonActions",
           "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonEnableRuleRefs)",
-          "group": "navigation@6"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCommandEnableRuleRef",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonEnableRuleRefs",
           "group": "inline@6"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCommandDisplayRuleRef",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonCommandDefinition || viewItem == d365RibbonDisplayRuleRefs)",
-          "group": "navigation@7"
         },
         {
           "command": "dynamics365Tools.ribbons.addCommandDisplayRuleRef",
