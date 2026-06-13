@@ -440,7 +440,7 @@
         "command": "dynamics365Tools.ribbons.addCommandDefinition",
         "title": "Add Command Definition",
         "category": "Dynamics 365 Tools",
-        "icon": "$(gear)"
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.overrideOobCommand",
@@ -488,7 +488,7 @@
         "command": "dynamics365Tools.ribbons.addLocLabel",
         "title": "Add Loc Label",
         "category": "Dynamics 365 Tools",
-        "icon": "$(symbol-string)"
+        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.addLocLabelTitle",
@@ -1011,8 +1011,18 @@
           "group": "inline@7"
         },
         {
+          "command": "dynamics365Tools.ribbons.addCustomButton",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:customActions",
+          "group": "inline@5"
+        },
+        {
           "command": "dynamics365Tools.ribbons.addHideOobButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:hideActions",
+          "group": "inline@5"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addCommandDefinition",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:commandDefinitions",
           "group": "inline@5"
         },
         {
@@ -1048,6 +1058,11 @@
         {
           "command": "dynamics365Tools.ribbons.addLocLabelTitle",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonLocLabel",
+          "group": "inline@5"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addLocLabel",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:locLabels",
           "group": "inline@5"
         },
         {
