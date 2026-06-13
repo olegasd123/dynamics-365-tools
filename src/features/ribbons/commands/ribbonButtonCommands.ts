@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 import { CommandContext } from "@app/commandContext";
 import {
+  createCustomControlPatches,
   createCustomButtonPatches,
   createHideActionPatches,
   createOobButtonReorderPatches,
   createOobStubReplacementPatches,
+  makeCustomControlIds,
   makeCustomButtonIds,
   makeHideActionId,
   nextHideActionId,
@@ -171,6 +173,127 @@ export async function addCustomRibbonButton(
   ctx.ribbon.explorer.refresh();
 }
 
+export async function addCustomRibbonGroup(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
+    return;
+  }
+
+  const title = await showRibbonInputBox({
+    prompt: "Group title",
+    placeHolder: "Custom actions",
+    validateInput: (value) => (value.trim() ? undefined : "Group title is required."),
+  });
+  if (!title) {
+    return;
+  }
+  const titleValue = title.trim();
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: String(nextCustomActionSequence(target.view)),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const location = await promptRibbonLocation({
+    prompt: "Group location",
+    value: defaultGroupLocation(target.document, target.view.scope),
+    placeHolder: "Mscrm.Form.account.MainTab.Groups._children",
+  });
+  if (!location) {
+    return;
+  }
+
+  const ids = makeCustomControlIds(target.document, target.view.scope, titleValue, "Group");
+  const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
+  ctx.ribbon.editorState.queuePatches(
+    target.document,
+    createCustomControlPatches(target.document, {
+      customActionId: ids.customActionId,
+      location,
+      sequence,
+      control: {
+        kind: "Group",
+        id: ids.controlId,
+        title: titleValue,
+        sequence,
+      },
+    }),
+  );
+  ctx.ribbon.explorer.refresh();
+}
+
+export async function addCustomRibbonMenuSection(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
+    return;
+  }
+
+  const name = await showRibbonInputBox({
+    prompt: "Menu section name",
+    placeHolder: "More actions",
+    validateInput: (value) => (value.trim() ? undefined : "Menu section name is required."),
+  });
+  if (!name) {
+    return;
+  }
+  const nameValue = name.trim();
+
+  const displayMode = await showRibbonQuickPick(["Menu16", "Menu32"], {
+    placeHolder: "Menu section display mode",
+  });
+  if (!displayMode) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: String(nextCustomActionSequence(target.view)),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const location = await promptRibbonLocation({
+    prompt: "Menu section location",
+    value: defaultMenuSectionLocation(target.document, target.view.scope),
+    placeHolder: "Mscrm.Form.account.MainTab.Actions.MenuSections._children",
+  });
+  if (!location) {
+    return;
+  }
+
+  const ids = makeCustomControlIds(target.document, target.view.scope, nameValue, "MenuSection");
+  const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
+  ctx.ribbon.editorState.queuePatches(
+    target.document,
+    createCustomControlPatches(target.document, {
+      customActionId: ids.customActionId,
+      location,
+      sequence,
+      control: {
+        kind: "MenuSection",
+        id: ids.controlId,
+        displayMode,
+        sequence,
+      },
+    }),
+  );
+  ctx.ribbon.explorer.refresh();
+}
+
 function newLocLabel(id: string, description: string) {
   return {
     id,
@@ -181,6 +304,36 @@ function newLocLabel(id: string, description: string) {
 
 function optionalLocLabel(id: string, description: string) {
   return description.trim() ? newLocLabel(id, description) : undefined;
+}
+
+async function promptRibbonLocation(input: {
+  prompt: string;
+  value: string;
+  placeHolder: string;
+}): Promise<string | undefined> {
+  return showRibbonInputBox({
+    prompt: input.prompt,
+    value: input.value,
+    placeHolder: input.placeHolder,
+    validateInput: (value) => (value.trim() ? undefined : "Location is required."),
+  });
+}
+
+function defaultGroupLocation(document: RibbonDocument, scope: RibbonScope): string {
+  return `${scopePrefix(document, scope)}.MainTab.Groups._children`;
+}
+
+function defaultMenuSectionLocation(document: RibbonDocument, scope: RibbonScope): string {
+  return `${scopePrefix(document, scope)}.MainTab.Actions.MenuSections._children`;
+}
+
+function scopePrefix(document: RibbonDocument, scope: RibbonScope): string {
+  if (scope === "Application") {
+    return "Mscrm.GlobalTab";
+  }
+
+  const entity = document.entityLogicalName ?? "{entity}";
+  return `Mscrm.${scope}.${entity}`;
 }
 
 export async function hideOobRibbonButton(

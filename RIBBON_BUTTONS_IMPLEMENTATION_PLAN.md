@@ -44,7 +44,7 @@ Acceptance:
 - TypeScript models represent all supported controls.
 - Existing ribbon tests still pass.
 
-## Milestone 3: XML Reader And Writer
+## Milestone 3: XML Reader And Writer [Dome]
 
 - Update `src/features/ribbons/ribbonXmlReader.ts` to parse the new controls.
 - Update `src/features/ribbons/ribbonEditPatches.ts` to render valid ribbon XML.
@@ -56,7 +56,7 @@ Acceptance:
 - Generated XML can be opened again without losing structure.
 - Existing custom button XML is unchanged.
 
-## Milestone 4: Basic Controls UI
+## Milestone 4: Basic Controls UI [Dome]
 
 - Add commands or wizard steps for:
   - Add Button

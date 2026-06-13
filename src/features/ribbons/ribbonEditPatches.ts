@@ -57,6 +57,65 @@ export interface NewCommandDefinitionInput {
   displayRuleIds?: string[];
 }
 
+interface NewLabeledControlInput {
+  labelLocId?: string;
+  labelText?: string;
+  altLocId?: string;
+  alt?: string;
+  toolTipTitleLocId?: string;
+  toolTipTitle?: string;
+  toolTipDescriptionLocId?: string;
+  toolTipDescription?: string;
+  image16x16?: string;
+  image32x32?: string;
+  modernImage?: string;
+  templateAlias?: string;
+}
+
+interface NewSequencedControlInput {
+  id: string;
+  sequence?: number;
+}
+
+export interface NewButtonControlInput extends NewSequencedControlInput, NewLabeledControlInput {
+  kind: "Button";
+  commandId: string;
+}
+
+export interface NewSplitButtonControlInput
+  extends NewSequencedControlInput,
+    NewLabeledControlInput {
+  kind: "SplitButton";
+  commandId?: string;
+  children?: NewRibbonControlInput[];
+}
+
+export interface NewFlyoutControlInput extends NewSequencedControlInput, NewLabeledControlInput {
+  kind: "Flyout";
+  commandId?: string;
+  children?: NewRibbonControlInput[];
+}
+
+export interface NewGroupControlInput extends NewSequencedControlInput {
+  kind: "Group";
+  commandId?: string;
+  title?: string;
+  children?: NewRibbonControlInput[];
+}
+
+export interface NewMenuSectionControlInput extends NewSequencedControlInput {
+  kind: "MenuSection";
+  displayMode?: string;
+  children?: NewRibbonControlInput[];
+}
+
+export type NewRibbonControlInput =
+  | NewButtonControlInput
+  | NewSplitButtonControlInput
+  | NewFlyoutControlInput
+  | NewGroupControlInput
+  | NewMenuSectionControlInput;
+
 export type CommandRuleRefKind = "EnableRule" | "DisplayRule";
 
 export type NewRuleStepInput =
@@ -204,6 +263,15 @@ export interface NewCustomButtonInput {
   locLabels?: NewLocLabelInput[];
 }
 
+export interface NewCustomControlInput {
+  customActionId: string;
+  location: string;
+  sequence?: number;
+  control: NewRibbonControlInput;
+  commandDefinitions?: NewCommandDefinitionInput[];
+  locLabels?: NewLocLabelInput[];
+}
+
 export interface NewOobStubReplacementInput extends NewCustomButtonInput {
   hideActionId: string;
   hideLocation?: string;
@@ -246,6 +314,36 @@ export function createCustomButtonPatches(
     sectionEdits.push({
       sectionName: "LocLabels",
       childText: locLabels.map((label) => renderLocLabel(label)).join("\n"),
+    });
+  }
+
+  return createSectionChildPatches(document, sectionEdits);
+}
+
+export function createCustomControlPatches(
+  document: RibbonDocument,
+  input: NewCustomControlInput,
+): RibbonPatch[] {
+  const sectionEdits: RibbonSectionChildEdit[] = [
+    {
+      sectionName: "CustomActions",
+      childText: renderCustomControlAction(input),
+    },
+  ];
+
+  if (input.commandDefinitions?.length) {
+    sectionEdits.push({
+      sectionName: "CommandDefinitions",
+      childText: input.commandDefinitions
+        .map((definition) => renderStandaloneCommandDefinition(definition))
+        .join("\n"),
+    });
+  }
+
+  if (input.locLabels?.length) {
+    sectionEdits.push({
+      sectionName: "LocLabels",
+      childText: input.locLabels.map((label) => renderLocLabel(label)).join("\n"),
     });
   }
 
@@ -330,6 +428,14 @@ export function createCustomButtonReplacePatch(
   input: NewCustomButtonInput,
 ): RibbonPatch {
   return createReplaceNodePatch(sourceText, range, renderCustomButtonAction(input));
+}
+
+export function createCustomControlReplacePatch(
+  sourceText: string,
+  range: TextRange,
+  input: NewCustomControlInput,
+): RibbonPatch {
+  return createReplaceNodePatch(sourceText, range, renderCustomControlAction(input));
 }
 
 export function createCommandDefinitionPatches(
@@ -622,6 +728,21 @@ export function makeCustomButtonIds(
   };
 }
 
+export function makeCustomControlIds(
+  document: RibbonDocument,
+  scope: string,
+  label: string,
+  controlKind: "Group" | "MenuSection" | "SplitButton" | "Flyout",
+): Pick<NewCustomControlInput, "customActionId"> & { controlId: string } {
+  const owner = document.entityLogicalName ?? "application";
+  const base = `d365tools.${sanitizeIdPart(owner)}.${sanitizeIdPart(scope)}.${sanitizeIdPart(label)}`;
+
+  return {
+    customActionId: nextRibbonId(document, `${base}.CustomAction`),
+    controlId: nextRibbonId(document, `${base}.${controlKind}`),
+  };
+}
+
 interface RibbonSectionChildEdit {
   sectionName: (typeof RIBBON_SECTION_ORDER)[number];
   childText: string;
@@ -869,6 +990,165 @@ function renderCustomButtonAction(input: NewCustomButtonInput): string {
     <Button ${renderAttributes(buttonAttributes)} />
   </CommandUIDefinition>
 </CustomAction>`;
+}
+
+function renderCustomControlAction(input: NewCustomControlInput): string {
+  const attributes: Array<[string, string | number | undefined]> = [
+    ["Id", input.customActionId],
+    ["Location", input.location],
+    ["Sequence", input.sequence],
+  ];
+
+  return `<CustomAction ${renderAttributes(attributes)}>
+  <CommandUIDefinition>
+    ${indentBlock(renderRibbonControl(input.control), "    ").trimStart()}
+  </CommandUIDefinition>
+</CustomAction>`;
+}
+
+function renderRibbonControl(input: NewRibbonControlInput): string {
+  switch (input.kind) {
+    case "Button":
+      return renderButtonControl(input);
+    case "SplitButton":
+      return renderDropdownControl("SplitButton", input);
+    case "Flyout":
+      return renderDropdownControl("FlyoutAnchor", input);
+    case "Group":
+      return renderControlsContainerControl("Group", input, [
+        ["Id", input.id],
+        ["Command", input.commandId],
+        ["Title", input.title],
+        ["Sequence", input.sequence],
+      ]);
+    case "MenuSection":
+      return renderControlsContainerControl("MenuSection", input, [
+        ["Id", input.id],
+        ["DisplayMode", input.displayMode],
+        ["Sequence", input.sequence],
+      ]);
+  }
+}
+
+function renderButtonControl(input: NewButtonControlInput): string {
+  return `<Button ${renderAttributes([
+    ["Id", input.id],
+    ["Command", input.commandId],
+    ...labeledControlAttributes(input),
+  ])} />`;
+}
+
+function renderDropdownControl(
+  nodeName: "SplitButton" | "FlyoutAnchor",
+  input: NewSplitButtonControlInput | NewFlyoutControlInput,
+): string {
+  const attributes = renderAttributes([
+    ["Id", input.id],
+    ["Command", input.commandId],
+    ...labeledControlAttributes(input),
+  ]);
+  const children = input.children ?? [];
+
+  if (!children.length) {
+    return `<${nodeName} ${attributes} />`;
+  }
+
+  const menuSections = normalizeMenuSections(children, `${input.id}.MenuSection`);
+  const menu = `<Menu Id="${escapeXmlAttribute(`${input.id}.Menu`)}">
+${indentBlock(menuSections.map(renderRibbonControl).join("\n"), "  ")}
+</Menu>`;
+
+  return `<${nodeName} ${attributes}>
+${indentBlock(menu, "  ")}
+</${nodeName}>`;
+}
+
+function renderControlsContainerControl(
+  nodeName: "Group" | "MenuSection",
+  input: NewGroupControlInput | NewMenuSectionControlInput,
+  attributes: Array<[string, string | number | undefined]>,
+): string {
+  const renderedAttributes = renderAttributes(attributes);
+  const children = input.children ?? [];
+
+  if (!children.length) {
+    return `<${nodeName} ${renderedAttributes} />`;
+  }
+
+  const controls = `<Controls Id="${escapeXmlAttribute(`${input.id}.Controls`)}">
+${indentBlock(children.map(renderRibbonControl).join("\n"), "  ")}
+</Controls>`;
+
+  return `<${nodeName} ${renderedAttributes}>
+${indentBlock(controls, "  ")}
+</${nodeName}>`;
+}
+
+function normalizeMenuSections(
+  children: NewRibbonControlInput[],
+  defaultSectionId: string,
+): NewMenuSectionControlInput[] {
+  const sections: NewMenuSectionControlInput[] = [];
+  let looseControls: NewRibbonControlInput[] = [];
+
+  const flushLooseControls = () => {
+    if (!looseControls.length) {
+      return;
+    }
+
+    const suffix = sections.length ? `.${sections.length + 1}` : "";
+    sections.push({
+      kind: "MenuSection",
+      id: `${defaultSectionId}${suffix}`,
+      displayMode: "Menu16",
+      sequence: nextMenuSectionSequence(sections),
+      children: looseControls,
+    });
+    looseControls = [];
+  };
+
+  for (const child of children) {
+    if (child.kind === "MenuSection") {
+      flushLooseControls();
+      sections.push(child);
+      continue;
+    }
+
+    looseControls.push(child);
+  }
+
+  flushLooseControls();
+  return sections;
+}
+
+function nextMenuSectionSequence(sections: NewMenuSectionControlInput[]): number {
+  const lastSequence = sections
+    .map((section) => section.sequence)
+    .filter((sequence): sequence is number => sequence !== undefined)
+    .sort((left, right) => right - left)[0];
+  return lastSequence === undefined ? 10 : lastSequence + 10;
+}
+
+function labeledControlAttributes(
+  input: NewLabeledControlInput & { sequence?: number },
+): Array<[string, string | number | undefined]> {
+  const labelText = input.labelText ?? locLabelReference(input.labelLocId);
+  const alt = input.alt ?? locLabelReference(input.altLocId);
+  const toolTipTitle = input.toolTipTitle ?? locLabelReference(input.toolTipTitleLocId);
+  const toolTipDescription =
+    input.toolTipDescription ?? locLabelReference(input.toolTipDescriptionLocId);
+
+  return [
+    ["LabelText", labelText],
+    ["Alt", alt],
+    ["ToolTipTitle", toolTipTitle],
+    ["ToolTipDescription", toolTipDescription],
+    ["Image16by16", webResourceValue(input.image16x16)],
+    ["Image32by32", webResourceValue(input.image32x32)],
+    ["ModernImage", webResourceValue(input.modernImage)],
+    ["Sequence", input.sequence],
+    ["TemplateAlias", input.templateAlias],
+  ];
 }
 
 function renderCommandDefinition(input: NewCustomButtonInput): string {
