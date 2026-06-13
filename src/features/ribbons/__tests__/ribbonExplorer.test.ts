@@ -200,6 +200,55 @@ test("shows empty button metadata details", async () => {
   );
 });
 
+test("renders nested dropdown controls in the explorer tree", async () => {
+  const workspaceRoot = await makeWorkspace();
+  await writeFile(
+    workspaceRoot,
+    "Entities/account/RibbonDiffXml.xml",
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.More.CustomAction" Location="Mscrm.Form.account.MainTab.Actions.Controls._children">
+      <CommandUIDefinition>
+        <SplitButton Id="new.account.Form.More.SplitButton" Command="new.account.Form.More.Command" LabelText="More">
+          <Menu Id="new.account.Form.More.Menu">
+            <MenuSection Id="new.account.Form.More.Section" DisplayMode="Menu16">
+              <Controls Id="new.account.Form.More.Controls">
+                <Button Id="new.account.Form.Child.Button" Command="new.account.Form.Child.Command" LabelText="Child" />
+              </Controls>
+            </MenuSection>
+          </Menu>
+        </SplitButton>
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`,
+  );
+  const explorer = new RibbonExplorerProvider(
+    createConfiguration(workspaceRoot),
+    new RibbonSourceLocator(),
+    new RibbonEditorState(new RibbonRepository()),
+  );
+
+  const roots = await explorer.getChildren();
+  const documents = await explorer.getChildren(roots[0]);
+  const views = await explorer.getChildren(documents[0]);
+  const sections = await explorer.getChildren(views[0]);
+  const customActions = await explorer.getChildren(sections[0]);
+  const splitButtons = await explorer.getChildren(customActions[0]);
+  const menuSections = await explorer.getChildren(splitButtons[0]);
+  const buttons = await explorer.getChildren(menuSections[0]);
+
+  assert.strictEqual(splitButtons[0].label, "SplitButton: new.account.Form.More.SplitButton");
+  assert.strictEqual(menuSections[0].label, "MenuSection: new.account.Form.More.Section");
+  assert.strictEqual(buttons[0].label, "Button: new.account.Form.Child.Button");
+  assert.deepStrictEqual((menuSections[0] as RibbonItemNode).details.slice(0, 4), [
+    ["Id", "new.account.Form.More.Section"],
+    ["Kind", "MenuSection"],
+    ["Display mode", "Menu16"],
+    ["Sequence", undefined],
+  ]);
+});
+
 test("indexes ribbon items for quick navigation", async () => {
   const workspaceRoot = await makeWorkspace();
   await writeFile(

@@ -190,6 +190,52 @@ test("keeps custom-only locations as their own group", () => {
   assert.strictEqual(group.items[0].source, "custom");
 });
 
+test("renders split button preview items with nested children", () => {
+  const view = viewWith({
+    customActions: [
+      {
+        id: "ca.more",
+        location: recordLocation,
+        commandUI: {
+          kind: "SplitButton",
+          id: "split.more",
+          command: "cmd.more",
+          labelText: "More",
+          children: [
+            {
+              kind: "MenuSection",
+              id: "section.more",
+              range,
+              children: [
+                {
+                  kind: "Button",
+                  id: "btn.child",
+                  command: "cmd.child",
+                  labelText: "Child",
+                  range,
+                },
+              ],
+            },
+          ],
+          range,
+        },
+        range,
+      },
+    ],
+  });
+
+  const record = groupByLabel(buildRibbonPreview(view, "account").groups, "Record");
+  const splitButton = record.items.find((item) => item.id === "split.more");
+
+  assert.ok(splitButton);
+  assert.strictEqual(splitButton.kind, "SplitButton");
+  assert.strictEqual(splitButton.label, "More");
+  assert.deepStrictEqual(
+    splitButton.children?.flatMap((child) => child.children ?? []).map((child) => child.label),
+    ["Child"],
+  );
+});
+
 test("prefers explicit label text over a localized label", () => {
   const view = viewWith({
     customActions: [

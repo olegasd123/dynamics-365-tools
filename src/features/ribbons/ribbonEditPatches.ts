@@ -20,6 +20,7 @@ import {
   TextRange,
   XmlElementRange,
 } from "./models";
+import { collectRibbonControls, ribbonControlId } from "./ribbonControlTree";
 import { scanXmlElements } from "./ribbonXmlReader";
 
 export interface NewHideActionInput {
@@ -1256,7 +1257,11 @@ function nextRibbonId(document: RibbonDocument, id: string): string {
     for (const customAction of view.customActions) {
       used.add(customAction.id);
       if (customAction.commandUI && customAction.commandUI.kind !== "Unknown") {
-        used.add(customAction.commandUI.id);
+        for (const control of collectRibbonControls(customAction.commandUI)) {
+          if (control.kind !== "Unknown") {
+            used.add(ribbonControlId(control));
+          }
+        }
       }
     }
     for (const command of view.commandDefinitions) {

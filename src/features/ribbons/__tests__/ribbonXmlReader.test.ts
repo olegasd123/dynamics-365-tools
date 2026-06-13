@@ -352,6 +352,91 @@ test("projects entity ribbon nodes into scoped views", () => {
   );
 });
 
+test("reads split buttons and flyouts with nested menu controls", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Form.More.CustomAction" Location="Mscrm.Form.account.MainTab.Actions.Controls._children" Sequence="20">
+      <CommandUIDefinition>
+        <SplitButton Id="new.account.Form.More.SplitButton" Command="new.account.Form.More.Command" LabelText="$LocLabels:new.account.Form.More.Label" Sequence="20">
+          <Menu Id="new.account.Form.More.Menu">
+            <MenuSection Id="new.account.Form.More.Section" DisplayMode="Menu16" Sequence="10">
+              <Controls Id="new.account.Form.More.Section.Controls">
+                <Button Id="new.account.Form.Child.Button" Command="new.account.Form.Child.Command" LabelText="Child action" Sequence="10" />
+                <FlyoutAnchor Id="new.account.Form.Child.Flyout" Command="new.account.Form.Flyout.Command" LabelText="$LocLabels:new.account.Form.Flyout.Label" Sequence="20">
+                  <Menu Id="new.account.Form.Child.Flyout.Menu">
+                    <MenuSection Id="new.account.Form.Child.Flyout.Section" Sequence="10">
+                      <Controls Id="new.account.Form.Child.Flyout.Controls">
+                        <Button Id="new.account.Form.Nested.Button" Command="new.account.Form.Nested.Command" LabelText="Nested action" />
+                      </Controls>
+                    </MenuSection>
+                  </Menu>
+                </FlyoutAnchor>
+              </Controls>
+            </MenuSection>
+          </Menu>
+        </SplitButton>
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Form.More.Command" />
+    <CommandDefinition Id="new.account.Form.Child.Command" />
+    <CommandDefinition Id="new.account.Form.Flyout.Command" />
+    <CommandDefinition Id="new.account.Form.Nested.Command" />
+  </CommandDefinitions>
+  <LocLabels>
+    <LocLabel Id="new.account.Form.More.Label"><Titles><Title languagecode="1033" description="More" /></Titles></LocLabel>
+    <LocLabel Id="new.account.Form.Flyout.Label"><Titles><Title languagecode="1033" description="More nested" /></Titles></LocLabel>
+  </LocLabels>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+  const form = document.views[0];
+  const splitButton = form.customActions[0].commandUI;
+
+  assert.strictEqual(splitButton?.kind, "SplitButton");
+  assert.strictEqual(
+    splitButton?.kind === "SplitButton" ? splitButton.labelLocId : undefined,
+    "new.account.Form.More.Label",
+  );
+  const menuSection = splitButton?.kind === "SplitButton" ? splitButton.children?.[0] : undefined;
+  assert.strictEqual(menuSection?.kind, "MenuSection");
+  assert.strictEqual(
+    menuSection?.kind === "MenuSection" ? menuSection.displayMode : undefined,
+    "Menu16",
+  );
+  const childButton = menuSection?.kind === "MenuSection" ? menuSection.children?.[0] : undefined;
+  assert.strictEqual(childButton?.kind, "Button");
+  assert.strictEqual(
+    childButton?.kind === "Button" ? childButton.command : undefined,
+    "new.account.Form.Child.Command",
+  );
+  const flyout = menuSection?.kind === "MenuSection" ? menuSection.children?.[1] : undefined;
+  assert.strictEqual(flyout?.kind, "Flyout");
+  const nestedSection = flyout?.kind === "Flyout" ? flyout.children?.[0] : undefined;
+  const nestedButton =
+    nestedSection?.kind === "MenuSection" ? nestedSection.children?.[0] : undefined;
+  assert.strictEqual(nestedButton?.kind, "Button");
+  assert.strictEqual(
+    nestedButton?.kind === "Button" ? nestedButton.command : undefined,
+    "new.account.Form.Nested.Command",
+  );
+  assert.deepStrictEqual(
+    form.commandDefinitions.map((command) => command.id),
+    [
+      "new.account.Form.More.Command",
+      "new.account.Form.Child.Command",
+      "new.account.Form.Flyout.Command",
+      "new.account.Form.Nested.Command",
+    ],
+  );
+  assert.deepStrictEqual(
+    form.locLabels.map((label) => label.id),
+    ["new.account.Form.More.Label", "new.account.Form.Flyout.Label"],
+  );
+});
+
 test("locates embedded RibbonDiffXml blocks in flat customizations XML", () => {
   const flatXml = `<ImportExportXml>
   <Entities>

@@ -285,6 +285,10 @@ function glyph(kind: RibbonPreviewItem["kind"]): string {
       return "▭";
     case "MenuSection":
       return "☰";
+    case "SplitButton":
+      return "▾";
+    case "Flyout":
+      return "›";
     case "Unknown":
       return "?";
     case "Button":

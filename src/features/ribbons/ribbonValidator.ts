@@ -14,6 +14,11 @@ import {
 } from "./models";
 import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
+import {
+  collectRibbonButtons,
+  collectRibbonControls,
+  ribbonControlChildren,
+} from "./ribbonControlTree";
 
 export type RibbonValidationSeverity = "error" | "warning";
 
@@ -121,12 +126,33 @@ function validateCustomActions(
     issues.push(...required(action.id, "CustomAction Id", action.range));
     issues.push(...required(action.location, "Location", action.range));
 
-    if (action.commandUI?.kind === "Button") {
-      issues.push(...validateButton(action.commandUI, commandIds, locLabelIds, document, view));
+    if (action.commandUI) {
+      issues.push(
+        ...collectRibbonButtons(action.commandUI).flatMap((button) =>
+          validateButton(button, commandIds, locLabelIds, document, view),
+        ),
+      );
+
+      issues.push(...validateDropdownControls(action.commandUI));
     }
   }
 
   return issues;
+}
+
+function validateDropdownControls(commandUI: CustomAction["commandUI"]): RibbonValidationIssue[] {
+  if (!commandUI) {
+    return [];
+  }
+
+  return collectRibbonControls(commandUI)
+    .filter((control) => control.kind === "SplitButton" || control.kind === "Flyout")
+    .filter((control) => ribbonControlChildren(control).length === 0)
+    .map((control) => ({
+      severity: "warning" as const,
+      message: `${control.kind} should contain at least one child control.`,
+      range: control.range,
+    }));
 }
 
 function validateButton(

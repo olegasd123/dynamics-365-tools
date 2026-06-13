@@ -143,9 +143,18 @@ export interface CustomAction {
   id: string;
   location: string;
   sequence?: number;
-  commandUI?: ButtonNode | GroupNode | TabNode | MenuSectionNode | UnknownCommandUINode;
+  commandUI?: RibbonCommandUINode;
   range: TextRange;
 }
+
+export type RibbonCommandUINode =
+  | ButtonNode
+  | SplitButtonNode
+  | FlyoutNode
+  | GroupNode
+  | TabNode
+  | MenuSectionNode
+  | UnknownCommandUINode;
 
 export interface ButtonNode {
   kind: "Button";
@@ -167,12 +176,55 @@ export interface ButtonNode {
   range: TextRange;
 }
 
+export interface SplitButtonNode {
+  kind: "SplitButton";
+  id: string;
+  command?: string;
+  labelLocId?: string;
+  labelText?: string;
+  altLocId?: string;
+  alt?: string;
+  toolTipTitle?: string;
+  toolTipDescription?: string;
+  toolTipTitleLocId?: string;
+  toolTipDescriptionLocId?: string;
+  image16x16?: ImageRef;
+  image32x32?: ImageRef;
+  modernImage?: ImageRef;
+  templateAlias?: string;
+  sequence?: number;
+  children?: RibbonCommandUINode[];
+  range: TextRange;
+}
+
+export interface FlyoutNode {
+  kind: "Flyout";
+  id: string;
+  command?: string;
+  labelLocId?: string;
+  labelText?: string;
+  altLocId?: string;
+  alt?: string;
+  toolTipTitle?: string;
+  toolTipDescription?: string;
+  toolTipTitleLocId?: string;
+  toolTipDescriptionLocId?: string;
+  image16x16?: ImageRef;
+  image32x32?: ImageRef;
+  modernImage?: ImageRef;
+  templateAlias?: string;
+  sequence?: number;
+  children?: RibbonCommandUINode[];
+  range: TextRange;
+}
+
 export interface GroupNode {
   kind: "Group";
   id: string;
   command?: string;
   title?: string;
   sequence?: number;
+  children?: RibbonCommandUINode[];
   range: TextRange;
 }
 
@@ -182,13 +234,16 @@ export interface TabNode {
   command?: string;
   title?: string;
   sequence?: number;
+  children?: RibbonCommandUINode[];
   range: TextRange;
 }
 
 export interface MenuSectionNode {
   kind: "MenuSection";
   id: string;
+  displayMode?: string;
   sequence?: number;
+  children?: RibbonCommandUINode[];
   range: TextRange;
 }
 

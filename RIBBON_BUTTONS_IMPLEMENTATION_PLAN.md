@@ -32,7 +32,7 @@ Acceptance:
 - We have examples of valid XML for each control.
 - We know which controls are in the first release.
 
-## Milestone 2: Extend Ribbon Models
+## Milestone 2: Extend Ribbon Models [Dome]
 
 - Update `src/features/ribbons/models.ts`.
 - Add real models for Split Button, Flyout, and nested menu items.

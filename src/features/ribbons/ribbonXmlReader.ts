@@ -6,12 +6,11 @@ import {
   CustomAction,
   DisplayRule,
   EnableRule,
-  GroupNode,
+  FlyoutNode,
   HideAction,
   ImageRef,
   LocLabel,
   LocLabelTitle,
-  MenuSectionNode,
   RibbonCommandClientType,
   RibbonDocument,
   RibbonEntityPropertyName,
@@ -26,10 +25,10 @@ import {
   RibbonScope,
   RibbonSectionRanges,
   RibbonView,
+  RibbonCommandUINode,
   RuleStep,
-  TabNode,
+  SplitButtonNode,
   TextRange,
-  UnknownCommandUINode,
   WebResourceRef,
   XmlAttributeRange,
   XmlElementRange,
@@ -480,7 +479,7 @@ function filterEntityView(
   );
   const commandIds = new Set(
     customActions
-      .map((action) => (action.commandUI?.kind === "Button" ? action.commandUI.command : undefined))
+      .flatMap((action) => (action.commandUI ? collectCommandReferences(action.commandUI) : []))
       .filter(isDefined),
   );
   const commandDefinitions = view.commandDefinitions.filter(
@@ -497,14 +496,7 @@ function filterEntityView(
   );
   const locLabelIds = new Set(
     customActions.flatMap((action) =>
-      action.commandUI?.kind === "Button"
-        ? [
-            action.commandUI.labelLocId,
-            action.commandUI.altLocId,
-            action.commandUI.toolTipTitleLocId,
-            action.commandUI.toolTipDescriptionLocId,
-          ].filter(isDefined)
-        : [],
+      action.commandUI ? collectLocLabelReferences(action.commandUI) : [],
     ),
   );
   const locLabels = view.locLabels.filter(
@@ -533,15 +525,46 @@ function commandDefinitionInScope(
 }
 
 function customActionInScope(action: CustomAction, scope: RibbonScope): boolean {
+  const commandUiValues = action.commandUI ? collectScopeValues(action.commandUI) : [];
   return belongsToScope(
     [
       action.id,
       action.location,
       action.commandUI?.kind === "Unknown" ? action.commandUI.name : action.commandUI?.id,
-      action.commandUI?.kind === "Button" ? action.commandUI.command : undefined,
+      ...commandUiValues,
     ],
     scope,
   );
+}
+
+function collectScopeValues(node: RibbonCommandUINode): Array<string | undefined> {
+  return [
+    node.kind === "Unknown" ? node.name : node.id,
+    "command" in node ? node.command : undefined,
+    ...childRibbonControls(node).flatMap(collectScopeValues),
+  ];
+}
+
+function collectCommandReferences(node: RibbonCommandUINode): string[] {
+  const command = node.kind !== "Unknown" && "command" in node ? node.command : undefined;
+  return [command, ...childRibbonControls(node).flatMap(collectCommandReferences)].filter(
+    isDefined,
+  );
+}
+
+function collectLocLabelReferences(node: RibbonCommandUINode): string[] {
+  const ownRefs =
+    node.kind === "Button" || node.kind === "SplitButton" || node.kind === "Flyout"
+      ? [node.labelLocId, node.altLocId, node.toolTipTitleLocId, node.toolTipDescriptionLocId]
+      : [];
+
+  return [...ownRefs, ...childRibbonControls(node).flatMap(collectLocLabelReferences)].filter(
+    isDefined,
+  );
+}
+
+function childRibbonControls(node: RibbonCommandUINode): RibbonCommandUINode[] {
+  return node.kind !== "Unknown" && "children" in node ? (node.children ?? []) : [];
 }
 
 function belongsToScope(values: Array<string | undefined>, scope: RibbonScope): boolean {
@@ -599,7 +622,7 @@ function readHideActions(section: XmlElementRange): HideAction[] {
 function readCommandUINode(
   sourceText: string,
   customAction: XmlElementRange,
-): ButtonNode | GroupNode | TabNode | MenuSectionNode | UnknownCommandUINode | undefined {
+): RibbonCommandUINode | undefined {
   const definition = getDirectChild(customAction, "CommandUIDefinition");
   const node = definition?.children[0];
   if (!node) {
@@ -607,37 +630,13 @@ function readCommandUINode(
   }
 
   switch (node.name) {
-    case "Button": {
-      const labelText = optionalAttr(node, "LabelText");
-      const alt = optionalAttr(node, "Alt");
-      const toolTipTitle = optionalAttr(node, "ToolTipTitle");
-      const toolTipDescription = optionalAttr(node, "ToolTipDescription");
-
-      return {
-        kind: "Button",
-        id: attr(node, "Id"),
-        command: attr(node, "Command"),
-        labelLocId: optionalAttr(node, "LabelLocId") ?? locLabelIdFromReference(labelText),
-        labelText: isLocLabelReference(labelText) ? undefined : labelText,
-        altLocId: locLabelIdFromReference(alt),
-        alt: isLocLabelReference(alt) ? undefined : alt,
-        toolTipTitle: isLocLabelReference(toolTipTitle) ? undefined : toolTipTitle,
-        toolTipDescription: isLocLabelReference(toolTipDescription)
-          ? undefined
-          : toolTipDescription,
-        toolTipTitleLocId:
-          optionalAttr(node, "ToolTipTitleLocId") ?? locLabelIdFromReference(toolTipTitle),
-        toolTipDescriptionLocId:
-          optionalAttr(node, "ToolTipDescriptionLocId") ??
-          locLabelIdFromReference(toolTipDescription),
-        image16x16: readImageRef(node, "Image16by16"),
-        image32x32: readImageRef(node, "Image32by32"),
-        modernImage: readImageRef(node, "ModernImage"),
-        templateAlias: optionalAttr(node, "TemplateAlias"),
-        sequence: numberAttr(node, "Sequence"),
-        range: node.range,
-      };
-    }
+    case "Button":
+      return readButtonNode(node);
+    case "SplitButton":
+      return readSplitButtonNode(sourceText, node);
+    case "FlyoutAnchor":
+    case "Flyout":
+      return readFlyoutNode(sourceText, node);
     case "Group":
       return {
         kind: "Group",
@@ -645,6 +644,7 @@ function readCommandUINode(
         command: optionalAttr(node, "Command"),
         title: optionalAttr(node, "Title"),
         sequence: numberAttr(node, "Sequence"),
+        children: readChildCommandUINodes(sourceText, node),
         range: node.range,
       };
     case "Tab":
@@ -654,13 +654,16 @@ function readCommandUINode(
         command: optionalAttr(node, "Command"),
         title: optionalAttr(node, "Title"),
         sequence: numberAttr(node, "Sequence"),
+        children: readChildCommandUINodes(sourceText, node),
         range: node.range,
       };
     case "MenuSection":
       return {
         kind: "MenuSection",
         id: attr(node, "Id"),
+        displayMode: optionalAttr(node, "DisplayMode"),
         sequence: numberAttr(node, "Sequence"),
+        children: readChildCommandUINodes(sourceText, node),
         range: node.range,
       };
     default:
@@ -671,6 +674,145 @@ function readCommandUINode(
         range: node.range,
       };
   }
+}
+
+function readButtonNode(node: XmlElementRange): ButtonNode {
+  return {
+    kind: "Button",
+    id: attr(node, "Id"),
+    command: attr(node, "Command"),
+    ...readLabeledControlAttributes(node),
+    range: node.range,
+  };
+}
+
+function readSplitButtonNode(sourceText: string, node: XmlElementRange): SplitButtonNode {
+  return {
+    kind: "SplitButton",
+    id: attr(node, "Id"),
+    command: optionalAttr(node, "Command"),
+    ...readLabeledControlAttributes(node),
+    children: readChildCommandUINodes(sourceText, node),
+    range: node.range,
+  };
+}
+
+function readFlyoutNode(sourceText: string, node: XmlElementRange): FlyoutNode {
+  return {
+    kind: "Flyout",
+    id: attr(node, "Id"),
+    command: optionalAttr(node, "Command"),
+    ...readLabeledControlAttributes(node),
+    children: readChildCommandUINodes(sourceText, node),
+    range: node.range,
+  };
+}
+
+function readLabeledControlAttributes(
+  node: XmlElementRange,
+): Omit<ButtonNode, "kind" | "id" | "command" | "range"> {
+  const labelText = optionalAttr(node, "LabelText");
+  const alt = optionalAttr(node, "Alt");
+  const toolTipTitle = optionalAttr(node, "ToolTipTitle");
+  const toolTipDescription = optionalAttr(node, "ToolTipDescription");
+
+  return {
+    labelLocId: optionalAttr(node, "LabelLocId") ?? locLabelIdFromReference(labelText),
+    labelText: isLocLabelReference(labelText) ? undefined : labelText,
+    altLocId: locLabelIdFromReference(alt),
+    alt: isLocLabelReference(alt) ? undefined : alt,
+    toolTipTitle: isLocLabelReference(toolTipTitle) ? undefined : toolTipTitle,
+    toolTipDescription: isLocLabelReference(toolTipDescription) ? undefined : toolTipDescription,
+    toolTipTitleLocId:
+      optionalAttr(node, "ToolTipTitleLocId") ?? locLabelIdFromReference(toolTipTitle),
+    toolTipDescriptionLocId:
+      optionalAttr(node, "ToolTipDescriptionLocId") ?? locLabelIdFromReference(toolTipDescription),
+    image16x16: readImageRef(node, "Image16by16"),
+    image32x32: readImageRef(node, "Image32by32"),
+    modernImage: readImageRef(node, "ModernImage"),
+    templateAlias: optionalAttr(node, "TemplateAlias"),
+    sequence: numberAttr(node, "Sequence"),
+  };
+}
+
+function readChildCommandUINodes(sourceText: string, node: XmlElementRange): RibbonCommandUINode[] {
+  return childCommandUIElements(node).map((child) =>
+    readCommandUINodeFromElement(sourceText, child),
+  );
+}
+
+function childCommandUIElements(node: XmlElementRange): XmlElementRange[] {
+  const containers = node.children.filter((child) =>
+    ["Controls", "Menu", "MenuSections", "Groups", "Tabs"].includes(child.name),
+  );
+  if (containers.length) {
+    return containers.flatMap((container) => container.children);
+  }
+
+  return node.children.filter(isCommandUIElement);
+}
+
+function readCommandUINodeFromElement(
+  sourceText: string,
+  node: XmlElementRange,
+): RibbonCommandUINode {
+  switch (node.name) {
+    case "Button":
+      return readButtonNode(node);
+    case "SplitButton":
+      return readSplitButtonNode(sourceText, node);
+    case "FlyoutAnchor":
+    case "Flyout":
+      return readFlyoutNode(sourceText, node);
+    case "Group":
+      return {
+        kind: "Group",
+        id: attr(node, "Id"),
+        command: optionalAttr(node, "Command"),
+        title: optionalAttr(node, "Title"),
+        sequence: numberAttr(node, "Sequence"),
+        children: readChildCommandUINodes(sourceText, node),
+        range: node.range,
+      };
+    case "Tab":
+      return {
+        kind: "Tab",
+        id: attr(node, "Id"),
+        command: optionalAttr(node, "Command"),
+        title: optionalAttr(node, "Title"),
+        sequence: numberAttr(node, "Sequence"),
+        children: readChildCommandUINodes(sourceText, node),
+        range: node.range,
+      };
+    case "MenuSection":
+      return {
+        kind: "MenuSection",
+        id: attr(node, "Id"),
+        displayMode: optionalAttr(node, "DisplayMode"),
+        sequence: numberAttr(node, "Sequence"),
+        children: readChildCommandUINodes(sourceText, node),
+        range: node.range,
+      };
+    default:
+      return {
+        kind: "Unknown",
+        name: node.name,
+        raw: sourceText.slice(node.range.start, node.range.end),
+        range: node.range,
+      };
+  }
+}
+
+function isCommandUIElement(node: XmlElementRange): boolean {
+  return [
+    "Button",
+    "SplitButton",
+    "FlyoutAnchor",
+    "Flyout",
+    "Group",
+    "Tab",
+    "MenuSection",
+  ].includes(node.name);
 }
 
 function isLocLabelReference(value: string | undefined): boolean {
