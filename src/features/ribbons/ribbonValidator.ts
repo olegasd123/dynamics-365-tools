@@ -125,6 +125,7 @@ function validateCustomActions(
   for (const action of actions) {
     issues.push(...required(action.id, "CustomAction Id", action.range));
     issues.push(...required(action.location, "Location", action.range));
+    issues.push(...validateCustomActionLocation(action, document, view));
 
     if (action.commandUI) {
       issues.push(
@@ -138,6 +139,41 @@ function validateCustomActions(
   }
 
   return issues;
+}
+
+function validateCustomActionLocation(
+  action: CustomAction,
+  document: RibbonDocument,
+  view: RibbonView,
+): RibbonValidationIssue[] {
+  if (!action.location || isValidCustomActionLocation(action.location, document, view)) {
+    return [];
+  }
+
+  return [
+    {
+      severity: "warning",
+      message: `CustomAction location '${action.location}' does not look like a ribbon container location.`,
+      range: action.range,
+    },
+  ];
+}
+
+function isValidCustomActionLocation(
+  location: string,
+  document: RibbonDocument,
+  view: RibbonView,
+): boolean {
+  if (!/\.(Controls|Groups|MenuSections)\._children$/.test(location)) {
+    return false;
+  }
+
+  if (view.scope === "Application") {
+    return /^Mscrm\./.test(location) && !/^Mscrm\.(Form|HomepageGrid|SubGrid)\./.test(location);
+  }
+
+  const entity = document.entityLogicalName ? escapeRegExp(document.entityLogicalName) : "[^.]+";
+  return new RegExp(`^Mscrm\\.${view.scope}\\.${entity}\\.`).test(location);
 }
 
 function validateDropdownControls(commandUI: CustomAction["commandUI"]): RibbonValidationIssue[] {
@@ -420,4 +456,8 @@ function requiredBoolean(
         },
       ]
     : [];
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
