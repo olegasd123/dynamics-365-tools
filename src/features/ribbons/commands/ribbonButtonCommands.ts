@@ -115,11 +115,6 @@ const SMART_BUTTON_TEMPLATES: SmartButtonTemplatePick[] = [
 
 const ROOT_RIBBON_ITEM_TYPES: AddRibbonItemPick[] = [
   {
-    itemKind: "smartButton",
-    label: "Smart Button",
-    description: "Create a button from an action template",
-  },
-  {
     itemKind: "customButton",
     label: "Custom Button",
     description: "Set labels, images, and action",
@@ -144,12 +139,17 @@ const ROOT_RIBBON_ITEM_TYPES: AddRibbonItemPick[] = [
     label: "Menu Section",
     description: "Add a menu section",
   },
+  {
+    itemKind: "smartButton",
+    label: "Smart Button",
+    description: "Create a button from an action template",
+  },
 ];
 
 const CHILD_RIBBON_ITEM_TYPES: AddRibbonItemPick[] = [
-  ROOT_RIBBON_ITEM_TYPES[1],
+  ROOT_RIBBON_ITEM_TYPES[0],
+  ROOT_RIBBON_ITEM_TYPES[2],
   ROOT_RIBBON_ITEM_TYPES[3],
-  ROOT_RIBBON_ITEM_TYPES[4],
 ];
 
 export async function addCustomRibbonButton(
@@ -374,7 +374,7 @@ async function pickRibbonItemType(
     : [
         ...CHILD_RIBBON_ITEM_TYPES,
         ...(resolveChildControlTarget(node, ["SplitButton", "Flyout"])
-          ? [ROOT_RIBBON_ITEM_TYPES[5]]
+          ? [ROOT_RIBBON_ITEM_TYPES[4]]
           : []),
       ];
 

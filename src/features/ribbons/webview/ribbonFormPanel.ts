@@ -236,8 +236,9 @@ function ribbonAddActions(): PanelAction[] {
 function sectionActions(node: RibbonSectionNode): PanelAction[] {
   switch (node.kind) {
     case "customActions":
+      return [{ command: "dynamics365Tools.ribbons.addSmartButton", label: "Add Item" }];
     case "hideActions":
-      return [];
+      return [{ command: "dynamics365Tools.ribbons.addHideOobButton", label: "Hide OOB" }];
     case "commandDefinitions":
       return [
         { command: "dynamics365Tools.ribbons.addCommandDefinition", label: "Add Command" },
