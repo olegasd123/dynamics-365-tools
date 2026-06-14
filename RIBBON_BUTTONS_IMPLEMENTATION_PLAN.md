@@ -83,7 +83,7 @@ Acceptance:
 - A user can add actions inside the dropdown.
 - Invalid empty dropdowns show validation warnings.
 
-## Milestone 6: Smart Buttons
+## Milestone 6: Smart Buttons [Dome]
 
 - Add Quick JS template.
 - Add Open Dialog template.

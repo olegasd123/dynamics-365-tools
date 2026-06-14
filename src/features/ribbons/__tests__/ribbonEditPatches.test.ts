@@ -26,6 +26,7 @@ import {
   createRuleStepReplacePatch,
   createSwapNodePatches,
 } from "../ribbonEditPatches";
+import { buildSmartButtonInput } from "../ribbonSmartButtons";
 
 test("creates a custom button with command action and label", () => {
   const source = `<RibbonDiffXml>
@@ -188,6 +189,73 @@ test("adds custom button text metadata as loc labels", () => {
     /ToolTipDescription="\$LocLabels:d365tools\.account\.Form\.Send\.ToolTipDescription"/,
   );
   assert.strictEqual(updatedDocument.views[0].locLabels.length, 4);
+});
+
+test("creates a smart button with command action and editable labels", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomButtonPatches(
+      document,
+      buildSmartButtonInput(document, "Form", {
+        label: "Open dialog",
+        location: "Mscrm.Form.account.MainTab.Actions.Controls._children",
+        sequence: 20,
+        action: {
+          kind: "JavaScriptFunction",
+          library: "new_/scripts/ribbon.js",
+          functionName: "openDialog",
+          parameters: [
+            { kind: "Crm", value: "PrimaryControl" },
+            { kind: "String", name: "pageName", value: "new_accountdialog" },
+          ],
+        },
+      }),
+    ),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const form = updatedDocument.views[0];
+  const button = form.customActions[0].commandUI;
+
+  assert.strictEqual(button?.kind, "Button");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.command : undefined,
+    form.commandDefinitions[0].id,
+  );
+  assert.strictEqual(
+    form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
+      ? form.commandDefinitions[0].actions[0].functionName
+      : undefined,
+    "openDialog",
+  );
+  assert.deepStrictEqual(
+    form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
+      ? form.commandDefinitions[0].actions[0].parameters
+      : [],
+    [
+      { kind: "Crm", value: "PrimaryControl" },
+      { kind: "String", name: "pageName", value: "new_accountdialog" },
+    ],
+  );
+  assert.strictEqual(form.locLabels.length, 3);
+  assert.match(updated, /TemplateAlias="o1"/);
+  assert.match(updated, /LabelText="\$LocLabels:d365tools\.account\.Form\.Open\.dialog\.Label"/);
 });
 
 test("adds a custom button to existing self-closing sections", () => {

@@ -42,6 +42,7 @@ import {
   addCustomRibbonMenuSection,
   addCustomRibbonSplitButton,
   addCustomRibbonButton,
+  addSmartRibbonButton,
   hideAndStubOobRibbonButtons,
   hideOobRibbonButton,
   reorderOobRibbonButtons,
@@ -237,6 +238,9 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
         validateConfiguration: false,
       },
     ),
+    register("dynamics365Tools.ribbons.addSmartButton", (node) => addSmartRibbonButton(ctx, node), {
+      validateConfiguration: false,
+    }),
     register("dynamics365Tools.ribbons.addCustomGroup", (node) => addCustomRibbonGroup(ctx, node), {
       validateConfiguration: false,
     }),

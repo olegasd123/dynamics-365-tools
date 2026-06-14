@@ -11,9 +11,11 @@ import {
   makeCustomButtonIds,
   makeHideActionId,
   nextHideActionId,
+  NewCommandActionInput,
 } from "../ribbonEditPatches";
 import { RibbonExplorerNode, RibbonItemNode } from "../ribbonExplorer";
 import {
+  ActionParameter,
   ButtonNode,
   RibbonCommandUINode,
   RibbonDocument,
@@ -27,6 +29,7 @@ import {
   OobRibbonCommand,
   OobRibbonLocation,
 } from "../oobCatalog";
+import { buildSmartButtonInput } from "../ribbonSmartButtons";
 import {
   promptJavaScriptAction,
   promptUrlAction,
@@ -52,6 +55,51 @@ interface LocationPick extends vscode.QuickPickItem {
   location?: string;
   manual?: boolean;
 }
+
+type SmartButtonTemplateKind =
+  | "quickJs"
+  | "openDialog"
+  | "runWebhook"
+  | "runReport"
+  | "runWorkflow";
+
+interface SmartButtonTemplatePick extends vscode.QuickPickItem {
+  templateKind: SmartButtonTemplateKind;
+  defaultLabel: string;
+}
+
+const SMART_BUTTON_TEMPLATES: SmartButtonTemplatePick[] = [
+  {
+    templateKind: "quickJs",
+    label: "Quick JS",
+    description: "Call a JavaScript web resource",
+    defaultLabel: "Run script",
+  },
+  {
+    templateKind: "openDialog",
+    label: "Open Dialog",
+    description: "Call JavaScript with dialog parameters",
+    defaultLabel: "Open dialog",
+  },
+  {
+    templateKind: "runWebhook",
+    label: "Run Webhook",
+    description: "Open a webhook URL with CRM parameters",
+    defaultLabel: "Run webhook",
+  },
+  {
+    templateKind: "runReport",
+    label: "Run Report",
+    description: "Call JavaScript with a report id",
+    defaultLabel: "Run report",
+  },
+  {
+    templateKind: "runWorkflow",
+    label: "Run Workflow",
+    description: "Call JavaScript with a workflow id",
+    defaultLabel: "Run workflow",
+  },
+];
 
 export async function addCustomRibbonButton(
   ctx: CommandContext,
@@ -221,6 +269,144 @@ export async function addCustomRibbonButton(
     }),
   );
   ctx.ribbon.explorer.refresh();
+}
+
+export async function addSmartRibbonButton(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
+    return;
+  }
+
+  const template = await showRibbonQuickPick(SMART_BUTTON_TEMPLATES, {
+    placeHolder: "Smart button template",
+  });
+  if (!template) {
+    return;
+  }
+
+  const label = await showRibbonInputBox({
+    prompt: "Button label",
+    value: template.defaultLabel,
+    validateInput: (value) => (value.trim() ? undefined : "Button label is required."),
+  });
+  if (!label) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: String(nextCustomActionSequence(target.view)),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const location = await pickLocation(target.document, target.view.scope);
+  if (!location) {
+    return;
+  }
+
+  const action = await promptSmartButtonAction(ctx, template.templateKind);
+  if (!action) {
+    return;
+  }
+
+  const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
+  const input = buildSmartButtonInput(target.document, target.view.scope, {
+    label: label.trim(),
+    location,
+    sequence,
+    action,
+  });
+
+  ctx.ribbon.editorState.queuePatches(
+    target.document,
+    createCustomButtonPatches(target.document, input),
+  );
+  ctx.ribbon.explorer.refresh();
+}
+
+async function promptSmartButtonAction(
+  ctx: CommandContext,
+  kind: SmartButtonTemplateKind,
+): Promise<NewCommandActionInput | undefined> {
+  if (kind === "quickJs") {
+    return promptJavaScriptAction(ctx);
+  }
+
+  if (kind === "runWebhook") {
+    const address = await showRibbonInputBox({
+      prompt: "Webhook URL",
+      placeHolder: "https://example.com/api/ribbon",
+      validateInput: (value) => (value.trim() ? undefined : "Webhook URL is required."),
+    });
+    if (!address) {
+      return undefined;
+    }
+
+    return {
+      kind: "Url",
+      address: address.trim(),
+      passParams: true,
+      parameters: [{ kind: "Crm", value: "PrimaryControl" }],
+    };
+  }
+
+  const action = await promptJavaScriptAction(ctx);
+  if (!action || action.kind !== "JavaScriptFunction") {
+    return action;
+  }
+
+  const templateParameters = await promptSmartButtonTypedParameters(kind);
+  if (templateParameters === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...action,
+    parameters: [...(action.parameters ?? []), ...templateParameters],
+  };
+}
+
+async function promptSmartButtonTypedParameters(
+  kind: Exclude<SmartButtonTemplateKind, "quickJs" | "runWebhook">,
+): Promise<ActionParameter[] | undefined> {
+  if (kind === "openDialog") {
+    const pageName = await showRibbonInputBox({
+      prompt: "Dialog page name",
+      placeHolder: "new_accountdialog",
+      validateInput: (value) => (value.trim() ? undefined : "Dialog page name is required."),
+    });
+    if (!pageName) {
+      return undefined;
+    }
+
+    return [
+      { kind: "Crm", value: "PrimaryControl" },
+      { kind: "String", name: "pageName", value: pageName.trim() },
+    ];
+  }
+
+  const prompt = kind === "runReport" ? "Report id" : "Workflow id";
+  const parameterName = kind === "runReport" ? "reportId" : "workflowId";
+  const value = await showRibbonInputBox({
+    prompt,
+    placeHolder: "00000000-0000-0000-0000-000000000000",
+    validateInput: (input) => (input.trim() ? undefined : `${prompt} is required.`),
+  });
+  if (!value) {
+    return undefined;
+  }
+
+  return [
+    { kind: "Crm", value: "PrimaryControl" },
+    { kind: "String", name: parameterName, value: value.trim() },
+  ];
 }
 
 export async function addCustomRibbonGroup(

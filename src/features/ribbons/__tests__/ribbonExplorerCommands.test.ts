@@ -16,6 +16,7 @@ import {
   addCustomRibbonGroup,
   addCustomRibbonMenuSection,
   addCustomRibbonSplitButton,
+  addSmartRibbonButton,
   pickLocation,
 } from "../commands/ribbonButtonCommands";
 import { addRibbonCommandAction } from "../commands/ribbonCommandDefinitionCommands";
@@ -266,6 +267,106 @@ test("prefills custom button text metadata from the label", async () => {
     updated,
     /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipDescription">/,
   );
+});
+
+test("adds a quick JS smart ribbon button from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    switch (options.placeHolder) {
+      case "Smart button template":
+        return items.find((item) => item.label === "Quick JS");
+      case "Ribbon location":
+        return items[0];
+      case "JavaScript web resource":
+        return items.find((item) => item.label === "Type schema name manually");
+      case "JavaScript function name":
+        return items.find((item) => item.label === "Type function name") ?? items[0];
+      case "CRM parameters":
+        return [];
+      case "Typed parameters":
+        return items.find((item) => item.label === "Done");
+      default:
+        return undefined;
+    }
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Button label":
+        return "Run account script";
+      case "Sequence":
+        return options.value ?? "10";
+      case "JavaScript web resource schema name":
+        return "new_/scripts/account.js";
+      case "JavaScript function name":
+        return "runAccountScript";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addSmartRibbonButton(
+      legacyContext({
+        bindings: {
+          listBindings: async () => ({ bindings: [] }),
+        },
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const form = updatedDocument.views[0];
+  const button = form.customActions[0].commandUI;
+  const action = form.commandDefinitions[0].actions[0];
+
+  assert.strictEqual(button?.kind, "Button");
+  assert.strictEqual(action.kind, "JavaScriptFunction");
+  assert.strictEqual(
+    action.kind === "JavaScriptFunction" ? action.functionName : undefined,
+    "runAccountScript",
+  );
+  assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
+  assert.match(
+    updated,
+    /LabelText="\$LocLabels:d365tools\.account\.Form\.Run\.account\.script\.Label"/,
+  );
+  assert.strictEqual(form.locLabels.length, 3);
 });
 
 test("adds a custom ribbon group from prompts", async () => {
