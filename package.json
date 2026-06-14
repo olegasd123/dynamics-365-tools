@@ -395,40 +395,10 @@
         "icon": "$(trash)"
       },
       {
-        "command": "dynamics365Tools.ribbons.addCustomButton",
-        "title": "Add Custom Button",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(add)"
-      },
-      {
         "command": "dynamics365Tools.ribbons.addSmartButton",
-        "title": "Add Smart Button",
+        "title": "Add Ribbon Item",
         "category": "Dynamics 365 Tools",
         "icon": "$(sparkle)"
-      },
-      {
-        "command": "dynamics365Tools.ribbons.addCustomGroup",
-        "title": "Add Custom Group",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(add)"
-      },
-      {
-        "command": "dynamics365Tools.ribbons.addCustomFlyout",
-        "title": "Add Custom Flyout",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(add)"
-      },
-      {
-        "command": "dynamics365Tools.ribbons.addCustomSplitButton",
-        "title": "Add Custom Split Button",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(add)"
-      },
-      {
-        "command": "dynamics365Tools.ribbons.addCustomMenuSection",
-        "title": "Add Custom Menu Section",
-        "category": "Dynamics 365 Tools",
-        "icon": "$(add)"
       },
       {
         "command": "dynamics365Tools.ribbons.addHideOobButton",
@@ -1014,49 +984,29 @@
           "group": "inline@99"
         },
         {
-          "command": "dynamics365Tools.ribbons.addCustomButton",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
-          "group": "inline@5"
-        },
-        {
           "command": "dynamics365Tools.ribbons.addSmartButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
-          "group": "inline@6"
+          "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.hideOobButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
-          "group": "inline@7"
+          "group": "inline@6"
         },
         {
           "submenu": "dynamics365Tools.ribbonViewMoreMenu",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonView",
-          "group": "inline@8"
+          "group": "inline@7"
         },
         {
-          "command": "dynamics365Tools.ribbons.addCustomButton",
+          "command": "dynamics365Tools.ribbons.addSmartButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:customActions",
           "group": "inline@5"
         },
         {
           "command": "dynamics365Tools.ribbons.addSmartButton",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:customActions",
-          "group": "inline@6"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCustomButton",
           "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonGroup || viewItem == d365RibbonMenuSection || viewItem == d365RibbonSplitButton || viewItem == d365RibbonFlyout)",
           "group": "inline@5"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCustomMenuSection",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonSplitButton || viewItem == d365RibbonFlyout)",
-          "group": "inline@6"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCustomFlyout",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonGroup || viewItem == d365RibbonMenuSection || viewItem == d365RibbonSplitButton || viewItem == d365RibbonFlyout)",
-          "group": "inline@7"
         },
         {
           "command": "dynamics365Tools.ribbons.addHideOobButton",
@@ -1130,26 +1080,6 @@
         }
       ],
       "dynamics365Tools.ribbonViewMoreMenu": [
-        {
-          "command": "dynamics365Tools.ribbons.addCustomGroup",
-          "group": "navigation@1"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addSmartButton",
-          "group": "navigation@2"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCustomFlyout",
-          "group": "navigation@3"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCustomSplitButton",
-          "group": "navigation@4"
-        },
-        {
-          "command": "dynamics365Tools.ribbons.addCustomMenuSection",
-          "group": "navigation@5"
-        },
         {
           "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
           "group": "navigation@6"

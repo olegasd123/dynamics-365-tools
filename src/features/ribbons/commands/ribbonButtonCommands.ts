@@ -56,6 +56,18 @@ interface LocationPick extends vscode.QuickPickItem {
   manual?: boolean;
 }
 
+type AddRibbonItemKind =
+  | "smartButton"
+  | "customButton"
+  | "group"
+  | "flyout"
+  | "splitButton"
+  | "menuSection";
+
+interface AddRibbonItemPick extends vscode.QuickPickItem {
+  itemKind: AddRibbonItemKind;
+}
+
 type SmartButtonTemplateKind =
   | "quickJs"
   | "openDialog"
@@ -99,6 +111,45 @@ const SMART_BUTTON_TEMPLATES: SmartButtonTemplatePick[] = [
     description: "Call JavaScript with a workflow id",
     defaultLabel: "Run workflow",
   },
+];
+
+const ROOT_RIBBON_ITEM_TYPES: AddRibbonItemPick[] = [
+  {
+    itemKind: "smartButton",
+    label: "Smart Button",
+    description: "Create a button from an action template",
+  },
+  {
+    itemKind: "customButton",
+    label: "Custom Button",
+    description: "Set labels, images, and action",
+  },
+  {
+    itemKind: "group",
+    label: "Group",
+    description: "Add a ribbon group",
+  },
+  {
+    itemKind: "flyout",
+    label: "Flyout",
+    description: "Add a menu button",
+  },
+  {
+    itemKind: "splitButton",
+    label: "Split Button",
+    description: "Add a button with a menu",
+  },
+  {
+    itemKind: "menuSection",
+    label: "Menu Section",
+    description: "Add a menu section",
+  },
+];
+
+const CHILD_RIBBON_ITEM_TYPES: AddRibbonItemPick[] = [
+  ROOT_RIBBON_ITEM_TYPES[1],
+  ROOT_RIBBON_ITEM_TYPES[3],
+  ROOT_RIBBON_ITEM_TYPES[4],
 ];
 
 export async function addCustomRibbonButton(
@@ -272,6 +323,67 @@ export async function addCustomRibbonButton(
 }
 
 export async function addSmartRibbonButton(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  const itemType = await pickRibbonItemType(ctx, node);
+  if (!itemType) {
+    return;
+  }
+
+  switch (itemType.itemKind) {
+    case "customButton":
+      await addCustomRibbonButton(ctx, node);
+      return;
+    case "group":
+      await addCustomRibbonGroup(ctx, node);
+      return;
+    case "flyout":
+      await addCustomRibbonFlyout(ctx, node);
+      return;
+    case "splitButton":
+      await addCustomRibbonSplitButton(ctx, node);
+      return;
+    case "menuSection":
+      await addCustomRibbonMenuSection(ctx, node);
+      return;
+    case "smartButton":
+      await addSmartRibbonButtonFromTemplate(ctx, node);
+      return;
+  }
+}
+
+async function pickRibbonItemType(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+): Promise<AddRibbonItemPick | undefined> {
+  const target = resolveRibbonTarget(node);
+  const childTarget = resolveChildControlTarget(node, [
+    "Group",
+    "MenuSection",
+    "SplitButton",
+    "Flyout",
+  ]);
+  if (!target && !childTarget) {
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
+    return undefined;
+  }
+
+  const picks = target
+    ? ROOT_RIBBON_ITEM_TYPES
+    : [
+        ...CHILD_RIBBON_ITEM_TYPES,
+        ...(resolveChildControlTarget(node, ["SplitButton", "Flyout"])
+          ? [ROOT_RIBBON_ITEM_TYPES[5]]
+          : []),
+      ];
+
+  return showRibbonQuickPick(picks, {
+    placeHolder: "Ribbon item type",
+  });
+}
+
+async function addSmartRibbonButtonFromTemplate(
   ctx: CommandContext,
   node?: RibbonExplorerNode,
 ): Promise<void> {

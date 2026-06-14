@@ -291,6 +291,8 @@ test("adds a quick JS smart ribbon button from prompts", async () => {
     options: { placeHolder?: string },
   ) => {
     switch (options.placeHolder) {
+      case "Ribbon item type":
+        return items.find((item) => item.label === "Smart Button");
       case "Smart button template":
         return items.find((item) => item.label === "Quick JS");
       case "Ribbon location":
@@ -367,6 +369,76 @@ test("adds a quick JS smart ribbon button from prompts", async () => {
     /LabelText="\$LocLabels:d365tools\.account\.Form\.Run\.account\.script\.Label"/,
   );
   assert.strictEqual(form.locLabels.length, 3);
+});
+
+test("adds a custom ribbon group from the unified add command", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon item type") {
+      return items.find((item) => item.label === "Group");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Group title":
+        return "Custom actions";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Group location":
+        return options.value ?? "Mscrm.Form.account.MainTab.Groups._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addSmartRibbonButton(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const group = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(group?.kind, "Group");
+  assert.strictEqual(group?.kind === "Group" ? group.title : undefined, "Custom actions");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Groups\._children"/);
 });
 
 test("adds a custom ribbon group from prompts", async () => {

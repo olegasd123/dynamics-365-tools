@@ -222,7 +222,7 @@ function actionsForNode(node: RibbonExplorerNode): PanelAction[] {
 
 function ribbonAddActions(): PanelAction[] {
   return [
-    { command: "dynamics365Tools.ribbons.addCustomButton", label: "Add Button" },
+    { command: "dynamics365Tools.ribbons.addSmartButton", label: "Add Item" },
     { command: "dynamics365Tools.ribbons.hideOobButton", label: "Hide OOB" },
     { command: "dynamics365Tools.ribbons.hideAndStubOobButtons", label: "Hide + Stub" },
     { command: "dynamics365Tools.ribbons.overrideOobCommand", label: "Override OOB" },
