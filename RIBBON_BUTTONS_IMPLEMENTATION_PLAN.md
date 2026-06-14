@@ -70,7 +70,7 @@ Acceptance:
 - A user can add basic controls from the ribbon tree.
 - The controls appear in the explorer and preview.
 
-## Milestone 5: Dropdown Controls
+## Milestone 5: Dropdown Controls [Dome]
 
 - Add Add Flyout support.
 - Add Add Split Button support.

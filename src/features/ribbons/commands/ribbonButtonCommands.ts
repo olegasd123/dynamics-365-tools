@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { CommandContext } from "@app/commandContext";
 import {
+  createRibbonControlChildPatches,
   createCustomControlPatches,
   createCustomButtonPatches,
   createHideActionPatches,
@@ -11,8 +12,14 @@ import {
   makeHideActionId,
   nextHideActionId,
 } from "../ribbonEditPatches";
-import { RibbonExplorerNode } from "../ribbonExplorer";
-import { ButtonNode, RibbonDocument, RibbonScope, RibbonView } from "../models";
+import { RibbonExplorerNode, RibbonItemNode } from "../ribbonExplorer";
+import {
+  ButtonNode,
+  RibbonCommandUINode,
+  RibbonDocument,
+  RibbonScope,
+  RibbonView,
+} from "../models";
 import {
   findOobRibbonLocation,
   listOobRibbonCommands,
@@ -31,6 +38,7 @@ import {
   nextBatchId,
   nextCustomActionSequence,
   resolveRibbonTarget,
+  sameRange,
 } from "./ribbonCommandSupport";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
 import { pickImageWebResource } from "./ribbonResourcePrompts";
@@ -49,7 +57,13 @@ export async function addCustomRibbonButton(
   ctx: CommandContext,
   node?: RibbonExplorerNode,
 ): Promise<void> {
-  const target = resolveRibbonTarget(node);
+  const childTarget = resolveChildControlTarget(node, [
+    "Group",
+    "MenuSection",
+    "SplitButton",
+    "Flyout",
+  ]);
+  const target = resolveRibbonTarget(node) ?? childTarget;
   if (!target) {
     await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
@@ -106,15 +120,19 @@ export async function addCustomRibbonButton(
 
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
-    value: String(nextCustomActionSequence(target.view)),
+    value: String(
+      childTarget
+        ? nextChildControlSequence(childTarget.control)
+        : nextCustomActionSequence(target.view),
+    ),
     validateInput: validateOptionalNumber,
   });
   if (sequenceText === undefined) {
     return;
   }
 
-  const location = await pickLocation(target.document, target.view.scope);
-  if (!location) {
+  const location = childTarget ? undefined : await pickLocation(target.document, target.view.scope);
+  if (!childTarget && !location) {
     return;
   }
 
@@ -148,13 +166,45 @@ export async function addCustomRibbonButton(
     optionalLocLabel(toolTipDescriptionLocId, toolTipDescription),
   ].filter((label): label is ReturnType<typeof newLocLabel> => Boolean(label));
 
+  const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
+  if (childTarget) {
+    ctx.ribbon.editorState.queuePatches(
+      target.document,
+      createRibbonControlChildPatches(target.document, {
+        parentRange: childTarget.control.range,
+        control: {
+          kind: "Button",
+          id: ids.buttonId,
+          commandId: ids.commandId,
+          sequence,
+          labelLocId,
+          altLocId: locLabels.some((label) => label.id === altLocId) ? altLocId : undefined,
+          toolTipTitleLocId: locLabels.some((label) => label.id === toolTipTitleLocId)
+            ? toolTipTitleLocId
+            : undefined,
+          toolTipDescriptionLocId: locLabels.some((label) => label.id === toolTipDescriptionLocId)
+            ? toolTipDescriptionLocId
+            : undefined,
+          image16x16: image16x16?.trim() || undefined,
+          image32x32: image32x32?.trim() || undefined,
+          modernImage: modernImage.trim() || undefined,
+          templateAlias: "o1",
+        },
+        commandDefinitions: [{ id: ids.commandId, action }],
+        locLabels,
+      }),
+    );
+    ctx.ribbon.explorer.refresh();
+    return;
+  }
+
   ctx.ribbon.editorState.queuePatches(
     target.document,
     createCustomButtonPatches(target.document, {
       ...ids,
-      location,
+      location: location ?? "",
       action,
-      sequence: sequenceText.trim() ? Number(sequenceText.trim()) : undefined,
+      sequence,
       labelLocId,
       altLocId: locLabels.some((label) => label.id === altLocId) ? altLocId : undefined,
       toolTipTitleLocId: locLabels.some((label) => label.id === toolTipTitleLocId)
@@ -234,7 +284,8 @@ export async function addCustomRibbonMenuSection(
   ctx: CommandContext,
   node?: RibbonExplorerNode,
 ): Promise<void> {
-  const target = resolveRibbonTarget(node);
+  const childTarget = resolveChildControlTarget(node, ["SplitButton", "Flyout"]);
+  const target = resolveRibbonTarget(node) ?? childTarget;
   if (!target) {
     await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
@@ -259,29 +310,52 @@ export async function addCustomRibbonMenuSection(
 
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
-    value: String(nextCustomActionSequence(target.view)),
+    value: String(
+      childTarget
+        ? nextChildControlSequence(childTarget.control)
+        : nextCustomActionSequence(target.view),
+    ),
     validateInput: validateOptionalNumber,
   });
   if (sequenceText === undefined) {
     return;
   }
 
-  const location = await promptRibbonLocation({
-    prompt: "Menu section location",
-    value: defaultMenuSectionLocation(target.document, target.view.scope),
-    placeHolder: "Mscrm.Form.account.MainTab.Actions.MenuSections._children",
-  });
-  if (!location) {
+  const location = childTarget
+    ? undefined
+    : await promptRibbonLocation({
+        prompt: "Menu section location",
+        value: defaultMenuSectionLocation(target.document, target.view.scope),
+        placeHolder: "Mscrm.Form.account.MainTab.Actions.MenuSections._children",
+      });
+  if (!childTarget && !location) {
     return;
   }
 
   const ids = makeCustomControlIds(target.document, target.view.scope, nameValue, "MenuSection");
   const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
+  if (childTarget) {
+    ctx.ribbon.editorState.queuePatches(
+      target.document,
+      createRibbonControlChildPatches(target.document, {
+        parentRange: childTarget.control.range,
+        control: {
+          kind: "MenuSection",
+          id: ids.controlId,
+          displayMode,
+          sequence,
+        },
+      }),
+    );
+    ctx.ribbon.explorer.refresh();
+    return;
+  }
+
   ctx.ribbon.editorState.queuePatches(
     target.document,
     createCustomControlPatches(target.document, {
       customActionId: ids.customActionId,
-      location,
+      location: location ?? "",
       sequence,
       control: {
         kind: "MenuSection",
@@ -328,7 +402,13 @@ async function addCustomDropdownControl(
     locationPlaceHolder: string;
   },
 ): Promise<void> {
-  const target = resolveRibbonTarget(node);
+  const childTarget = resolveChildControlTarget(node, [
+    "Group",
+    "MenuSection",
+    "SplitButton",
+    "Flyout",
+  ]);
+  const target = resolveRibbonTarget(node) ?? childTarget;
   if (!target) {
     await ctx.core.notifications.warning("Select a ribbon scope first.");
     return;
@@ -346,19 +426,25 @@ async function addCustomDropdownControl(
 
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
-    value: String(nextCustomActionSequence(target.view)),
+    value: String(
+      childTarget
+        ? nextChildControlSequence(childTarget.control)
+        : nextCustomActionSequence(target.view),
+    ),
     validateInput: validateOptionalNumber,
   });
   if (sequenceText === undefined) {
     return;
   }
 
-  const location = await promptRibbonLocation({
-    prompt: options.locationPrompt,
-    value: defaultDropdownLocation(target.document, target.view.scope),
-    placeHolder: options.locationPlaceHolder,
-  });
-  if (!location) {
+  const location = childTarget
+    ? undefined
+    : await promptRibbonLocation({
+        prompt: options.locationPrompt,
+        value: defaultDropdownLocation(target.document, target.view.scope),
+        placeHolder: options.locationPlaceHolder,
+      });
+  if (!childTarget && !location) {
     return;
   }
 
@@ -366,11 +452,29 @@ async function addCustomDropdownControl(
   const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
   const labelLocId = `${ids.controlId}.Label`;
 
+  if (childTarget) {
+    ctx.ribbon.editorState.queuePatches(
+      target.document,
+      createRibbonControlChildPatches(target.document, {
+        parentRange: childTarget.control.range,
+        control: {
+          kind: options.kind,
+          id: ids.controlId,
+          labelLocId,
+          sequence,
+        },
+        locLabels: [newLocLabel(labelLocId, labelValue)],
+      }),
+    );
+    ctx.ribbon.explorer.refresh();
+    return;
+  }
+
   ctx.ribbon.editorState.queuePatches(
     target.document,
     createCustomControlPatches(target.document, {
       customActionId: ids.customActionId,
-      location,
+      location: location ?? "",
       sequence,
       control: {
         kind: options.kind,
@@ -390,6 +494,63 @@ function newLocLabel(id: string, description: string) {
     languageCode: 1033,
     description: description.trim(),
   };
+}
+
+function resolveChildControlTarget(
+  node: RibbonExplorerNode | undefined,
+  allowedKinds: RibbonCommandUINode["kind"][],
+): { document: RibbonDocument; view: RibbonView; control: RibbonCommandUINode } | undefined {
+  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
+    return undefined;
+  }
+
+  for (const view of node.editTarget.document.views) {
+    for (const action of view.customActions) {
+      if (!action.commandUI) {
+        continue;
+      }
+
+      const control = findRibbonControlByRange(action.commandUI, node.editTarget.range);
+      if (control && allowedKinds.includes(control.kind)) {
+        return { document: node.editTarget.document, view, control };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function findRibbonControlByRange(
+  control: RibbonCommandUINode,
+  range: { start: number; end: number },
+): RibbonCommandUINode | undefined {
+  if (sameRange(control.range, range)) {
+    return control;
+  }
+
+  if (control.kind === "Unknown" || !("children" in control)) {
+    return undefined;
+  }
+
+  for (const child of control.children ?? []) {
+    const match = findRibbonControlByRange(child, range);
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+}
+
+function nextChildControlSequence(control: RibbonCommandUINode): number {
+  if (control.kind === "Unknown" || !("children" in control)) {
+    return 10;
+  }
+
+  const sequences = (control.children ?? [])
+    .map((child) => (child.kind === "Unknown" ? undefined : child.sequence))
+    .filter((sequence): sequence is number => sequence !== undefined);
+  return sequences.length ? Math.max(...sequences) + 10 : 10;
 }
 
 function optionalLocLabel(id: string, description: string) {

@@ -523,6 +523,109 @@ test("adds a custom ribbon split button from prompts", async () => {
   );
 });
 
+test("adds a child button to a selected flyout from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.More.Action" Location="Mscrm.Form.account.MainTab.Actions.Controls._children">
+      <CommandUIDefinition>
+        <FlyoutAnchor Id="new.account.More.Flyout" LabelText="More" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const flyout = document.views[0].customActions[0].commandUI;
+  assert.strictEqual(flyout?.kind, "Flyout");
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Button action") {
+      return items.find((item) => item.label === "URL");
+    }
+
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Button label":
+        return "Child action";
+      case "Alt":
+      case "Tool tip title":
+      case "Tool tip description":
+      case "Sequence":
+        return options.value ?? "";
+      case "Image 16 web resource":
+      case "Image 32 web resource":
+      case "Modern image web resource":
+        return "";
+      case "URL":
+        return "https://contoso.example/child";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonButton(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonItemNode(
+        "Flyout: new.account.More.Flyout",
+        undefined,
+        "d365RibbonFlyout",
+        "list-tree",
+        [],
+        [],
+        { document, range: flyout.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const updatedFlyout = updatedDocument.views[0].customActions[0].commandUI;
+  const section = updatedFlyout?.kind === "Flyout" ? updatedFlyout.children?.[0] : undefined;
+  const button = section?.kind === "MenuSection" ? section.children?.[0] : undefined;
+
+  assert.strictEqual(button?.kind, "Button");
+  assert.match(updated, /<MenuSection Id="new\.account\.More\.Flyout\.MenuSection"/);
+  assert.match(updated, /<Url Address="https:\/\/contoso\.example\/child" \/>/);
+});
+
 test("edits a custom group without rebuilding child controls", async () => {
   const source = `<RibbonDiffXml>
   <CustomActions>

@@ -21,6 +21,7 @@ import {
   createNodeAttributeValuePatch,
   createOobButtonReorderPatches,
   createOobStubReplacementPatches,
+  createRibbonControlChildPatches,
   createRuleChildStepPatch,
   createRuleStepReplacePatch,
   createSwapNodePatches,
@@ -392,6 +393,62 @@ test("creates split button and flyout XML that can be read again", () => {
     updated,
     /<MenuSection Id="d365tools\.account\.Form\.More\.Child\.Flyout\.MenuSection"/,
   );
+});
+
+test("adds a child button to an empty dropdown control", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="d365tools.account.Form.More.CustomAction" Location="Mscrm.Form.account.MainTab.Actions.Controls._children">
+      <CommandUIDefinition>
+        <FlyoutAnchor Id="d365tools.account.Form.More.Flyout" LabelText="More" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const flyout = document.views[0].customActions[0].commandUI;
+  assert.strictEqual(flyout?.kind, "Flyout");
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createRibbonControlChildPatches(document, {
+      parentRange: flyout.range,
+      control: {
+        kind: "Button",
+        id: "d365tools.account.Form.More.Child.Button",
+        commandId: "d365tools.account.Form.More.Child.Command",
+        labelText: "Child action",
+        sequence: 10,
+      },
+      commandDefinitions: [
+        {
+          id: "d365tools.account.Form.More.Child.Command",
+          action: { kind: "Url", address: "https://contoso.example/child" },
+        },
+      ],
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const updatedFlyout = updatedDocument.views[0].customActions[0].commandUI;
+  const section = updatedFlyout?.kind === "Flyout" ? updatedFlyout.children?.[0] : undefined;
+  const button = section?.kind === "MenuSection" ? section.children?.[0] : undefined;
+
+  assert.strictEqual(updatedFlyout?.kind, "Flyout");
+  assert.strictEqual(section?.kind, "MenuSection");
+  assert.strictEqual(button?.kind, "Button");
+  assert.match(updated, /<Menu Id="d365tools\.account\.Form\.More\.Flyout\.Menu">/);
+  assert.match(updated, /<MenuSection Id="d365tools\.account\.Form\.More\.Flyout\.MenuSection"/);
+  assert.match(updated, /<CommandDefinition Id="d365tools\.account\.Form\.More\.Child\.Command">/);
 });
 
 test("creates a hide action inside an existing CustomActions section", () => {

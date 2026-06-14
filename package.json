@@ -1028,6 +1028,21 @@
           "group": "inline@5"
         },
         {
+          "command": "dynamics365Tools.ribbons.addCustomButton",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonGroup || viewItem == d365RibbonMenuSection || viewItem == d365RibbonSplitButton || viewItem == d365RibbonFlyout)",
+          "group": "inline@5"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addCustomMenuSection",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonSplitButton || viewItem == d365RibbonFlyout)",
+          "group": "inline@6"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addCustomFlyout",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonGroup || viewItem == d365RibbonMenuSection || viewItem == d365RibbonSplitButton || viewItem == d365RibbonFlyout)",
+          "group": "inline@7"
+        },
+        {
           "command": "dynamics365Tools.ribbons.addHideOobButton",
           "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonSection:hideActions",
           "group": "inline@5"

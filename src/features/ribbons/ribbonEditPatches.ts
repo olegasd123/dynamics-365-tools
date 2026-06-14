@@ -272,6 +272,13 @@ export interface NewCustomControlInput {
   locLabels?: NewLocLabelInput[];
 }
 
+export interface NewRibbonControlChildInput {
+  parentRange: TextRange;
+  control: NewRibbonControlInput;
+  commandDefinitions?: NewCommandDefinitionInput[];
+  locLabels?: NewLocLabelInput[];
+}
+
 export interface NewOobStubReplacementInput extends NewCustomButtonInput {
   hideActionId: string;
   hideLocation?: string;
@@ -348,6 +355,34 @@ export function createCustomControlPatches(
   }
 
   return createSectionChildPatches(document, sectionEdits);
+}
+
+export function createRibbonControlChildPatches(
+  document: RibbonDocument,
+  input: NewRibbonControlChildInput,
+): RibbonPatch[] {
+  const patches: RibbonPatch[] = [
+    createRibbonControlChildPatch(document.sourceText, input.parentRange, input.control),
+  ];
+
+  const sectionEdits: RibbonSectionChildEdit[] = [];
+  if (input.commandDefinitions?.length) {
+    sectionEdits.push({
+      sectionName: "CommandDefinitions",
+      childText: input.commandDefinitions
+        .map((definition) => renderStandaloneCommandDefinition(definition))
+        .join("\n"),
+    });
+  }
+
+  if (input.locLabels?.length) {
+    sectionEdits.push({
+      sectionName: "LocLabels",
+      childText: input.locLabels.map((label) => renderLocLabel(label)).join("\n"),
+    });
+  }
+
+  return sortPatchesForApply([...patches, ...createSectionChildPatches(document, sectionEdits)]);
 }
 
 export function createOobStubReplacementPatches(
@@ -845,6 +880,105 @@ function createCommandChildPatch(
     offset,
     text: `\n${indentBlock(containerText, containerIndent)}${offset === commandElement.innerRange.end ? `\n${commandIndent}` : ""}`,
   };
+}
+
+function createRibbonControlChildPatch(
+  sourceText: string,
+  parentRange: TextRange,
+  control: NewRibbonControlInput,
+): RibbonPatch {
+  const parent = findElementByRange(sourceText, parentRange);
+
+  if (parent.name === "SplitButton" || parent.name === "FlyoutAnchor" || parent.name === "Flyout") {
+    return createDropdownControlChildPatch(sourceText, parent, control);
+  }
+
+  if (parent.name === "Group" || parent.name === "MenuSection") {
+    return createControlContainerChildPatch(sourceText, parent, control);
+  }
+
+  throw new Error(`${parent.name} cannot contain ribbon child controls.`);
+}
+
+function createDropdownControlChildPatch(
+  sourceText: string,
+  parent: XmlElementRange,
+  control: NewRibbonControlInput,
+): RibbonPatch {
+  const menu = parent.children.find((child) => child.name === "Menu");
+  if (control.kind === "MenuSection") {
+    if (menu) {
+      return createExistingSectionChildPatch(sourceText, menu, renderRibbonControl(control));
+    }
+
+    return createControlContainerPatch(sourceText, parent, "Menu", renderRibbonControl(control));
+  }
+
+  const existingMenuSection = menu?.children.find((child) => child.name === "MenuSection");
+  if (existingMenuSection) {
+    return createControlContainerChildPatch(sourceText, existingMenuSection, control);
+  }
+
+  const parentId = readElementAttribute(parent, "Id") ?? parent.name;
+  const section: NewMenuSectionControlInput = {
+    kind: "MenuSection",
+    id: `${parentId}.MenuSection`,
+    displayMode: "Menu16",
+    sequence: 10,
+    children: [control],
+  };
+  const childText = renderRibbonControl(section);
+
+  if (menu) {
+    return createExistingSectionChildPatch(sourceText, menu, childText);
+  }
+
+  return createControlContainerPatch(sourceText, parent, "Menu", childText);
+}
+
+function createControlContainerChildPatch(
+  sourceText: string,
+  parent: XmlElementRange,
+  control: NewRibbonControlInput,
+): RibbonPatch {
+  const controls = parent.children.find((child) => child.name === "Controls");
+  if (controls) {
+    return createExistingSectionChildPatch(sourceText, controls, renderRibbonControl(control));
+  }
+
+  return createControlContainerPatch(sourceText, parent, "Controls", renderRibbonControl(control));
+}
+
+function createControlContainerPatch(
+  sourceText: string,
+  parent: XmlElementRange,
+  containerName: "Controls" | "Menu",
+  childText: string,
+): RibbonPatch {
+  const parentIndent = indentationBefore(sourceText, parent.range.start);
+  const containerIndent = findChildIndent(sourceText, parent) ?? `${parentIndent}  `;
+  const parentId = readElementAttribute(parent, "Id") ?? parent.name;
+  const containerText = `<${containerName} Id="${escapeXmlAttribute(`${parentId}.${containerName}`)}">
+${indentBlock(childText, "  ")}
+</${containerName}>`;
+
+  if (parent.selfClosing) {
+    return {
+      kind: "replace",
+      range: parent.range,
+      text: `${openSelfClosingElement(sourceText, parent)}\n${indentBlock(containerText, containerIndent)}\n${parentIndent}</${parent.name}>`,
+    };
+  }
+
+  return {
+    kind: "insert",
+    offset: parent.children.length ? parent.innerRange.end : parent.startTagRange.end,
+    text: `\n${indentBlock(containerText, containerIndent)}\n${parentIndent}`,
+  };
+}
+
+function readElementAttribute(element: XmlElementRange, name: string): string | undefined {
+  return element.attributes.find((attribute) => attribute.name === name)?.value;
 }
 
 function findCommandElement(document: RibbonDocument, command: CommandDefinition): XmlElementRange {
@@ -1524,6 +1658,10 @@ function indentContinuationLines(text: string, indent: string): string {
 
 function sectionOrder(edit: RibbonSectionChildEdit): number {
   return RIBBON_SECTION_ORDER.indexOf(edit.sectionName);
+}
+
+function sortPatchesForApply(patches: RibbonPatch[]): RibbonPatch[] {
+  return [...patches].sort((a, b) => patchStart(b) - patchStart(a));
 }
 
 function patchStart(patch: RibbonPatch): number {
