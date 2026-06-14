@@ -465,14 +465,6 @@ export function createCustomButtonReplacePatch(
   return createReplaceNodePatch(sourceText, range, renderCustomButtonAction(input));
 }
 
-export function createCustomControlReplacePatch(
-  sourceText: string,
-  range: TextRange,
-  input: NewCustomControlInput,
-): RibbonPatch {
-  return createReplaceNodePatch(sourceText, range, renderCustomControlAction(input));
-}
-
 export function createCommandDefinitionPatches(
   document: RibbonDocument,
   input: NewCommandDefinitionInput,
