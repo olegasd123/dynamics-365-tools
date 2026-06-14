@@ -41,7 +41,7 @@ test("renders selected ribbon document details with edit actions", () => {
   formPanel.dispose();
 });
 
-test("does not render custom button actions for ribbon sections", () => {
+test("renders add actions for custom and hide action sections", () => {
   const formPanel = new RibbonFormPanel();
   const document: RibbonDocument = {
     id: "doc",
@@ -67,11 +67,16 @@ test("does not render custom button actions for ribbon sections", () => {
   };
   const [view] = document.views;
 
+  formPanel.show(new RibbonSectionNode(document, view, "customActions", 0));
+  let panel = (vscode.window as any).__lastWebviewPanel;
+  assert.match(panel.webview.html, /Add Item/);
+  assert.doesNotMatch(panel.webview.html, /Hide OOB/);
+
   formPanel.show(new RibbonSectionNode(document, view, "hideActions", 0));
 
-  const panel = (vscode.window as any).__lastWebviewPanel;
-  assert.doesNotMatch(panel.webview.html, /Add Button/);
-  assert.doesNotMatch(panel.webview.html, /Hide OOB/);
+  panel = (vscode.window as any).__lastWebviewPanel;
+  assert.match(panel.webview.html, /Hide OOB/);
+  assert.doesNotMatch(panel.webview.html, /Add Item/);
   formPanel.dispose();
 });
 

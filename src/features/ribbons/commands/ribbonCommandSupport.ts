@@ -6,6 +6,7 @@ import {
   RibbonViewNode,
 } from "../ribbonExplorer";
 import { CommandDefinition, LocLabel, RibbonDocument, RibbonScope, RibbonView } from "../models";
+import { collectRibbonControls, ribbonControlId } from "../ribbonControlTree";
 
 export function resolveRibbonTarget(
   node: RibbonExplorerNode | undefined,
@@ -123,7 +124,11 @@ export function validateUniqueId(
     for (const action of view.customActions) {
       used.add(action.id);
       if (action.commandUI && action.commandUI.kind !== "Unknown") {
-        used.add(action.commandUI.id);
+        for (const control of collectRibbonControls(action.commandUI)) {
+          if (control.kind !== "Unknown") {
+            used.add(ribbonControlId(control));
+          }
+        }
       }
     }
     for (const action of view.hideActions) {
@@ -152,7 +157,11 @@ export function collectRibbonIds(document: RibbonDocument): Set<string> {
     for (const action of view.customActions) {
       used.add(action.id);
       if (action.commandUI && action.commandUI.kind !== "Unknown") {
-        used.add(action.commandUI.id);
+        for (const control of collectRibbonControls(action.commandUI)) {
+          if (control.kind !== "Unknown") {
+            used.add(ribbonControlId(control));
+          }
+        }
       }
     }
     for (const action of view.hideActions) {

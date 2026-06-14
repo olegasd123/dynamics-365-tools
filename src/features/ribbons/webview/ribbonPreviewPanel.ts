@@ -217,6 +217,29 @@ function renderHtml(title: string, models: RibbonPreviewModel[]): string {
     .tile.hidden .caption {
       text-decoration: line-through;
     }
+    .tile-stack {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tile-children {
+      border-left: 1px solid var(--vscode-panel-border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: 13px;
+      padding-left: 8px;
+    }
+    .child-row {
+      align-items: center;
+      display: flex;
+      gap: 4px;
+    }
+    .child-kind {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.78em;
+      min-width: 70px;
+    }
     .empty {
       color: var(--vscode-descriptionForeground);
     }
@@ -254,7 +277,16 @@ function renderGroup(group: RibbonPreviewGroup): string {
 
 function renderTile(item: RibbonPreviewItem): string {
   const classes = ["tile", item.source, item.hidden ? "hidden" : ""].filter(Boolean).join(" ");
-  return `<span class="${classes}" title="${escapeHtml(tileTooltip(item))}"><span class="icon">${glyph(item.kind)}</span><span class="caption">${escapeHtml(item.label)}</span></span>`;
+  const tile = `<span class="${classes}" title="${escapeHtml(tileTooltip(item))}"><span class="icon">${glyph(item.kind)}</span><span class="caption">${escapeHtml(item.label)}</span></span>`;
+  if (!item.children?.length) {
+    return tile;
+  }
+
+  return `<span class="tile-stack">${tile}<span class="tile-children">${item.children.map(renderChildTile).join("")}</span></span>`;
+}
+
+function renderChildTile(item: RibbonPreviewItem): string {
+  return `<span class="child-row"><span class="child-kind">${escapeHtml(item.kind)}</span>${renderTile(item)}</span>`;
 }
 
 function tileTooltip(item: RibbonPreviewItem): string {
@@ -285,6 +317,10 @@ function glyph(kind: RibbonPreviewItem["kind"]): string {
       return "▭";
     case "MenuSection":
       return "☰";
+    case "SplitButton":
+      return "▾";
+    case "Flyout":
+      return "›";
     case "Unknown":
       return "?";
     case "Button":

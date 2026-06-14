@@ -14,6 +14,11 @@ import {
 } from "./models";
 import { isBuiltInEnableRule } from "./enableRuleCatalog";
 import { findOobRibbonCommand } from "./oobCatalog";
+import {
+  collectRibbonButtons,
+  collectRibbonControls,
+  ribbonControlChildren,
+} from "./ribbonControlTree";
 
 export type RibbonValidationSeverity = "error" | "warning";
 
@@ -120,13 +125,70 @@ function validateCustomActions(
   for (const action of actions) {
     issues.push(...required(action.id, "CustomAction Id", action.range));
     issues.push(...required(action.location, "Location", action.range));
+    issues.push(...validateCustomActionLocation(action, document, view));
 
-    if (action.commandUI?.kind === "Button") {
-      issues.push(...validateButton(action.commandUI, commandIds, locLabelIds, document, view));
+    if (action.commandUI) {
+      issues.push(
+        ...collectRibbonButtons(action.commandUI).flatMap((button) =>
+          validateButton(button, commandIds, locLabelIds, document, view),
+        ),
+      );
+
+      issues.push(...validateDropdownControls(action.commandUI));
     }
   }
 
   return issues;
+}
+
+function validateCustomActionLocation(
+  action: CustomAction,
+  document: RibbonDocument,
+  view: RibbonView,
+): RibbonValidationIssue[] {
+  if (!action.location || isValidCustomActionLocation(action.location, document, view)) {
+    return [];
+  }
+
+  return [
+    {
+      severity: "warning",
+      message: `CustomAction location '${action.location}' does not look like a ribbon container location.`,
+      range: action.range,
+    },
+  ];
+}
+
+function isValidCustomActionLocation(
+  location: string,
+  document: RibbonDocument,
+  view: RibbonView,
+): boolean {
+  if (!/\.(Controls|Groups|MenuSections)\._children$/.test(location)) {
+    return false;
+  }
+
+  if (view.scope === "Application") {
+    return /^Mscrm\./.test(location) && !/^Mscrm\.(Form|HomepageGrid|SubGrid)\./.test(location);
+  }
+
+  const entity = document.entityLogicalName ? escapeRegExp(document.entityLogicalName) : "[^.]+";
+  return new RegExp(`^Mscrm\\.${view.scope}\\.${entity}\\.`).test(location);
+}
+
+function validateDropdownControls(commandUI: CustomAction["commandUI"]): RibbonValidationIssue[] {
+  if (!commandUI) {
+    return [];
+  }
+
+  return collectRibbonControls(commandUI)
+    .filter((control) => control.kind === "SplitButton" || control.kind === "Flyout")
+    .filter((control) => ribbonControlChildren(control).length === 0)
+    .map((control) => ({
+      severity: "warning" as const,
+      message: `${control.kind} should contain at least one child control.`,
+      range: control.range,
+    }));
 }
 
 function validateButton(
@@ -394,4 +456,8 @@ function requiredBoolean(
         },
       ]
     : [];
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
