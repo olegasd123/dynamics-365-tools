@@ -407,6 +407,18 @@
         "icon": "$(add)"
       },
       {
+        "command": "dynamics365Tools.ribbons.addCustomFlyout",
+        "title": "Add Custom Flyout",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dynamics365Tools.ribbons.addCustomSplitButton",
+        "title": "Add Custom Split Button",
+        "category": "Dynamics 365 Tools",
+        "icon": "$(add)"
+      },
+      {
         "command": "dynamics365Tools.ribbons.addCustomMenuSection",
         "title": "Add Custom Menu Section",
         "category": "Dynamics 365 Tools",
@@ -1092,36 +1104,44 @@
           "group": "navigation@1"
         },
         {
-          "command": "dynamics365Tools.ribbons.addCustomMenuSection",
+          "command": "dynamics365Tools.ribbons.addCustomFlyout",
           "group": "navigation@2"
         },
         {
-          "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
+          "command": "dynamics365Tools.ribbons.addCustomSplitButton",
           "group": "navigation@3"
         },
         {
-          "command": "dynamics365Tools.ribbons.overrideOobCommand",
+          "command": "dynamics365Tools.ribbons.addCustomMenuSection",
           "group": "navigation@4"
         },
         {
-          "command": "dynamics365Tools.ribbons.reorderOobButtons",
+          "command": "dynamics365Tools.ribbons.hideAndStubOobButtons",
           "group": "navigation@5"
         },
         {
-          "command": "dynamics365Tools.ribbons.addCommandDefinition",
+          "command": "dynamics365Tools.ribbons.overrideOobCommand",
           "group": "navigation@6"
         },
         {
-          "command": "dynamics365Tools.ribbons.addEnableRule",
+          "command": "dynamics365Tools.ribbons.reorderOobButtons",
           "group": "navigation@7"
         },
         {
-          "command": "dynamics365Tools.ribbons.addDisplayRule",
+          "command": "dynamics365Tools.ribbons.addCommandDefinition",
           "group": "navigation@8"
         },
         {
-          "command": "dynamics365Tools.ribbons.addLocLabel",
+          "command": "dynamics365Tools.ribbons.addEnableRule",
           "group": "navigation@9"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addDisplayRule",
+          "group": "navigation@10"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.addLocLabel",
+          "group": "navigation@11"
         }
       ]
     },

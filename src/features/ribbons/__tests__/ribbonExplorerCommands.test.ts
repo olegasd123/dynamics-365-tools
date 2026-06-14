@@ -12,8 +12,10 @@ import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
 import {
   addCustomRibbonButton,
+  addCustomRibbonFlyout,
   addCustomRibbonGroup,
   addCustomRibbonMenuSection,
+  addCustomRibbonSplitButton,
   pickLocation,
 } from "../commands/ribbonButtonCommands";
 import { addRibbonCommandAction } from "../commands/ribbonCommandDefinitionCommands";
@@ -397,6 +399,127 @@ test("adds a custom ribbon menu section from prompts", async () => {
   assert.match(
     updated,
     /Location="Mscrm\.Form\.account\.MainTab\.Actions\.MenuSections\._children"/,
+  );
+});
+
+test("adds a custom ribbon flyout from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Flyout label":
+        return "More actions";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Flyout location":
+        return "Mscrm.Form.account.MainTab.Actions.Controls._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonFlyout(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const flyout = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(flyout?.kind, "Flyout");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Actions\.Controls\._children"/);
+  assert.match(updated, /<FlyoutAnchor Id="d365tools\.account\.Form\.More\.actions\.Flyout"/);
+  assert.match(updated, /<LocLabel Id="d365tools\.account\.Form\.More\.actions\.Flyout\.Label">/);
+});
+
+test("adds a custom ribbon split button from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Split button label":
+        return "Main action";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Split button location":
+        return "Mscrm.Form.account.MainTab.Actions.Controls._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonSplitButton(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const splitButton = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(splitButton?.kind, "SplitButton");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Actions\.Controls\._children"/);
+  assert.match(updated, /<SplitButton Id="d365tools\.account\.Form\.Main\.action\.SplitButton"/);
+  assert.match(
+    updated,
+    /<LocLabel Id="d365tools\.account\.Form\.Main\.action\.SplitButton\.Label">/,
   );
 });
 

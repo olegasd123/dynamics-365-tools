@@ -37,8 +37,10 @@ import {
 } from "@features/plugins/commands/pluginStepCommands";
 import { deletePluginType } from "@features/plugins/commands/pluginTypeCommands";
 import {
+  addCustomRibbonFlyout,
   addCustomRibbonGroup,
   addCustomRibbonMenuSection,
+  addCustomRibbonSplitButton,
   addCustomRibbonButton,
   hideAndStubOobRibbonButtons,
   hideOobRibbonButton,
@@ -238,6 +240,20 @@ export function registerCommands(ctx: CommandContext): vscode.Disposable[] {
     register("dynamics365Tools.ribbons.addCustomGroup", (node) => addCustomRibbonGroup(ctx, node), {
       validateConfiguration: false,
     }),
+    register(
+      "dynamics365Tools.ribbons.addCustomFlyout",
+      (node) => addCustomRibbonFlyout(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
+    register(
+      "dynamics365Tools.ribbons.addCustomSplitButton",
+      (node) => addCustomRibbonSplitButton(ctx, node),
+      {
+        validateConfiguration: false,
+      },
+    ),
     register(
       "dynamics365Tools.ribbons.addCustomMenuSection",
       (node) => addCustomRibbonMenuSection(ctx, node),

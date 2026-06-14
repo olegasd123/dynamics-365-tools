@@ -294,6 +294,96 @@ export async function addCustomRibbonMenuSection(
   ctx.ribbon.explorer.refresh();
 }
 
+export async function addCustomRibbonFlyout(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await addCustomDropdownControl(ctx, node, {
+    kind: "Flyout",
+    labelPrompt: "Flyout label",
+    locationPrompt: "Flyout location",
+    locationPlaceHolder: "Mscrm.Form.account.MainTab.Actions.Controls._children",
+  });
+}
+
+export async function addCustomRibbonSplitButton(
+  ctx: CommandContext,
+  node?: RibbonExplorerNode,
+): Promise<void> {
+  await addCustomDropdownControl(ctx, node, {
+    kind: "SplitButton",
+    labelPrompt: "Split button label",
+    locationPrompt: "Split button location",
+    locationPlaceHolder: "Mscrm.Form.account.MainTab.Actions.Controls._children",
+  });
+}
+
+async function addCustomDropdownControl(
+  ctx: CommandContext,
+  node: RibbonExplorerNode | undefined,
+  options: {
+    kind: "Flyout" | "SplitButton";
+    labelPrompt: string;
+    locationPrompt: string;
+    locationPlaceHolder: string;
+  },
+): Promise<void> {
+  const target = resolveRibbonTarget(node);
+  if (!target) {
+    await ctx.core.notifications.warning("Select a ribbon scope first.");
+    return;
+  }
+
+  const label = await showRibbonInputBox({
+    prompt: options.labelPrompt,
+    placeHolder: options.kind === "Flyout" ? "More actions" : "Main action",
+    validateInput: (value) => (value.trim() ? undefined : "Label is required."),
+  });
+  if (!label) {
+    return;
+  }
+  const labelValue = label.trim();
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: String(nextCustomActionSequence(target.view)),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const location = await promptRibbonLocation({
+    prompt: options.locationPrompt,
+    value: defaultDropdownLocation(target.document, target.view.scope),
+    placeHolder: options.locationPlaceHolder,
+  });
+  if (!location) {
+    return;
+  }
+
+  const ids = makeCustomControlIds(target.document, target.view.scope, labelValue, options.kind);
+  const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
+  const labelLocId = `${ids.controlId}.Label`;
+
+  ctx.ribbon.editorState.queuePatches(
+    target.document,
+    createCustomControlPatches(target.document, {
+      customActionId: ids.customActionId,
+      location,
+      sequence,
+      control: {
+        kind: options.kind,
+        id: ids.controlId,
+        labelLocId,
+        sequence,
+      },
+      locLabels: [newLocLabel(labelLocId, labelValue)],
+    }),
+  );
+  ctx.ribbon.explorer.refresh();
+}
+
 function newLocLabel(id: string, description: string) {
   return {
     id,
@@ -325,6 +415,10 @@ function defaultGroupLocation(document: RibbonDocument, scope: RibbonScope): str
 
 function defaultMenuSectionLocation(document: RibbonDocument, scope: RibbonScope): string {
   return `${scopePrefix(document, scope)}.MainTab.Actions.MenuSections._children`;
+}
+
+function defaultDropdownLocation(document: RibbonDocument, scope: RibbonScope): string {
+  return `${scopePrefix(document, scope)}.MainTab.Actions.Controls._children`;
 }
 
 function scopePrefix(document: RibbonDocument, scope: RibbonScope): string {
