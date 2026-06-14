@@ -63,6 +63,42 @@ test("renders standard and custom buttons inline in one command bar", () => {
   panel.dispose();
 });
 
+test("renders nested dropdown controls in the command bar", () => {
+  const panel = new RibbonPreviewPanel();
+  const document = documentWith();
+  document.views[0].customActions[0].commandUI = {
+    kind: "SplitButton",
+    id: "split",
+    command: "new.parent",
+    labelText: "More",
+    children: [
+      {
+        kind: "MenuSection",
+        id: "section",
+        range,
+        children: [
+          {
+            kind: "Button",
+            id: "child",
+            command: "new.child",
+            labelText: "Child action",
+            range,
+          },
+        ],
+      },
+    ],
+    range,
+  };
+
+  panel.show(new RibbonViewNode(document, document.views[0]));
+
+  const rendered = (vscode.window as any).__lastWebviewPanel;
+  assert.match(rendered.webview.html, /class="tile-children"/);
+  assert.match(rendered.webview.html, /MenuSection/);
+  assert.match(rendered.webview.html, /Child action/);
+  panel.dispose();
+});
+
 test("renders an empty state for a command bar without buttons", () => {
   const panel = new RibbonPreviewPanel();
   const document = documentWith();

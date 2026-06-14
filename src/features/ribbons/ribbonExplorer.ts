@@ -17,7 +17,9 @@ import {
   TextRange,
   XmlElementRange,
   ButtonNode,
+  RibbonCommandUINode,
 } from "./models";
+import { ribbonControlChildren, ribbonControlCommand, ribbonControlId } from "./ribbonControlTree";
 import { RibbonDiagnosticsService } from "./ribbonDiagnostics";
 import { RibbonEditorState } from "./ribbonEditorState";
 import { RibbonSourceLocator } from "./ribbonSourceLocator";
@@ -551,62 +553,106 @@ function customActionNode(document: RibbonDocument, action: CustomAction): Ribbo
       ["Location", action.location],
       ["Sequence", action.sequence],
       ["UI kind", action.commandUI?.kind],
-      ["Command", action.commandUI?.kind === "Button" ? action.commandUI.command : undefined],
+      ["Command", action.commandUI ? ribbonControlCommand(action.commandUI) : undefined],
     ],
-    action.commandUI
-      ? [
-          new RibbonItemNode(
-            `${action.commandUI.kind}: ${commandUiId(action.commandUI)}`,
-            action.commandUI.kind === "Button" ? action.commandUI.command : undefined,
-            `d365Ribbon${action.commandUI.kind}`,
-            action.commandUI.kind === "Button" ? "symbol-method" : "symbol-misc",
-            commandUiDetails(action.commandUI),
-            [],
-            { document, range: action.commandUI.range },
-          ),
-        ]
-      : [],
+    action.commandUI ? [commandUiNode(document, action.commandUI)] : [],
     { document, range: action.range },
   );
 }
 
-function commandUiDetails(commandUI: NonNullable<CustomAction["commandUI"]>) {
+function commandUiNode(document: RibbonDocument, commandUI: RibbonCommandUINode): RibbonItemNode {
+  return new RibbonItemNode(
+    `${commandUI.kind}: ${ribbonControlId(commandUI)}`,
+    ribbonControlCommand(commandUI),
+    `d365Ribbon${commandUI.kind}`,
+    commandUiIcon(commandUI),
+    commandUiDetails(commandUI),
+    ribbonControlChildren(commandUI).map((child) => commandUiNode(document, child)),
+    { document, range: commandUI.range },
+  );
+}
+
+function commandUiIcon(commandUI: RibbonCommandUINode): string {
+  switch (commandUI.kind) {
+    case "Button":
+      return "symbol-method";
+    case "SplitButton":
+    case "Flyout":
+      return "list-tree";
+    case "MenuSection":
+      return "symbol-namespace";
+    default:
+      return "symbol-misc";
+  }
+}
+
+function commandUiDetails(commandUI: RibbonCommandUINode) {
   const rows: Array<[string, RibbonDetailValue]> = [
-    ["Id", commandUiId(commandUI)],
+    ["Id", ribbonControlId(commandUI)],
     ["Kind", commandUI.kind],
   ];
 
-  if (commandUI.kind === "Button") {
+  if (
+    commandUI.kind === "Button" ||
+    commandUI.kind === "SplitButton" ||
+    commandUI.kind === "Flyout"
+  ) {
     rows.push(
       ["Command", commandUI.command],
       ["Label", commandUI.labelText ?? commandUI.labelLocId],
-      ...optionalButtonDetails(commandUI),
+      ...optionalLabeledControlDetails(commandUI),
       ["Sequence", commandUI.sequence],
+    );
+    if (commandUI.kind !== "Button") {
+      rows.push(["Children", ribbonControlChildren(commandUI).length]);
+    }
+    return rows;
+  }
+
+  if (commandUI.kind === "Group" || commandUI.kind === "Tab") {
+    rows.push(
+      ["Command", commandUI.command],
+      ["Title", commandUI.title],
+      ["Sequence", commandUI.sequence],
+      ["Children", ribbonControlChildren(commandUI).length],
     );
     return rows;
   }
 
-  rows.push(["Sequence", commandUiSequence(commandUI)]);
+  if (commandUI.kind === "MenuSection") {
+    rows.push(
+      ["Display mode", commandUI.displayMode],
+      ["Sequence", commandUI.sequence],
+      ["Children", ribbonControlChildren(commandUI).length],
+    );
+    return rows;
+  }
+
   return rows;
 }
 
-function optionalButtonDetails(button: ButtonNode): Array<[string, RibbonDetailValue]> {
+function optionalLabeledControlDetails(
+  control: Pick<
+    ButtonNode,
+    | "alt"
+    | "altLocId"
+    | "toolTipTitle"
+    | "toolTipTitleLocId"
+    | "toolTipDescription"
+    | "toolTipDescriptionLocId"
+    | "image16x16"
+    | "image32x32"
+    | "modernImage"
+  >,
+): Array<[string, RibbonDetailValue]> {
   return [
-    ["Alt", button.alt ?? button.altLocId],
-    ["Tool tip title", button.toolTipTitle ?? button.toolTipTitleLocId],
-    ["Tool tip description", button.toolTipDescription ?? button.toolTipDescriptionLocId],
-    ["Image 16", button.image16x16?.webResourceUniqueName],
-    ["Image 32", button.image32x32?.webResourceUniqueName],
-    ["Modern image", button.modernImage?.webResourceUniqueName],
+    ["Alt", control.alt ?? control.altLocId],
+    ["Tool tip title", control.toolTipTitle ?? control.toolTipTitleLocId],
+    ["Tool tip description", control.toolTipDescription ?? control.toolTipDescriptionLocId],
+    ["Image 16", control.image16x16?.webResourceUniqueName],
+    ["Image 32", control.image32x32?.webResourceUniqueName],
+    ["Modern image", control.modernImage?.webResourceUniqueName],
   ];
-}
-
-function commandUiId(commandUI: NonNullable<CustomAction["commandUI"]>): string {
-  return commandUI.kind === "Unknown" ? commandUI.name : commandUI.id;
-}
-
-function commandUiSequence(commandUI: NonNullable<CustomAction["commandUI"]>): number | undefined {
-  return commandUI.kind === "Unknown" ? undefined : commandUI.sequence;
 }
 
 function hideActionNode(document: RibbonDocument, action: HideAction): RibbonItemNode {

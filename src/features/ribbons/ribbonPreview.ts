@@ -1,7 +1,23 @@
-import { ButtonNode, CustomAction, HideAction, LocLabel, RibbonScope, RibbonView } from "./models";
+import {
+  ButtonNode,
+  CustomAction,
+  HideAction,
+  LocLabel,
+  RibbonCommandUINode,
+  RibbonScope,
+  RibbonView,
+} from "./models";
+import { ribbonControlChildren, ribbonControlCommand, ribbonControlId } from "./ribbonControlTree";
 import { listOobRibbonCommands, listOobRibbonLocations } from "./oobCatalog";
 
-export type RibbonPreviewItemKind = "Button" | "Group" | "Tab" | "MenuSection" | "Unknown";
+export type RibbonPreviewItemKind =
+  | "Button"
+  | "SplitButton"
+  | "Flyout"
+  | "Group"
+  | "Tab"
+  | "MenuSection"
+  | "Unknown";
 export type RibbonPreviewItemSource = "oob" | "custom";
 
 export interface RibbonPreviewItem {
@@ -15,6 +31,7 @@ export interface RibbonPreviewItem {
   tooltip?: string;
   imageName?: string;
   sequence?: number;
+  children?: RibbonPreviewItem[];
 }
 
 export interface RibbonPreviewGroup {
@@ -135,56 +152,78 @@ function groupSequence(sequence: number | undefined): number {
 function customItem(action: CustomAction, locLabels: LocLabel[]): RibbonPreviewItem {
   const ui = action.commandUI;
   const sequence = action.sequence ?? (ui && "sequence" in ui ? ui.sequence : undefined);
-  const base = { source: "custom" as const, hidden: false, sequence };
 
-  if (ui?.kind === "Button") {
+  if (!ui) {
+    return {
+      source: "custom",
+      hidden: false,
+      sequence,
+      id: action.id,
+      label: cleanLabel(action.id || "(custom action)"),
+      kind: "Unknown",
+    };
+  }
+
+  return commandUiPreviewItem(ui, locLabels, action.id, sequence);
+}
+
+function commandUiPreviewItem(
+  ui: RibbonCommandUINode,
+  locLabels: LocLabel[],
+  fallbackId: string,
+  sequence?: number,
+): RibbonPreviewItem {
+  const base = { source: "custom" as const, hidden: false, sequence };
+  const children = ribbonControlChildren(ui).map((child) =>
+    commandUiPreviewItem(
+      child,
+      locLabels,
+      fallbackId,
+      child.kind === "Unknown" ? undefined : child.sequence,
+    ),
+  );
+
+  if (ui.kind === "Button" || ui.kind === "SplitButton" || ui.kind === "Flyout") {
     return {
       ...base,
-      id: ui.id || action.id,
-      label: cleanLabel(buttonLabel(ui, locLabels) ?? ui.command ?? ui.id ?? action.id),
-      kind: "Button",
+      id: ui.id || fallbackId,
+      label: cleanLabel(labeledControlLabel(ui, locLabels) ?? ui.command ?? ui.id ?? fallbackId),
+      kind: ui.kind,
       commandId: ui.command || undefined,
-      tooltip: buttonTooltip(ui, locLabels),
+      tooltip: labeledControlTooltip(ui, locLabels),
       imageName:
         ui.modernImage?.webResourceUniqueName ??
         ui.image16x16?.webResourceUniqueName ??
         ui.image32x32?.webResourceUniqueName,
+      children,
     };
   }
 
-  if (ui?.kind === "Group") {
+  if (ui.kind === "Group" || ui.kind === "Tab") {
     return {
       ...base,
-      id: ui.id || action.id,
-      label: cleanLabel(ui.title || ui.id || action.id),
-      kind: "Group",
-      commandId: ui.command || undefined,
+      id: ui.id || fallbackId,
+      label: cleanLabel(ui.title || ui.id || fallbackId),
+      kind: ui.kind,
+      commandId: ribbonControlCommand(ui),
+      children,
     };
   }
 
-  if (ui?.kind === "Tab") {
+  if (ui.kind === "MenuSection") {
     return {
       ...base,
-      id: ui.id || action.id,
-      label: cleanLabel(ui.title || ui.id || action.id),
-      kind: "Tab",
-      commandId: ui.command || undefined,
-    };
-  }
-
-  if (ui?.kind === "MenuSection") {
-    return {
-      ...base,
-      id: ui.id || action.id,
-      label: cleanLabel(ui.id || action.id),
+      id: ui.id || fallbackId,
+      label: cleanLabel(ui.id || fallbackId),
       kind: "MenuSection",
+      children,
     };
   }
 
   return {
     ...base,
-    id: action.id,
-    label: cleanLabel(action.id || "(custom action)"),
+    id: fallbackId,
+    label: cleanLabel(ribbonControlId(ui) || fallbackId || "(custom action)"),
     kind: "Unknown",
   };
 }
@@ -193,7 +232,7 @@ function applyHide(groups: Map<string, RibbonPreviewGroup>, hide: HideAction): v
   const targets = [hide.hideActionId, hide.location].filter(Boolean);
   let matched = false;
   for (const group of groups.values()) {
-    for (const item of group.items) {
+    for (const item of group.items.flatMap(flattenPreviewItem)) {
       if (targets.includes(item.id) || (item.controlId && targets.includes(item.controlId))) {
         item.hidden = true;
         matched = true;
@@ -226,19 +265,29 @@ function applyHide(groups: Map<string, RibbonPreviewGroup>, hide: HideAction): v
   });
 }
 
-function buttonLabel(button: ButtonNode, locLabels: LocLabel[]): string | undefined {
-  if (button.labelText) {
-    return button.labelText;
-  }
-  return button.labelLocId ? resolveLocLabel(button.labelLocId, locLabels) : undefined;
+function flattenPreviewItem(item: RibbonPreviewItem): RibbonPreviewItem[] {
+  return [item, ...(item.children ?? []).flatMap(flattenPreviewItem)];
 }
 
-function buttonTooltip(button: ButtonNode, locLabels: LocLabel[]): string | undefined {
-  if (button.toolTipTitle) {
-    return button.toolTipTitle;
+function labeledControlLabel(
+  control: Pick<ButtonNode, "labelText" | "labelLocId">,
+  locLabels: LocLabel[],
+): string | undefined {
+  if (control.labelText) {
+    return control.labelText;
   }
-  return button.toolTipTitleLocId
-    ? resolveLocLabel(button.toolTipTitleLocId, locLabels)
+  return control.labelLocId ? resolveLocLabel(control.labelLocId, locLabels) : undefined;
+}
+
+function labeledControlTooltip(
+  control: Pick<ButtonNode, "toolTipTitle" | "toolTipTitleLocId">,
+  locLabels: LocLabel[],
+): string | undefined {
+  if (control.toolTipTitle) {
+    return control.toolTipTitle;
+  }
+  return control.toolTipTitleLocId
+    ? resolveLocLabel(control.toolTipTitleLocId, locLabels)
     : undefined;
 }
 

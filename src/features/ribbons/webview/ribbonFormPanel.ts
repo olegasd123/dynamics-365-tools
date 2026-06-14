@@ -222,7 +222,7 @@ function actionsForNode(node: RibbonExplorerNode): PanelAction[] {
 
 function ribbonAddActions(): PanelAction[] {
   return [
-    { command: "dynamics365Tools.ribbons.addCustomButton", label: "Add Button" },
+    { command: "dynamics365Tools.ribbons.addSmartButton", label: "Add Item" },
     { command: "dynamics365Tools.ribbons.hideOobButton", label: "Hide OOB" },
     { command: "dynamics365Tools.ribbons.hideAndStubOobButtons", label: "Hide + Stub" },
     { command: "dynamics365Tools.ribbons.overrideOobCommand", label: "Override OOB" },
@@ -236,8 +236,9 @@ function ribbonAddActions(): PanelAction[] {
 function sectionActions(node: RibbonSectionNode): PanelAction[] {
   switch (node.kind) {
     case "customActions":
+      return [{ command: "dynamics365Tools.ribbons.addSmartButton", label: "Add Item" }];
     case "hideActions":
-      return [];
+      return [{ command: "dynamics365Tools.ribbons.addHideOobButton", label: "Hide OOB" }];
     case "commandDefinitions":
       return [
         { command: "dynamics365Tools.ribbons.addCommandDefinition", label: "Add Command" },

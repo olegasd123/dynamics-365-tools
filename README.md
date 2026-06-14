@@ -250,11 +250,13 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 **Preview**
 
-- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar: the standard out-of-the-box buttons come from a built-in catalog, your custom buttons are highlighted and slotted in at their sequence, and hidden buttons are struck through. The action is on the view and document items (inline icon and right-click menu) and on the details panel.
+- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar. Standard buttons come from a built-in catalog. Custom buttons are highlighted and placed by sequence. Hidden buttons are struck through. Split buttons and flyouts show their child menu items. The action is on the view and document items and on the details panel.
 
 **Edit buttons**
 
 - `Add Custom Button` adds your own button to a ribbon.
+- `Add Custom Group`, `Add Custom Menu Section`, `Add Custom Flyout`, and `Add Custom Split Button` add more control types.
+- `Add Smart Button` creates a simple ready-to-edit button from a template: Quick JS, Open Dialog, Run Webhook, Run Report, or Run Workflow.
 - `Hide OOB Button` hides an out-of-the-box button.
 - The ribbon view `...` button opens more actions, such as `Hide OOB Buttons and Create Stubs` and `Reorder OOB Buttons`.
 
@@ -265,6 +267,7 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 - `Add Enable Rule` / `Add Display Rule` create new rules. `Add Enable Rule Reference` / `Add Display Rule Reference` link a command to an existing rule. `Add Rule Step` adds a step inside a rule.
 - `Add Loc Label` and `Add Loc Label Language` manage localized labels.
 - `Move Ribbon Item Up` / `Down`, `Edit Ribbon Item`, and `Delete Ribbon Item` work on any node in the tree.
+- The ribbon validator warns about common problems, like missing commands, missing labels, empty dropdowns, and bad custom action locations.
 
 **Built-in rules**
 

@@ -7,6 +7,7 @@ import {
   createCommandActionPatch,
   createCommandActionReplacePatch,
   createCommandRuleRefPatch,
+  createCustomControlPatches,
   createCustomButtonReplacePatch,
   createCustomButtonPatches,
   createDeleteNodePatch,
@@ -20,10 +21,12 @@ import {
   createNodeAttributeValuePatch,
   createOobButtonReorderPatches,
   createOobStubReplacementPatches,
+  createRibbonControlChildPatches,
   createRuleChildStepPatch,
   createRuleStepReplacePatch,
   createSwapNodePatches,
 } from "../ribbonEditPatches";
+import { buildSmartButtonInput } from "../ribbonSmartButtons";
 
 test("creates a custom button with command action and label", () => {
   const source = `<RibbonDiffXml>
@@ -188,6 +191,73 @@ test("adds custom button text metadata as loc labels", () => {
   assert.strictEqual(updatedDocument.views[0].locLabels.length, 4);
 });
 
+test("creates a smart button with command action and editable labels", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomButtonPatches(
+      document,
+      buildSmartButtonInput(document, "Form", {
+        label: "Open dialog",
+        location: "Mscrm.Form.account.MainTab.Actions.Controls._children",
+        sequence: 20,
+        action: {
+          kind: "JavaScriptFunction",
+          library: "new_/scripts/ribbon.js",
+          functionName: "openDialog",
+          parameters: [
+            { kind: "Crm", value: "PrimaryControl" },
+            { kind: "String", name: "pageName", value: "new_accountdialog" },
+          ],
+        },
+      }),
+    ),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const form = updatedDocument.views[0];
+  const button = form.customActions[0].commandUI;
+
+  assert.strictEqual(button?.kind, "Button");
+  assert.strictEqual(
+    button?.kind === "Button" ? button.command : undefined,
+    form.commandDefinitions[0].id,
+  );
+  assert.strictEqual(
+    form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
+      ? form.commandDefinitions[0].actions[0].functionName
+      : undefined,
+    "openDialog",
+  );
+  assert.deepStrictEqual(
+    form.commandDefinitions[0].actions[0].kind === "JavaScriptFunction"
+      ? form.commandDefinitions[0].actions[0].parameters
+      : [],
+    [
+      { kind: "Crm", value: "PrimaryControl" },
+      { kind: "String", name: "pageName", value: "new_accountdialog" },
+    ],
+  );
+  assert.strictEqual(form.locLabels.length, 3);
+  assert.match(updated, /TemplateAlias="o1"/);
+  assert.match(updated, /LabelText="\$LocLabels:d365tools\.account\.Form\.Open\.dialog\.Label"/);
+});
+
 test("adds a custom button to existing self-closing sections", () => {
   const source = `<RibbonDiffXml>
   <CustomActions />
@@ -219,6 +289,234 @@ test("adds a custom button to existing self-closing sections", () => {
   assert.doesNotMatch(updated, /<CustomActions \/>/);
   assert.doesNotMatch(updated, /<CommandDefinitions \/>/);
   assert.match(updated, /<Url Address="https:\/\/contoso\.example\/help" \/>/);
+});
+
+test("creates a custom group with child controls", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomControlPatches(document, {
+      customActionId: "d365tools.account.Form.Group.CustomAction",
+      location: "Mscrm.Form.account.MainTab.Groups._children",
+      sequence: 30,
+      control: {
+        kind: "Group",
+        id: "d365tools.account.Form.Group",
+        title: "$LocLabels:d365tools.account.Form.Group.Label",
+        sequence: 30,
+        children: [
+          {
+            kind: "Button",
+            id: "d365tools.account.Form.Group.Button",
+            commandId: "d365tools.account.Form.Group.Button.Command",
+            labelText: "Group button",
+            sequence: 10,
+          },
+        ],
+      },
+      commandDefinitions: [
+        {
+          id: "d365tools.account.Form.Group.Button.Command",
+          action: { kind: "Url", address: "https://contoso.example/group" },
+        },
+      ],
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const group = updatedDocument.views[0].customActions[0].commandUI;
+  const child = group?.kind === "Group" ? group.children?.[0] : undefined;
+
+  assert.strictEqual(group?.kind, "Group");
+  assert.strictEqual(
+    group?.kind === "Group" ? group.title : undefined,
+    "$LocLabels:d365tools.account.Form.Group.Label",
+  );
+  assert.strictEqual(child?.kind, "Button");
+  assert.strictEqual(
+    child?.kind === "Button" ? child.command : undefined,
+    "d365tools.account.Form.Group.Button.Command",
+  );
+  assert.match(updated, /<Group Id="d365tools\.account\.Form\.Group"/);
+  assert.match(updated, /<Controls Id="d365tools\.account\.Form\.Group\.Controls">/);
+});
+
+test("creates split button and flyout XML that can be read again", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createCustomControlPatches(document, {
+      customActionId: "d365tools.account.Form.More.CustomAction",
+      location: "Mscrm.Form.account.MainTab.Actions.Controls._children",
+      sequence: 40,
+      control: {
+        kind: "SplitButton",
+        id: "d365tools.account.Form.More.SplitButton",
+        commandId: "d365tools.account.Form.More.Command",
+        labelLocId: "d365tools.account.Form.More.Label",
+        sequence: 40,
+        children: [
+          {
+            kind: "MenuSection",
+            id: "d365tools.account.Form.More.Section",
+            displayMode: "Menu16",
+            sequence: 10,
+            children: [
+              {
+                kind: "Button",
+                id: "d365tools.account.Form.More.Child.Button",
+                commandId: "d365tools.account.Form.More.Child.Command",
+                labelText: "Child action",
+                sequence: 10,
+              },
+              {
+                kind: "Flyout",
+                id: "d365tools.account.Form.More.Child.Flyout",
+                commandId: "d365tools.account.Form.More.Flyout.Command",
+                labelText: "More child actions",
+                sequence: 20,
+                children: [
+                  {
+                    kind: "Button",
+                    id: "d365tools.account.Form.More.Nested.Button",
+                    commandId: "d365tools.account.Form.More.Nested.Command",
+                    labelText: "Nested action",
+                    sequence: 10,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      commandDefinitions: [
+        { id: "d365tools.account.Form.More.Command" },
+        { id: "d365tools.account.Form.More.Child.Command" },
+        { id: "d365tools.account.Form.More.Flyout.Command" },
+        { id: "d365tools.account.Form.More.Nested.Command" },
+      ],
+      locLabels: [
+        {
+          id: "d365tools.account.Form.More.Label",
+          languageCode: 1033,
+          description: "More",
+        },
+      ],
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const splitButton = updatedDocument.views[0].customActions[0].commandUI;
+  const menuSection = splitButton?.kind === "SplitButton" ? splitButton.children?.[0] : undefined;
+  const flyout = menuSection?.kind === "MenuSection" ? menuSection.children?.[1] : undefined;
+  const nestedSection = flyout?.kind === "Flyout" ? flyout.children?.[0] : undefined;
+  const nestedButton =
+    nestedSection?.kind === "MenuSection" ? nestedSection.children?.[0] : undefined;
+
+  assert.strictEqual(splitButton?.kind, "SplitButton");
+  assert.strictEqual(
+    splitButton?.kind === "SplitButton" ? splitButton.labelLocId : undefined,
+    "d365tools.account.Form.More.Label",
+  );
+  assert.strictEqual(menuSection?.kind, "MenuSection");
+  assert.strictEqual(flyout?.kind, "Flyout");
+  assert.strictEqual(nestedSection?.kind, "MenuSection");
+  assert.strictEqual(nestedButton?.kind, "Button");
+  assert.strictEqual(
+    nestedButton?.kind === "Button" ? nestedButton.command : undefined,
+    "d365tools.account.Form.More.Nested.Command",
+  );
+  assert.match(updated, /<SplitButton Id="d365tools\.account\.Form\.More\.SplitButton"/);
+  assert.match(updated, /<FlyoutAnchor Id="d365tools\.account\.Form\.More\.Child\.Flyout"/);
+  assert.match(
+    updated,
+    /<MenuSection Id="d365tools\.account\.Form\.More\.Child\.Flyout\.MenuSection"/,
+  );
+});
+
+test("adds a child button to an empty dropdown control", () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="d365tools.account.Form.More.CustomAction" Location="Mscrm.Form.account.MainTab.Actions.Controls._children">
+      <CommandUIDefinition>
+        <FlyoutAnchor Id="d365tools.account.Form.More.Flyout" LabelText="More" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const flyout = document.views[0].customActions[0].commandUI;
+  assert.strictEqual(flyout?.kind, "Flyout");
+
+  const updated = applyRibbonPatchSequence(
+    source,
+    createRibbonControlChildPatches(document, {
+      parentRange: flyout.range,
+      control: {
+        kind: "Button",
+        id: "d365tools.account.Form.More.Child.Button",
+        commandId: "d365tools.account.Form.More.Child.Command",
+        labelText: "Child action",
+        sequence: 10,
+      },
+      commandDefinitions: [
+        {
+          id: "d365tools.account.Form.More.Child.Command",
+          action: { kind: "Url", address: "https://contoso.example/child" },
+        },
+      ],
+    }),
+  );
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const updatedFlyout = updatedDocument.views[0].customActions[0].commandUI;
+  const section = updatedFlyout?.kind === "Flyout" ? updatedFlyout.children?.[0] : undefined;
+  const button = section?.kind === "MenuSection" ? section.children?.[0] : undefined;
+
+  assert.strictEqual(updatedFlyout?.kind, "Flyout");
+  assert.strictEqual(section?.kind, "MenuSection");
+  assert.strictEqual(button?.kind, "Button");
+  assert.match(updated, /<Menu Id="d365tools\.account\.Form\.More\.Flyout\.Menu">/);
+  assert.match(updated, /<MenuSection Id="d365tools\.account\.Form\.More\.Flyout\.MenuSection"/);
+  assert.match(updated, /<CommandDefinition Id="d365tools\.account\.Form\.More\.Child\.Command">/);
 });
 
 test("creates a hide action inside an existing CustomActions section", () => {

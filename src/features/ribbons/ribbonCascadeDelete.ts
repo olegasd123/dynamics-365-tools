@@ -9,6 +9,7 @@ import {
   TextRange,
   XmlElementRange,
 } from "./models";
+import { collectRibbonCommandIds, collectRibbonLocLabelIds } from "./ribbonControlTree";
 import { createDeleteNodePatch } from "./ribbonEditPatches";
 import { scanXmlElements } from "./ribbonXmlReader";
 
@@ -372,25 +373,11 @@ function locLabelIdFromAttribute(name: string, value: string): string | undefine
 }
 
 function commandIdFromCustomAction(action: CustomAction): string | undefined {
-  const commandUI = action.commandUI;
-  if (!commandUI || commandUI.kind === "MenuSection" || commandUI.kind === "Unknown") {
-    return undefined;
-  }
-
-  return commandUI.command;
+  return action.commandUI ? collectRibbonCommandIds(action.commandUI)[0] : undefined;
 }
 
 function locLabelIdsFromCustomAction(action: CustomAction): string[] {
-  if (action.commandUI?.kind !== "Button") {
-    return [];
-  }
-
-  return [
-    action.commandUI.labelLocId,
-    action.commandUI.altLocId,
-    action.commandUI.toolTipTitleLocId,
-    action.commandUI.toolTipDescriptionLocId,
-  ].filter(isDefined);
+  return action.commandUI ? collectRibbonLocLabelIds(action.commandUI) : [];
 }
 
 function idsForKind(

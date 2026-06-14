@@ -10,7 +10,15 @@ import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
 import { DataverseClient } from "@features/dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
-import { addCustomRibbonButton, pickLocation } from "../commands/ribbonButtonCommands";
+import {
+  addCustomRibbonButton,
+  addCustomRibbonFlyout,
+  addCustomRibbonGroup,
+  addCustomRibbonMenuSection,
+  addCustomRibbonSplitButton,
+  addSmartRibbonButton,
+  pickLocation,
+} from "../commands/ribbonButtonCommands";
 import { addRibbonCommandAction } from "../commands/ribbonCommandDefinitionCommands";
 import { addRibbonLocLabelTitle } from "../commands/ribbonLabelCommands";
 import {
@@ -259,6 +267,620 @@ test("prefills custom button text metadata from the label", async () => {
     updated,
     /<LocLabel Id="d365tools\.application\.[^"]+\.Validate\.and\.save\.ToolTipDescription">/,
   );
+});
+
+test("adds a quick JS smart ribbon button from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+  <CommandDefinitions />
+  <LocLabels />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+
+  (vscode.window as any).showQuickPick = async (
+    items: any[],
+    options: { placeHolder?: string },
+  ) => {
+    switch (options.placeHolder) {
+      case "Ribbon item type":
+        return items.find((item) => item.label === "Smart Button");
+      case "Smart button template":
+        return items.find((item) => item.label === "Quick JS");
+      case "Ribbon location":
+        return items[0];
+      case "JavaScript web resource":
+        return items.find((item) => item.label === "Type schema name manually");
+      case "JavaScript function name":
+        return items.find((item) => item.label === "Type function name") ?? items[0];
+      case "CRM parameters":
+        return [];
+      case "Typed parameters":
+        return items.find((item) => item.label === "Done");
+      default:
+        return undefined;
+    }
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Button label":
+        return "Run account script";
+      case "Sequence":
+        return options.value ?? "10";
+      case "JavaScript web resource schema name":
+        return "new_/scripts/account.js";
+      case "JavaScript function name":
+        return "runAccountScript";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addSmartRibbonButton(
+      legacyContext({
+        bindings: {
+          listBindings: async () => ({ bindings: [] }),
+        },
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const form = updatedDocument.views[0];
+  const button = form.customActions[0].commandUI;
+  const action = form.commandDefinitions[0].actions[0];
+
+  assert.strictEqual(button?.kind, "Button");
+  assert.strictEqual(action.kind, "JavaScriptFunction");
+  assert.strictEqual(
+    action.kind === "JavaScriptFunction" ? action.functionName : undefined,
+    "runAccountScript",
+  );
+  assert.match(updated, /Library="\$webresource:new_\/scripts\/account\.js"/);
+  assert.match(
+    updated,
+    /LabelText="\$LocLabels:d365tools\.account\.Form\.Run\.account\.script\.Label"/,
+  );
+  assert.strictEqual(form.locLabels.length, 3);
+});
+
+test("adds a custom ribbon group from the unified add command", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Ribbon item type") {
+      return items.find((item) => item.label === "Group");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Group title":
+        return "Custom actions";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Group location":
+        return options.value ?? "Mscrm.Form.account.MainTab.Groups._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addSmartRibbonButton(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const group = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(group?.kind, "Group");
+  assert.strictEqual(group?.kind === "Group" ? group.title : undefined, "Custom actions");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Groups\._children"/);
+});
+
+test("adds a custom ribbon group from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Group title":
+        return "Custom actions";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Group location":
+        return options.value ?? "Mscrm.Form.account.MainTab.Groups._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonGroup(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const group = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(group?.kind, "Group");
+  assert.strictEqual(group?.kind === "Group" ? group.title : undefined, "Custom actions");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Groups\._children"/);
+});
+
+test("adds a custom ribbon menu section from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Menu section name":
+        return "More actions";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Menu section location":
+        return "Mscrm.Form.account.MainTab.Actions.MenuSections._children";
+      default:
+        return undefined;
+    }
+  };
+  (vscode.window as any).showQuickPick = async (
+    items: string[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Menu section display mode") {
+      return items[0];
+    }
+
+    return undefined;
+  };
+
+  try {
+    await addCustomRibbonMenuSection(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const menuSection = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(menuSection?.kind, "MenuSection");
+  assert.strictEqual(
+    menuSection?.kind === "MenuSection" ? menuSection.displayMode : undefined,
+    "Menu16",
+  );
+  assert.match(
+    updated,
+    /Location="Mscrm\.Form\.account\.MainTab\.Actions\.MenuSections\._children"/,
+  );
+});
+
+test("adds a custom ribbon flyout from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Flyout label":
+        return "More actions";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Flyout location":
+        return "Mscrm.Form.account.MainTab.Actions.Controls._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonFlyout(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const flyout = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(flyout?.kind, "Flyout");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Actions\.Controls\._children"/);
+  assert.match(updated, /<FlyoutAnchor Id="d365tools\.account\.Form\.More\.actions\.Flyout"/);
+  assert.match(updated, /<LocLabel Id="d365tools\.account\.Form\.More\.actions\.Flyout\.Label">/);
+});
+
+test("adds a custom ribbon split button from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions />
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Split button label":
+        return "Main action";
+      case "Sequence":
+        return options.value ?? "10";
+      case "Split button location":
+        return "Mscrm.Form.account.MainTab.Actions.Controls._children";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonSplitButton(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonViewNode(document, document.views[0]),
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const splitButton = updatedDocument.views[0].customActions[0].commandUI;
+
+  assert.strictEqual(splitButton?.kind, "SplitButton");
+  assert.match(updated, /Location="Mscrm\.Form\.account\.MainTab\.Actions\.Controls\._children"/);
+  assert.match(updated, /<SplitButton Id="d365tools\.account\.Form\.Main\.action\.SplitButton"/);
+  assert.match(
+    updated,
+    /<LocLabel Id="d365tools\.account\.Form\.Main\.action\.SplitButton\.Label">/,
+  );
+});
+
+test("adds a child button to a selected flyout from prompts", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.More.Action" Location="Mscrm.Form.account.MainTab.Actions.Controls._children">
+      <CommandUIDefinition>
+        <FlyoutAnchor Id="new.account.More.Flyout" LabelText="More" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const flyout = document.views[0].customActions[0].commandUI;
+  assert.strictEqual(flyout?.kind, "Flyout");
+  let patches: RibbonPatch[] = [];
+
+  const originalShowQuickPick = vscode.window.showQuickPick;
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showQuickPick = async (
+    items: vscode.QuickPickItem[],
+    options: { placeHolder?: string },
+  ) => {
+    if (options.placeHolder === "Button action") {
+      return items.find((item) => item.label === "URL");
+    }
+
+    if (
+      options.placeHolder === "Image 16 web resource" ||
+      options.placeHolder === "Image 32 web resource" ||
+      options.placeHolder === "Modern image web resource"
+    ) {
+      return items.find((item) => item.label === "Fill manually");
+    }
+
+    return undefined;
+  };
+  (vscode.window as any).showInputBox = async (options: { prompt?: string; value?: string }) => {
+    switch (options.prompt) {
+      case "Button label":
+        return "Child action";
+      case "Alt":
+      case "Tool tip title":
+      case "Tool tip description":
+      case "Sequence":
+        return options.value ?? "";
+      case "Image 16 web resource":
+      case "Image 32 web resource":
+      case "Modern image web resource":
+        return "";
+      case "URL":
+        return "https://contoso.example/child";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await addCustomRibbonButton(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      new RibbonItemNode(
+        "Flyout: new.account.More.Flyout",
+        undefined,
+        "d365RibbonFlyout",
+        "list-tree",
+        [],
+        [],
+        { document, range: flyout.range },
+      ),
+    );
+  } finally {
+    (vscode.window as any).showQuickPick = originalShowQuickPick;
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const updatedFlyout = updatedDocument.views[0].customActions[0].commandUI;
+  const section = updatedFlyout?.kind === "Flyout" ? updatedFlyout.children?.[0] : undefined;
+  const button = section?.kind === "MenuSection" ? section.children?.[0] : undefined;
+
+  assert.strictEqual(button?.kind, "Button");
+  assert.match(updated, /<MenuSection Id="new\.account\.More\.Flyout\.MenuSection"/);
+  assert.match(updated, /<Url Address="https:\/\/contoso\.example\/child" \/>/);
+});
+
+test("edits a custom group without rebuilding child controls", async () => {
+  const source = `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="old.Action" Location="Mscrm.Form.account.MainTab.Groups._children" Sequence="10">
+      <CommandUIDefinition>
+        <Group Id="old.Group" Title="Old group" Sequence="10">
+          <Controls Id="old.Group.Controls">
+            <Button Id="old.Button" Command="old.Command" LabelText="Keep child" />
+          </Controls>
+        </Group>
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`;
+  const [document] = readRibbonDocuments(source, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const action = document.views[0].customActions[0];
+  const node = new RibbonItemNode(
+    "CustomAction: old.Action",
+    undefined,
+    "d365RibbonCustomAction",
+    "symbol-event",
+    [],
+    [],
+    { document, range: action.range },
+  );
+  let patches: RibbonPatch[] = [];
+
+  const originalShowInputBox = vscode.window.showInputBox;
+  (vscode.window as any).showInputBox = async (options: { prompt?: string }) => {
+    switch (options.prompt) {
+      case "Custom action id":
+        return "new.Action";
+      case "Location":
+        return "Mscrm.Form.account.MainTab.Groups._children";
+      case "Group id":
+        return "new.Group";
+      case "Group title":
+        return "New group";
+      case "Sequence":
+        return "20";
+      default:
+        return undefined;
+    }
+  };
+
+  try {
+    await editRibbonNode(
+      legacyContext({
+        ribbonEditorState: {
+          queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+            patches = queuedPatches;
+          },
+        },
+        ribbonExplorer: {
+          refresh: () => undefined,
+        },
+      } as any),
+      node,
+    );
+  } finally {
+    (vscode.window as any).showInputBox = originalShowInputBox;
+  }
+
+  const updated = applyRibbonPatchSequence(source, patches);
+  const [updatedDocument] = readRibbonDocuments(updated, {
+    sourceId: "source",
+    fileUri: "/tmp/RibbonDiffXml.xml",
+    kind: "Entity",
+    entityLogicalName: "account",
+  });
+  const group = updatedDocument.views[0].customActions[0].commandUI;
+  const child = group?.kind === "Group" ? group.children?.[0] : undefined;
+
+  assert.strictEqual(updatedDocument.views[0].customActions[0].id, "new.Action");
+  assert.strictEqual(group?.kind === "Group" ? group.id : undefined, "new.Group");
+  assert.strictEqual(group?.kind === "Group" ? group.title : undefined, "New group");
+  assert.strictEqual(child?.kind === "Button" ? child.id : undefined, "old.Button");
 });
 
 test("presents OOB ribbon locations with their buttons and sequences", async () => {

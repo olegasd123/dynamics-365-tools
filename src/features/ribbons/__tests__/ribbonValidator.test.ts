@@ -78,6 +78,91 @@ test("allows known OOB button commands without local command definitions", () =>
   assert.ok(!messages.includes("Button references missing CommandDefinition 'Mscrm.SavePrimary'."));
 });
 
+test("reports broken references inside nested dropdown controls", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Action" Location="Mscrm.Form.account.MainTab.Controls._children">
+      <CommandUIDefinition>
+        <SplitButton Id="new.account.Split" LabelText="More">
+          <Menu Id="new.account.Menu">
+            <MenuSection Id="new.account.Section">
+              <Controls Id="new.account.Controls">
+                <Button Id="new.account.Child.Button" Command="new.account.MissingCommand" LabelLocId="new.account.MissingLabel" />
+              </Controls>
+            </MenuSection>
+          </Menu>
+        </SplitButton>
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(
+    messages.includes("Button references missing CommandDefinition 'new.account.MissingCommand'."),
+  );
+  assert.ok(messages.includes("Button references missing LocLabel 'new.account.MissingLabel'."));
+});
+
+test("warns about empty dropdown controls", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Action" Location="Mscrm.Form.account.MainTab.Controls._children">
+      <CommandUIDefinition>
+        <FlyoutAnchor Id="new.account.Empty.Flyout" LabelText="More" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(messages.includes("Flyout should contain at least one child control."));
+});
+
+test("warns about invalid custom action locations", () => {
+  const [document] = readRibbonDocuments(
+    `<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="new.account.Bad.Action" Location="Mscrm.Form.account.MainTab.Save">
+      <CommandUIDefinition>
+        <Button Id="new.account.Bad.Button" Command="new.account.Command" LabelText="Bad" />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="new.account.Custom.Group.Action" Location="Mscrm.Form.account.MainTab.MyGroup.Controls._children">
+      <CommandUIDefinition>
+        <Button Id="new.account.Custom.Group.Button" Command="new.account.Command" LabelText="Good" />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="new.account.Command" />
+  </CommandDefinitions>
+</RibbonDiffXml>`,
+    { kind: "Entity", entityLogicalName: "account" },
+  );
+
+  const messages = validateRibbonDocument(document).map((issue) => issue.message);
+
+  assert.ok(
+    messages.includes(
+      "CustomAction location 'Mscrm.Form.account.MainTab.Save' does not look like a ribbon container location.",
+    ),
+  );
+  assert.ok(
+    !messages.includes(
+      "CustomAction location 'Mscrm.Form.account.MainTab.MyGroup.Controls._children' does not look like a ribbon container location.",
+    ),
+  );
+});
+
 test("warns about unknown CRM parameters", () => {
   const [document] = readRibbonDocuments(
     `<RibbonDiffXml>

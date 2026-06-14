@@ -988,8 +988,20 @@ async function editCustomAction(
   document: RibbonDocument,
   action: CustomAction,
 ): Promise<void> {
+  if (action.commandUI?.kind === "Group") {
+    await editCustomGroupAction(ctx, document, action);
+    return;
+  }
+
+  if (action.commandUI?.kind === "MenuSection") {
+    await editCustomMenuSectionAction(ctx, document, action);
+    return;
+  }
+
   if (action.commandUI?.kind !== "Button") {
-    await ctx.core.notifications.warning("Only Button custom actions can be edited.");
+    await ctx.core.notifications.warning(
+      "Only Button, Group, and Menu Section custom actions can be edited.",
+    );
     return;
   }
 
@@ -1174,6 +1186,151 @@ async function editCustomAction(
     ...createLocLabelsPatches(document, newLocLabels),
   ]);
   ctx.ribbon.editorState.queuePatches(document, patches);
+  ctx.ribbon.explorer.refresh();
+}
+
+async function editCustomGroupAction(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  action: CustomAction,
+): Promise<void> {
+  if (action.commandUI?.kind !== "Group") {
+    return;
+  }
+
+  const customActionId = await promptRequired("Custom action id", action.id);
+  if (customActionId === undefined) {
+    return;
+  }
+
+  const location = await promptRequired("Location", action.location);
+  if (location === undefined) {
+    return;
+  }
+
+  const groupId = await promptRequired("Group id", action.commandUI.id);
+  if (groupId === undefined) {
+    return;
+  }
+
+  const title = await promptRequired("Group title", action.commandUI.title ?? "");
+  if (title === undefined) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: action.sequence === undefined ? "" : String(action.sequence),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const sequence = sequenceText.trim();
+  const patches: RibbonPatch[] = [
+    createNodeAttributeValuePatch(document.sourceText, action.range, "Id", customActionId.trim()),
+    createNodeAttributeValuePatch(document.sourceText, action.range, "Location", location.trim()),
+    createNodeAttributeValuePatch(
+      document.sourceText,
+      action.commandUI.range,
+      "Id",
+      groupId.trim(),
+    ),
+    createNodeAttributeValuePatch(
+      document.sourceText,
+      action.commandUI.range,
+      "Title",
+      title.trim(),
+    ),
+  ];
+  if (sequence) {
+    patches.push(
+      createNodeAttributeValuePatch(document.sourceText, action.range, "Sequence", sequence),
+      createNodeAttributeValuePatch(
+        document.sourceText,
+        action.commandUI.range,
+        "Sequence",
+        sequence,
+      ),
+    );
+  }
+
+  ctx.ribbon.editorState.queuePatches(document, sortRibbonPatchesForApply(patches));
+  ctx.ribbon.explorer.refresh();
+}
+
+async function editCustomMenuSectionAction(
+  ctx: CommandContext,
+  document: RibbonDocument,
+  action: CustomAction,
+): Promise<void> {
+  if (action.commandUI?.kind !== "MenuSection") {
+    return;
+  }
+
+  const customActionId = await promptRequired("Custom action id", action.id);
+  if (customActionId === undefined) {
+    return;
+  }
+
+  const location = await promptRequired("Location", action.location);
+  if (location === undefined) {
+    return;
+  }
+
+  const menuSectionId = await promptRequired("Menu section id", action.commandUI.id);
+  if (menuSectionId === undefined) {
+    return;
+  }
+
+  const displayMode = await promptRequired(
+    "Display mode",
+    action.commandUI.displayMode ?? "Menu16",
+  );
+  if (displayMode === undefined) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: action.sequence === undefined ? "" : String(action.sequence),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
+    return;
+  }
+
+  const sequence = sequenceText.trim();
+  const patches: RibbonPatch[] = [
+    createNodeAttributeValuePatch(document.sourceText, action.range, "Id", customActionId.trim()),
+    createNodeAttributeValuePatch(document.sourceText, action.range, "Location", location.trim()),
+    createNodeAttributeValuePatch(
+      document.sourceText,
+      action.commandUI.range,
+      "Id",
+      menuSectionId.trim(),
+    ),
+    createNodeAttributeValuePatch(
+      document.sourceText,
+      action.commandUI.range,
+      "DisplayMode",
+      displayMode.trim(),
+    ),
+  ];
+  if (sequence) {
+    patches.push(
+      createNodeAttributeValuePatch(document.sourceText, action.range, "Sequence", sequence),
+      createNodeAttributeValuePatch(
+        document.sourceText,
+        action.commandUI.range,
+        "Sequence",
+        sequence,
+      ),
+    );
+  }
+
+  ctx.ribbon.editorState.queuePatches(document, sortRibbonPatchesForApply(patches));
   ctx.ribbon.explorer.refresh();
 }
 
