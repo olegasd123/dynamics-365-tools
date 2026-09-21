@@ -27,6 +27,48 @@ test("getAccessToken silently reuses the session for normal CRM actions", async 
   });
 });
 
+test("getAccessToken prompts once and caches a valid token when no session exists", async () => {
+  const authentication = new FakeAuthentication();
+  const accessToken = createAccessToken(Date.now() + 3_600_000);
+  authentication.sessionResults.push(undefined, {
+    id: "new-session-id",
+    accessToken,
+  });
+  const auth = new AuthService(authentication);
+  const env = {
+    name: "dev",
+    url: "https://example.crm.dynamics.com",
+  };
+
+  assert.strictEqual(await auth.getAccessToken(env), accessToken);
+  assert.strictEqual(await auth.getAccessToken(env), accessToken);
+  assert.deepStrictEqual(
+    authentication.calls.map((call) => call.options),
+    [{ createIfNone: false, silent: true }, { createIfNone: true }],
+  );
+});
+
+test("getAccessToken does not repeat an automatic prompt after it was cancelled", async () => {
+  const authentication = new FakeAuthentication();
+  authentication.sessionResults.push(undefined, undefined, undefined);
+  const auth = new AuthService(authentication);
+  const env = {
+    name: "dev",
+    url: "https://example.crm.dynamics.com",
+  };
+
+  assert.strictEqual(await auth.getAccessToken(env), undefined);
+  assert.strictEqual(await auth.getAccessToken(env), undefined);
+  assert.deepStrictEqual(
+    authentication.calls.map((call) => call.options),
+    [
+      { createIfNone: false, silent: true },
+      { createIfNone: true },
+      { createIfNone: false, silent: true },
+    ],
+  );
+});
+
 test("getAccessToken can prompt when an explicit sign-in needs a session", async () => {
   const authentication = new FakeAuthentication();
   authentication.session = { id: "session-id", accessToken: "token-from-session" };
@@ -148,6 +190,11 @@ test("signOut warns when the current VS Code version cannot remove sessions", as
 
 class FakeAuthentication implements AuthenticationPort {
   session: AuthenticationSession | undefined;
+  readonly sessionResults: Array<AuthenticationSession | undefined> = [];
+  readonly calls: Array<{
+    scopes: readonly string[];
+    options: AuthenticationSessionOptions;
+  }> = [];
   getSessionError: unknown;
   scopes: readonly string[] = [];
   options: AuthenticationSessionOptions | undefined;
@@ -164,8 +211,17 @@ class FakeAuthentication implements AuthenticationPort {
     }
     this.scopes = scopes;
     this.options = options;
-    return this.session;
+    this.calls.push({ scopes, options });
+    return this.sessionResults.length ? this.sessionResults.shift() : this.session;
   }
+}
+
+function createAccessToken(expiresAt: number): string {
+  const payload = Buffer.from(
+    JSON.stringify({ exp: Math.floor(expiresAt / 1000) }),
+    "utf8",
+  ).toString("base64url");
+  return `header.${payload}.signature`;
 }
 
 function createNotificationRecorder(): NotificationPort & {
