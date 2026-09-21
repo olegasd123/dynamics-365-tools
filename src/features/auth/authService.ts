@@ -8,6 +8,7 @@ import { EnvironmentConfig } from "../config/domain/models";
 export interface InteractiveSignInOptions {
   forceNewSession?: boolean;
   clearSessionPreference?: boolean;
+  promptIfNeeded?: boolean;
 }
 
 export class AuthService {
@@ -22,9 +23,14 @@ export class AuthService {
   ): Promise<string | undefined> {
     const scope = this.buildScope(env);
     try {
-      const sessionOptions: AuthenticationSessionOptions = options.forceNewSession
-        ? { forceNewSession: true }
-        : { createIfNone: true };
+      let sessionOptions: AuthenticationSessionOptions;
+      if (options.forceNewSession) {
+        sessionOptions = { forceNewSession: true };
+      } else if (options.promptIfNeeded) {
+        sessionOptions = { createIfNone: true };
+      } else {
+        sessionOptions = { createIfNone: false, silent: true };
+      }
       if (options.clearSessionPreference) {
         sessionOptions.clearSessionPreference = true;
       }

@@ -66,7 +66,10 @@ export async function signInInteractive(ctx: CommandContext): Promise<void> {
 
   await lastSelection.setLastEnvironment(env.name);
 
-  const token = await auth.getAccessToken(env, { clearSessionPreference: true });
+  const token = await auth.getAccessToken(env, {
+    clearSessionPreference: true,
+    promptIfNeeded: true,
+  });
   if (token) {
     await authorizations.save(environmentToProfile(env, "interactive"));
     await notifications.info(`Signed in interactively for ${env.name}.`);

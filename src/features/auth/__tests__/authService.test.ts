@@ -8,7 +8,7 @@ import type {
 import type { NotificationPort } from "@app/ports/notifications";
 import { AuthService } from "../authService";
 
-test("getAccessToken requests scope built from resource when provided", async () => {
+test("getAccessToken silently reuses the session for normal CRM actions", async () => {
   const authentication = new FakeAuthentication();
   authentication.session = { id: "session-id", accessToken: "token-from-session" };
   const auth = new AuthService(authentication);
@@ -21,7 +21,30 @@ test("getAccessToken requests scope built from resource when provided", async ()
 
   assert.strictEqual(token, "token-from-session");
   assert.deepStrictEqual(authentication.scopes, ["https://alt.resource/.default"]);
-  assert.deepStrictEqual(authentication.options, { createIfNone: true });
+  assert.deepStrictEqual(authentication.options, {
+    createIfNone: false,
+    silent: true,
+  });
+});
+
+test("getAccessToken can prompt when an explicit sign-in needs a session", async () => {
+  const authentication = new FakeAuthentication();
+  authentication.session = { id: "session-id", accessToken: "token-from-session" };
+  const auth = new AuthService(authentication);
+
+  const token = await auth.getAccessToken(
+    {
+      name: "dev",
+      url: "https://example.crm.dynamics.com",
+    },
+    { promptIfNeeded: true, clearSessionPreference: true },
+  );
+
+  assert.strictEqual(token, "token-from-session");
+  assert.deepStrictEqual(authentication.options, {
+    createIfNone: true,
+    clearSessionPreference: true,
+  });
 });
 
 test("getAccessToken can force a new interactive session", async () => {
