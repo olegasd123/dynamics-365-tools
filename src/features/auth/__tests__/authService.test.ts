@@ -27,7 +27,7 @@ test("getAccessToken silently reuses the session for normal CRM actions", async 
   });
 });
 
-test("getAccessToken prompts once and caches a valid token when no session exists", async () => {
+test("getAccessToken prompts for a user action and caches a valid token", async () => {
   const authentication = new FakeAuthentication();
   const accessToken = createAccessToken(Date.now() + 3_600_000);
   authentication.sessionResults.push(undefined, {
@@ -40,7 +40,7 @@ test("getAccessToken prompts once and caches a valid token when no session exist
     url: "https://example.crm.dynamics.com",
   };
 
-  assert.strictEqual(await auth.getAccessToken(env), accessToken);
+  assert.strictEqual(await auth.getAccessToken(env, { promptIfNeeded: true }), accessToken);
   assert.strictEqual(await auth.getAccessToken(env), accessToken);
   assert.deepStrictEqual(
     authentication.calls.map((call) => call.options),
@@ -48,9 +48,9 @@ test("getAccessToken prompts once and caches a valid token when no session exist
   );
 });
 
-test("getAccessToken does not repeat an automatic prompt after it was cancelled", async () => {
+test("getAccessToken does not prompt during background access", async () => {
   const authentication = new FakeAuthentication();
-  authentication.sessionResults.push(undefined, undefined, undefined);
+  authentication.sessionResults.push(undefined, undefined);
   const auth = new AuthService(authentication);
   const env = {
     name: "dev",
@@ -63,10 +63,39 @@ test("getAccessToken does not repeat an automatic prompt after it was cancelled"
     authentication.calls.map((call) => call.options),
     [
       { createIfNone: false, silent: true },
-      { createIfNone: true },
       { createIfNone: false, silent: true },
     ],
   );
+});
+
+test("getAccessToken serializes prompts for different environment scopes", async () => {
+  const authentication = new ControlledPromptAuthentication();
+  const auth = new AuthService(authentication);
+
+  const firstToken = auth.getAccessToken(
+    { name: "dev", url: "https://dev.crm.dynamics.com" },
+    { promptIfNeeded: true },
+  );
+  await waitForEventLoop();
+  assert.deepStrictEqual(authentication.promptedScopes, ["https://dev.crm.dynamics.com/.default"]);
+
+  const secondToken = auth.getAccessToken(
+    { name: "int", url: "https://int.crm.dynamics.com" },
+    { promptIfNeeded: true },
+  );
+  await waitForEventLoop();
+  assert.strictEqual(authentication.promptedScopes.length, 1);
+
+  authentication.resolveNext({ id: "dev-session", accessToken: "dev-token" });
+  assert.strictEqual(await firstToken, "dev-token");
+  await waitForEventLoop();
+  assert.deepStrictEqual(authentication.promptedScopes, [
+    "https://dev.crm.dynamics.com/.default",
+    "https://int.crm.dynamics.com/.default",
+  ]);
+
+  authentication.resolveNext({ id: "int-session", accessToken: "int-token" });
+  assert.strictEqual(await secondToken, "int-token");
 });
 
 test("getAccessToken can prompt when an explicit sign-in needs a session", async () => {
@@ -214,6 +243,37 @@ class FakeAuthentication implements AuthenticationPort {
     this.calls.push({ scopes, options });
     return this.sessionResults.length ? this.sessionResults.shift() : this.session;
   }
+}
+
+class ControlledPromptAuthentication implements AuthenticationPort {
+  readonly promptedScopes: string[] = [];
+  private readonly promptResolvers: Array<(session: AuthenticationSession | undefined) => void> =
+    [];
+
+  async getSession(
+    _providerId: string,
+    scopes: readonly string[],
+    options: AuthenticationSessionOptions,
+  ): Promise<AuthenticationSession | undefined> {
+    if (options.silent) {
+      return undefined;
+    }
+
+    this.promptedScopes.push(scopes[0]);
+    return new Promise((resolve) => {
+      this.promptResolvers.push(resolve);
+    });
+  }
+
+  resolveNext(session: AuthenticationSession | undefined): void {
+    const resolve = this.promptResolvers.shift();
+    assert.ok(resolve, "Expected a pending authentication prompt");
+    resolve(session);
+  }
+}
+
+async function waitForEventLoop(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 function createAccessToken(expiresAt: number): string {

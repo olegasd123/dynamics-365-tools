@@ -116,7 +116,7 @@ Tips:
 ## Authenticate
 
 - **Interactive (default)**: run `Dynamics 365 Tools: Sign In (Interactive)`, then pick a saved authorization or create a new one. The command can create `.vscode/dynamics365tools.config.json` with the selected environment if the file does not exist.
-- Normal CRM actions reuse the signed-in Microsoft session and token silently. If no session exists, the first action can ask you to sign in once. If the session is lost later, run `Dynamics 365 Tools: Sign In (Interactive)` again.
+- User-started CRM actions reuse the signed-in Microsoft session and token, or ask you to sign in for the selected environment. Background views never open sign-in dialogs. Each environment uses its own token scope.
 - **Client credentials**: run `Dynamics 365 Tools: Set Environment Credentials`, then pick or create an authorization. The command stores `clientId`, `clientSecret`, and an optional `tenantId` in Secret Storage.
 - **Sign out**: run `Dynamics 365 Tools: Sign Out` to clear the interactive session for an environment. You can also remove any stored client credentials for it.
 
