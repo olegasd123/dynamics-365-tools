@@ -65,7 +65,10 @@ export async function pickEnvironmentAndAuth(
 
   await lastSelection.setLastEnvironment(env.name);
 
-  const accessToken = env.authType !== "clientSecret" ? await auth.getAccessToken(env) : undefined;
+  const accessToken =
+    env.authType !== "clientSecret"
+      ? await auth.getAccessToken(env, { promptIfNeeded: true })
+      : undefined;
   const credentials =
     env.authType === "clientSecret" || !accessToken
       ? await secrets.getCredentials(env.name)

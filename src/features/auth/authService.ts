@@ -21,11 +21,11 @@ const TOKEN_EXPIRY_BUFFER_MS = 60_000;
 
 export class AuthService {
   private readonly cachedTokens = new Map<string, CachedAccessToken>();
-  private readonly automaticSignInAttempts = new Set<string>();
-  private readonly automaticSessionRequests = new Map<
+  private readonly promptedSessionRequests = new Map<
     string,
     Promise<AuthenticationSession | undefined>
   >();
+  private promptQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly authentication: AuthenticationPort,
@@ -38,26 +38,34 @@ export class AuthService {
   ): Promise<string | undefined> {
     const scope = this.buildScope(env);
     try {
-      if (!options.forceNewSession && !options.promptIfNeeded) {
-        const cachedToken = this.getCachedToken(scope);
-        if (cachedToken) {
-          return cachedToken;
+      if (options.forceNewSession || options.clearSessionPreference) {
+        const sessionOptions: AuthenticationSessionOptions = options.forceNewSession
+          ? { forceNewSession: true }
+          : { createIfNone: true };
+        if (options.clearSessionPreference) {
+          sessionOptions.clearSessionPreference = true;
         }
-
-        const session = await this.getAutomaticSession(scope);
+        const session = await this.getPromptedSession(scope, sessionOptions, false);
         return this.rememberSession(scope, session);
       }
 
-      this.automaticSignInAttempts.add(scope);
-      const sessionOptions: AuthenticationSessionOptions = options.forceNewSession
-        ? { forceNewSession: true }
-        : { createIfNone: true };
-      if (options.clearSessionPreference) {
-        sessionOptions.clearSessionPreference = true;
+      const cachedToken = this.getCachedToken(scope);
+      if (cachedToken) {
+        return cachedToken;
       }
-      const session = await this.authentication.getSession("microsoft", [scope], {
-        ...sessionOptions,
+
+      const existing = await this.authentication.getSession("microsoft", [scope], {
+        createIfNone: false,
+        silent: true,
       });
+      if (existing) {
+        return this.rememberSession(scope, existing);
+      }
+      if (!options.promptIfNeeded) {
+        return undefined;
+      }
+
+      const session = await this.getPromptedSession(scope, { createIfNone: true }, true);
       return this.rememberSession(scope, session);
     } catch (error) {
       await this.notifications.error(
@@ -102,34 +110,45 @@ export class AuthService {
     return `${resource.replace(/\/$/, "")}/.default`;
   }
 
-  private async getAutomaticSession(scope: string): Promise<AuthenticationSession | undefined> {
-    const pending = this.automaticSessionRequests.get(scope);
+  private async getPromptedSession(
+    scope: string,
+    options: AuthenticationSessionOptions,
+    reusePendingRequest: boolean,
+  ): Promise<AuthenticationSession | undefined> {
+    const pending = reusePendingRequest ? this.promptedSessionRequests.get(scope) : undefined;
     if (pending) {
       return pending;
     }
 
-    const request = this.requestAutomaticSession(scope);
-    this.automaticSessionRequests.set(scope, request);
+    const request = this.enqueuePrompt(scope, options);
+    if (!reusePendingRequest) {
+      return request;
+    }
+
+    this.promptedSessionRequests.set(scope, request);
     try {
       return await request;
     } finally {
-      this.automaticSessionRequests.delete(scope);
+      this.promptedSessionRequests.delete(scope);
     }
   }
 
-  private async requestAutomaticSession(scope: string): Promise<AuthenticationSession | undefined> {
-    const existing = await this.authentication.getSession("microsoft", [scope], {
-      createIfNone: false,
-      silent: true,
+  private async enqueuePrompt(
+    scope: string,
+    options: AuthenticationSessionOptions,
+  ): Promise<AuthenticationSession | undefined> {
+    const previousPrompt = this.promptQueue;
+    let finishPrompt: () => void = () => undefined;
+    this.promptQueue = new Promise<void>((resolve) => {
+      finishPrompt = resolve;
     });
-    if (existing || this.automaticSignInAttempts.has(scope)) {
-      return existing;
-    }
 
-    this.automaticSignInAttempts.add(scope);
-    return this.authentication.getSession("microsoft", [scope], {
-      createIfNone: true,
-    });
+    await previousPrompt;
+    try {
+      return await this.authentication.getSession("microsoft", [scope], options);
+    } finally {
+      finishPrompt();
+    }
   }
 
   private getCachedToken(scope: string): string | undefined {
