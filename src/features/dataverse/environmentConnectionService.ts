@@ -29,23 +29,11 @@ export class EnvironmentConnectionService {
     authContext: EnvironmentAuthContext = {},
   ): Promise<EnvironmentConnection | undefined> {
     const userAgent = this.buildUserAgent(env);
-    let token = await this.resolveToken(env, authContext, userAgent);
+    const token = await this.resolveToken(env, authContext, userAgent);
     if (!token) {
-      if (env.authType !== "clientSecret") {
-        const action = await this.notifications.askError(
-          `No credentials available for ${env.name}. Sign in to this environment to continue.`,
-          ["Sign In"],
-        );
-        if (action === "Sign In") {
-          token = await this.auth.getAccessToken(env, { promptIfNeeded: true });
-        }
-      } else {
-        await this.notifications.error(
-          `No client credentials available for ${env.name}. Set client credentials first.`,
-        );
-      }
-    }
-    if (!token) {
+      await this.notifications.error(
+        `No credentials available for ${env.name}. Sign in interactively or set client credentials first.`,
+      );
       return undefined;
     }
 
