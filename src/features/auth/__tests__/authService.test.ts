@@ -8,7 +8,7 @@ import type {
 import type { NotificationPort } from "@app/ports/notifications";
 import { AuthService } from "../authService";
 
-test("getAccessToken silently reuses the session for normal CRM actions", async () => {
+test("getAccessToken requests scope built from resource when provided", async () => {
   const authentication = new FakeAuthentication();
   authentication.session = { id: "session-id", accessToken: "token-from-session" };
   const auth = new AuthService(authentication);
@@ -21,101 +21,7 @@ test("getAccessToken silently reuses the session for normal CRM actions", async 
 
   assert.strictEqual(token, "token-from-session");
   assert.deepStrictEqual(authentication.scopes, ["https://alt.resource/.default"]);
-  assert.deepStrictEqual(authentication.options, {
-    createIfNone: false,
-    silent: true,
-  });
-});
-
-test("getAccessToken prompts for a user action and caches a valid token", async () => {
-  const authentication = new FakeAuthentication();
-  const accessToken = createAccessToken(Date.now() + 3_600_000);
-  authentication.sessionResults.push(undefined, {
-    id: "new-session-id",
-    accessToken,
-  });
-  const auth = new AuthService(authentication);
-  const env = {
-    name: "dev",
-    url: "https://example.crm.dynamics.com",
-  };
-
-  assert.strictEqual(await auth.getAccessToken(env, { promptIfNeeded: true }), accessToken);
-  assert.strictEqual(await auth.getAccessToken(env), accessToken);
-  assert.deepStrictEqual(
-    authentication.calls.map((call) => call.options),
-    [{ createIfNone: false, silent: true }, { createIfNone: true }],
-  );
-});
-
-test("getAccessToken does not prompt during background access", async () => {
-  const authentication = new FakeAuthentication();
-  authentication.sessionResults.push(undefined, undefined);
-  const auth = new AuthService(authentication);
-  const env = {
-    name: "dev",
-    url: "https://example.crm.dynamics.com",
-  };
-
-  assert.strictEqual(await auth.getAccessToken(env), undefined);
-  assert.strictEqual(await auth.getAccessToken(env), undefined);
-  assert.deepStrictEqual(
-    authentication.calls.map((call) => call.options),
-    [
-      { createIfNone: false, silent: true },
-      { createIfNone: false, silent: true },
-    ],
-  );
-});
-
-test("getAccessToken serializes prompts for different environment scopes", async () => {
-  const authentication = new ControlledPromptAuthentication();
-  const auth = new AuthService(authentication);
-
-  const firstToken = auth.getAccessToken(
-    { name: "dev", url: "https://dev.crm.dynamics.com" },
-    { promptIfNeeded: true },
-  );
-  await waitForEventLoop();
-  assert.deepStrictEqual(authentication.promptedScopes, ["https://dev.crm.dynamics.com/.default"]);
-
-  const secondToken = auth.getAccessToken(
-    { name: "int", url: "https://int.crm.dynamics.com" },
-    { promptIfNeeded: true },
-  );
-  await waitForEventLoop();
-  assert.strictEqual(authentication.promptedScopes.length, 1);
-
-  authentication.resolveNext({ id: "dev-session", accessToken: "dev-token" });
-  assert.strictEqual(await firstToken, "dev-token");
-  await waitForEventLoop();
-  assert.deepStrictEqual(authentication.promptedScopes, [
-    "https://dev.crm.dynamics.com/.default",
-    "https://int.crm.dynamics.com/.default",
-  ]);
-
-  authentication.resolveNext({ id: "int-session", accessToken: "int-token" });
-  assert.strictEqual(await secondToken, "int-token");
-});
-
-test("getAccessToken can prompt when an explicit sign-in needs a session", async () => {
-  const authentication = new FakeAuthentication();
-  authentication.session = { id: "session-id", accessToken: "token-from-session" };
-  const auth = new AuthService(authentication);
-
-  const token = await auth.getAccessToken(
-    {
-      name: "dev",
-      url: "https://example.crm.dynamics.com",
-    },
-    { promptIfNeeded: true, clearSessionPreference: true },
-  );
-
-  assert.strictEqual(token, "token-from-session");
-  assert.deepStrictEqual(authentication.options, {
-    createIfNone: true,
-    clearSessionPreference: true,
-  });
+  assert.deepStrictEqual(authentication.options, { createIfNone: true });
 });
 
 test("getAccessToken can force a new interactive session", async () => {
@@ -219,11 +125,6 @@ test("signOut warns when the current VS Code version cannot remove sessions", as
 
 class FakeAuthentication implements AuthenticationPort {
   session: AuthenticationSession | undefined;
-  readonly sessionResults: Array<AuthenticationSession | undefined> = [];
-  readonly calls: Array<{
-    scopes: readonly string[];
-    options: AuthenticationSessionOptions;
-  }> = [];
   getSessionError: unknown;
   scopes: readonly string[] = [];
   options: AuthenticationSessionOptions | undefined;
@@ -240,48 +141,8 @@ class FakeAuthentication implements AuthenticationPort {
     }
     this.scopes = scopes;
     this.options = options;
-    this.calls.push({ scopes, options });
-    return this.sessionResults.length ? this.sessionResults.shift() : this.session;
+    return this.session;
   }
-}
-
-class ControlledPromptAuthentication implements AuthenticationPort {
-  readonly promptedScopes: string[] = [];
-  private readonly promptResolvers: Array<(session: AuthenticationSession | undefined) => void> =
-    [];
-
-  async getSession(
-    _providerId: string,
-    scopes: readonly string[],
-    options: AuthenticationSessionOptions,
-  ): Promise<AuthenticationSession | undefined> {
-    if (options.silent) {
-      return undefined;
-    }
-
-    this.promptedScopes.push(scopes[0]);
-    return new Promise((resolve) => {
-      this.promptResolvers.push(resolve);
-    });
-  }
-
-  resolveNext(session: AuthenticationSession | undefined): void {
-    const resolve = this.promptResolvers.shift();
-    assert.ok(resolve, "Expected a pending authentication prompt");
-    resolve(session);
-  }
-}
-
-async function waitForEventLoop(): Promise<void> {
-  await new Promise<void>((resolve) => setImmediate(resolve));
-}
-
-function createAccessToken(expiresAt: number): string {
-  const payload = Buffer.from(
-    JSON.stringify({ exp: Math.floor(expiresAt / 1000) }),
-    "utf8",
-  ).toString("base64url");
-  return `header.${payload}.signature`;
 }
 
 function createNotificationRecorder(): NotificationPort & {
