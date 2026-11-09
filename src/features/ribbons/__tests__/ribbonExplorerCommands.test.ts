@@ -2333,6 +2333,126 @@ test("creates flat display rules from prompts", async () => {
   }
 });
 
+for (const ruleKind of ["Enable", "Display"] as const) {
+  for (const content of ["self-closing", "empty", "with step"]) {
+    test(`adds a step to a ${content} ${ruleKind}Rule from prompts`, async () => {
+      const ruleXml =
+        content === "self-closing"
+          ? `<${ruleKind}Rule Id="new.Target" />`
+          : `<${ruleKind}Rule Id="new.Target">${content === "with step" ? '\n        <FormStateRule State="Existing" />\n      ' : ""}</${ruleKind}Rule>`;
+      const otherRuleXml = `<${ruleKind}Rule Id="new.Other"><FormStateRule State="Create" /></${ruleKind}Rule>`;
+      const source = `<RibbonDiffXml>
+  <RuleDefinitions>
+    <${ruleKind}Rules>
+      ${ruleXml}
+      ${otherRuleXml}
+    </${ruleKind}Rules>
+  </RuleDefinitions>
+</RibbonDiffXml>`;
+      const readOptions = {
+        sourceId: "source",
+        fileUri: "/tmp/RibbonDiffXml.xml",
+        kind: "Application" as const,
+      };
+      const [document] = readRibbonDocuments(source, readOptions);
+      const rule =
+        ruleKind === "Enable"
+          ? document.views[0].enableRules[0]
+          : document.views[0].displayRules[0];
+      let patches: RibbonPatch[] = [];
+      let refreshCount = 0;
+      const originalShowQuickPick = vscode.window.showQuickPick;
+      const originalShowInputBox = vscode.window.showInputBox;
+      (vscode.window as any).showQuickPick = async (
+        picks: vscode.QuickPickItem[] | string[],
+        options: { placeHolder?: string },
+      ) => {
+        if (options.placeHolder === "Rule step") {
+          const labels = (picks as vscode.QuickPickItem[]).map((pick) => pick.label);
+          assert.ok(!labels.includes("No step"));
+          assert.strictEqual(labels.includes("SelectionCountRule"), ruleKind === "Enable");
+          assert.strictEqual(labels.includes("FormTypeRule"), ruleKind === "Display");
+        }
+        if (options.placeHolder === "CRM parameters") {
+          return (picks as vscode.QuickPickItem[]).filter(
+            (pick) => pick.label === "PrimaryControl",
+          );
+        }
+        const label = new Map([
+          ["Rule step", ruleKind === "Enable" ? "CustomRule" : "FormTypeRule"],
+          ["JavaScript web resource", "Type schema name manually"],
+          ["JavaScript function name", "Type function name"],
+          ["Typed parameters", "Done"],
+          ["Form type", "Main"],
+          ["Invert result?", "No"],
+        ]).get(options.placeHolder ?? "");
+        return typeof picks[0] === "string"
+          ? label
+          : (picks as vscode.QuickPickItem[]).find((pick) => pick.label === label);
+      };
+      (vscode.window as any).showInputBox = async (options: { prompt?: string }) =>
+        new Map([
+          ["JavaScript web resource schema name", "new_/scripts/account.js"],
+          ["JavaScript function name", "Account.canRun"],
+        ]).get(options.prompt ?? "");
+
+      try {
+        await addRibbonRuleChildStep(
+          legacyContext({
+            bindings: { listBindings: async () => ({ bindings: [] }) },
+            ribbonEditorState: {
+              queuePatches: (_document: unknown, queuedPatches: RibbonPatch[]) => {
+                patches = queuedPatches;
+              },
+            },
+            ribbonExplorer: { refresh: () => refreshCount++ },
+          } as any),
+          new RibbonItemNode(rule.id, undefined, `d365Ribbon${ruleKind}Rule`, "check", [], [], {
+            document,
+            range: rule.range,
+          }),
+        );
+      } finally {
+        (vscode.window as any).showQuickPick = originalShowQuickPick;
+        (vscode.window as any).showInputBox = originalShowInputBox;
+      }
+
+      const updated = applyRibbonPatchSequence(source, patches);
+      const [updatedDocument] = readRibbonDocuments(updated, readOptions);
+      const rules =
+        ruleKind === "Enable"
+          ? updatedDocument.views[0].enableRules
+          : updatedDocument.views[0].displayRules;
+      assert.deepStrictEqual(
+        rules.map((item) => item.id),
+        ["new.Target", "new.Other"],
+      );
+      assert.ok(updated.includes(otherRuleXml));
+      assert.strictEqual(refreshCount, 1);
+      assert.strictEqual(rules[0].steps.length, content === "with step" ? 2 : 1);
+      if (content === "with step") {
+        const existingStep = rules[0].steps[0];
+        assert.strictEqual(existingStep.kind, "FormStateRule");
+        assert.strictEqual(existingStep.kind === "FormStateRule" && existingStep.state, "Existing");
+      }
+      const addedStep = rules[0].steps[rules[0].steps.length - 1];
+      if (ruleKind === "Enable") {
+        assert.strictEqual(addedStep.kind, "CustomRule");
+        assert.ok(addedStep.kind === "CustomRule");
+        assert.strictEqual(addedStep.library.uniqueName, "new_/scripts/account.js");
+        assert.strictEqual(addedStep.functionName, "Account.canRun");
+        assert.deepStrictEqual(
+          addedStep.parameters.map(({ kind, value }) => ({ kind, value })),
+          [{ kind: "Crm", value: "PrimaryControl" }],
+        );
+      } else {
+        assert.strictEqual(addedStep.kind, "FormTypeRule");
+        assert.strictEqual(addedStep.kind === "FormTypeRule" && addedStep.type, "Main");
+      }
+    });
+  }
+}
+
 test("adds a nested child rule step from prompts", async () => {
   const source = `<RibbonDiffXml>
   <RuleDefinitions>
@@ -2357,7 +2477,7 @@ test("adds a nested child rule step from prompts", async () => {
     options: { placeHolder?: string },
   ) => {
     const label = new Map([
-      ["First rule step", "FormStateRule"],
+      ["Rule step", "FormStateRule"],
       ["Form state", "Create"],
       ["Invert result?", "No"],
     ]).get(options.placeHolder ?? "");

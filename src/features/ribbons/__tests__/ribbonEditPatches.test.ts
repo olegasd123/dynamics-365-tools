@@ -1162,7 +1162,7 @@ test("adds a child step to an OrRule", () => {
   const orRule = document.views[0].displayRules[0].steps[0];
 
   const updated = applyRibbonPatchSequence(source, [
-    createRuleChildStepPatch(document.sourceText, orRule, {
+    createRuleChildStepPatch(document.sourceText, orRule.range, {
       kind: "FormStateRule",
       state: "Create",
     }),

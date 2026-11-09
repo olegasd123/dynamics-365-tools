@@ -291,19 +291,31 @@ export async function addRibbonRuleChildStep(
   ctx: CommandContext,
   node?: RibbonExplorerNode,
 ): Promise<void> {
-  const target = resolveRuleStepTarget(node);
-  if (!target || target.step.kind !== "OrRule") {
-    await ctx.core.notifications.warning("Select an OrRule first.");
+  const target = node instanceof RibbonItemNode ? resolveEditableTarget(node) : undefined;
+  if (
+    !target ||
+    (target.kind !== "EnableRule" &&
+      target.kind !== "DisplayRule" &&
+      !(target.kind === "RuleStep" && target.step.kind === "OrRule"))
+  ) {
+    await ctx.core.notifications.warning("Select an enable rule, display rule, or OrRule first.");
     return;
   }
 
-  const step = await promptRuleStep(ctx, target.ruleKind, target.document);
+  const ruleKind =
+    target.kind === "RuleStep"
+      ? target.ruleKind
+      : target.kind === "EnableRule"
+        ? "Enable"
+        : "Display";
+  const step = await promptRuleStep(ctx, ruleKind, target.document, { allowEmpty: false });
   if (!step) {
     return;
   }
 
+  const parent = target.kind === "RuleStep" ? target.step : target.rule;
   ctx.ribbon.editorState.queuePatches(target.document, [
-    createRuleChildStepPatch(target.document.sourceText, target.step, step),
+    createRuleChildStepPatch(target.document.sourceText, parent.range, step),
   ]);
   ctx.ribbon.explorer.refresh();
 }
@@ -953,17 +965,6 @@ function resolveEditableTarget(node: RibbonItemNode): EditableTarget | undefined
   }
 
   return undefined;
-}
-
-function resolveRuleStepTarget(
-  node: RibbonExplorerNode | undefined,
-): Extract<EditableTarget, { kind: "RuleStep" }> | undefined {
-  if (!(node instanceof RibbonItemNode) || !node.editTarget) {
-    return undefined;
-  }
-
-  const target = resolveEditableTarget(node);
-  return target?.kind === "RuleStep" ? target : undefined;
 }
 
 function findRuleStepByRange(steps: RuleStep[], range: TextRange): RuleStep | undefined {

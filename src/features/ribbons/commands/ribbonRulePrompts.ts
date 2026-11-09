@@ -78,7 +78,9 @@ export async function promptRuleStep(
   ctx: CommandContext,
   ruleKind: "Enable" | "Display",
   document?: RibbonDocument,
+  options: { allowEmpty?: boolean } = {},
 ): Promise<NewRuleStepInput | null | undefined> {
+  const allowEmpty = options.allowEmpty ?? true;
   const common = [
     { label: "CustomRule", description: "Call a JavaScript function" },
     { label: "FormStateRule", description: "Check form state" },
@@ -110,9 +112,9 @@ export async function promptRuleStep(
       ...(ruleKind === "Enable" ? enableOnly : []),
       ...(ruleKind === "Display" ? displayOnly : []),
       ...common,
-      { label: "No step", description: "Create an empty rule" },
+      ...(allowEmpty ? [{ label: "No step", description: "Create an empty rule" }] : []),
     ],
-    { placeHolder: "First rule step" },
+    { placeHolder: allowEmpty ? "First rule step" : "Rule step" },
   );
   if (!pick) {
     return undefined;

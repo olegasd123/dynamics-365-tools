@@ -1040,7 +1040,7 @@
         },
         {
           "command": "dynamics365Tools.ribbons.addRuleChildStep",
-          "when": "view == dynamics365Tools.ribbonExplorer && viewItem == d365RibbonRuleStep:OrRule",
+          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem == d365RibbonEnableRule || viewItem == d365RibbonDisplayRule || viewItem == d365RibbonRuleStep:OrRule)",
           "group": "inline@5"
         },
         {
