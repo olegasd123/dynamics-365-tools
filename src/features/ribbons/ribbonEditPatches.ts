@@ -604,16 +604,12 @@ export function createRuleStepReplacePatch(
 
 export function createRuleChildStepPatch(
   sourceText: string,
-  parent: RuleStep,
+  parentRange: TextRange,
   input: NewRuleStepInput,
 ): RibbonPatch {
-  if (parent.kind !== "OrRule") {
-    throw new Error("Rule child steps can only be added to OrRule.");
-  }
-
-  const parentElement = findElementByRange(sourceText, parent.range);
-  if (parentElement.name !== "OrRule") {
-    throw new Error("OrRule range was not found in the current document text.");
+  const parentElement = findElementByRange(sourceText, parentRange);
+  if (!["EnableRule", "DisplayRule", "OrRule"].includes(parentElement.name)) {
+    throw new Error("Rule steps can only be added to an EnableRule, DisplayRule, or OrRule.");
   }
 
   const parentIndent = indentationBefore(sourceText, parentElement.range.start);
@@ -621,15 +617,13 @@ export function createRuleChildStepPatch(
   const stepText = indentBlock(renderRuleStep(input), childIndent);
 
   if (parentElement.selfClosing) {
-    const attributes = renderAttributes([
-      ["Default", optionalBoolean(parent.default)],
-      ["InvertResult", optionalBoolean(parent.invertResult)],
-    ]);
-    const name = attributes ? `OrRule ${attributes}` : "OrRule";
+    const startTag = sourceText
+      .slice(parentElement.startTagRange.start, parentElement.startTagRange.end)
+      .replace(/\s*\/>$/, ">");
     return {
       kind: "replace",
       range: parentElement.range,
-      text: `<${name}>\n${stepText}\n${parentIndent}</OrRule>`,
+      text: `${startTag}\n${stepText}\n${parentIndent}</${parentElement.name}>`,
     };
   }
 
