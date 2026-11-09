@@ -6,6 +6,7 @@ import { WorkspaceFileType, type WorkspaceFilesPort } from "@app/ports/files";
 import { BindingEntry } from "@features/config/domain/models";
 import type { DataverseClient } from "@features/dataverse/dataverseClient";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
+import { pickJavaScriptWebResource } from "./ribbonJavaScriptResourcePicker";
 import {
   buildImageWebResourceQueryUrl,
   currentFunctionFirst,
@@ -207,17 +208,9 @@ export async function pickWebResourceLibrary(
   ctx: CommandContext,
   currentUniqueName?: string,
 ): Promise<WebResourceLibraryPick | undefined> {
-  const picks = currentWebResourceFirst(await listBoundJavaScriptLibraries(ctx), currentUniqueName);
-  const manualPick: WebResourceLibraryPick = {
-    label: "Type schema name manually",
-    description: "Use an external or unbound web resource",
-    uniqueName: "",
-    manual: true,
-  };
-
-  const pick = await showRibbonQuickPick([...picks, manualPick], {
-    placeHolder: "JavaScript web resource",
-  });
+  const pick = await pickJavaScriptWebResource(ctx, async () =>
+    currentWebResourceFirst(await listBoundJavaScriptLibraries(ctx), currentUniqueName),
+  );
   if (!pick) {
     return undefined;
   }

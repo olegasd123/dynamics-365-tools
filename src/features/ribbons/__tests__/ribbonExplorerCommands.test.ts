@@ -2,11 +2,12 @@ import assert from "node:assert";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import test from "node:test";
+import test, { beforeEach, afterEach } from "node:test";
 import * as vscode from "vscode";
 import JSZip from "jszip";
 import { VsCodeNotificationService } from "@platform/vscode/notificationService";
 import { MemoryWorkspaceFiles } from "../../../testSupport/fakes";
+import { TestQuickPick } from "../../../testSupport/quickPick";
 import { DataverseClient } from "@features/dataverse/dataverseClient";
 import { applyRibbonPatchSequence } from "../ribbonPatchWriter";
 import { createCustomButtonPatches, createDeleteNodePatch } from "../ribbonEditPatches";
@@ -65,19 +66,37 @@ function createNotifications(): VsCodeNotificationService {
   return new VsCodeNotificationService();
 }
 
+const originalCreateQuickPick = vscode.window.createQuickPick;
+beforeEach(() => {
+  // Reuse the scripted choices in command tests after the async picker loads.
+  vscode.window.createQuickPick = (() =>
+    new TestQuickPick(async (picker) =>
+      vscode.window.showQuickPick(picker.items, {
+        placeHolder: picker.placeholder,
+        ignoreFocusOut: picker.ignoreFocusOut,
+      }),
+    )) as unknown as typeof vscode.window.createQuickPick;
+});
+afterEach(() => {
+  vscode.window.createQuickPick = originalCreateQuickPick;
+});
+
 function legacyContext<T extends Record<string, any>>(ctx: T): T {
   return {
     ...ctx,
     core: {
       ...(ctx.core ?? {}),
-      configuration: ctx.configuration,
+      configuration: {
+        loadConfiguration: async () => ({ environments: [] }),
+        ...ctx.configuration,
+      },
       ui: ctx.ui,
       auth: ctx.auth,
       authorizations: ctx.authorizations,
       secrets: ctx.secrets,
       notifications: ctx.notifications,
       files: ctx.files ?? new MemoryWorkspaceFiles("/workspace"),
-      lastSelection: ctx.lastSelection,
+      lastSelection: ctx.lastSelection ?? { getLastEnvironment: () => undefined },
       connections: ctx.connections,
       statusBar: ctx.statusBar,
       assemblyStatusBar: ctx.assemblyStatusBar,

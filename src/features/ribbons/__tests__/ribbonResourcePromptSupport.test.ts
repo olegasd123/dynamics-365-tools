@@ -2,6 +2,7 @@ import assert from "node:assert";
 import test from "node:test";
 import {
   buildImageWebResourceQueryUrl,
+  buildJavaScriptWebResourceQueryUrl,
   currentFunctionFirst,
   imageWebResourceExtensionLabel,
   imageWebResourceTypeLabel,
@@ -12,6 +13,22 @@ import {
   uniqueByWebResourceUniqueName,
   withDefaultJavaScriptFunctionSuggestions,
 } from "../commands/ribbonResourcePromptSupport";
+
+test("JavaScript search uses a bounded prefix query and escapes literal names", () => {
+  assert.strictEqual(buildJavaScriptWebResourceQueryUrl(" m "), undefined);
+  assert.strictEqual(buildJavaScriptWebResourceQueryUrl(""), undefined);
+  const url = new URL(
+    buildJavaScriptWebResourceQueryUrl(" $webresource:mso_\\o'hare%[ ")!,
+    "https://example.com",
+  );
+  assert.strictEqual(url.searchParams.get("$select"), "name,displayname");
+  assert.strictEqual(
+    url.searchParams.get("$filter"),
+    "webresourcetype eq 3 and startswith(name,'mso[_]/o''hare[%][[]')",
+  );
+  assert.strictEqual(url.searchParams.get("$orderby"), "name asc");
+  assert.strictEqual(url.searchParams.get("$top"), "101");
+});
 
 test("buildImageWebResourceQueryUrl builds base and escaped search queries", () => {
   assert.strictEqual(

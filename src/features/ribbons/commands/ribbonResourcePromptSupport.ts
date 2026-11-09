@@ -2,6 +2,18 @@ import * as path from "node:path";
 
 const DEFAULT_JAVASCRIPT_FUNCTION_SUGGESTIONS = ["isNaN"];
 const IMAGE_WEB_RESOURCE_EXTENSIONS = [".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg"];
+export const WEB_RESOURCE_SEARCH_LIMIT = 100;
+
+export function buildJavaScriptWebResourceQueryUrl(searchText: string): string | undefined {
+  const search = normalizeWebResourceUniqueName(searchText);
+  if (search.length < 2) {
+    return undefined;
+  }
+  // Dataverse treats these characters as wildcards, even in startswith().
+  const literal = escapeODataString(search.replace(/[[%_]/g, (character) => `[${character}]`));
+  const filter = encodeURIComponent(`webresourcetype eq 3 and startswith(name,'${literal}')`);
+  return `/webresourceset?$select=name,displayname&$filter=${filter}&$orderby=name asc&$top=${WEB_RESOURCE_SEARCH_LIMIT + 1}`;
+}
 
 export function buildImageWebResourceQueryUrl(searchText?: string): string | undefined {
   const search = searchText?.trim();

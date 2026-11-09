@@ -264,6 +264,7 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 - The ribbon view `...` button also has `Add Command Definition`, `Override OOB Command`, `Add Enable Rule`, `Add Display Rule`, and `Add Loc Label`.
 - `Add Command Action` sets up what a command does.
+- The JavaScript web resource picker shows bound files and searches the last selected environment (or the only configured environment). Type at least 2 characters from the start of the name. Use `Change environment...` to search another environment. A loading indicator, search errors, and empty results appear above the list. Each search shows up to 100 environment matches; type more of the name to narrow the results. You can also type a schema name manually.
 - `Add Enable Rule` / `Add Display Rule` create new rules. `Add Enable Rule Reference` / `Add Display Rule Reference` link a command to an existing rule. `Add Rule Step` adds a step inside a rule.
 - `Add Loc Label` and `Add Loc Label Language` manage localized labels.
 - `Move Ribbon Item Up` / `Down`, `Edit Ribbon Item`, and `Delete Ribbon Item` work on any node in the tree.
