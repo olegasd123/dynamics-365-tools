@@ -202,15 +202,15 @@ function actionsForNode(node: RibbonExplorerNode): PanelAction[] {
   if (node instanceof RibbonDocumentNode) {
     return node.document.kind === "Application"
       ? [openFileAction(), previewAction(), saveAction(), ...ribbonAddActions()]
-      : [previewAction(), saveAction()];
+      : [openFileAction(), previewAction(), saveAction()];
   }
 
   if (node instanceof RibbonViewNode) {
-    return [previewAction(), ...ribbonAddActions(), saveAction()];
+    return [openFileAction(), previewAction(), ...ribbonAddActions(), saveAction()];
   }
 
   if (node instanceof RibbonSectionNode) {
-    return [...sectionActions(node), saveAction()];
+    return [openFileAction(), ...sectionActions(node), saveAction()];
   }
 
   if (node instanceof RibbonItemNode) {
@@ -257,10 +257,9 @@ function sectionActions(node: RibbonSectionNode): PanelAction[] {
 }
 
 function itemActions(node: RibbonItemNode): PanelAction[] {
-  const actions: PanelAction[] = [];
+  const actions: PanelAction[] = node.editTarget ? [openFileAction()] : [];
 
   if (isRawXmlNode(node)) {
-    actions.push(openFileAction());
     return actions;
   }
 
@@ -349,7 +348,7 @@ function canDelete(node: RibbonItemNode): boolean {
 }
 
 function openFileAction(): PanelAction {
-  return { command: "dynamics365Tools.ribbons.openFile", label: "Open XML" };
+  return { command: "dynamics365Tools.ribbons.openFile", label: "Reveal in XML" };
 }
 
 function saveAction(): PanelAction {

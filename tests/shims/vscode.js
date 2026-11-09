@@ -217,6 +217,10 @@ const ViewColumn = {
   Beside: -2,
 };
 
+const TextEditorRevealType = {
+  InCenterIfOutsideViewport: 2,
+};
+
 module.exports = {
   Uri,
   workspace,
@@ -236,4 +240,5 @@ module.exports = {
   MarkdownString,
   Disposable,
   ViewColumn,
+  TextEditorRevealType,
 };

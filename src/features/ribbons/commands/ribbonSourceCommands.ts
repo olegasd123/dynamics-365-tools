@@ -15,6 +15,7 @@ import {
 import { RibbonDocument, RibbonSource } from "../models";
 import { createRibbonPullPlan } from "../ribbonPullService";
 import type { RibbonPublishSolution } from "../ribbonPublishService";
+import { resolveRibbonXmlRange, ribbonXmlTarget } from "../ribbonXmlNavigation";
 import { isSolutionExportCancelledError } from "../solutionZipService";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
 
@@ -518,7 +519,7 @@ export async function cleanupGeneratedRibbonSolutions(ctx: CommandContext): Prom
 
 export async function openRibbonFile(
   ctx: CommandContext,
-  node?: RibbonDocumentNode | RibbonSourceNode | RibbonItemNode,
+  node?: RibbonExplorerNode,
 ): Promise<void> {
   if (node instanceof RibbonSourceNode && node.source.kind === "flat") {
     const fileUri = node.source.files[0]?.fileUri;
@@ -528,26 +529,39 @@ export async function openRibbonFile(
     return;
   }
 
-  if (node instanceof RibbonItemNode && node.editTarget) {
-    await openDocumentAtRange(node.editTarget.document, node.editTarget.range.start);
+  const target = ribbonXmlTarget(node);
+  if (!target) {
+    await ctx.core.notifications.warning("Select a ribbon item or document first.");
     return;
   }
 
-  if (!(node instanceof RibbonDocumentNode)) {
-    await ctx.core.notifications.warning("Select a ribbon document first.");
+  const textDocument = await vscode.workspace.openTextDocument(
+    vscode.Uri.file(target.document.fileUri),
+  );
+  const currentRange = resolveRibbonXmlRange(
+    target.document.sourceText,
+    target.range,
+    textDocument.getText(),
+  );
+  if (!currentRange) {
+    await ctx.core.notifications.warning(
+      ctx.ribbon.editorState.isFileDirty(target.document.fileUri)
+        ? "This item cannot be located in the XML file. Save your Ribbon changes, then try again."
+        : "This item cannot be located in the current XML. Refresh the Ribbon tree, then try again.",
+    );
     return;
   }
 
-  await openDocumentAtRange(node.document, node.document.ribbonRange.start);
-}
-
-async function openDocumentAtRange(document: RibbonDocument, offset: number): Promise<void> {
-  const textDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(document.fileUri));
-  const editor = await vscode.window.showTextDocument(textDocument);
-  const position = textDocument.positionAt(offset);
-  const range = new vscode.Range(position, position);
-  editor.selection = new vscode.Selection(position, position);
-  editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  const start = textDocument.positionAt(currentRange.start);
+  const end = textDocument.positionAt(currentRange.end);
+  const editor = await vscode.window.showTextDocument(textDocument, {
+    preview: false,
+    selection: new vscode.Range(start, end),
+  });
+  editor.revealRange(
+    new vscode.Range(start, start),
+    vscode.TextEditorRevealType.InCenterIfOutsideViewport,
+  );
 }
 
 async function openRibbonsFromDisk(ctx: CommandContext): Promise<void> {

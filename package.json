@@ -348,7 +348,7 @@
       },
       {
         "command": "dynamics365Tools.ribbons.openFile",
-        "title": "Open Ribbon XML",
+        "title": "Reveal in XML",
         "category": "Dynamics 365 Tools",
         "icon": "$(go-to-file)"
       },
@@ -955,8 +955,13 @@
         },
         {
           "command": "dynamics365Tools.ribbons.openFile",
-          "when": "view == dynamics365Tools.ribbonExplorer && (viewItem =~ /d365RibbonSource:flat/ || viewItem =~ /d365RibbonDocument:application/ || viewItem == d365RibbonTemplates || viewItem == d365RibbonUnknownXml)",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /^d365Ribbon/ && viewItem != d365RibbonEmpty && !(viewItem =~ /^d365RibbonSource:(unpacked|zip)/)",
           "group": "inline@1"
+        },
+        {
+          "command": "dynamics365Tools.ribbons.openFile",
+          "when": "view == dynamics365Tools.ribbonExplorer && viewItem =~ /^d365Ribbon/ && viewItem != d365RibbonEmpty && !(viewItem =~ /^d365RibbonSource:(unpacked|zip)/)",
+          "group": "navigation@1"
         },
         {
           "command": "dynamics365Tools.ribbons.save",
