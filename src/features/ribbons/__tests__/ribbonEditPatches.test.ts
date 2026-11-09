@@ -1186,6 +1186,114 @@ test("adds a child step to an OrRule", () => {
   assert.match(updated, /<OrRule>\n\s+<FormStateRule State="Create" \/>\n\s+<\/OrRule>/);
 });
 
+for (const eol of ["\n", "\r\n"]) {
+  const lineEnding = eol === "\n" ? "LF" : "CRLF";
+
+  for (const hasParameters of [false, true]) {
+    test(`adds and moves custom rules without blank lines (${lineEnding}, parameters: ${hasParameters})`, () => {
+      const existingStep = hasParameters
+        ? [
+            '        <CustomRule FunctionName="showButton" Library="$webresource:mso_/candidat/ribbon.js">',
+            '          <CrmParameter Value="PrimaryControl" />',
+            "        </CustomRule>",
+          ].join(eol)
+        : '        <CustomRule FunctionName="showButton" Library="$webresource:mso_/candidat/ribbon.js" />';
+      const addedStep =
+        '        <CustomRule Library="$webresource:mso_/common/security.js" FunctionName="isNaN" InvertResult="false" />';
+      const source = [
+        "<RibbonDiffXml>",
+        "  <RuleDefinitions>",
+        "    <EnableRules>",
+        '      <EnableRule Id="new.Enable">',
+        existingStep,
+        "      </EnableRule>",
+        "    </EnableRules>",
+        "  </RuleDefinitions>",
+        "</RibbonDiffXml>",
+      ].join(eol);
+      const readRule = (text: string) =>
+        readRibbonDocuments(text, {
+          sourceId: "source",
+          fileUri: "/tmp/RibbonDiffXml.xml",
+          kind: "Application",
+        })[0].views[0].enableRules[0];
+
+      const added = applyRibbonPatchSequence(source, [
+        createRuleChildStepPatch(source, readRule(source).range, {
+          kind: "CustomRule",
+          library: "$webresource:mso_/common/security.js",
+          functionName: "isNaN",
+          invertResult: false,
+        }),
+      ]);
+      assert.strictEqual(added, source.replace(existingStep, `${existingStep}${eol}${addedStep}`));
+
+      const [first, second] = readRule(added).steps;
+      const moved = applyRibbonPatchSequence(
+        added,
+        createSwapNodePatches(added, second.range, first.range),
+      );
+      assert.strictEqual(moved, source.replace(existingStep, `${addedStep}${eol}${existingStep}`));
+
+      const [movedFirst, movedSecond] = readRule(moved).steps;
+      assert.strictEqual(
+        applyRibbonPatchSequence(
+          moved,
+          createSwapNodePatches(moved, movedFirst.range, movedSecond.range),
+        ),
+        added,
+      );
+    });
+  }
+
+  for (const innerXml of [
+    undefined,
+    "",
+    `${eol}      `,
+    `${eol}        <!-- keep -->${eol}      `,
+  ]) {
+    test(`adds a rule step to an empty rule without changing attributes or comments (${lineEnding}, ${JSON.stringify(innerXml)})`, () => {
+      const startTag = '<EnableRule Id="new.Enable" CustomAttr="keep">';
+      const ruleXml =
+        innerXml === undefined
+          ? startTag.replace(/>$/, " />")
+          : `${startTag}${innerXml}</EnableRule>`;
+      const source = [
+        "<RibbonDiffXml>",
+        "  <RuleDefinitions>",
+        "    <EnableRules>",
+        `      ${ruleXml}`,
+        "    </EnableRules>",
+        "  </RuleDefinitions>",
+        "</RibbonDiffXml>",
+      ].join(eol);
+      const [document] = readRibbonDocuments(source, {
+        sourceId: "source",
+        fileUri: "/tmp/RibbonDiffXml.xml",
+        kind: "Application",
+      });
+      const updated = applyRibbonPatchSequence(source, [
+        createRuleChildStepPatch(source, document.views[0].enableRules[0].range, {
+          kind: "CustomRule",
+          library: "mso_/common/security.js",
+          functionName: "isEnabled",
+          parameters: [{ kind: "Crm", value: "PrimaryControl" }],
+        }),
+      ]);
+      const expectedRule = [
+        startTag,
+        ...(innerXml?.includes("<!-- keep -->") ? ["        <!-- keep -->"] : []),
+        '        <CustomRule Library="$webresource:mso_/common/security.js" FunctionName="isEnabled">',
+        '          <CrmParameter Value="PrimaryControl" />',
+        "        </CustomRule>",
+        "      </EnableRule>",
+      ].join(eol);
+
+      assert.strictEqual(updated, source.replace(ruleXml, expectedRule));
+    });
+  }
+}
+
 test("replaces rule steps with common enable rule step types", () => {
   const source = `<RibbonDiffXml>
   <RuleDefinitions>

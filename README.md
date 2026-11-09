@@ -233,7 +233,7 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 **Open and save**
 
-- `Open Ribbon XML` opens a local ribbon XML file.
+- `Reveal in XML` opens the source XML file for the selected ribbon item.
 - `Open Ribbons from Solution...` opens the ribbons inside a solution `.zip`.
 - `Pull Ribbons from Environment...` downloads the ribbons from a connected environment.
 - The view also finds flat `customizations.xml` files in the workspace, including child folders up to 4 levels deep, for example `Ribbons/new_/account/customizations.xml`.
@@ -244,6 +244,7 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 **Find and filter**
 
+- Use the `Reveal in XML` button beside a tree row, its right-click menu, or the details panel to select the full XML element. Views such as `Form` select the containing `RibbonDiffXml`. Groups select their XML container, or the nearest parent when the container does not exist yet. If a new item exists only in pending Ribbon edits, save those edits first.
 - `Go to Ribbon Item...` opens a quick pick for ribbon documents, views, buttons, commands, rules, actions, and labels. It searches by id, label, command, rule, and action details, then selects the item in the tree.
 - `Filter Ribbons...` filters the tree by the same kind of text. Matching items stay visible with their parent nodes, so you can still see where each match is.
 - `Clear Ribbon Filter` removes the active filter. While a filter is active, the filter button is hidden and only the clear button is shown.

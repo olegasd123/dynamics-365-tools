@@ -612,28 +612,7 @@ export function createRuleChildStepPatch(
     throw new Error("Rule steps can only be added to an EnableRule, DisplayRule, or OrRule.");
   }
 
-  const parentIndent = indentationBefore(sourceText, parentElement.range.start);
-  const childIndent = findChildIndent(sourceText, parentElement) ?? `${parentIndent}  `;
-  const stepText = indentBlock(renderRuleStep(input), childIndent);
-
-  if (parentElement.selfClosing) {
-    const startTag = sourceText
-      .slice(parentElement.startTagRange.start, parentElement.startTagRange.end)
-      .replace(/\s*\/>$/, ">");
-    return {
-      kind: "replace",
-      range: parentElement.range,
-      text: `${startTag}\n${stepText}\n${parentIndent}</${parentElement.name}>`,
-    };
-  }
-
-  return {
-    kind: "insert",
-    offset: parentElement.children.length
-      ? parentElement.innerRange.end
-      : parentElement.startTagRange.end,
-    text: `\n${stepText}\n${parentIndent}`,
-  };
+  return createExistingSectionChildPatch(sourceText, parentElement, renderRuleStep(input));
 }
 
 export function createLocLabelTitleReplacePatch(
@@ -808,28 +787,28 @@ function createExistingSectionChildPatch(
 ): RibbonPatch {
   const sectionIndent = indentationBefore(sourceText, section.range.start);
   const childIndent = findChildIndent(sourceText, section) ?? `${sectionIndent}  `;
+  const eol = sourceText.match(/\r?\n/)?.[0] ?? "\n";
+  const indentedChild = indentBlock(childText, childIndent).replace(/\r?\n/g, eol);
 
   if (section.selfClosing) {
     return {
       kind: "replace",
       range: section.range,
-      text: `<${section.name}>\n${indentBlock(childText, childIndent)}\n${sectionIndent}</${section.name}>`,
+      text: `${openSelfClosingElement(sourceText, section)}${eol}${indentedChild}${eol}${sectionIndent}</${section.name}>`,
     };
   }
 
-  if (!section.children.length) {
-    return {
-      kind: "replace",
-      range: section.innerRange,
-      text: `\n${indentBlock(childText, childIndent)}\n${sectionIndent}`,
-    };
-  }
+  const innerText = sourceText.slice(section.innerRange.start, section.innerRange.end);
+  const contentEnd = section.innerRange.start + innerText.trimEnd().length;
+  const trailingWhitespace = sourceText.slice(contentEnd, section.innerRange.end);
+  const closingSpacing = trailingWhitespace.includes("\n")
+    ? trailingWhitespace
+    : `${eol}${sectionIndent}`;
 
-  const lastChild = section.children[section.children.length - 1];
   return {
-    kind: "insert",
-    offset: lastChild.range.end,
-    text: `\n${indentBlock(childText, childIndent)}`,
+    kind: "replace",
+    range: { start: contentEnd, end: section.innerRange.end },
+    text: `${eol}${indentedChild}${closingSpacing}`,
   };
 }
 
