@@ -59,6 +59,7 @@ import {
   RibbonViewNode,
 } from "../ribbonExplorer";
 import { RibbonRepository } from "../ribbonRepository";
+import { RibbonSourceLocator } from "../ribbonSourceLocator";
 import { SolutionZipService } from "../solutionZipService";
 import { readRibbonDocuments, scanXmlElements } from "../ribbonXmlReader";
 
@@ -4811,6 +4812,93 @@ var Hjk;
 
   const updated = applyRibbonPatchSequence(source, patches);
   assert.match(updated, /FunctionName="Hjk\.Account\.Ribbon\.onButtonClick"/);
+});
+
+for (const cancel of [false, true]) {
+  test(`${cancel ? "cancels" : "opens"} an imported solution from the solution menu`, async (t) => {
+    const storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-imported-"));
+    const zip = new JSZip();
+    zip.file("customizations.xml", "<ImportExportXml><RibbonDiffXml /></ImportExportXml>");
+    const service = new SolutionZipService();
+    const source = await service.openZipBuffer(await zip.generateAsync({ type: "nodebuffer" }), {
+      storageRoot,
+      sourceName: "Core.zip",
+    });
+    const locator = new RibbonSourceLocator();
+    let refreshCount = 0;
+    const messages: string[] = [];
+    const prompts: string[] = [];
+    t.mock.method(
+      vscode.window as any,
+      "showQuickPick",
+      async (
+        items: Array<vscode.QuickPickItem & { sourceKind?: string }>,
+        options: { placeHolder?: string },
+      ) => {
+        prompts.push(options.placeHolder ?? "");
+        if (options.placeHolder === "Open ribbons from solution") {
+          return items.find((item) => item.sourceKind === "imported");
+        }
+        assert.strictEqual(options.placeHolder, "Select imported solution (latest first)");
+        assert.strictEqual(items.length, 1);
+        assert.strictEqual(items[0].label, "Core.zip");
+        assert.ok(items[0].description);
+        assert.strictEqual(items[0].detail, source.rootUri);
+        return cancel ? undefined : items[0];
+      },
+    );
+    const ctx = {
+      extensionContext: { globalStorageUri: vscode.Uri.file(storageRoot) },
+      core: { notifications: { info: (message: string) => messages.push(message) } },
+      ribbon: {
+        solutionZipService: new SolutionZipService(),
+        sourceLocator: locator,
+        explorer: { refresh: () => refreshCount++ },
+      },
+    } as any;
+
+    await openRibbonsFromSolution(ctx);
+
+    assert.deepStrictEqual(prompts, [
+      "Open ribbons from solution",
+      "Select imported solution (latest first)",
+    ]);
+    assert.deepStrictEqual(await locator.locate(undefined), cancel ? [] : [source]);
+    assert.strictEqual(refreshCount, cancel ? 0 : 1);
+    assert.strictEqual(messages.length, cancel ? 0 : 1);
+    if (!cancel) {
+      await openRibbonsFromSolution(ctx);
+      assert.deepStrictEqual(
+        await locator.locate(undefined),
+        [source],
+        "reopening does not duplicate the source",
+      );
+    }
+  });
+}
+
+test("explains when there are no retained imported solutions", async (t) => {
+  const storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "d365-ribbon-imported-"));
+  const messages: string[] = [];
+  t.mock.method(
+    vscode.window as any,
+    "showQuickPick",
+    async (
+      items: Array<vscode.QuickPickItem & { sourceKind?: string }>,
+      options: { placeHolder?: string },
+    ) => {
+      assert.strictEqual(options.placeHolder, "Open ribbons from solution");
+      return items.find((item) => item.sourceKind === "imported");
+    },
+  );
+
+  await openRibbonsFromSolution({
+    extensionContext: { globalStorageUri: vscode.Uri.file(storageRoot) },
+    core: { notifications: { info: (message: string) => messages.push(message) } },
+    ribbon: { solutionZipService: new SolutionZipService() },
+  } as any);
+
+  assert.deepStrictEqual(messages, ["No imported ribbon solutions found."]);
 });
 
 test("offers to save a backup when opening an exported solution", async () => {

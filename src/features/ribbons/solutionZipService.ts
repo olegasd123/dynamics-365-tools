@@ -17,6 +17,18 @@ export interface DataverseSolutionSummary {
   version?: string;
 }
 
+export interface ImportedRibbonSolution {
+  source: RibbonSource;
+  importedAt: number;
+}
+
+interface ImportedSolutionMetadata {
+  name: string;
+  importedAt: number;
+  originalZipUri?: string;
+  entries: string[];
+}
+
 interface DataverseSolutionsResponse {
   value?: Array<{
     uniquename?: string;
@@ -70,7 +82,7 @@ export class SolutionZipService {
       entries.push(safeName);
     }
 
-    return {
+    const source: RibbonSource = {
       id: `zip:${extractedRoot}`,
       kind: "zip",
       name: options.sourceName,
@@ -82,6 +94,77 @@ export class SolutionZipService {
         entries: entries.sort((a, b) => a.localeCompare(b)),
       },
     };
+
+    const metadata: ImportedSolutionMetadata = {
+      name: options.sourceName,
+      importedAt: Date.now(),
+      originalZipUri: options.originalZipUri,
+      entries,
+    };
+    await fs.writeFile(`${extractedRoot}.json`, JSON.stringify(metadata), "utf8");
+    return source;
+  }
+
+  async listImportedSolutions(storageRoot: string): Promise<ImportedRibbonSolution[]> {
+    const parent = path.join(storageRoot, "ribbon-zips");
+    let directories: import("node:fs").Dirent[];
+    try {
+      directories = await fs.readdir(parent, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return [];
+      }
+      throw error;
+    }
+
+    const solutions = await Promise.all(
+      directories
+        .filter((entry) => entry.isDirectory())
+        .map(async (directory): Promise<ImportedRibbonSolution | undefined> => {
+          const root = path.join(parent, directory.name);
+          try {
+            const [stat, metadata, entries] = await Promise.all([
+              fs.stat(root),
+              readImportedSolutionMetadata(root),
+              listExtractedEntries(root),
+            ]);
+            const files = await findRibbonSourceFiles(root, entries);
+            if (!files.length) {
+              return undefined;
+            }
+
+            return {
+              importedAt: metadata?.importedAt ?? stat.mtimeMs,
+              source: {
+                id: `zip:${root}`,
+                kind: "zip",
+                name:
+                  metadata?.name ??
+                  directory.name.replace(/-[^-]{6}$/, "").replace(/-zip$/, ".zip"),
+                rootUri: root,
+                files,
+                zip: {
+                  originalZipUri: metadata?.originalZipUri,
+                  extractedRootUri: root,
+                  entries: metadata?.entries ?? entries,
+                },
+              },
+            };
+          } catch (error) {
+            // Cleanup may remove a retained folder while the list is loading.
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+              return undefined;
+            }
+            throw error;
+          }
+        }),
+    );
+
+    return solutions
+      .filter((solution): solution is ImportedRibbonSolution => solution !== undefined)
+      .sort(
+        (a, b) => b.importedAt - a.importedAt || a.source.rootUri.localeCompare(b.source.rootUri),
+      );
   }
 
   async saveSourceToZip(source: RibbonSource, outputZipUri?: string): Promise<string> {
@@ -267,6 +350,50 @@ function normalizeZipEntryName(entryName: string): string | undefined {
   return parts.join("/");
 }
 
+async function readImportedSolutionMetadata(
+  root: string,
+): Promise<ImportedSolutionMetadata | undefined> {
+  try {
+    const metadata = JSON.parse(
+      await fs.readFile(`${root}.json`, "utf8"),
+    ) as Partial<ImportedSolutionMetadata> | null;
+    if (
+      metadata &&
+      typeof metadata.name === "string" &&
+      metadata.name.trim() &&
+      typeof metadata.importedAt === "number" &&
+      Number.isFinite(metadata.importedAt) &&
+      (metadata.originalZipUri === undefined || typeof metadata.originalZipUri === "string") &&
+      Array.isArray(metadata.entries) &&
+      metadata.entries.every(
+        (entry) => typeof entry === "string" && normalizeZipEntryName(entry) === entry,
+      )
+    ) {
+      return metadata as ImportedSolutionMetadata;
+    }
+    return undefined;
+  } catch (error) {
+    if (error instanceof SyntaxError || (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function listExtractedEntries(root: string, relativePath = ""): Promise<string[]> {
+  const entries = await fs.readdir(path.join(root, relativePath), { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        return listExtractedEntries(root, entryPath);
+      }
+      return entry.isFile() ? [entryPath] : [];
+    }),
+  );
+  return files.flat().sort((a, b) => a.localeCompare(b));
+}
+
 export async function cleanRibbonZipsFolder(folderPath: string, keepCount: number): Promise<void> {
   let entries: import("node:fs").Dirent[];
   try {
@@ -288,7 +415,12 @@ export async function cleanRibbonZipsFolder(folderPath: string, keepCount: numbe
   dirs.sort((a, b) => b.mtime - a.mtime);
   const toDelete = dirs.slice(keepCount);
 
-  await Promise.all(toDelete.map((d) => fs.rm(d.fullPath, { recursive: true, force: true })));
+  await Promise.all(
+    toDelete.map(async (directory) => {
+      await fs.rm(directory.fullPath, { recursive: true, force: true });
+      await fs.rm(`${directory.fullPath}.json`, { force: true });
+    }),
+  );
 }
 
 async function isFile(filePath: string): Promise<boolean> {
