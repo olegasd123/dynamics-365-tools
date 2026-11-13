@@ -12,6 +12,7 @@ import {
   makeHideActionId,
   nextHideActionId,
   NewCommandActionInput,
+  NewRibbonControlChildInput,
 } from "../ribbonEditPatches";
 import { RibbonExplorerNode, RibbonItemNode } from "../ribbonExplorer";
 import {
@@ -217,6 +218,11 @@ export async function addCustomRibbonButton(
     return;
   }
 
+  const location = childTarget ? undefined : await pickLocation(target.document, target.view.scope);
+  if (!childTarget && !location) {
+    return;
+  }
+
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
     value: String(
@@ -230,15 +236,28 @@ export async function addCustomRibbonButton(
     return;
   }
 
-  const location = childTarget ? undefined : await pickLocation(target.document, target.view.scope);
-  if (!childTarget && !location) {
-    return;
-  }
-
+  const commandIds = [
+    ...new Set(
+      target.document.views.flatMap((view) => view.commandDefinitions.map(({ id }) => id)),
+    ),
+  ].sort();
   const actionKind = await showRibbonQuickPick(
     [
-      { label: "JavaScript function", description: "Call a workspace web resource" },
-      { label: "URL", description: "Open a URL" },
+      ...(commandIds.length
+        ? [
+            {
+              label: "Existing command definition",
+              description: "Reuse a command from this ribbon",
+              actionType: "existing",
+            },
+          ]
+        : []),
+      {
+        label: "JavaScript function",
+        description: "Call a workspace web resource",
+        actionType: "javascript",
+      },
+      { label: "URL", description: "Open a URL", actionType: "url" },
     ],
     { placeHolder: "Button action" },
   );
@@ -252,10 +271,25 @@ export async function addCustomRibbonButton(
   const toolTipTitleLocId = ids.toolTipTitleLocId ?? `${ids.buttonId}.ToolTipTitle`;
   const toolTipDescriptionLocId =
     ids.toolTipDescriptionLocId ?? `${ids.buttonId}.ToolTipDescription`;
-  const action =
-    actionKind.label === "URL" ? await promptUrlAction() : await promptJavaScriptAction(ctx);
-  if (!action) {
-    return;
+  let commandId = ids.commandId;
+  let action: NewCommandActionInput | undefined;
+  if (actionKind.actionType === "existing") {
+    const command = await showRibbonQuickPick(
+      commandIds.map((id) => ({ label: id })),
+      {
+        placeHolder: "Existing command definition",
+      },
+    );
+    if (!command) {
+      return;
+    }
+    commandId = command.label;
+  } else {
+    action =
+      actionKind.actionType === "url" ? await promptUrlAction() : await promptJavaScriptAction(ctx);
+    if (!action) {
+      return;
+    }
   }
 
   const locLabels = [
@@ -266,43 +300,11 @@ export async function addCustomRibbonButton(
   ].filter((label): label is ReturnType<typeof newLocLabel> => Boolean(label));
 
   const sequence = sequenceText.trim() ? Number(sequenceText.trim()) : undefined;
-  if (childTarget) {
-    ctx.ribbon.editorState.queuePatches(
-      target.document,
-      createRibbonControlChildPatches(target.document, {
-        parentRange: childTarget.control.range,
-        control: {
-          kind: "Button",
-          id: ids.buttonId,
-          commandId: ids.commandId,
-          sequence,
-          labelLocId,
-          altLocId: locLabels.some((label) => label.id === altLocId) ? altLocId : undefined,
-          toolTipTitleLocId: locLabels.some((label) => label.id === toolTipTitleLocId)
-            ? toolTipTitleLocId
-            : undefined,
-          toolTipDescriptionLocId: locLabels.some((label) => label.id === toolTipDescriptionLocId)
-            ? toolTipDescriptionLocId
-            : undefined,
-          image16x16: image16x16?.trim() || undefined,
-          image32x32: image32x32?.trim() || undefined,
-          modernImage: modernImage.trim() || undefined,
-          templateAlias: "o1",
-        },
-        commandDefinitions: [{ id: ids.commandId, action }],
-        locLabels,
-      }),
-    );
-    ctx.ribbon.explorer.refresh();
-    return;
-  }
-
-  ctx.ribbon.editorState.queuePatches(
-    target.document,
-    createCustomButtonPatches(target.document, {
-      ...ids,
-      location: location ?? "",
-      action,
+  const input: Omit<NewRibbonControlChildInput, "parentRange"> = {
+    control: {
+      kind: "Button",
+      id: ids.buttonId,
+      commandId,
       sequence,
       labelLocId,
       altLocId: locLabels.some((label) => label.id === altLocId) ? altLocId : undefined,
@@ -316,8 +318,23 @@ export async function addCustomRibbonButton(
       image32x32: image32x32?.trim() || undefined,
       modernImage: modernImage.trim() || undefined,
       templateAlias: "o1",
-      locLabels,
-    }),
+    },
+    commandDefinitions: action ? [{ id: commandId, action }] : undefined,
+    locLabels,
+  };
+  ctx.ribbon.editorState.queuePatches(
+    target.document,
+    childTarget
+      ? createRibbonControlChildPatches(target.document, {
+          ...input,
+          parentRange: childTarget.control.range,
+        })
+      : createCustomControlPatches(target.document, {
+          ...input,
+          customActionId: ids.customActionId,
+          location: location ?? "",
+          sequence,
+        }),
   );
   ctx.ribbon.explorer.refresh();
 }
@@ -409,17 +426,17 @@ async function addSmartRibbonButtonFromTemplate(
     return;
   }
 
+  const location = await pickLocation(target.document, target.view.scope);
+  if (!location) {
+    return;
+  }
+
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
     value: String(nextCustomActionSequence(target.view)),
     validateInput: validateOptionalNumber,
   });
   if (sequenceText === undefined) {
-    return;
-  }
-
-  const location = await pickLocation(target.document, target.view.scope);
-  if (!location) {
     return;
   }
 
@@ -541,21 +558,21 @@ export async function addCustomRibbonGroup(
   }
   const titleValue = title.trim();
 
-  const sequenceText = await showRibbonInputBox({
-    prompt: "Sequence",
-    value: String(nextCustomActionSequence(target.view)),
-    validateInput: validateOptionalNumber,
-  });
-  if (sequenceText === undefined) {
-    return;
-  }
-
   const location = await promptRibbonLocation({
     prompt: "Group location",
     value: defaultGroupLocation(target.document, target.view.scope),
     placeHolder: "Mscrm.Form.account.MainTab.Groups._children",
   });
   if (!location) {
+    return;
+  }
+
+  const sequenceText = await showRibbonInputBox({
+    prompt: "Sequence",
+    value: String(nextCustomActionSequence(target.view)),
+    validateInput: validateOptionalNumber,
+  });
+  if (sequenceText === undefined) {
     return;
   }
 
@@ -606,6 +623,17 @@ export async function addCustomRibbonMenuSection(
     return;
   }
 
+  const location = childTarget
+    ? undefined
+    : await promptRibbonLocation({
+        prompt: "Menu section location",
+        value: defaultMenuSectionLocation(target.document, target.view.scope),
+        placeHolder: "Mscrm.Form.account.MainTab.Actions.MenuSections._children",
+      });
+  if (!childTarget && !location) {
+    return;
+  }
+
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
     value: String(
@@ -616,17 +644,6 @@ export async function addCustomRibbonMenuSection(
     validateInput: validateOptionalNumber,
   });
   if (sequenceText === undefined) {
-    return;
-  }
-
-  const location = childTarget
-    ? undefined
-    : await promptRibbonLocation({
-        prompt: "Menu section location",
-        value: defaultMenuSectionLocation(target.document, target.view.scope),
-        placeHolder: "Mscrm.Form.account.MainTab.Actions.MenuSections._children",
-      });
-  if (!childTarget && !location) {
     return;
   }
 
@@ -722,6 +739,17 @@ async function addCustomDropdownControl(
   }
   const labelValue = label.trim();
 
+  const location = childTarget
+    ? undefined
+    : await promptRibbonLocation({
+        prompt: options.locationPrompt,
+        value: defaultDropdownLocation(target.document, target.view.scope),
+        placeHolder: options.locationPlaceHolder,
+      });
+  if (!childTarget && !location) {
+    return;
+  }
+
   const sequenceText = await showRibbonInputBox({
     prompt: "Sequence",
     value: String(
@@ -732,17 +760,6 @@ async function addCustomDropdownControl(
     validateInput: validateOptionalNumber,
   });
   if (sequenceText === undefined) {
-    return;
-  }
-
-  const location = childTarget
-    ? undefined
-    : await promptRibbonLocation({
-        prompt: options.locationPrompt,
-        value: defaultDropdownLocation(target.document, target.view.scope),
-        placeHolder: options.locationPlaceHolder,
-      });
-  if (!childTarget && !location) {
     return;
   }
 
