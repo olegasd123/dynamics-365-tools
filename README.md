@@ -251,13 +251,14 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 **Preview**
 
-- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar. Standard buttons come from a built-in catalog. Custom buttons are highlighted and placed by sequence. Hidden buttons are struck through. Split buttons and flyouts show their child menu items. The action is on the view and document items and on the details panel.
+- `Preview Ribbon` opens a visual command-bar preview of a ribbon view or document. Each scope (Home grid, subgrid, form) is drawn as one horizontal command bar. Standard buttons come from a built-in catalog. Custom buttons are highlighted and placed by sequence. Each item shows its sequence when one is set. Hidden buttons are struck through. Split buttons and flyouts show their child menu items. The action is on the view and document items and on the details panel.
 
 **Edit buttons**
 
-- `Add Custom Button` adds your own button to a ribbon.
+- `Add Custom Button` adds your own button to a ribbon. Choose a new JavaScript or URL action, or reuse an existing command definition from the same ribbon document. A reused command keeps its actions and rules.
 - `Add Custom Group`, `Add Custom Menu Section`, `Add Custom Flyout`, and `Add Custom Split Button` add more control types.
 - `Add Smart Button` creates a simple ready-to-edit button from a template: Quick JS, Open Dialog, Run Webhook, Run Report, or Run Workflow.
+- When adding an item, choose its location before entering its sequence. For a child item, the selected parent sets the location.
 - `Hide OOB Button` hides an out-of-the-box button.
 - The ribbon view `...` button opens more actions, such as `Hide OOB Buttons and Create Stubs` and `Reorder OOB Buttons`.
 

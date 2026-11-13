@@ -201,6 +201,11 @@ function renderHtml(title: string, models: RibbonPreviewModel[]): string {
       letter-spacing: 0.02em;
       text-transform: uppercase;
     }
+    .tile .sequence {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.78em;
+      font-variant-numeric: tabular-nums;
+    }
     .tile.custom {
       background: var(--vscode-list-hoverBackground);
       border-color: var(--vscode-focusBorder);
@@ -277,7 +282,9 @@ function renderGroup(group: RibbonPreviewGroup): string {
 
 function renderTile(item: RibbonPreviewItem): string {
   const classes = ["tile", item.source, item.hidden ? "hidden" : ""].filter(Boolean).join(" ");
-  const tile = `<span class="${classes}" title="${escapeHtml(tileTooltip(item))}"><span class="icon">${glyph(item.kind)}</span><span class="caption">${escapeHtml(item.label)}</span></span>`;
+  const sequence =
+    typeof item.sequence === "number" ? `<span class="sequence">Seq: ${item.sequence}</span>` : "";
+  const tile = `<span class="${classes}" title="${escapeHtml(tileTooltip(item))}"><span class="icon">${glyph(item.kind)}</span><span class="caption">${escapeHtml(item.label)}</span>${sequence}</span>`;
   if (!item.children?.length) {
     return tile;
   }

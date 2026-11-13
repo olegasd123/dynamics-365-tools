@@ -60,6 +60,14 @@ test("renders standard and custom buttons inline in one command bar", () => {
   assert.match(rendered.webview.html, /Delete/);
   assert.match(rendered.webview.html, /class="ribbon"/);
   assert.match(rendered.webview.html, /Mscrm\.Form\.account\.MainTab/);
+  assert.match(
+    rendered.webview.html,
+    /class="caption">Approve<\/span><span class="sequence">Seq: 35<\/span>/,
+  );
+  assert.match(
+    rendered.webview.html,
+    /class="caption">Delete<\/span><span class="sequence">Seq: 40<\/span>/,
+  );
   panel.dispose();
 });
 
@@ -82,6 +90,7 @@ test("renders nested dropdown controls in the command bar", () => {
             id: "child",
             command: "new.child",
             labelText: "Child action",
+            sequence: 0,
             range,
           },
         ],
@@ -96,6 +105,11 @@ test("renders nested dropdown controls in the command bar", () => {
   assert.match(rendered.webview.html, /class="tile-children"/);
   assert.match(rendered.webview.html, /MenuSection/);
   assert.match(rendered.webview.html, /Child action/);
+  assert.match(
+    rendered.webview.html,
+    /class="caption">Child action<\/span><span class="sequence">Seq: 0<\/span>/,
+  );
+  assert.match(rendered.webview.html, /class="caption">section<\/span><\/span>/);
   panel.dispose();
 });
 
