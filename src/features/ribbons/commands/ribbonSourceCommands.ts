@@ -20,7 +20,7 @@ import { isSolutionExportCancelledError } from "../solutionZipService";
 import { showRibbonInputBox, showRibbonQuickPick } from "./ribbonPromptUi";
 
 interface SolutionOpenPick extends vscode.QuickPickItem {
-  sourceKind: "environment" | "disk";
+  sourceKind: "environment" | "disk" | "imported";
 }
 
 interface DataverseSolutionPick extends vscode.QuickPickItem {
@@ -126,6 +126,11 @@ export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void
         description: "Use a local solution zip file",
         sourceKind: "disk",
       },
+      {
+        label: "Open imported solution",
+        description: "Reopen saved local files, latest first",
+        sourceKind: "imported",
+      },
     ],
     { placeHolder: "Open ribbons from solution" },
   );
@@ -138,7 +143,39 @@ export async function openRibbonsFromSolution(ctx: CommandContext): Promise<void
     return;
   }
 
+  if (pick.sourceKind === "imported") {
+    await openImportedRibbonSolution(ctx);
+    return;
+  }
+
   await openRibbonsFromEnvironment(ctx);
+}
+
+async function openImportedRibbonSolution(ctx: CommandContext): Promise<void> {
+  const solutions = await ctx.ribbon.solutionZipService.listImportedSolutions(
+    ctx.extensionContext.globalStorageUri.fsPath,
+  );
+  if (!solutions.length) {
+    void ctx.core.notifications.info("No imported ribbon solutions found.");
+    return;
+  }
+
+  const pick = await showRibbonQuickPick<RibbonSourcePick>(
+    solutions.map(({ source, importedAt }) => ({
+      label: source.name,
+      description: new Date(importedAt).toLocaleString(),
+      detail: source.rootUri,
+      source,
+    })),
+    {
+      placeHolder: "Select imported solution (latest first)",
+      matchOnDescription: true,
+      matchOnDetail: true,
+    },
+  );
+  if (pick) {
+    addImportedRibbonSource(ctx, pick.source);
+  }
 }
 
 export async function saveRibbonSolutionZip(

@@ -235,6 +235,8 @@ Open the **Ribbons** view to load ribbon XML, edit it visually, and publish it b
 
 - `Reveal in XML` opens the source XML file for the selected ribbon item.
 - `Open Ribbons from Solution...` opens the ribbons inside a solution `.zip`.
+- Choose `Open imported solution` to reopen retained local solutions, with the latest import first. The list shows each name, date, and folder. It uses the saved local files, so saved edits are kept even if they have not been published. Older imports without date records use the folder date.
+- The extension keeps the five most recent extracted solution folders after a restart. Use `Save Solution Zip...` for a lasting copy of your edits.
 - `Pull Ribbons from Environment...` downloads the ribbons from a connected environment.
 - The view also finds flat `customizations.xml` files in the workspace, including child folders up to 4 levels deep, for example `Ribbons/new_/account/customizations.xml`.
 - `Save Ribbon Changes`, `Undo Ribbon Edit`, and `Redo Ribbon Edit` manage your edits.
